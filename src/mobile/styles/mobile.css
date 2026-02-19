@@ -1,0 +1,344 @@
+/* iOS Mobile Design System for YourDateGenie */
+
+/* Safe area handling */
+.mobile-container {
+  min-height: 100vh;
+  min-height: -webkit-fill-available;
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+/* iOS-style navigation bar */
+.mobile-nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: calc(44px + env(safe-area-inset-top));
+  padding-top: env(safe-area-inset-top);
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  border-bottom: 0.5px solid rgba(0, 0, 0, 0.1);
+  z-index: 100;
+}
+
+.dark .mobile-nav {
+  background: rgba(18, 18, 18, 0.72);
+  border-bottom: 0.5px solid rgba(255, 255, 255, 0.1);
+}
+
+/* iOS Tab Bar */
+.mobile-tab-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: calc(49px + env(safe-area-inset-bottom));
+  padding-bottom: env(safe-area-inset-bottom);
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  border-top: 0.5px solid rgba(0, 0, 0, 0.15);
+  display: flex;
+  justify-content: space-around;
+  align-items: flex-start;
+  padding-top: 6px;
+  z-index: 100;
+}
+
+.dark .mobile-tab-bar {
+  background: rgba(18, 18, 18, 0.92);
+  border-top: 0.5px solid rgba(255, 255, 255, 0.15);
+}
+
+.tab-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 12px;
+  border-radius: 8px;
+  transition: all 0.2s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.tab-item.active {
+  color: hsl(var(--primary));
+}
+
+.tab-item:not(.active) {
+  color: hsl(var(--muted-foreground));
+}
+
+.tab-item .tab-icon {
+  width: 24px;
+  height: 24px;
+}
+
+.tab-item .tab-label {
+  font-size: 10px;
+  font-weight: 500;
+}
+
+/* Center create button */
+.tab-create {
+  position: relative;
+  top: -16px;
+}
+
+.tab-create-button {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary) / 0.8));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 16px hsl(var(--primary) / 0.4);
+}
+
+/* iOS Card style */
+.ios-card {
+  background: hsl(var(--card));
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+/* iOS List style */
+.ios-list {
+  background: hsl(var(--card));
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.ios-list-item {
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 0.5px solid hsl(var(--border));
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color 0.15s;
+}
+
+.ios-list-item:last-child {
+  border-bottom: none;
+}
+
+.ios-list-item:active {
+  background-color: hsl(var(--muted));
+}
+
+/* iOS Segmented Control */
+.ios-segmented {
+  display: flex;
+  background: hsl(var(--muted));
+  border-radius: 9px;
+  padding: 2px;
+}
+
+.ios-segment {
+  flex: 1;
+  padding: 8px 16px;
+  border-radius: 7px;
+  font-size: 13px;
+  font-weight: 500;
+  text-align: center;
+  transition: all 0.2s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.ios-segment.active {
+  background: hsl(var(--card));
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+/* iOS Button styles */
+.ios-button {
+  border-radius: 12px;
+  font-weight: 600;
+  padding: 14px 20px;
+  font-size: 17px;
+  -webkit-tap-highlight-color: transparent;
+  transition: all 0.15s;
+}
+
+.ios-button:active {
+  transform: scale(0.98);
+  opacity: 0.9;
+}
+
+.ios-button-primary {
+  background: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary) / 0.85));
+  color: hsl(var(--primary-foreground));
+}
+
+.ios-button-secondary {
+  background: hsl(var(--secondary));
+  color: hsl(var(--secondary-foreground));
+}
+
+/* iOS Input styles */
+.ios-input {
+  width: 100%;
+  padding: 16px;
+  border-radius: 12px;
+  background: hsl(var(--muted));
+  border: none;
+  font-size: 17px;
+  -webkit-appearance: none;
+}
+
+.ios-input:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px hsl(var(--primary) / 0.3);
+}
+
+/* Swipe gesture indicator */
+.swipe-indicator {
+  width: 36px;
+  height: 5px;
+  background: hsl(var(--muted-foreground) / 0.3);
+  border-radius: 3px;
+  margin: 8px auto;
+}
+
+/* Pull to refresh indicator */
+.pull-refresh {
+  display: flex;
+  justify-content: center;
+  padding: 12px;
+}
+
+/* iOS Modal/Sheet */
+.ios-sheet {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: hsl(var(--card));
+  border-radius: 12px 12px 0 0;
+  padding: 8px 16px 32px;
+  padding-bottom: calc(32px + env(safe-area-inset-bottom));
+  z-index: 200;
+  animation: slideUp 0.3s ease-out;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+.ios-sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 199;
+  animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Page transitions */
+.page-enter {
+  animation: pageEnter 0.3s ease-out;
+}
+
+@keyframes pageEnter {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.page-exit {
+  animation: pageExit 0.3s ease-out;
+}
+
+@keyframes pageExit {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+}
+
+/* Scroll snap for carousels */
+.snap-scroll {
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+}
+
+.snap-item {
+  scroll-snap-align: center;
+}
+
+/* Haptic-ready button */
+.haptic-button {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+/* Status bar text color hint for light content */
+.status-bar-light {
+  background: linear-gradient(to bottom, rgba(0,0,0,0.3), transparent);
+  height: env(safe-area-inset-top);
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  pointer-events: none;
+}
+
+/* Large title style (iOS 11+) */
+.large-title {
+  font-size: 34px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  line-height: 1.2;
+}
+
+/* Section header */
+.section-header {
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: hsl(var(--muted-foreground));
+  padding: 8px 16px;
+}
+
+/* Floating action feedback */
+.float-action {
+  position: fixed;
+  bottom: calc(80px + env(safe-area-inset-bottom));
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 12px 24px;
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  border-radius: 100px;
+  font-weight: 600;
+  box-shadow: 0 4px 20px hsl(var(--primary) / 0.4);
+  z-index: 90;
+}

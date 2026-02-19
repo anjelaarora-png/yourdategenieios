@@ -1,0 +1,381 @@
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Inter:wght@300;400;500;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Your Date Genie — Maroon, Gold & Cream Theme */
+
+@layer base {
+  :root {
+    /* Deep Maroon Background Theme - Default (matching yourdategenie.com) */
+    --background: 345 50% 12%;
+    --foreground: 40 30% 92%;
+
+    --card: 345 45% 15%;
+    --card-foreground: 40 30% 92%;
+
+    --popover: 345 45% 13%;
+    --popover-foreground: 40 30% 92%;
+
+    /* Gold Primary */
+    --primary: 43 74% 49%;
+    --primary-foreground: 345 50% 10%;
+
+    --secondary: 345 40% 18%;
+    --secondary-foreground: 40 30% 92%;
+
+    --muted: 345 35% 22%;
+    --muted-foreground: 40 20% 70%;
+
+    /* Cream Accent */
+    --accent: 40 30% 92%;
+    --accent-foreground: 345 50% 12%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 40 30% 92%;
+
+    --border: 345 35% 22%;
+    --input: 345 35% 20%;
+    --ring: 43 74% 49%;
+
+    --radius: 0.5rem;
+
+    /* Gold Gradient */
+    --gold-start: 43 74% 49%;
+    --gold-end: 38 72% 40%;
+    --gold-glow: 43 74% 49%;
+
+    /* Maroon Gradient */
+    --maroon-start: 345 60% 30%;
+    --maroon-end: 345 65% 22%;
+    --maroon-glow: 345 60% 30%;
+
+    /* Cream */
+    --cream: 40 30% 92%;
+    --cream-dark: 40 25% 85%;
+
+    /* Sidebar - maroon theme */
+    --sidebar-background: 345 45% 15%;
+    --sidebar-foreground: 40 30% 92%;
+    --sidebar-primary: 43 74% 49%;
+    --sidebar-primary-foreground: 345 50% 10%;
+    --sidebar-accent: 345 40% 20%;
+    --sidebar-accent-foreground: 40 30% 92%;
+    --sidebar-border: 345 35% 22%;
+    --sidebar-ring: 43 74% 49%;
+  }
+
+  /* Light mode - cream background (alternate) */
+  .light {
+    --background: 40 33% 96%;
+    --foreground: 345 45% 20%;
+
+    --card: 40 30% 98%;
+    --card-foreground: 345 45% 20%;
+
+    --popover: 40 30% 98%;
+    --popover-foreground: 345 45% 20%;
+
+    --primary: 345 60% 30%;
+    --primary-foreground: 40 30% 98%;
+
+    --secondary: 40 20% 90%;
+    --secondary-foreground: 345 45% 20%;
+
+    --muted: 40 15% 88%;
+    --muted-foreground: 345 20% 45%;
+
+    --accent: 43 74% 49%;
+    --accent-foreground: 345 45% 15%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 40 30% 98%;
+
+    --border: 40 20% 85%;
+    --input: 40 20% 90%;
+    --ring: 345 60% 30%;
+
+    --sidebar-background: 40 30% 98%;
+    --sidebar-foreground: 345 45% 20%;
+    --sidebar-primary: 345 60% 30%;
+    --sidebar-primary-foreground: 40 30% 98%;
+    --sidebar-accent: 40 20% 92%;
+    --sidebar-accent-foreground: 345 45% 20%;
+    --sidebar-border: 40 20% 85%;
+    --sidebar-ring: 345 60% 30%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+    /* Prevent iOS tap highlight */
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  html {
+    /* Prevent iOS bounce scroll when at boundaries */
+    overscroll-behavior: none;
+    /* Smooth scrolling for all browsers */
+    scroll-behavior: smooth;
+    /* Prevent text size adjustment on orientation change */
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: 'Inter', sans-serif;
+    /* Prevent iOS bounce scroll */
+    overscroll-behavior-y: none;
+    /* Prevent pull-to-refresh in WebView */
+    touch-action: pan-x pan-y;
+    /* Fix iOS viewport issues */
+    min-height: 100vh;
+    min-height: -webkit-fill-available;
+  }
+
+  /* iOS safe area support */
+  #root {
+    min-height: 100vh;
+    min-height: -webkit-fill-available;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Cormorant Garamond', serif;
+    @apply font-semibold tracking-tight;
+  }
+
+  /* iOS-specific input fixes */
+  input, textarea, select {
+    /* Prevent iOS zoom on focus */
+    font-size: 16px !important;
+    /* Prevent iOS input styling */
+    -webkit-appearance: none;
+    border-radius: 0;
+  }
+
+  /* Ensure touch targets are at least 44px (iOS minimum) */
+  button, a, [role="button"], input[type="checkbox"], input[type="radio"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Fix for iOS keyboard overlap */
+  input:focus, textarea:focus, select:focus {
+    scroll-margin-bottom: 120px;
+  }
+}
+
+@layer utilities {
+  .font-display {
+    font-family: 'Cormorant Garamond', serif;
+  }
+
+  .font-script {
+    font-family: 'Playfair Display', serif;
+    font-style: italic;
+  }
+
+  .font-body {
+    font-family: 'Inter', sans-serif;
+  }
+
+  .gradient-gold {
+    background: linear-gradient(135deg, hsl(var(--gold-start)), hsl(var(--gold-end)));
+  }
+
+  .gradient-maroon {
+    background: linear-gradient(135deg, hsl(var(--maroon-start)), hsl(var(--maroon-end)));
+  }
+
+  .text-gradient-gold {
+    background: linear-gradient(135deg, hsl(var(--gold-start)), hsl(var(--gold-end)));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .text-gradient-maroon {
+    background: linear-gradient(135deg, hsl(var(--maroon-start)), hsl(var(--maroon-end)));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .text-cream {
+    color: hsl(var(--cream));
+  }
+
+  .bg-cream {
+    background-color: hsl(var(--cream));
+  }
+
+  .glow-gold {
+    box-shadow: 0 0 40px -10px hsl(var(--gold-glow) / 0.4);
+  }
+
+  .glow-maroon {
+    box-shadow: 0 0 40px -10px hsl(var(--maroon-glow) / 0.4);
+  }
+
+  .border-gold {
+    border-color: hsl(var(--gold-start));
+  }
+
+  .border-gold-subtle {
+    border-color: hsl(var(--gold-start) / 0.3);
+  }
+
+  .border-maroon-subtle {
+    border-color: hsl(var(--maroon-start) / 0.2);
+  }
+
+  /* iOS WebView scroll container fix */
+  .ios-scroll-fix {
+    -webkit-overflow-scrolling: touch;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  /* Prevent iOS momentum scroll bleed */
+  .scroll-container {
+    overscroll-behavior: contain;
+  }
+
+  /* Fix dialog/modal scroll on iOS */
+  .dialog-content {
+    max-height: calc(100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    max-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  }
+
+  /* Touch-friendly interaction area */
+  .touch-target {
+    position: relative;
+  }
+  .touch-target::before {
+    content: '';
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    bottom: -8px;
+    left: -8px;
+  }
+
+  /* Safe area utilities for iOS */
+  .safe-area-top {
+    padding-top: env(safe-area-inset-top);
+  }
+
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .pb-safe {
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  }
+
+  /* Mobile-friendly scrollable areas */
+  .mobile-scroll {
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+    overscroll-behavior-y: contain;
+  }
+
+  /* Prevent text selection on interactive elements */
+  .no-select {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
+
+  /* Hardware acceleration for smooth animations */
+  .gpu-accelerate {
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+    will-change: transform;
+  }
+
+  /* Mobile-optimized cards */
+  .mobile-card {
+    @apply rounded-lg border border-border bg-card p-4 sm:p-6;
+  }
+
+  /* Responsive text utilities */
+  .text-responsive-sm {
+    @apply text-xs sm:text-sm;
+  }
+
+  .text-responsive-base {
+    @apply text-sm sm:text-base;
+  }
+
+  .text-responsive-lg {
+    @apply text-base sm:text-lg;
+  }
+
+  .text-responsive-xl {
+    @apply text-lg sm:text-xl;
+  }
+
+  .text-responsive-2xl {
+    @apply text-xl sm:text-2xl;
+  }
+
+  .text-responsive-3xl {
+    @apply text-2xl sm:text-3xl;
+  }
+}
+
+/* Slide up animation for floating CTA */
+@keyframes slide-up {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-up {
+  animation: slide-up 0.3s ease-out forwards;
+}
+
+/* Pulse animation for CTAs */
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 20px -5px hsl(var(--gold-glow) / 0.4);
+  }
+  50% {
+    box-shadow: 0 0 30px -5px hsl(var(--gold-glow) / 0.6);
+  }
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+/* iOS-specific overrides via media query */
+@supports (-webkit-touch-callout: none) {
+  /* iOS-only styles */
+  
+  /* Fix for iOS keyboard pushing content */
+  body.keyboard-open {
+    position: fixed;
+    width: 100%;
+  }
+
+  /* Prevent iOS rubber-band scrolling in modals */
+  [data-radix-popper-content-wrapper] {
+    overscroll-behavior: contain;
+  }
+
+  /* Better tap feedback for iOS */
+  button:active, a:active, [role="button"]:active {
+    opacity: 0.7;
+    transition: opacity 0.1s ease;
+  }
+}

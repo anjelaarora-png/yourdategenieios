@@ -1,0 +1,16 @@
+project_id = "vuqmxacjtrhsqvswxmxu"
+
+[functions.generate-date-plan]
+verify_jwt = false
+
+[functions.generate-more-gifts]
+verify_jwt = false
+
+[functions.send-date-plan-email]
+verify_jwt = false
+
+[functions.notify-new-signup]
+verify_jwt = false
+
+[functions.send-welcome-email]
+verify_jwt = false
