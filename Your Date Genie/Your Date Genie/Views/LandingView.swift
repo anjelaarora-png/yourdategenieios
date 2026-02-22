@@ -1,12 +1,7 @@
 import SwiftUI
 
 struct LandingView: View {
-    @State private var showOnboarding = false
-    
-    // Brand colors
-    private let primaryColor = Color(red: 0.55, green: 0.22, blue: 0.24)
-    private let goldColor = Color(red: 0.78, green: 0.65, blue: 0.47)
-    private let backgroundColor = Color(red: 0.98, green: 0.97, blue: 0.95)
+    @EnvironmentObject var coordinator: NavigationCoordinator
     
     var body: some View {
         NavigationStack {
@@ -28,7 +23,7 @@ struct LandingView: View {
                     ctaSection
                 }
             }
-            .background(backgroundColor)
+            .background(Color.brandCream)
             .ignoresSafeArea(edges: .top)
         }
     }
@@ -45,7 +40,7 @@ struct LandingView: View {
                         .aspectRatio(contentMode: .fill)
                 case .empty, .failure:
                     Rectangle()
-                        .fill(primaryColor.opacity(0.3))
+                        .fill(Color.brandPrimary.opacity(0.3))
                 @unknown default:
                     EmptyView()
                 }
@@ -69,7 +64,7 @@ struct LandingView: View {
                 // Logo
                 Image(systemName: "sparkles")
                     .font(.system(size: 40))
-                    .foregroundColor(goldColor)
+                    .foregroundColor(.brandGold)
                 
                 Text("Your Date Genie")
                     .font(.custom("Cormorant-Bold", size: 36, relativeTo: .largeTitle))
@@ -80,18 +75,20 @@ struct LandingView: View {
                     .foregroundColor(.white.opacity(0.9))
                 
                 // CTA Button
-                NavigationLink(destination: OnboardingView()) {
+                Button {
+                    coordinator.startDatePlanning()
+                } label: {
                     HStack {
                         Text("Get Started")
                             .font(.system(size: 17, weight: .semibold))
                         Image(systemName: "arrow.right")
                     }
-                    .foregroundColor(primaryColor)
+                    .foregroundColor(.brandPrimary)
                     .padding(.horizontal, 32)
                     .padding(.vertical, 16)
-                    .background(goldColor)
+                    .background(Color.brandGold)
                     .cornerRadius(30)
-                    .shadow(color: goldColor.opacity(0.5), radius: 10, y: 5)
+                    .shadow(color: Color.brandGold.opacity(0.5), radius: 10, y: 5)
                 }
                 .padding(.top, 8)
             }
@@ -110,7 +107,7 @@ struct LandingView: View {
                 
                 Text("Us")
                     .font(.custom("Cormorant-Italic", size: 28, relativeTo: .title))
-                    .foregroundColor(primaryColor)
+                    .foregroundColor(.brandPrimary)
             }
             
             // Image
@@ -214,13 +211,15 @@ struct LandingView: View {
                 .foregroundColor(.white.opacity(0.8))
                 .multilineTextAlignment(.center)
             
-            NavigationLink(destination: OnboardingView()) {
+            Button {
+                coordinator.startDatePlanning()
+            } label: {
                 Text("Start Planning Free")
                     .font(.system(size: 17, weight: .semibold))
-                    .foregroundColor(primaryColor)
+                    .foregroundColor(.brandPrimary)
                     .padding(.horizontal, 40)
                     .padding(.vertical, 16)
-                    .background(goldColor)
+                    .background(Color.brandGold)
                     .cornerRadius(30)
             }
             .padding(.top, 8)
@@ -228,7 +227,7 @@ struct LandingView: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, 60)
         .padding(.horizontal, 24)
-        .background(primaryColor)
+        .background(Color.brandPrimary)
     }
 }
 
@@ -239,15 +238,12 @@ struct StepCard: View {
     let description: String
     let icon: String
     
-    private let primaryColor = Color(red: 0.55, green: 0.22, blue: 0.24)
-    private let goldColor = Color(red: 0.78, green: 0.65, blue: 0.47)
-    
     var body: some View {
         HStack(alignment: .top, spacing: 16) {
             // Number circle
             ZStack {
                 Circle()
-                    .fill(goldColor)
+                    .fill(Color.brandGold)
                     .frame(width: 44, height: 44)
                 
                 Text(number)
@@ -298,15 +294,9 @@ struct FeatureCard: View {
     }
 }
 
-// MARK: - Placeholder Onboarding View
-struct OnboardingView: View {
-    var body: some View {
-        Text("Onboarding Flow")
-            .navigationTitle("Welcome")
-    }
-}
 
 // MARK: - Preview
 #Preview {
     LandingView()
+        .environmentObject(NavigationCoordinator.shared)
 }

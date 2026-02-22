@@ -8,6 +8,8 @@ struct MemoryGalleryView: View {
     @State private var showingPhotoPicker = false
     @State private var showingCamera = false
     
+    var showCloseButton: Bool = false
+    
     var body: some View {
         NavigationStack {
             ScrollView(showsIndicators: false) {
@@ -54,13 +56,16 @@ struct MemoryGalleryView: View {
                 .padding(.bottom, 40)
             }
             .background(Color.brandCream)
+            .navigationTitle("Memories")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Close") {
-                        dismiss()
+                if showCloseButton {
+                    ToolbarItem(placement: .navigationBarLeading) {
+                        Button("Close") {
+                            dismiss()
+                        }
+                        .foregroundColor(.brandPrimary)
                     }
-                    .foregroundColor(.brandPrimary)
                 }
             }
             .onChange(of: selectedItems) { items in

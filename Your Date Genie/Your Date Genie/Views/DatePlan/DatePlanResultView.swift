@@ -7,9 +7,14 @@ struct DatePlanResultView: View {
     var isViewingMode: Bool = false
     
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject var coordinator: NavigationCoordinator
     @State private var showPlaylist = false
     @State private var showMap = false
+    @State private var showPartnerShare = false
+    @State private var showGiftFinder = false
     @State private var selectedStop: DatePlanStop?
+    @State private var selectedVenue: DatePlanStop?
+    @State private var isSaved = false
     
     var body: some View {
         NavigationStack {
@@ -82,7 +87,36 @@ struct DatePlanResultView: View {
             }
         }
         .sheet(isPresented: $showPlaylist) {
-            PlaylistView(planTitle: plan.title)
+            PlaylistWidgetView(planTitle: plan.title)
+        }
+        .sheet(isPresented: $showMap) {
+            NavigationStack {
+                RouteMapView(stops: plan.stops)
+                    .navigationTitle("Your Route")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .navigationBarTrailing) {
+                            Button("Done") {
+                                showMap = false
+                            }
+                            .foregroundColor(.brandPrimary)
+                        }
+                    }
+            }
+        }
+        .sheet(isPresented: $showPartnerShare) {
+            PartnerShareView(plan: plan)
+        }
+        .sheet(isPresented: $showGiftFinder) {
+            GiftFinderView()
+        }
+        .sheet(item: $selectedVenue) { venue in
+            ReservationWidgetView(
+                venueName: venue.name,
+                venueType: venue.venueType,
+                address: venue.address,
+                phoneNumber: venue.phoneNumber
+            )
         }
     }
     
@@ -155,16 +189,28 @@ struct DatePlanResultView: View {
                 }
                 
                 QuickActionButton(icon: "person.2.fill", title: "Invite", color: .purple) {
-                    // Share with partner
+                    showPartnerShare = true
+                }
+                
+                QuickActionButton(icon: "gift.fill", title: "Gifts", color: .red) {
+                    showGiftFinder = true
+                }
+                
+                QuickActionButton(icon: "camera.fill", title: "Memory", color: .green) {
+                    // Memory capture
                 }
                 
                 QuickActionButton(icon: "calendar", title: "Schedule", color: .orange) {
-                    // Add to calendar
+                    addToCalendar()
                 }
             }
             .padding(.horizontal, 16)
         }
         .padding(.vertical, 16)
+    }
+    
+    private func addToCalendar() {
+        // Open calendar to add event
     }
     
     // MARK: - Itinerary Section
@@ -174,7 +220,13 @@ struct DatePlanResultView: View {
             
             VStack(spacing: 0) {
                 ForEach(Array(plan.stops.enumerated()), id: \.element.id) { index, stop in
-                    StopCard(stop: stop, isLast: index == plan.stops.count - 1)
+                    StopCard(
+                        stop: stop,
+                        isLast: index == plan.stops.count - 1,
+                        onReserve: {
+                            selectedVenue = stop
+                        }
+                    )
                 }
             }
             .background(Color.white)
@@ -307,20 +359,32 @@ struct DatePlanResultView: View {
             
             if let onSave = onSave {
                 Button {
+                    withAnimation(.spring(response: 0.3)) {
+                        isSaved = true
+                    }
                     onSave()
                 } label: {
                     HStack {
-                        Image(systemName: "bookmark.fill")
-                        Text("Save Plan")
+                        Image(systemName: isSaved ? "checkmark.circle.fill" : "bookmark.fill")
+                        Text(isSaved ? "Saved!" : "Save Plan")
                     }
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundColor(.white)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
-                    .background(LinearGradient.goldGradient)
+                    .background(
+                        Group {
+                            if isSaved {
+                                Color.green
+                            } else {
+                                LinearGradient.goldGradient
+                            }
+                        }
+                    )
                     .cornerRadius(12)
-                    .shadow(color: Color.brandGold.opacity(0.4), radius: 8, y: 4)
+                    .shadow(color: (isSaved ? Color.green : Color.brandGold).opacity(0.4), radius: 8, y: 4)
                 }
+                .disabled(isSaved)
             }
         }
         .padding(16)
@@ -396,6 +460,12 @@ struct SectionTitle: View {
 struct StopCard: View {
     let stop: DatePlanStop
     let isLast: Bool
+    var onReserve: (() -> Void)?
+    
+    private var isReservable: Bool {
+        let reservableTypes = ["restaurant", "bar", "cafe", "lounge", "bistro", "dining", "eatery"]
+        return reservableTypes.contains { stop.venueType.lowercased().contains($0) }
+    }
     
     var body: some View {
         HStack(alignment: .top, spacing: 16) {
@@ -460,6 +530,47 @@ struct StopCard: View {
                 .background(Color.pink.opacity(0.1))
                 .cornerRadius(8)
                 
+                // Action buttons row
+                HStack(spacing: 8) {
+                    // Reserve button for restaurants/bars
+                    if isReservable, let onReserve = onReserve {
+                        Button {
+                            onReserve()
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: "calendar.badge.plus")
+                                    .font(.system(size: 12))
+                                Text("Reserve")
+                                    .font(.system(size: 12, weight: .medium))
+                            }
+                            .foregroundColor(.brandPrimary)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(Color.brandPrimary.opacity(0.1))
+                            .cornerRadius(8)
+                        }
+                    }
+                    
+                    // Get directions button
+                    if let address = stop.address {
+                        Button {
+                            openDirections(address: address)
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: "location.fill")
+                                    .font(.system(size: 12))
+                                Text("Directions")
+                                    .font(.system(size: 12, weight: .medium))
+                            }
+                            .foregroundColor(.blue)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(Color.blue.opacity(0.1))
+                            .cornerRadius(8)
+                        }
+                    }
+                }
+                
                 // Travel time to next
                 if let travelTime = stop.travelTimeFromPrevious {
                     HStack(spacing: 4) {
@@ -475,6 +586,13 @@ struct StopCard: View {
         }
         .padding(.horizontal, 16)
         .padding(.top, 16)
+    }
+    
+    private func openDirections(address: String) {
+        if let encoded = address.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+           let url = URL(string: "maps://?daddr=\(encoded)") {
+            UIApplication.shared.open(url)
+        }
     }
 }
 
@@ -542,13 +660,6 @@ struct ConversationCard: View {
     }
 }
 
-// Placeholder views
-struct PlaylistView: View {
-    let planTitle: String
-    var body: some View {
-        Text("Playlist for \(planTitle)")
-    }
-}
 
 #Preview {
     DatePlanResultView(
