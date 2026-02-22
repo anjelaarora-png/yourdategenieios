@@ -11,7 +11,7 @@ import SwiftUI
 struct Your_Date_GenieApp: App {
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            LandingView()
         }
     }
 }
