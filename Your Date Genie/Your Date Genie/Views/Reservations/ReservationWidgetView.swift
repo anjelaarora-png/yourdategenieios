@@ -5,365 +5,380 @@ struct ReservationWidgetView: View {
     let venueType: String
     var address: String?
     var phoneNumber: String?
-    var websiteUrl: String?
     
     @Environment(\.dismiss) private var dismiss
     @State private var selectedDate = Date()
     @State private var selectedTime = "7:00 PM"
     @State private var partySize = 2
     @State private var specialRequests = ""
+    @State private var isSubmitting = false
+    @State private var showConfirmation = false
     
-    let timeSlots = [
-        "5:00 PM", "5:30 PM", "6:00 PM", "6:30 PM",
-        "7:00 PM", "7:30 PM", "8:00 PM", "8:30 PM",
-        "9:00 PM", "9:30 PM", "10:00 PM"
-    ]
+    private let timeSlots = ["6:00 PM", "6:30 PM", "7:00 PM", "7:30 PM", "8:00 PM", "8:30 PM", "9:00 PM", "9:30 PM"]
     
     var body: some View {
         NavigationStack {
-            ScrollView(showsIndicators: false) {
-                VStack(spacing: 24) {
-                    // Venue Header
-                    venueHeader
-                    
-                    // Quick Actions
-                    quickActions
-                    
-                    // Reservation Form
-                    reservationForm
-                    
-                    // Booking Options
-                    bookingOptions
+            ZStack {
+                // Luxurious background
+                Color.luxuryMaroon
+                    .ignoresSafeArea()
+                
+                if showConfirmation {
+                    confirmationView
+                } else {
+                    formContent
                 }
-                .padding(20)
             }
-            .background(Color.brandCream)
+            .navigationTitle("Make a Reservation")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Close") {
                         dismiss()
                     }
-                    .foregroundColor(.brandPrimary)
+                    .font(Font.inter(16, weight: .medium))
+                    .foregroundColor(Color.luxuryGold)
                 }
             }
+            .toolbarBackground(Color.luxuryMaroon, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
         }
     }
     
-    private var venueHeader: some View {
-        VStack(spacing: 12) {
-            // Venue icon
-            ZStack {
-                Circle()
-                    .fill(Color.brandGold.opacity(0.15))
-                    .frame(width: 72, height: 72)
-                
-                Image(systemName: venueIcon)
-                    .font(.system(size: 32))
-                    .foregroundColor(.brandGold)
-            }
-            
-            Text(venueName)
-                .font(.custom("Cormorant-Bold", size: 24, relativeTo: .title))
-                .foregroundColor(Color(UIColor.label))
-                .multilineTextAlignment(.center)
-            
-            Text(venueType)
-                .font(.system(size: 15))
-                .foregroundColor(Color(UIColor.secondaryLabel))
-            
-            if let address = address {
-                HStack(spacing: 6) {
-                    Image(systemName: "mappin")
-                        .font(.system(size: 12))
-                    Text(address)
-                        .font(.system(size: 13))
-                }
-                .foregroundColor(Color(UIColor.tertiaryLabel))
-            }
-        }
-    }
-    
-    private var quickActions: some View {
-        HStack(spacing: 12) {
-            if let phone = phoneNumber {
-                QuickActionCard(icon: "phone.fill", title: "Call", color: .green) {
-                    if let url = URL(string: "tel://\(phone.replacingOccurrences(of: " ", with: ""))") {
-                        UIApplication.shared.open(url)
+    private var formContent: some View {
+        ScrollView(showsIndicators: false) {
+            VStack(spacing: 24) {
+                // Venue info card
+                VStack(spacing: 14) {
+                    Image(systemName: "fork.knife.circle.fill")
+                        .font(.system(size: 44))
+                        .foregroundStyle(LinearGradient.goldShimmer)
+                    
+                    VStack(spacing: 6) {
+                        Text(venueName)
+                            .font(Font.displayTitle())
+                            .foregroundColor(Color.luxuryGold)
+                        
+                        Text(venueType)
+                            .font(Font.playfair(15, weight: .regular))
+                            .foregroundColor(Color.luxuryCreamMuted)
                     }
-                }
-            }
-            
-            QuickActionCard(icon: "map.fill", title: "Directions", color: .blue) {
-                if let addr = address,
-                   let encoded = addr.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
-                   let url = URL(string: "maps://?daddr=\(encoded)") {
-                    UIApplication.shared.open(url)
-                }
-            }
-            
-            if let website = websiteUrl, let url = URL(string: website) {
-                QuickActionCard(icon: "globe", title: "Website", color: .purple) {
-                    UIApplication.shared.open(url)
-                }
-            }
-        }
-    }
-    
-    private var reservationForm: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Make a Reservation")
-                .font(.system(size: 18, weight: .semibold))
-            
-            // Date Picker
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Date")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(Color(UIColor.secondaryLabel))
-                
-                DatePicker("", selection: $selectedDate, in: Date()..., displayedComponents: .date)
-                    .datePickerStyle(.compact)
-                    .labelsHidden()
-                    .padding(12)
-                    .background(Color.white)
-                    .cornerRadius(12)
-            }
-            
-            // Time Picker
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Time")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(Color(UIColor.secondaryLabel))
-                
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        ForEach(timeSlots, id: \.self) { time in
-                            TimeSlotButton(
-                                time: time,
-                                isSelected: selectedTime == time,
-                                onTap: { selectedTime = time }
-                            )
+                    
+                    if let address = address {
+                        HStack(spacing: 8) {
+                            Image(systemName: "mappin.circle")
+                                .foregroundColor(Color.luxuryGold.opacity(0.7))
+                            Text(address)
+                                .font(Font.inter(13, weight: .regular))
+                                .foregroundColor(Color.luxuryMuted)
                         }
                     }
                 }
-            }
-            
-            // Party Size
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Party Size")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(Color(UIColor.secondaryLabel))
+                .padding(24)
+                .frame(maxWidth: .infinity)
+                .luxuryCard()
+                .padding(.horizontal, 20)
+                .padding(.top, 12)
                 
-                HStack(spacing: 12) {
-                    ForEach(1...8, id: \.self) { size in
-                        PartySizeButton(
-                            size: size,
-                            isSelected: partySize == size,
-                            onTap: { partySize = size }
-                        )
-                    }
-                }
-            }
-            
-            // Special Requests
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Special Requests (optional)")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(Color(UIColor.secondaryLabel))
-                
-                TextField("E.g., window seat, quiet corner...", text: $specialRequests)
-                    .padding(12)
-                    .background(Color.white)
-                    .cornerRadius(12)
-            }
-        }
-        .padding(16)
-        .background(Color.white.opacity(0.5))
-        .cornerRadius(16)
-    }
-    
-    private var bookingOptions: some View {
-        VStack(spacing: 12) {
-            Text("Book via")
-                .font(.system(size: 14, weight: .medium))
-                .foregroundColor(Color(UIColor.secondaryLabel))
-            
-            HStack(spacing: 12) {
-                BookingServiceButton(
-                    name: "OpenTable",
-                    color: Color(red: 0.85, green: 0.22, blue: 0.26)
-                ) {
-                    openBookingService(service: "opentable")
-                }
-                
-                BookingServiceButton(
-                    name: "Resy",
-                    color: Color(red: 0.78, green: 0.65, blue: 0.35)
-                ) {
-                    openBookingService(service: "resy")
-                }
-                
-                BookingServiceButton(
-                    name: "Yelp",
-                    color: Color(red: 0.83, green: 0.14, blue: 0.14)
-                ) {
-                    openBookingService(service: "yelp")
-                }
-            }
-            
-            // Or call directly
-            if let phone = phoneNumber {
-                Button {
-                    if let url = URL(string: "tel://\(phone.replacingOccurrences(of: " ", with: ""))") {
-                        UIApplication.shared.open(url)
-                    }
-                } label: {
+                // Date picker
+                VStack(alignment: .leading, spacing: 12) {
                     HStack {
-                        Image(systemName: "phone.fill")
-                        Text("Call to reserve: \(phone)")
+                        Image(systemName: "calendar")
+                            .foregroundColor(Color.luxuryGold)
+                        Text("Select Date")
+                            .font(Font.playfair(16, weight: .semibold))
+                            .foregroundColor(Color.luxuryCream)
                     }
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundColor(.brandPrimary)
+                    
+                    DatePicker("", selection: $selectedDate, in: Date()..., displayedComponents: .date)
+                        .datePickerStyle(.graphical)
+                        .tint(Color.luxuryGold)
+                        .colorScheme(.dark)
+                        .padding(16)
+                        .background(Color.luxuryMaroonLight)
+                        .cornerRadius(16)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16)
+                                .stroke(Color.luxuryGold.opacity(0.3), lineWidth: 1)
+                        )
+                }
+                .padding(.horizontal, 20)
+                
+                // Time selection
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        Image(systemName: "clock")
+                            .foregroundColor(Color.luxuryGold)
+                        Text("Select Time")
+                            .font(Font.playfair(16, weight: .semibold))
+                            .foregroundColor(Color.luxuryCream)
+                    }
+                    
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 4), spacing: 10) {
+                        ForEach(timeSlots, id: \.self) { time in
+                            TimeChip(time: time, isSelected: selectedTime == time) {
+                                selectedTime = time
+                            }
+                        }
+                    }
+                }
+                .padding(.horizontal, 20)
+                
+                // Party size
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        Image(systemName: "person.2")
+                            .foregroundColor(Color.luxuryGold)
+                        Text("Party Size")
+                            .font(Font.playfair(16, weight: .semibold))
+                            .foregroundColor(Color.luxuryCream)
+                    }
+                    
+                    HStack(spacing: 20) {
+                        Button {
+                            if partySize > 1 { partySize -= 1 }
+                        } label: {
+                            Image(systemName: "minus.circle.fill")
+                                .font(.system(size: 32))
+                                .foregroundColor(partySize > 1 ? Color.luxuryGold : Color.luxuryMuted.opacity(0.4))
+                        }
+                        .disabled(partySize <= 1)
+                        
+                        VStack(spacing: 2) {
+                            Text("\(partySize)")
+                                .font(Font.cormorant(36, weight: .bold))
+                                .foregroundColor(Color.luxuryGold)
+                            Text(partySize == 1 ? "guest" : "guests")
+                                .font(Font.inter(12, weight: .regular))
+                                .foregroundColor(Color.luxuryMuted)
+                        }
+                        .frame(width: 80)
+                        
+                        Button {
+                            if partySize < 12 { partySize += 1 }
+                        } label: {
+                            Image(systemName: "plus.circle.fill")
+                                .font(.system(size: 32))
+                                .foregroundColor(partySize < 12 ? Color.luxuryGold : Color.luxuryMuted.opacity(0.4))
+                        }
+                        .disabled(partySize >= 12)
+                    }
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
-                    .background(Color.white)
-                    .cornerRadius(12)
+                    .padding(.vertical, 16)
+                    .background(Color.luxuryMaroonLight)
+                    .cornerRadius(16)
                     .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(Color.brandPrimary.opacity(0.3), lineWidth: 1)
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(Color.luxuryGold.opacity(0.3), lineWidth: 1)
                     )
                 }
-            }
-        }
-    }
-    
-    private var venueIcon: String {
-        switch venueType.lowercased() {
-        case let t where t.contains("restaurant"): return "fork.knife"
-        case let t where t.contains("bar"): return "wineglass"
-        case let t where t.contains("cafe"), let t where t.contains("coffee"): return "cup.and.saucer"
-        case let t where t.contains("rooftop"): return "building.2"
-        default: return "mappin.circle"
-        }
-    }
-    
-    private func openBookingService(service: String) {
-        let encodedName = venueName.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
-        var urlString = ""
-        
-        switch service {
-        case "opentable":
-            urlString = "https://www.opentable.com/s?term=\(encodedName)"
-        case "resy":
-            urlString = "https://resy.com/cities/ny?query=\(encodedName)"
-        case "yelp":
-            urlString = "https://www.yelp.com/search?find_desc=\(encodedName)"
-        default:
-            break
-        }
-        
-        if let url = URL(string: urlString) {
-            UIApplication.shared.open(url)
-        }
-    }
-}
-
-// MARK: - Supporting Views
-struct QuickActionCard: View {
-    let icon: String
-    let title: String
-    let color: Color
-    let action: () -> Void
-    
-    var body: some View {
-        Button(action: action) {
-            VStack(spacing: 8) {
-                Image(systemName: icon)
-                    .font(.system(size: 20))
-                    .foregroundColor(color)
-                    .frame(width: 44, height: 44)
-                    .background(color.opacity(0.1))
-                    .cornerRadius(12)
+                .padding(.horizontal, 20)
                 
-                Text(title)
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(Color(UIColor.label))
+                // Special requests
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        Image(systemName: "note.text")
+                            .foregroundColor(Color.luxuryGold)
+                        Text("Special Requests")
+                            .font(Font.playfair(16, weight: .semibold))
+                            .foregroundColor(Color.luxuryCream)
+                        
+                        Text("(optional)")
+                            .font(Font.inter(12, weight: .regular))
+                            .foregroundColor(Color.luxuryMuted)
+                    }
+                    
+                    TextEditor(text: $specialRequests)
+                        .font(Font.inter(15, weight: .regular))
+                        .foregroundColor(Color.luxuryCream)
+                        .scrollContentBackground(.hidden)
+                        .frame(height: 100)
+                        .padding(14)
+                        .background(Color.luxuryMaroonLight)
+                        .cornerRadius(16)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16)
+                                .stroke(Color.luxuryGold.opacity(0.3), lineWidth: 1)
+                        )
+                        .overlay(
+                            Group {
+                                if specialRequests.isEmpty {
+                                    Text("Window seat, anniversary celebration...")
+                                        .font(Font.inter(15, weight: .regular))
+                                        .foregroundColor(Color.luxuryMuted.opacity(0.5))
+                                        .padding(.horizontal, 18)
+                                        .padding(.vertical, 22)
+                                        .allowsHitTesting(false)
+                                }
+                            },
+                            alignment: .topLeading
+                        )
+                }
+                .padding(.horizontal, 20)
+                
+                // Submit button
+                Button {
+                    submitReservation()
+                } label: {
+                    HStack(spacing: 10) {
+                        if isSubmitting {
+                            ProgressView()
+                                .tint(Color.luxuryMaroon)
+                        } else {
+                            Image(systemName: "checkmark.circle.fill")
+                            Text("Request Reservation")
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(LuxuryGoldButtonStyle())
+                .disabled(isSubmitting)
+                .padding(.horizontal, 20)
+                
+                // Call option
+                if let phone = phoneNumber {
+                    Button {
+                        if let url = URL(string: "tel://\(phone.replacingOccurrences(of: "-", with: ""))") {
+                            UIApplication.shared.open(url)
+                        }
+                    } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: "phone.fill")
+                            Text("Or Call Directly: \(phone)")
+                        }
+                        .font(Font.inter(14, weight: .medium))
+                        .foregroundColor(Color.luxuryMuted)
+                    }
+                }
             }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 12)
-            .background(Color.white)
-            .cornerRadius(14)
-            .shadow(color: Color.black.opacity(0.05), radius: 6, y: 2)
+            .padding(.bottom, 40)
+        }
+    }
+    
+    private var confirmationView: some View {
+        VStack(spacing: 28) {
+            Spacer()
+            
+            ZStack {
+                Circle()
+                    .fill(Color.luxuryGold.opacity(0.15))
+                    .frame(width: 120, height: 120)
+                
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 70))
+                    .foregroundStyle(LinearGradient.goldShimmer)
+            }
+            
+            VStack(spacing: 10) {
+                Text("Reservation Requested!")
+                    .font(Font.displayTitle())
+                    .foregroundColor(Color.luxuryGold)
+                
+                Text("We'll confirm your booking shortly")
+                    .font(Font.playfair(16, weight: .regular))
+                    .foregroundColor(Color.luxuryCreamMuted)
+            }
+            
+            // Details card
+            VStack(spacing: 16) {
+                ReservationDetailRow(icon: "building.2", label: "Venue", value: venueName)
+                ReservationDetailRow(icon: "calendar", label: "Date", value: formattedDate)
+                ReservationDetailRow(icon: "clock", label: "Time", value: selectedTime)
+                ReservationDetailRow(icon: "person.2", label: "Guests", value: "\(partySize)")
+            }
+            .padding(20)
+            .luxuryCard()
+            .padding(.horizontal, 40)
+            
+            Spacer()
+            
+            Button {
+                dismiss()
+            } label: {
+                Text("Done")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(LuxuryGoldButtonStyle())
+            .padding(.horizontal, 24)
+            .padding(.bottom, 40)
+        }
+    }
+    
+    private var formattedDate: String {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        return formatter.string(from: selectedDate)
+    }
+    
+    private func submitReservation() {
+        isSubmitting = true
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+            isSubmitting = false
+            withAnimation(.spring(response: 0.5)) {
+                showConfirmation = true
+            }
         }
     }
 }
 
-struct TimeSlotButton: View {
+// MARK: - Time Chip
+struct TimeChip: View {
     let time: String
     let isSelected: Bool
-    let onTap: () -> Void
-    
-    var body: some View {
-        Button(action: onTap) {
-            Text(time)
-                .font(.system(size: 14, weight: .medium))
-                .foregroundColor(isSelected ? .white : Color(UIColor.label))
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
-                .background(isSelected ? Color.brandGold : Color.white)
-                .cornerRadius(20)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 20)
-                        .stroke(isSelected ? Color.brandGold : Color.gray.opacity(0.2), lineWidth: 1)
-                )
-        }
-    }
-}
-
-struct PartySizeButton: View {
-    let size: Int
-    let isSelected: Bool
-    let onTap: () -> Void
-    
-    var body: some View {
-        Button(action: onTap) {
-            Text("\(size)")
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundColor(isSelected ? .white : Color(UIColor.label))
-                .frame(width: 36, height: 36)
-                .background(isSelected ? Color.brandGold : Color.white)
-                .cornerRadius(8)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(isSelected ? Color.brandGold : Color.gray.opacity(0.2), lineWidth: 1)
-                )
-        }
-    }
-}
-
-struct BookingServiceButton: View {
-    let name: String
-    let color: Color
     let action: () -> Void
     
     var body: some View {
         Button(action: action) {
-            Text(name)
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundColor(.white)
+            Text(time)
+                .font(Font.inter(13, weight: isSelected ? .semibold : .regular))
+                .foregroundColor(isSelected ? Color.luxuryMaroon : Color.luxuryCream)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 14)
-                .background(color)
-                .cornerRadius(12)
+                .background(
+                    isSelected ? LinearGradient.goldShimmer : LinearGradient(colors: [Color.luxuryMaroonLight], startPoint: .top, endPoint: .bottom)
+                )
+                .cornerRadius(10)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(isSelected ? Color.clear : Color.luxuryGold.opacity(0.3), lineWidth: 1)
+                )
+        }
+        .animation(.easeInOut(duration: 0.2), value: isSelected)
+    }
+}
+
+// MARK: - Reservation Detail Row
+struct ReservationDetailRow: View {
+    let icon: String
+    let label: String
+    let value: String
+    
+    var body: some View {
+        HStack(spacing: 14) {
+            Image(systemName: icon)
+                .foregroundColor(Color.luxuryGold)
+                .frame(width: 20)
+            
+            Text(label)
+                .font(Font.inter(14, weight: .regular))
+                .foregroundColor(Color.luxuryMuted)
+            
+            Spacer()
+            
+            Text(value)
+                .font(Font.playfair(15, weight: .semibold))
+                .foregroundColor(Color.luxuryCream)
         }
     }
 }
 
 #Preview {
     ReservationWidgetView(
-        venueName: "Trattoria Milano",
+        venueName: "Carbone",
         venueType: "Italian Restaurant",
-        address: "123 Main Street",
-        phoneNumber: "(555) 123-4567"
+        address: "181 Thompson St, New York",
+        phoneNumber: "212-254-3000"
     )
 }

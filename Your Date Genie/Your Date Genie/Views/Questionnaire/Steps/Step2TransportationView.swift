@@ -90,5 +90,5 @@ struct TravelRadiusCard: View {
 
 #Preview {
     Step2TransportationView(data: .constant(QuestionnaireData()))
-        .background(Color.brandCream)
+        .background(Color.luxuryMaroon)
 }

@@ -5,25 +5,34 @@ struct LandingView: View {
     
     var body: some View {
         NavigationStack {
-            ScrollView(showsIndicators: false) {
-                VStack(spacing: 0) {
-                    // Hero Section
-                    heroSection
-                    
-                    // About Section (from Hero.tsx)
-                    aboutSection
-                    
-                    // How It Works Section
-                    howItWorksSection
-                    
-                    // Features Section
-                    featuresSection
-                    
-                    // CTA Section
-                    ctaSection
+            ZStack {
+                // Deep maroon background
+                Color.luxuryMaroon
+                    .ignoresSafeArea()
+                
+                // Subtle vignette overlay
+                RadialGradient.maroonVignette
+                    .ignoresSafeArea()
+                
+                ScrollView(showsIndicators: false) {
+                    VStack(spacing: 0) {
+                        // Hero Section
+                        heroSection
+                        
+                        // About Section
+                        aboutSection
+                        
+                        // How It Works Section
+                        howItWorksSection
+                        
+                        // Features Section
+                        featuresSection
+                        
+                        // CTA Section
+                        ctaSection
+                    }
                 }
             }
-            .background(Color.brandCream)
             .ignoresSafeArea(edges: .top)
         }
     }
@@ -31,7 +40,7 @@ struct LandingView: View {
     // MARK: - Hero Section
     private var heroSection: some View {
         ZStack(alignment: .bottom) {
-            // Background Image
+            // Background Image with overlay
             AsyncImage(url: URL(string: "https://images.unsplash.com/photo-1529333166437-7750a6dd5a70?w=800&h=600&fit=crop")) { phase in
                 switch phase {
                 case .success(let image):
@@ -40,56 +49,62 @@ struct LandingView: View {
                         .aspectRatio(contentMode: .fill)
                 case .empty, .failure:
                     Rectangle()
-                        .fill(Color.brandPrimary.opacity(0.3))
+                        .fill(Color.luxuryMaroonLight)
                 @unknown default:
                     EmptyView()
                 }
             }
             .frame(height: UIScreen.main.bounds.height * 0.6)
             .clipped()
-            
-            // Gradient Overlay
-            LinearGradient(
-                gradient: Gradient(colors: [
-                    Color.clear,
-                    Color.black.opacity(0.3),
-                    Color.black.opacity(0.7)
-                ]),
-                startPoint: .top,
-                endPoint: .bottom
+            .overlay(
+                LinearGradient(
+                    gradient: Gradient(colors: [
+                        Color.luxuryMaroon.opacity(0.3),
+                        Color.luxuryMaroon.opacity(0.6),
+                        Color.luxuryMaroon
+                    ]),
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
             )
             
             // Hero Content
-            VStack(spacing: 16) {
-                // Logo
+            VStack(spacing: 20) {
+                // Sparkle icon
                 Image(systemName: "sparkles")
-                    .font(.system(size: 40))
-                    .foregroundColor(.brandGold)
+                    .font(.system(size: 44))
+                    .foregroundStyle(LinearGradient.goldShimmer)
+                    .shadow(color: Color.luxuryGold.opacity(0.5), radius: 20)
                 
-                Text("Your Date Genie")
-                    .font(.custom("Cormorant-Bold", size: 36, relativeTo: .largeTitle))
-                    .foregroundColor(.white)
-                
-                Text("Date nights, planned for you.")
-                    .font(.system(size: 18, weight: .medium))
-                    .foregroundColor(.white.opacity(0.9))
+                // Title
+                VStack(spacing: 8) {
+                    HStack(spacing: 4) {
+                        Text("Your Date")
+                            .font(Font.header(32, weight: .bold))
+                            .foregroundColor(Color.luxuryGold)
+                        Text("Genie")
+                            .font(Font.special(48, weight: .bold))
+                            .foregroundColor(Color.luxuryGold)
+                    }
+                    .shadow(color: Color.black.opacity(0.5), radius: 4, y: 2)
+                    
+                    Text("Date nights, planned for you.")
+                        .font(Font.subheader(18, weight: .regular))
+                        .foregroundColor(Color.luxuryCream.opacity(0.9))
+                }
                 
                 // CTA Button
                 Button {
                     coordinator.startDatePlanning()
                 } label: {
-                    HStack {
-                        Text("Get Started")
-                            .font(.system(size: 17, weight: .semibold))
+                    HStack(spacing: 10) {
+                        Text("Begin Your Journey")
+                            .font(Font.bodySans(16, weight: .semibold))
                         Image(systemName: "arrow.right")
+                            .font(.system(size: 14, weight: .semibold))
                     }
-                    .foregroundColor(.brandPrimary)
-                    .padding(.horizontal, 32)
-                    .padding(.vertical, 16)
-                    .background(Color.brandGold)
-                    .cornerRadius(30)
-                    .shadow(color: Color.brandGold.opacity(0.5), radius: 10, y: 5)
                 }
+                .buttonStyle(LuxuryGoldButtonStyle())
                 .padding(.top, 8)
             }
             .padding(.bottom, 60)
@@ -98,16 +113,24 @@ struct LandingView: View {
     
     // MARK: - About Section
     private var aboutSection: some View {
-        VStack(spacing: 24) {
+        VStack(spacing: 28) {
             // Section Title
-            HStack(spacing: 8) {
-                Text("About")
-                    .font(.custom("Cormorant-Bold", size: 28, relativeTo: .title))
-                    .foregroundColor(Color(UIColor.label))
+            HStack(spacing: 12) {
+                Rectangle()
+                    .fill(Color.luxuryGold)
+                    .frame(width: 40, height: 1)
                 
-                Text("Us")
-                    .font(.custom("Cormorant-Italic", size: 28, relativeTo: .title))
-                    .foregroundColor(.brandPrimary)
+                Text("About")
+                    .font(Font.header(28, weight: .bold))
+                    .foregroundColor(Color.luxuryGold)
+                +
+                Text(" Us")
+                    .font(Font.headerItalic(28))
+                    .foregroundColor(Color.luxuryCream)
+                
+                Rectangle()
+                    .fill(Color.luxuryGold)
+                    .frame(width: 40, height: 1)
             }
             
             // Image
@@ -117,58 +140,77 @@ struct LandingView: View {
                     image
                         .resizable()
                         .aspectRatio(contentMode: .fill)
-                        .frame(height: 280)
+                        .frame(height: 260)
                         .clipped()
-                        .cornerRadius(16)
+                        .cornerRadius(20)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 20)
+                                .stroke(Color.luxuryGold.opacity(0.3), lineWidth: 1)
+                        )
                 case .empty, .failure:
-                    RoundedRectangle(cornerRadius: 16)
-                        .fill(Color.gray.opacity(0.2))
-                        .frame(height: 280)
+                    RoundedRectangle(cornerRadius: 20)
+                        .fill(Color.luxuryMaroonLight)
+                        .frame(height: 260)
                 @unknown default:
                     EmptyView()
                 }
             }
+            .shadow(color: Color.black.opacity(0.4), radius: 20, y: 10)
             
             // Description
-            VStack(alignment: .leading, spacing: 16) {
-                Text("Your Date Genie was created for people who love with intention but juggle full-demanding lives. For those who care deeply, yet often find themselves thinking, \"I want to plan something special... I just don't know where to begin.\"")
-                    .font(.system(size: 16))
-                    .foregroundColor(Color(UIColor.secondaryLabel))
-                    .lineSpacing(5)
+            VStack(spacing: 16) {
+                Text("Your Date Genie was created for people who love with intention but juggle full-demanding lives.")
+                    .font(Font.bodySerif(16, weight: .regular))
+                    .foregroundColor(Color.luxuryCreamMuted)
+                    .lineSpacing(6)
                 
-                Text("That's where your Genie steps in. We take the details that define you and shape them into moments that feel thoughtful, easy, and beautifully personal.")
-                    .font(.system(size: 16))
-                    .foregroundColor(Color(UIColor.secondaryLabel))
-                    .lineSpacing(5)
+                HStack(spacing: 4) {
+                    Text("That's where your")
+                        .font(Font.bodySerif(16, weight: .regular))
+                        .foregroundColor(Color.luxuryCreamMuted)
+                    Text("Genie")
+                        .font(Font.special(28, weight: .bold))
+                        .foregroundColor(Color.luxuryGold)
+                    Text("steps in.")
+                        .font(Font.bodySerif(16, weight: .regular))
+                        .foregroundColor(Color.luxuryCreamMuted)
+                }
+                
+                Text("We take the details that define you and shape them into moments that feel thoughtful, easy, and beautifully personal.")
+                    .font(Font.bodySerif(16, weight: .regular))
+                    .foregroundColor(Color.luxuryCreamMuted)
+                    .lineSpacing(6)
             }
+            .multilineTextAlignment(.center)
         }
         .padding(.horizontal, 24)
-        .padding(.vertical, 48)
+        .padding(.vertical, 56)
     }
     
     // MARK: - How It Works Section
     private var howItWorksSection: some View {
-        VStack(spacing: 32) {
+        VStack(spacing: 36) {
+            // Section Title
             Text("How It Works")
-                .font(.custom("Cormorant-Bold", size: 28, relativeTo: .title))
-                .foregroundColor(Color(UIColor.label))
+                .font(Font.header(28, weight: .bold))
+                .foregroundColor(Color.luxuryGold)
             
-            VStack(spacing: 24) {
-                StepCard(
+            VStack(spacing: 20) {
+                LuxuryStepCard(
                     number: "1",
                     title: "Tell Us Your Vibe",
                     description: "Answer a few quick questions about your preferences, budget, and what you're in the mood for.",
                     icon: "sparkles"
                 )
                 
-                StepCard(
+                LuxuryStepCard(
                     number: "2",
                     title: "We Plan Everything",
                     description: "Our AI creates a personalized itinerary with venues, timing, and insider tips.",
                     icon: "wand.and.stars"
                 )
                 
-                StepCard(
+                LuxuryStepCard(
                     number: "3",
                     title: "Enjoy Your Date",
                     description: "Show up and make memories. We handle the planning so you can focus on each other.",
@@ -177,62 +219,70 @@ struct LandingView: View {
             }
         }
         .padding(.horizontal, 24)
-        .padding(.vertical, 48)
-        .background(Color.white)
+        .padding(.vertical, 56)
+        .background(Color.luxuryMaroonMedium.opacity(0.5))
     }
     
     // MARK: - Features Section
     private var featuresSection: some View {
-        VStack(spacing: 32) {
+        VStack(spacing: 36) {
             Text("Everything You Need")
-                .font(.custom("Cormorant-Bold", size: 28, relativeTo: .title))
-                .foregroundColor(Color(UIColor.label))
+                .font(Font.header(28, weight: .bold))
+                .foregroundColor(Color.luxuryGold)
             
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
-                FeatureCard(icon: "map.fill", title: "Verified Venues", color: .blue)
-                FeatureCard(icon: "gift.fill", title: "Gift Ideas", color: .pink)
-                FeatureCard(icon: "bubble.left.and.bubble.right.fill", title: "Conversation Starters", color: .purple)
-                FeatureCard(icon: "music.note", title: "Date Playlists", color: .orange)
+                LuxuryFeatureCard(icon: "map.fill", title: "Verified Venues")
+                LuxuryFeatureCard(icon: "gift.fill", title: "Gift Ideas")
+                LuxuryFeatureCard(icon: "bubble.left.and.bubble.right.fill", title: "Conversation Starters")
+                LuxuryFeatureCard(icon: "music.note", title: "Date Playlists")
             }
         }
         .padding(.horizontal, 24)
-        .padding(.vertical, 48)
+        .padding(.vertical, 56)
     }
     
     // MARK: - CTA Section
     private var ctaSection: some View {
-        VStack(spacing: 20) {
-            Text("Ready for Better Dates?")
-                .font(.custom("Cormorant-Bold", size: 28, relativeTo: .title))
-                .foregroundColor(.white)
+        VStack(spacing: 24) {
+            // Decorative sparkle
+            Image(systemName: "sparkle")
+                .font(.system(size: 32))
+                .foregroundColor(Color.luxuryGold)
             
-            Text("Join 500+ couples planning stress-free date nights")
-                .font(.system(size: 16))
-                .foregroundColor(.white.opacity(0.8))
-                .multilineTextAlignment(.center)
+            Text("Ready for Better Dates?")
+                .font(Font.header(28, weight: .bold))
+                .foregroundColor(Color.luxuryGold)
+            
+            Text("Join couples planning stress-free date nights")
+                .font(Font.subheader(16, weight: .regular))
+                .foregroundColor(Color.luxuryCreamMuted)
             
             Button {
                 coordinator.startDatePlanning()
             } label: {
                 Text("Start Planning Free")
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundColor(.brandPrimary)
-                    .padding(.horizontal, 40)
-                    .padding(.vertical, 16)
-                    .background(Color.brandGold)
-                    .cornerRadius(30)
             }
+            .buttonStyle(LuxuryGoldButtonStyle())
             .padding(.top, 8)
+            
+            Text("No credit card required")
+                .font(Font.bodySans(12, weight: .regular))
+                .foregroundColor(Color.luxuryMuted)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 60)
         .padding(.horizontal, 24)
-        .background(Color.brandPrimary)
+        .background(
+            ZStack {
+                Color.luxuryMaroonLight.opacity(0.5)
+                RadialGradient.goldGlow.opacity(0.3)
+            }
+        )
     }
 }
 
-// MARK: - Step Card
-struct StepCard: View {
+// MARK: - Luxury Step Card
+struct LuxuryStepCard: View {
     let number: String
     let title: String
     let description: String
@@ -240,60 +290,63 @@ struct StepCard: View {
     
     var body: some View {
         HStack(alignment: .top, spacing: 16) {
-            // Number circle
+            // Number with gold circle
             ZStack {
                 Circle()
-                    .fill(Color.brandGold)
-                    .frame(width: 44, height: 44)
+                    .fill(LinearGradient.goldShimmer)
+                    .frame(width: 48, height: 48)
                 
                 Text(number)
-                    .font(.system(size: 18, weight: .bold))
-                    .foregroundColor(.white)
+                    .font(Font.header(20, weight: .bold))
+                    .foregroundColor(Color.luxuryMaroon)
             }
+            .shadow(color: Color.luxuryGold.opacity(0.3), radius: 10)
             
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 8) {
                 Text(title)
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundColor(Color(UIColor.label))
+                    .font(Font.subheader(18, weight: .semibold))
+                    .foregroundColor(Color.luxuryCream)
                 
                 Text(description)
-                    .font(.system(size: 15))
-                    .foregroundColor(Color(UIColor.secondaryLabel))
-                    .lineSpacing(3)
+                    .font(Font.bodySans(14, weight: .regular))
+                    .foregroundColor(Color.luxuryMuted)
+                    .lineSpacing(4)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(20)
+        .luxuryCard()
     }
 }
 
-// MARK: - Feature Card
-struct FeatureCard: View {
+// MARK: - Luxury Feature Card
+struct LuxuryFeatureCard: View {
     let icon: String
     let title: String
-    let color: Color
     
     var body: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 14) {
             Image(systemName: icon)
                 .font(.system(size: 28))
-                .foregroundColor(color)
+                .foregroundStyle(LinearGradient.goldShimmer)
                 .frame(width: 56, height: 56)
-                .background(color.opacity(0.1))
-                .cornerRadius(12)
+                .background(Color.luxuryMaroonLight)
+                .cornerRadius(14)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14)
+                        .stroke(Color.luxuryGold.opacity(0.3), lineWidth: 1)
+                )
             
             Text(title)
-                .font(.system(size: 14, weight: .medium))
-                .foregroundColor(Color(UIColor.label))
+                .font(Font.bodySans(13, weight: .medium))
+                .foregroundColor(Color.luxuryCream)
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 20)
-        .background(Color.white)
-        .cornerRadius(16)
-        .shadow(color: Color.black.opacity(0.05), radius: 10, y: 4)
+        .padding(.vertical, 24)
+        .luxuryCard()
     }
 }
-
 
 // MARK: - Preview
 #Preview {

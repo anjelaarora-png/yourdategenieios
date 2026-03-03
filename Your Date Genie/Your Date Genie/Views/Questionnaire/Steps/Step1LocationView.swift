@@ -30,8 +30,7 @@ struct Step1LocationView: View {
                             OptionCardView(
                                 item: type,
                                 isSelected: data.dateType == type.value,
-                                onTap: { data.dateType = type.value },
-                                compact: true
+                                onTap: { data.dateType = type.value }
                             )
                         }
                     }
@@ -50,8 +49,7 @@ struct Step1LocationView: View {
                             OptionCardView(
                                 item: occasion,
                                 isSelected: data.occasion == occasion.value,
-                                onTap: { data.occasion = occasion.value },
-                                compact: true
+                                onTap: { data.occasion = occasion.value }
                             )
                         }
                     }
@@ -74,13 +72,15 @@ struct Step1LocationView: View {
                         )
                         .datePickerStyle(.compact)
                         .labelsHidden()
+                        .tint(Color.luxuryGold)
+                        .colorScheme(.dark)
                         .padding(.horizontal, 16)
                         .padding(.vertical, 12)
-                        .background(Color.white)
-                        .cornerRadius(12)
+                        .background(Color.luxuryMaroonLight)
+                        .cornerRadius(14)
                         .overlay(
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(Color.gray.opacity(0.2), lineWidth: 1)
+                            RoundedRectangle(cornerRadius: 14)
+                                .stroke(Color.luxuryGold.opacity(0.3), lineWidth: 1)
                         )
                         
                         // Time Picker
@@ -91,13 +91,14 @@ struct Step1LocationView: View {
                             }
                         }
                         .pickerStyle(.menu)
+                        .tint(Color.luxuryGold)
                         .padding(.horizontal, 16)
                         .padding(.vertical, 12)
-                        .background(Color.white)
-                        .cornerRadius(12)
+                        .background(Color.luxuryMaroonLight)
+                        .cornerRadius(14)
                         .overlay(
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(Color.gray.opacity(0.2), lineWidth: 1)
+                            RoundedRectangle(cornerRadius: 14)
+                                .stroke(Color.luxuryGold.opacity(0.3), lineWidth: 1)
                         )
                     }
                 }
@@ -115,18 +116,20 @@ struct Step1LocationView: View {
 struct CustomTextFieldStyle: TextFieldStyle {
     func _body(configuration: TextField<Self._Label>) -> some View {
         configuration
+            .font(Font.inter(15, weight: .regular))
+            .foregroundColor(Color.luxuryCream)
             .padding(.horizontal, 16)
             .padding(.vertical, 14)
-            .background(Color.white)
-            .cornerRadius(12)
+            .background(Color.luxuryMaroonLight)
+            .cornerRadius(14)
             .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(Color.gray.opacity(0.2), lineWidth: 1)
+                RoundedRectangle(cornerRadius: 14)
+                    .stroke(Color.luxuryGold.opacity(0.3), lineWidth: 1)
             )
     }
 }
 
 #Preview {
     Step1LocationView(data: .constant(QuestionnaireData()))
-        .background(Color.brandCream)
+        .background(Color.luxuryMaroon)
 }

@@ -2,360 +2,304 @@ import SwiftUI
 
 struct PartnerShareView: View {
     let plan: DatePlan
-    @Environment(\.dismiss) private var dismiss
-    @State private var shareMethod: ShareMethod = .link
-    @State private var partnerEmail = ""
-    @State private var partnerPhone = ""
-    @State private var personalMessage = ""
-    @State private var isSharing = false
-    @State private var shareSuccess = false
     
-    enum ShareMethod: String, CaseIterable {
-        case link = "link"
-        case email = "email"
-        case sms = "sms"
-        
-        var title: String {
-            switch self {
-            case .link: return "Copy Link"
-            case .email: return "Email"
-            case .sms: return "Text"
-            }
-        }
-        
-        var icon: String {
-            switch self {
-            case .link: return "link"
-            case .email: return "envelope.fill"
-            case .sms: return "message.fill"
-            }
-        }
-        
-        var color: Color {
-            switch self {
-            case .link: return .blue
-            case .email: return .orange
-            case .sms: return .green
-            }
-        }
-    }
+    @Environment(\.dismiss) private var dismiss
+    @State private var shareMessage = ""
+    @State private var showShareSheet = false
+    @State private var copiedToClipboard = false
     
     var body: some View {
         NavigationStack {
-            ScrollView(showsIndicators: false) {
-                VStack(spacing: 24) {
-                    // Header
-                    headerSection
-                    
-                    // Plan Preview
-                    planPreview
-                    
-                    // Share Method Selection
-                    shareMethodSelection
-                    
-                    // Share Form
-                    shareForm
-                    
-                    // Share Button
-                    shareButton
+            ZStack {
+                // Luxurious background
+                Color.luxuryMaroon
+                    .ignoresSafeArea()
+                
+                ScrollView(showsIndicators: false) {
+                    VStack(spacing: 28) {
+                        // Header
+                        VStack(spacing: 14) {
+                            ZStack {
+                                Circle()
+                                    .fill(Color.luxuryGold.opacity(0.1))
+                                    .frame(width: 90, height: 90)
+                                
+                                Image(systemName: "heart.circle.fill")
+                                    .font(.system(size: 50))
+                                    .foregroundStyle(LinearGradient.goldShimmer)
+                            }
+                            
+                            VStack(spacing: 6) {
+                                Text("Share with Your Date")
+                                    .font(Font.displayTitle())
+                                    .foregroundColor(Color.luxuryGold)
+                                
+                                Text("Send this evening's plan to your partner")
+                                    .font(Font.playfair(15, weight: .regular))
+                                    .foregroundColor(Color.luxuryCreamMuted)
+                            }
+                        }
+                        .padding(.top, 20)
+                        
+                        // Plan preview card
+                        VStack(spacing: 18) {
+                            HStack(spacing: 8) {
+                                ForEach(plan.stops.prefix(4)) { stop in
+                                    Text(stop.emoji)
+                                        .font(.system(size: 26))
+                                }
+                            }
+                            
+                            VStack(spacing: 8) {
+                                Text(plan.title)
+                                    .font(Font.playfair(20, weight: .bold))
+                                    .foregroundColor(Color.luxuryGold)
+                                
+                                Text(plan.tagline)
+                                    .font(Font.playfair(14, weight: .regular))
+                                    .foregroundColor(Color.luxuryCreamMuted)
+                                    .multilineTextAlignment(.center)
+                            }
+                            
+                            HStack(spacing: 24) {
+                                VStack(spacing: 4) {
+                                    Text("\(plan.stops.count)")
+                                        .font(Font.cormorant(22, weight: .bold))
+                                        .foregroundColor(Color.luxuryGold)
+                                    Text("stops")
+                                        .font(Font.inter(11, weight: .regular))
+                                        .foregroundColor(Color.luxuryMuted)
+                                }
+                                
+                                Rectangle()
+                                    .fill(Color.luxuryGold.opacity(0.3))
+                                    .frame(width: 1, height: 30)
+                                
+                                VStack(spacing: 4) {
+                                    Text(plan.totalDuration)
+                                        .font(Font.cormorant(22, weight: .bold))
+                                        .foregroundColor(Color.luxuryGold)
+                                    Text("duration")
+                                        .font(Font.inter(11, weight: .regular))
+                                        .foregroundColor(Color.luxuryMuted)
+                                }
+                                
+                                Rectangle()
+                                    .fill(Color.luxuryGold.opacity(0.3))
+                                    .frame(width: 1, height: 30)
+                                
+                                VStack(spacing: 4) {
+                                    Text(plan.estimatedCost)
+                                        .font(Font.cormorant(22, weight: .bold))
+                                        .foregroundColor(Color.luxuryGold)
+                                    Text("budget")
+                                        .font(Font.inter(11, weight: .regular))
+                                        .foregroundColor(Color.luxuryMuted)
+                                }
+                            }
+                        }
+                        .padding(24)
+                        .frame(maxWidth: .infinity)
+                        .luxuryCard()
+                        .padding(.horizontal, 20)
+                        
+                        // Personal message
+                        VStack(alignment: .leading, spacing: 12) {
+                            HStack {
+                                Image(systemName: "quote.bubble")
+                                    .foregroundColor(Color.luxuryGold)
+                                Text("Add a Personal Note")
+                                    .font(Font.playfair(16, weight: .semibold))
+                                    .foregroundColor(Color.luxuryCream)
+                            }
+                            
+                            TextEditor(text: $shareMessage)
+                                .font(Font.inter(15, weight: .regular))
+                                .foregroundColor(Color.luxuryCream)
+                                .scrollContentBackground(.hidden)
+                                .frame(height: 100)
+                                .padding(14)
+                                .background(Color.luxuryMaroonLight)
+                                .cornerRadius(16)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 16)
+                                        .stroke(Color.luxuryGold.opacity(0.3), lineWidth: 1)
+                                )
+                                .overlay(
+                                    Group {
+                                        if shareMessage.isEmpty {
+                                            Text("Can't wait to spend this evening with you...")
+                                                .font(Font.playfairItalic(15))
+                                                .foregroundColor(Color.luxuryMuted.opacity(0.5))
+                                                .padding(.horizontal, 18)
+                                                .padding(.vertical, 22)
+                                                .allowsHitTesting(false)
+                                        }
+                                    },
+                                    alignment: .topLeading
+                                )
+                        }
+                        .padding(.horizontal, 20)
+                        
+                        // Share options
+                        VStack(spacing: 14) {
+                            // Primary share button
+                            Button {
+                                sharePlan()
+                            } label: {
+                                HStack(spacing: 10) {
+                                    Image(systemName: "square.and.arrow.up")
+                                    Text("Share Plan")
+                                }
+                                .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(LuxuryGoldButtonStyle())
+                            
+                            // Copy link
+                            Button {
+                                copyToClipboard()
+                            } label: {
+                                HStack(spacing: 10) {
+                                    Image(systemName: copiedToClipboard ? "checkmark.circle.fill" : "doc.on.doc")
+                                    Text(copiedToClipboard ? "Copied!" : "Copy Link")
+                                }
+                                .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(LuxuryOutlineButtonStyle())
+                            
+                            // Quick share row
+                            HStack(spacing: 20) {
+                                ShareButton(icon: "message.fill", label: "iMessage", color: Color(hex: "34C759")) {
+                                    shareViaMessages()
+                                }
+                                
+                                ShareButton(icon: "envelope.fill", label: "Email", color: Color.luxuryGold) {
+                                    shareViaEmail()
+                                }
+                                
+                                ShareButton(icon: "doc.text.fill", label: "Note", color: Color.luxuryGoldLight) {
+                                    shareAsNote()
+                                }
+                            }
+                            .padding(.top, 10)
+                        }
+                        .padding(.horizontal, 20)
+                    }
+                    .padding(.bottom, 40)
                 }
-                .padding(20)
             }
-            .background(Color.brandCream)
+            .navigationTitle("Share Plan")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") {
+                    Button("Close") {
                         dismiss()
                     }
-                    .foregroundColor(.brandPrimary)
+                    .font(Font.inter(16, weight: .medium))
+                    .foregroundColor(Color.luxuryGold)
                 }
             }
-            .alert("Shared!", isPresented: $shareSuccess) {
-                Button("Done") {
-                    dismiss()
-                }
-            } message: {
-                Text("Your date plan has been shared with your partner!")
-            }
+            .toolbarBackground(Color.luxuryMaroon, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
         }
     }
     
-    private var headerSection: some View {
-        VStack(spacing: 12) {
-            ZStack {
-                Circle()
-                    .fill(Color.pink.opacity(0.15))
-                    .frame(width: 72, height: 72)
-                
-                Image(systemName: "person.2.fill")
-                    .font(.system(size: 32))
-                    .foregroundColor(.pink)
-            }
-            
-            Text("Invite Your Partner")
-                .font(.custom("Cormorant-Bold", size: 26, relativeTo: .title))
-                .foregroundColor(Color(UIColor.label))
-            
-            Text("Share this date plan and make it official!")
-                .font(.system(size: 15))
-                .foregroundColor(Color(UIColor.secondaryLabel))
-                .multilineTextAlignment(.center)
+    private var shareText: String {
+        var text = "I've planned something special for us!\n\n"
+        text += "✨ \(plan.title)\n"
+        text += "\"\(plan.tagline)\"\n\n"
+        
+        for stop in plan.stops {
+            text += "\(stop.emoji) \(stop.timeSlot) - \(stop.name)\n"
         }
-    }
-    
-    private var planPreview: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(plan.title)
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundColor(Color(UIColor.label))
-                    
-                    Text(plan.tagline)
-                        .font(.system(size: 14))
-                        .foregroundColor(Color(UIColor.secondaryLabel))
-                        .lineLimit(2)
-                }
-                
-                Spacer()
-                
-                VStack(alignment: .trailing, spacing: 4) {
-                    Text(plan.totalDuration)
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(.brandGold)
-                    
-                    Text("\(plan.stops.count) stops")
-                        .font(.system(size: 12))
-                        .foregroundColor(Color(UIColor.tertiaryLabel))
-                }
-            }
-            
-            // Mini itinerary
-            HStack(spacing: 8) {
-                ForEach(plan.stops.prefix(4)) { stop in
-                    Text(stop.emoji)
-                        .font(.system(size: 20))
-                        .frame(width: 36, height: 36)
-                        .background(Color.white)
-                        .cornerRadius(8)
-                }
-                
-                if plan.stops.count > 4 {
-                    Text("+\(plan.stops.count - 4)")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(Color(UIColor.secondaryLabel))
-                        .frame(width: 36, height: 36)
-                        .background(Color.white)
-                        .cornerRadius(8)
-                }
-            }
+        
+        text += "\nTotal time: \(plan.totalDuration)\n"
+        text += "Estimated cost: \(plan.estimatedCost)\n"
+        
+        if !shareMessage.isEmpty {
+            text += "\n\(shareMessage)"
         }
-        .padding(16)
-        .background(Color.brandGold.opacity(0.1))
-        .cornerRadius(16)
-        .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(Color.brandGold.opacity(0.3), lineWidth: 1)
-        )
-    }
-    
-    private var shareMethodSelection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("How would you like to share?")
-                .font(.system(size: 16, weight: .semibold))
-            
-            HStack(spacing: 12) {
-                ForEach(ShareMethod.allCases, id: \.self) { method in
-                    ShareMethodCard(
-                        method: method,
-                        isSelected: shareMethod == method,
-                        onTap: { shareMethod = method }
-                    )
-                }
-            }
-        }
-    }
-    
-    private var shareForm: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            switch shareMethod {
-            case .link:
-                // Link preview
-                HStack {
-                    Text("yourdategenie.app/plan/abc123")
-                        .font(.system(size: 14))
-                        .foregroundColor(Color(UIColor.secondaryLabel))
-                        .lineLimit(1)
-                    
-                    Spacer()
-                    
-                    Button {
-                        copyLink()
-                    } label: {
-                        Image(systemName: "doc.on.doc")
-                            .foregroundColor(.brandPrimary)
-                    }
-                }
-                .padding(14)
-                .background(Color.white)
-                .cornerRadius(12)
-                
-            case .email:
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Partner's email")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(Color(UIColor.secondaryLabel))
-                    
-                    TextField("email@example.com", text: $partnerEmail)
-                        .textContentType(.emailAddress)
-                        .keyboardType(.emailAddress)
-                        .autocapitalization(.none)
-                        .padding(14)
-                        .background(Color.white)
-                        .cornerRadius(12)
-                }
-                
-            case .sms:
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Partner's phone")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(Color(UIColor.secondaryLabel))
-                    
-                    TextField("(555) 123-4567", text: $partnerPhone)
-                        .textContentType(.telephoneNumber)
-                        .keyboardType(.phonePad)
-                        .padding(14)
-                        .background(Color.white)
-                        .cornerRadius(12)
-                }
-            }
-            
-            // Personal message
-            if shareMethod != .link {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Add a personal message (optional)")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(Color(UIColor.secondaryLabel))
-                    
-                    TextEditor(text: $personalMessage)
-                        .frame(height: 80)
-                        .padding(8)
-                        .background(Color.white)
-                        .cornerRadius(12)
-                        .overlay(
-                            Group {
-                                if personalMessage.isEmpty {
-                                    Text("E.g., Can't wait for our date! 💕")
-                                        .foregroundColor(Color(UIColor.placeholderText))
-                                        .padding(12)
-                                        .allowsHitTesting(false)
-                                }
-                            },
-                            alignment: .topLeading
-                        )
-                }
-            }
-        }
-    }
-    
-    private var shareButton: some View {
-        Button {
-            sharePlan()
-        } label: {
-            HStack {
-                if isSharing {
-                    ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                } else {
-                    Image(systemName: shareMethod.icon)
-                }
-                Text(shareButtonText)
-            }
-            .font(.system(size: 17, weight: .semibold))
-            .foregroundColor(.white)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 16)
-            .background(
-                isShareEnabled
-                    ? LinearGradient.goldGradient
-                    : LinearGradient(colors: [Color.gray.opacity(0.5)], startPoint: .leading, endPoint: .trailing)
-            )
-            .cornerRadius(14)
-            .shadow(color: isShareEnabled ? Color.brandGold.opacity(0.4) : .clear, radius: 10, y: 4)
-        }
-        .disabled(!isShareEnabled || isSharing)
-    }
-    
-    private var shareButtonText: String {
-        switch shareMethod {
-        case .link: return "Copy Link"
-        case .email: return "Send Email"
-        case .sms: return "Send Text"
-        }
-    }
-    
-    private var isShareEnabled: Bool {
-        switch shareMethod {
-        case .link: return true
-        case .email: return !partnerEmail.isEmpty && partnerEmail.contains("@")
-        case .sms: return !partnerPhone.isEmpty
-        }
-    }
-    
-    private func copyLink() {
-        UIPasteboard.general.string = "https://yourdategenie.app/plan/abc123"
-        // Show feedback
+        
+        text += "\n\n— Planned with Your Date Genie"
+        
+        return text
     }
     
     private func sharePlan() {
-        isSharing = true
+        let activityController = UIActivityViewController(activityItems: [shareText], applicationActivities: nil)
         
-        // Simulate sending
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-            isSharing = false
-            
-            switch shareMethod {
-            case .link:
-                copyLink()
-                shareSuccess = true
-            case .email, .sms:
-                shareSuccess = true
+        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+           let window = windowScene.windows.first,
+           let rootVC = window.rootViewController {
+            rootVC.present(activityController, animated: true)
+        }
+    }
+    
+    private func copyToClipboard() {
+        UIPasteboard.general.string = shareText
+        withAnimation(.spring(response: 0.3)) {
+            copiedToClipboard = true
+        }
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+            withAnimation {
+                copiedToClipboard = false
             }
+        }
+    }
+    
+    private func shareViaMessages() {
+        if let encoded = shareText.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+           let url = URL(string: "sms:&body=\(encoded)") {
+            UIApplication.shared.open(url)
+        }
+    }
+    
+    private func shareViaEmail() {
+        let subject = "Our Date Plan: \(plan.title)"
+        if let subjectEncoded = subject.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+           let bodyEncoded = shareText.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+           let url = URL(string: "mailto:?subject=\(subjectEncoded)&body=\(bodyEncoded)") {
+            UIApplication.shared.open(url)
+        }
+    }
+    
+    private func shareAsNote() {
+        UIPasteboard.general.string = shareText
+        copiedToClipboard = true
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+            copiedToClipboard = false
         }
     }
 }
 
-// MARK: - Share Method Card
-struct ShareMethodCard: View {
-    let method: PartnerShareView.ShareMethod
-    let isSelected: Bool
-    let onTap: () -> Void
+// MARK: - Share Button
+struct ShareButton: View {
+    let icon: String
+    let label: String
+    let color: Color
+    let action: () -> Void
     
     var body: some View {
-        Button(action: onTap) {
-            VStack(spacing: 8) {
-                Image(systemName: method.icon)
+        Button(action: action) {
+            VStack(spacing: 10) {
+                Image(systemName: icon)
                     .font(.system(size: 22))
-                    .foregroundColor(isSelected ? .white : method.color)
-                    .frame(width: 48, height: 48)
-                    .background(isSelected ? method.color : method.color.opacity(0.1))
-                    .cornerRadius(12)
+                    .foregroundColor(color)
+                    .frame(width: 54, height: 54)
+                    .background(Color.luxuryMaroonLight)
+                    .cornerRadius(14)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14)
+                            .stroke(color.opacity(0.3), lineWidth: 1)
+                    )
                 
-                Text(method.title)
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(isSelected ? method.color : Color(UIColor.label))
+                Text(label)
+                    .font(Font.inter(11, weight: .medium))
+                    .foregroundColor(Color.luxuryCream)
             }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 12)
-            .background(isSelected ? method.color.opacity(0.1) : Color.white)
-            .cornerRadius(14)
-            .overlay(
-                RoundedRectangle(cornerRadius: 14)
-                    .stroke(isSelected ? method.color : Color.gray.opacity(0.2), lineWidth: isSelected ? 2 : 1)
-            )
         }
-        .buttonStyle(ScaleButtonStyle())
     }
 }
 

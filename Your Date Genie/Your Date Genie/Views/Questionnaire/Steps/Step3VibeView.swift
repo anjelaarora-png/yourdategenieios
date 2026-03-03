@@ -145,5 +145,5 @@ struct FlowLayout: Layout {
 
 #Preview {
     Step3VibeView(data: .constant(QuestionnaireData()))
-        .background(Color.brandCream)
+        .background(Color.luxuryMaroon)
 }

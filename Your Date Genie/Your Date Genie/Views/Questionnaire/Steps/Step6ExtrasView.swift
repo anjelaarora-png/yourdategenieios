@@ -164,5 +164,5 @@ struct Step6ExtrasView: View {
 
 #Preview {
     Step6ExtrasView(data: .constant(QuestionnaireData()))
-        .background(Color.brandCream)
+        .background(Color.luxuryMaroon)
 }

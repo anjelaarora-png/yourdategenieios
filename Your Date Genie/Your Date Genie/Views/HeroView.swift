@@ -1,182 +1,141 @@
 import SwiftUI
 
 struct HeroView: View {
-    @State private var isAnimated = false
-    
-    // Brand colors matching the React app
-    private let primaryColor = Color(red: 0.55, green: 0.22, blue: 0.24) // Maroon
-    private let goldColor = Color(red: 0.78, green: 0.65, blue: 0.47) // Gold
-    private let backgroundColor = Color(red: 0.98, green: 0.97, blue: 0.95) // Cream
+    @EnvironmentObject var coordinator: NavigationCoordinator
+    @State private var sparkleRotation: Double = 0
+    @State private var glowPulse = false
     
     var body: some View {
-        ScrollView {
-            VStack(spacing: 0) {
-                // Hero Image
-                heroImage
-                
-                // Content Section
-                contentSection
-            }
-        }
-        .background(backgroundColor)
-        .ignoresSafeArea(edges: .top)
-        .onAppear {
-            withAnimation(.easeOut(duration: 0.8)) {
-                isAnimated = true
-            }
-        }
-    }
-    
-    // MARK: - Hero Image
-    private var heroImage: some View {
-        GeometryReader { geometry in
-            AsyncImage(url: URL(string: "https://images.unsplash.com/photo-1529634806980-85c3dd6d34ac?q=80&w=1000&auto=format&fit=crop")) { phase in
+        ZStack(alignment: .bottom) {
+            // Background image with luxurious overlay
+            AsyncImage(url: URL(string: "https://images.unsplash.com/photo-1529333166437-7750a6dd5a70?w=800&h=600&fit=crop")) { phase in
                 switch phase {
-                case .empty:
-                    Rectangle()
-                        .fill(Color.gray.opacity(0.2))
-                        .overlay(
-                            ProgressView()
-                                .tint(primaryColor)
-                        )
                 case .success(let image):
                     image
                         .resizable()
                         .aspectRatio(contentMode: .fill)
-                        .frame(width: geometry.size.width, height: geometry.size.height)
-                        .clipped()
+                case .empty:
+                    Rectangle()
+                        .fill(Color.luxuryMaroonLight)
+                        .overlay(ProgressView().tint(Color.luxuryGold))
                 case .failure:
                     Rectangle()
-                        .fill(Color.gray.opacity(0.2))
-                        .overlay(
-                            Image(systemName: "photo")
-                                .font(.largeTitle)
-                                .foregroundColor(.gray)
-                        )
+                        .fill(Color.luxuryMaroonLight)
                 @unknown default:
                     EmptyView()
                 }
             }
-        }
-        .frame(height: UIScreen.main.bounds.height * 0.5)
-        .overlay(
-            // Gradient overlay for text readability
-            LinearGradient(
-                gradient: Gradient(colors: [
-                    Color.clear,
-                    backgroundColor.opacity(0.3),
-                    backgroundColor
-                ]),
-                startPoint: .top,
-                endPoint: .bottom
-            )
-        )
-    }
-    
-    // MARK: - Content Section
-    private var contentSection: some View {
-        VStack(alignment: .leading, spacing: 24) {
-            // Title
-            titleSection
-                .opacity(isAnimated ? 1 : 0)
-                .offset(y: isAnimated ? 0 : 20)
-            
-            // Description paragraphs
-            descriptionSection
-                .opacity(isAnimated ? 1 : 0)
-                .offset(y: isAnimated ? 0 : 20)
-                .animation(.easeOut(duration: 0.8).delay(0.1), value: isAnimated)
-            
-            // CTA Button
-            ctaButton
-                .opacity(isAnimated ? 1 : 0)
-                .offset(y: isAnimated ? 0 : 20)
-                .animation(.easeOut(duration: 0.8).delay(0.3), value: isAnimated)
-        }
-        .padding(.horizontal, 24)
-        .padding(.top, -40)
-        .padding(.bottom, 40)
-    }
-    
-    // MARK: - Title Section
-    private var titleSection: some View {
-        HStack(spacing: 8) {
-            Text("About")
-                .font(.custom("Cormorant-Bold", size: 32, relativeTo: .title))
-                .foregroundColor(Color(UIColor.label))
-            
-            Text("Us")
-                .font(.custom("Cormorant-Italic", size: 32, relativeTo: .title))
-                .foregroundColor(primaryColor)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-    
-    // MARK: - Description Section
-    private var descriptionSection: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            Text("Your Date Genie was created for people who love with intention but juggle full-demanding lives. For those who care deeply, yet often find themselves thinking, \"I want to plan something special... I just don't know where to begin.\" When days get crowded and routines take over, romance can slip into the background without anyone meaning to let it.")
-                .font(.system(size: 17, weight: .regular))
-                .foregroundColor(Color(UIColor.secondaryLabel))
-                .lineSpacing(6)
-            
-            Text("That's where your Genie steps in. We take the details that define you, your pace, your preferences, your partner's little quirks, the rhythm of your week and shape them into moments that feel thoughtful, easy, and beautifully personal.")
-                .font(.system(size: 17, weight: .regular))
-                .foregroundColor(Color(UIColor.secondaryLabel))
-                .lineSpacing(6)
-        }
-    }
-    
-    // MARK: - CTA Button
-    private var ctaButton: some View {
-        NavigationLink(destination: SignUpView()) {
-            HStack(spacing: 8) {
-                Text("Plan Your Date")
-                    .font(.system(size: 18, weight: .semibold))
-                
-                Image(systemName: "arrow.right")
-                    .font(.system(size: 16, weight: .semibold))
-            }
-            .foregroundColor(.white)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 18)
-            .background(
+            .frame(height: UIScreen.main.bounds.height * 0.65)
+            .clipped()
+            .overlay(
                 LinearGradient(
                     gradient: Gradient(colors: [
-                        goldColor,
-                        goldColor.opacity(0.85)
+                        Color.luxuryMaroon.opacity(0.3),
+                        Color.luxuryMaroon.opacity(0.5),
+                        Color.luxuryMaroon.opacity(0.9),
+                        Color.luxuryMaroon
                     ]),
-                    startPoint: .leading,
-                    endPoint: .trailing
+                    startPoint: .top,
+                    endPoint: .bottom
                 )
             )
-            .cornerRadius(12)
-            .shadow(color: goldColor.opacity(0.4), radius: 12, x: 0, y: 6)
+            
+            // Content
+            VStack(spacing: 28) {
+                // Animated sparkle icon
+                ZStack {
+                    // Glow effect
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 60))
+                        .foregroundColor(Color.luxuryGold.opacity(glowPulse ? 0.4 : 0.2))
+                        .blur(radius: glowPulse ? 20 : 15)
+                    
+                    // Main sparkle
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 50))
+                        .foregroundStyle(LinearGradient.goldShimmer)
+                        .rotationEffect(.degrees(sparkleRotation))
+                }
+                
+                // Brand and tagline
+                VStack(spacing: 10) {
+                    HStack(spacing: 4) {
+                        Text("Your Date")
+                            .font(Font.header(14, weight: .bold))
+                            .foregroundColor(Color.luxuryGold.opacity(0.8))
+                        Text("Genie")
+                            .font(Font.special(32, weight: .bold))
+                            .foregroundColor(Color.luxuryGold)
+                    }
+                    
+                    Text("Date nights,")
+                        .font(Font.header(38, weight: .bold))
+                        .foregroundColor(Color.luxuryCream)
+                    +
+                    Text("\nplanned for you.")
+                        .font(Font.header(38, weight: .bold))
+                        .foregroundStyle(LinearGradient.goldShimmer)
+                }
+                .multilineTextAlignment(.center)
+                
+                // Description
+                Text("Tell us what you love. We'll create a complete evening — venues, timing, and all the details.")
+                    .font(Font.subheader(16, weight: .regular))
+                    .foregroundColor(Color.luxuryCreamMuted)
+                    .multilineTextAlignment(.center)
+                    .lineSpacing(5)
+                    .padding(.horizontal, 24)
+                
+                // CTA Button
+                Button {
+                    coordinator.startDatePlanning()
+                } label: {
+                    HStack(spacing: 12) {
+                        Text("Begin Your Journey")
+                            .font(Font.bodySans(16, weight: .semibold))
+                        
+                        Image(systemName: "arrow.right")
+                            .font(.system(size: 14, weight: .semibold))
+                    }
+                }
+                .buttonStyle(LuxuryGoldButtonStyle())
+                
+                // Trust text
+                HStack(spacing: 4) {
+                    Text("Join 500+ couples planning")
+                        .font(Font.bodySans(12, weight: .regular))
+                        .foregroundColor(Color.luxuryMuted)
+                    Text("magical")
+                        .font(Font.special(20))
+                        .foregroundColor(Color.luxuryGold)
+                    Text("dates")
+                        .font(Font.bodySans(12, weight: .regular))
+                        .foregroundColor(Color.luxuryMuted)
+                }
+            }
+            .padding(.bottom, 60)
         }
-        .buttonStyle(ScaleButtonStyle())
+        .onAppear {
+            withAnimation(.linear(duration: 30).repeatForever(autoreverses: false)) {
+                sparkleRotation = 360
+            }
+            withAnimation(.easeInOut(duration: 2.5).repeatForever(autoreverses: true)) {
+                glowPulse = true
+            }
+        }
     }
 }
 
-// MARK: - Scale Button Style
+// MARK: - Scale Button Style (for reuse)
 struct ScaleButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .scaleEffect(configuration.isPressed ? 0.97 : 1)
-            .animation(.easeInOut(duration: 0.2), value: configuration.isPressed)
+            .scaleEffect(configuration.isPressed ? 0.97 : 1.0)
+            .animation(.easeInOut(duration: 0.15), value: configuration.isPressed)
     }
 }
 
-// MARK: - Placeholder SignUpView
-struct SignUpView: View {
-    var body: some View {
-        Text("Sign Up")
-            .navigationTitle("Get Started")
-    }
-}
-
-// MARK: - Preview
 #Preview {
-    NavigationStack {
-        HeroView()
-    }
+    HeroView()
+        .environmentObject(NavigationCoordinator.shared)
 }

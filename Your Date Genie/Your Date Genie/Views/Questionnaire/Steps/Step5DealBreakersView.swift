@@ -110,5 +110,5 @@ struct Step5DealBreakersView: View {
 
 #Preview {
     Step5DealBreakersView(data: .constant(QuestionnaireData()))
-        .background(Color.brandCream)
+        .background(Color.luxuryMaroon)
 }

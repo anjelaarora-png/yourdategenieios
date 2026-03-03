@@ -9,49 +9,57 @@ struct QuestionnaireView: View {
     
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
-                // Progress indicator
-                StepProgressView(currentStep: viewModel.currentStep, totalSteps: 6)
-                    .padding(.horizontal)
-                    .padding(.top, 8)
+            ZStack {
+                // Luxurious background
+                Color.luxuryMaroon
+                    .ignoresSafeArea()
                 
-                // Step content
-                TabView(selection: $viewModel.currentStep) {
-                    Step1LocationView(data: $viewModel.data)
-                        .tag(1)
-                    Step2TransportationView(data: $viewModel.data)
-                        .tag(2)
-                    Step3VibeView(data: $viewModel.data)
-                        .tag(3)
-                    Step4FoodView(data: $viewModel.data)
-                        .tag(4)
-                    Step5DealBreakersView(data: $viewModel.data)
-                        .tag(5)
-                    Step6ExtrasView(data: $viewModel.data)
-                        .tag(6)
+                VStack(spacing: 0) {
+                    // Progress indicator
+                    StepProgressView(currentStep: viewModel.currentStep, totalSteps: 6)
+                        .padding(.horizontal)
+                        .padding(.top, 8)
+                    
+                    // Step content
+                    TabView(selection: $viewModel.currentStep) {
+                        Step1LocationView(data: $viewModel.data)
+                            .tag(1)
+                        Step2TransportationView(data: $viewModel.data)
+                            .tag(2)
+                        Step3VibeView(data: $viewModel.data)
+                            .tag(3)
+                        Step4FoodView(data: $viewModel.data)
+                            .tag(4)
+                        Step5DealBreakersView(data: $viewModel.data)
+                            .tag(5)
+                        Step6ExtrasView(data: $viewModel.data)
+                            .tag(6)
+                    }
+                    .tabViewStyle(.page(indexDisplayMode: .never))
+                    .animation(.easeInOut(duration: 0.3), value: viewModel.currentStep)
+                    
+                    // Navigation buttons
+                    navigationButtons
                 }
-                .tabViewStyle(.page(indexDisplayMode: .never))
-                .animation(.easeInOut(duration: 0.3), value: viewModel.currentStep)
-                
-                // Navigation buttons
-                navigationButtons
             }
-            .background(Color.brandCream)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancel") {
                         dismiss()
                     }
-                    .foregroundColor(.brandPrimary)
+                    .font(Font.bodySans(16, weight: .medium))
+                    .foregroundColor(Color.luxuryGold)
                 }
                 
                 ToolbarItem(placement: .principal) {
                     Text(viewModel.stepTitle)
-                        .font(.headline)
-                        .foregroundColor(.brandPrimary)
+                        .font(Font.subheader(17, weight: .semibold))
+                        .foregroundColor(Color.luxuryGold)
                 }
             }
+            .toolbarBackground(Color.luxuryMaroon, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
         }
     }
     
@@ -64,21 +72,12 @@ struct QuestionnaireView: View {
                         viewModel.previousStep()
                     }
                 } label: {
-                    HStack {
+                    HStack(spacing: 8) {
                         Image(systemName: "chevron.left")
                         Text("Back")
                     }
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundColor(.brandPrimary)
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 14)
-                    .background(Color.white)
-                    .cornerRadius(12)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(Color.brandPrimary.opacity(0.3), lineWidth: 1)
-                    )
                 }
+                .buttonStyle(LuxuryOutlineButtonStyle(isSmall: true))
             } else {
                 Spacer()
             }
@@ -94,7 +93,7 @@ struct QuestionnaireView: View {
                     }
                 }
             } label: {
-                HStack {
+                HStack(spacing: 8) {
                     if viewModel.currentStep == 6 {
                         Image(systemName: "sparkles")
                         Text("Create Plan")
@@ -103,24 +102,18 @@ struct QuestionnaireView: View {
                         Image(systemName: "chevron.right")
                     }
                 }
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundColor(.white)
                 .frame(maxWidth: viewModel.currentStep == 1 ? .infinity : nil)
-                .padding(.horizontal, 24)
-                .padding(.vertical, 14)
-                .background(
-                    viewModel.isCurrentStepValid
-                        ? LinearGradient.goldGradient
-                        : LinearGradient(colors: [Color.gray.opacity(0.5)], startPoint: .leading, endPoint: .trailing)
-                )
-                .cornerRadius(12)
-                .shadow(color: viewModel.isCurrentStepValid ? Color.brandGold.opacity(0.4) : .clear, radius: 8, y: 4)
             }
+            .buttonStyle(LuxuryGoldButtonStyle(isSmall: true))
             .disabled(!viewModel.isCurrentStepValid)
+            .opacity(viewModel.isCurrentStepValid ? 1 : 0.5)
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 16)
-        .background(Color.white)
+        .background(
+            Color.luxuryMaroon
+                .shadow(color: Color.black.opacity(0.3), radius: 10, y: -5)
+        )
     }
 }
 
@@ -132,17 +125,17 @@ struct StepProgressView: View {
     private let stepLabels = ["Location", "Travel", "Vibe", "Food", "Avoid", "Extras"]
     
     var body: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 12) {
             // Progress bar
             GeometryReader { geometry in
                 ZStack(alignment: .leading) {
                     Rectangle()
-                        .fill(Color.gray.opacity(0.2))
+                        .fill(Color.luxuryMuted.opacity(0.3))
                         .frame(height: 4)
                         .cornerRadius(2)
                     
                     Rectangle()
-                        .fill(LinearGradient.goldGradient)
+                        .fill(LinearGradient.goldShimmer)
                         .frame(width: geometry.size.width * CGFloat(currentStep) / CGFloat(totalSteps), height: 4)
                         .cornerRadius(2)
                         .animation(.easeInOut(duration: 0.3), value: currentStep)
@@ -153,15 +146,23 @@ struct StepProgressView: View {
             // Step indicators
             HStack {
                 ForEach(1...totalSteps, id: \.self) { step in
-                    VStack(spacing: 4) {
-                        Circle()
-                            .fill(step <= currentStep ? Color.brandGold : Color.gray.opacity(0.3))
-                            .frame(width: 8, height: 8)
+                    VStack(spacing: 6) {
+                        ZStack {
+                            Circle()
+                                .fill(step <= currentStep ? Color.luxuryGold : Color.luxuryMuted.opacity(0.3))
+                                .frame(width: 10, height: 10)
+                            
+                            if step < currentStep {
+                                Image(systemName: "checkmark")
+                                    .font(.system(size: 6, weight: .bold))
+                                    .foregroundColor(Color.luxuryMaroon)
+                            }
+                        }
                         
                         if step == currentStep {
                             Text(stepLabels[step - 1])
-                                .font(.system(size: 10, weight: .medium))
-                                .foregroundColor(.brandPrimary)
+                                .font(Font.inter(10, weight: .medium))
+                                .foregroundColor(Color.luxuryGold)
                         }
                     }
                     
@@ -171,7 +172,7 @@ struct StepProgressView: View {
                 }
             }
         }
-        .padding(.vertical, 8)
+        .padding(.vertical, 12)
     }
 }
 
@@ -179,6 +180,10 @@ struct StepProgressView: View {
 class QuestionnaireViewModel: ObservableObject {
     @Published var currentStep = 1
     @Published var data = QuestionnaireData()
+    
+    init() {
+        prePopulateFromSavedPreferences()
+    }
     
     var stepTitle: String {
         switch currentStep {
@@ -214,6 +219,10 @@ class QuestionnaireViewModel: ObservableObject {
         if currentStep > 1 {
             currentStep -= 1
         }
+    }
+    
+    private func prePopulateFromSavedPreferences() {
+        UserProfileManager.shared.prePopulateQuestionnaireData(&data)
     }
 }
 

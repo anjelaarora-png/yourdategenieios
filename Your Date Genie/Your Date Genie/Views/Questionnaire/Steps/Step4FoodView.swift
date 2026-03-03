@@ -135,5 +135,5 @@ struct BudgetCard: View {
 
 #Preview {
     Step4FoodView(data: .constant(QuestionnaireData()))
-        .background(Color.brandCream)
+        .background(Color.luxuryMaroon)
 }

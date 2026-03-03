@@ -96,8 +96,9 @@ struct GiftSuggestion: Identifiable, Hashable {
     var purchaseUrl: String?
     let whyItFits: String
     let emoji: String
+    var storeSearchQuery: String?
     
-    init(name: String, description: String, priceRange: String, whereToBuy: String, purchaseUrl: String? = nil, whyItFits: String, emoji: String) {
+    init(name: String, description: String, priceRange: String, whereToBuy: String, purchaseUrl: String? = nil, whyItFits: String, emoji: String, storeSearchQuery: String? = nil) {
         self.id = UUID()
         self.name = name
         self.description = description
@@ -106,6 +107,7 @@ struct GiftSuggestion: Identifiable, Hashable {
         self.purchaseUrl = purchaseUrl
         self.whyItFits = whyItFits
         self.emoji = emoji
+        self.storeSearchQuery = storeSearchQuery
     }
 }
 
