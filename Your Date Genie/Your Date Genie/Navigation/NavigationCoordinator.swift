@@ -162,6 +162,8 @@ class NavigationCoordinator: ObservableObject {
     @Published var hasCompletedOnboarding = false
     @Published var hasCompletedSignUp = false
     @Published var hasCompletedPreferences = false
+    @Published var showMemoryGallery = false
+    @Published var showMemoryCapture = false
     
     @Published var activeSheet: ActiveSheet?
     
@@ -184,6 +186,7 @@ class NavigationCoordinator: ObservableObject {
     enum ActiveSheet: Identifiable {
         case questionnaire
         case datePlanResult
+        case datePlanOptions
         case giftFinder(datePlan: DatePlan?, dateLocation: String?)
         case playlist(planTitle: String)
         case reservation(venueName: String, venueType: String, address: String?, phone: String?)
@@ -195,6 +198,7 @@ class NavigationCoordinator: ObservableObject {
             switch self {
             case .questionnaire: return "questionnaire"
             case .datePlanResult: return "datePlanResult"
+            case .datePlanOptions: return "datePlanOptions"
             case .giftFinder: return "giftFinder"
             case .playlist: return "playlist"
             case .reservation: return "reservation"
@@ -219,9 +223,20 @@ class NavigationCoordinator: ObservableObject {
         activeSheet = nil
         
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-            self.currentDatePlan = DatePlan.sample
-            self.generatedPlans = [DatePlan.sample]
-            self.activeSheet = .datePlanResult
+            let generator = DatePlanGeneratorService.shared
+            if !generator.generatedPlans.isEmpty {
+                self.currentDatePlan = generator.generatedPlans.first
+                self.generatedPlans = generator.generatedPlans
+            } else {
+                self.currentDatePlan = DatePlan.sample
+                self.generatedPlans = [DatePlan.sample, DatePlan.sampleOptionB, DatePlan.sampleOptionC]
+            }
+            
+            if self.generatedPlans.count >= 3 {
+                self.activeSheet = .datePlanOptions
+            } else {
+                self.activeSheet = .datePlanResult
+            }
         }
     }
     
@@ -273,6 +288,17 @@ class NavigationCoordinator: ObservableObject {
     
     func completeSignUp() {
         hasCompletedSignUp = true
+        isLoggedIn = true
+        saveState()
+    }
+    
+    func completeSignIn() {
+        hasCompletedSignUp = true
+        isLoggedIn = true
+        
+        if UserProfileManager.shared.hasCompletedPreferences {
+            hasCompletedPreferences = true
+        }
         saveState()
     }
     
@@ -282,8 +308,8 @@ class NavigationCoordinator: ObservableObject {
     }
     
     func signOut() {
-        UserProfileManager.shared.clearProfile()
-        hasCompletedOnboarding = false
+        UserProfileManager.shared.signOut()
+        isLoggedIn = false
         hasCompletedSignUp = false
         hasCompletedPreferences = false
         currentDatePlan = nil
@@ -300,6 +326,7 @@ class NavigationCoordinator: ObservableObject {
         hasCompletedOnboarding = UserDefaults.standard.bool(forKey: "hasCompletedOnboarding")
         hasCompletedSignUp = UserDefaults.standard.bool(forKey: "hasCompletedSignUp")
         hasCompletedPreferences = UserDefaults.standard.bool(forKey: "hasCompletedPreferences")
+        isLoggedIn = UserProfileManager.shared.isLoggedIn
     }
     
     private func saveState() {
@@ -317,7 +344,6 @@ struct RootNavigationView: View {
     
     var body: some View {
         ZStack {
-            // Luxurious background
             Color.luxuryMaroon
                 .ignoresSafeArea()
             
@@ -327,8 +353,8 @@ struct RootNavigationView: View {
             } else if !coordinator.hasCompletedOnboarding {
                 MobileOnboardingView()
                     .environmentObject(coordinator)
-            } else if !coordinator.hasCompletedSignUp {
-                SignUpView()
+            } else if !coordinator.isLoggedIn {
+                AuthenticationView()
                     .environmentObject(coordinator)
             } else if !coordinator.hasCompletedPreferences {
                 PreferencesSetupView()
@@ -341,7 +367,7 @@ struct RootNavigationView: View {
         }
         .animation(.easeInOut(duration: 0.6), value: showSplash)
         .animation(.easeInOut(duration: 0.4), value: coordinator.hasCompletedOnboarding)
-        .animation(.easeInOut(duration: 0.4), value: coordinator.hasCompletedSignUp)
+        .animation(.easeInOut(duration: 0.4), value: coordinator.isLoggedIn)
         .animation(.easeInOut(duration: 0.4), value: coordinator.hasCompletedPreferences)
         .onAppear {
             DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
@@ -389,18 +415,28 @@ struct LuxurySplashView: View {
                 .opacity(logoOpacity)
                 
                 VStack(spacing: 10) {
-                    HStack(spacing: 4) {
+                    HStack(spacing: 6) {
                         Text("Your Date")
-                            .font(Font.header(28, weight: .bold))
+                            .font(Font.header(24, weight: .regular))
                             .foregroundColor(Color.luxuryGold)
                         Text("Genie")
-                            .font(Font.special(48, weight: .bold))
+                            .font(Font.tangerine(48, weight: .bold))
+                            .italic()
                             .foregroundColor(Color.luxuryGold)
                     }
                     
-                    Text("Date nights, planned for you.")
-                        .font(Font.subheader(16, weight: .regular))
-                        .foregroundColor(Color.luxuryCreamMuted)
+                    HStack(spacing: 6) {
+                        Text("Date nights,")
+                            .font(Font.header(18, weight: .regular))
+                            .foregroundColor(Color.luxuryCreamMuted)
+                        Text("planned")
+                            .font(Font.tangerine(28, weight: .bold))
+                            .italic()
+                            .foregroundColor(Color.luxuryGold)
+                        Text("for you.")
+                            .font(Font.header(18, weight: .regular))
+                            .foregroundColor(Color.luxuryCreamMuted)
+                    }
                 }
                 .opacity(textOpacity)
             }
@@ -468,6 +504,12 @@ struct LuxuryMainAppView: View {
         .sheet(item: $coordinator.activeSheet) { sheet in
             sheetContent(for: sheet)
         }
+        .sheet(isPresented: $coordinator.showMemoryGallery) {
+            MemoryGalleryView(showCloseButton: true)
+        }
+        .sheet(isPresented: $coordinator.showMemoryCapture) {
+            AddMemorySheet()
+        }
     }
     
     @ViewBuilder
@@ -477,6 +519,13 @@ struct LuxuryMainAppView: View {
             QuestionnaireView { data in
                 coordinator.completeQuestionnaire(with: data)
             }
+        case .datePlanOptions:
+            DatePlanOptionsView(
+                plans: coordinator.generatedPlans,
+                onSave: { plan in coordinator.savePlan(plan) },
+                onRegenerate: { /* Regenerate logic */ }
+            )
+            .environmentObject(coordinator)
         case .datePlanResult:
             if let plan = coordinator.currentDatePlan {
                 DatePlanResultView(
@@ -573,16 +622,17 @@ struct LuxuryHomeTabView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    HStack(spacing: 6) {
+                    HStack(spacing: 4) {
                         Image(systemName: "sparkles")
                             .foregroundStyle(LinearGradient.goldShimmer)
                             .rotationEffect(.degrees(sparkleAnimation ? 10 : -10))
                             .animation(.easeInOut(duration: 2).repeatForever(autoreverses: true), value: sparkleAnimation)
                         Text("Your Date")
-                            .font(Font.header(16, weight: .bold))
+                            .font(Font.header(14, weight: .regular))
                             .foregroundColor(Color.luxuryGold)
                         Text("Genie")
-                            .font(Font.special(26, weight: .bold))
+                            .font(Font.tangerine(26, weight: .bold))
+                            .italic()
                             .foregroundColor(Color.luxuryGold)
                     }
                 }
@@ -609,8 +659,8 @@ struct LuxuryHomeTabView: View {
                 .foregroundColor(Color.luxuryMuted)
             
             Text(magicalGreeting)
-                .font(Font.header(28, weight: .bold))
-                .foregroundColor(Color.luxuryGold)
+                .font(Font.header(26, weight: .regular))
+                .foregroundColor(Color.luxuryCream)
                 .multilineTextAlignment(.center)
         }
         .padding(.horizontal, 20)
@@ -669,19 +719,26 @@ struct LuxuryHomeTabView: View {
                         }
                     }
                     
-                    Text("Create Your Next Adventure")
-                        .font(Font.header(26, weight: .bold))
-                        .foregroundColor(Color.luxuryGold)
+                    HStack(spacing: 6) {
+                        Text("Create Your Next")
+                            .font(Font.header(22, weight: .regular))
+                            .foregroundColor(Color.luxuryCream)
+                        Text("Adventure")
+                            .font(Font.tangerine(36, weight: .bold))
+                            .italic()
+                            .foregroundColor(Color.luxuryGold)
+                    }
                     
                     HStack(spacing: 4) {
                         Text("Let your")
-                            .font(Font.subheader(14, weight: .regular))
+                            .font(Font.bodySans(14, weight: .regular))
                             .foregroundColor(Color.luxuryCreamMuted)
                         Text("Genie")
-                            .font(Font.special(24, weight: .bold))
+                            .font(Font.tangerine(26, weight: .bold))
+                            .italic()
                             .foregroundColor(Color.luxuryGold)
                         Text("craft an unforgettable experience")
-                            .font(Font.subheader(14, weight: .regular))
+                            .font(Font.bodySans(14, weight: .regular))
                             .foregroundColor(Color.luxuryCreamMuted)
                     }
                     
@@ -724,12 +781,16 @@ struct LuxuryHomeTabView: View {
     
     private var upcomingExperiencesSection: some View {
         VStack(alignment: .leading, spacing: 16) {
-            HStack {
+            HStack(spacing: 6) {
                 Image(systemName: "calendar.badge.clock")
                     .foregroundColor(Color.luxuryGold)
-                Text("Experiences Waiting")
-                    .font(Font.subheader(18, weight: .semibold))
+                Text("Experiences")
+                    .font(Font.header(17, weight: .regular))
                     .foregroundColor(Color.luxuryCream)
+                Text("Waiting")
+                    .font(Font.tangerine(28, weight: .bold))
+                    .italic()
+                    .foregroundColor(Color.luxuryGold)
             }
             .padding(.horizontal, 20)
             
@@ -781,12 +842,13 @@ struct LuxuryHomeTabView: View {
     
     private var quickActionsSection: some View {
         VStack(alignment: .leading, spacing: 16) {
-            HStack(spacing: 4) {
+            HStack(spacing: 6) {
                 Text("Quick")
-                    .font(Font.subheader(18, weight: .semibold))
+                    .font(Font.header(17, weight: .regular))
                     .foregroundColor(Color.luxuryCream)
                 Text("Magic")
-                    .font(Font.special(28, weight: .bold))
+                    .font(Font.tangerine(28, weight: .bold))
+                    .italic()
                     .foregroundColor(Color.luxuryGold)
             }
             .padding(.horizontal, 20)
@@ -820,9 +882,15 @@ struct LuxuryHomeTabView: View {
     private var savedPlansSection: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
-                Text("Your Planned Adventures")
-                    .font(Font.subheader(18, weight: .semibold))
-                    .foregroundColor(Color.luxuryCream)
+                HStack(spacing: 6) {
+                    Text("Your Planned")
+                        .font(Font.header(17, weight: .regular))
+                        .foregroundColor(Color.luxuryCream)
+                    Text("Adventures")
+                        .font(Font.tangerine(28, weight: .bold))
+                        .italic()
+                        .foregroundColor(Color.luxuryGold)
+                }
                 
                 Spacer()
                 
@@ -856,12 +924,13 @@ struct LuxuryHomeTabView: View {
     
     private var featuresSection: some View {
         VStack(alignment: .leading, spacing: 16) {
-            HStack(spacing: 4) {
+            HStack(spacing: 6) {
                 Text("Magical")
-                    .font(Font.special(28, weight: .bold))
+                    .font(Font.tangerine(28, weight: .bold))
+                    .italic()
                     .foregroundColor(Color.luxuryGold)
                 Text("Tools")
-                    .font(Font.subheader(18, weight: .semibold))
+                    .font(Font.header(17, weight: .regular))
                     .foregroundColor(Color.luxuryCream)
             }
             .padding(.horizontal, 20)
@@ -949,7 +1018,7 @@ struct NotificationsSheetView: View {
                             .foregroundColor(Color.luxuryMuted)
                         
                         Text("No notifications yet")
-                            .font(Font.subheader(18, weight: .semibold))
+                            .font(Font.header(18, weight: .regular))
                             .foregroundColor(Color.luxuryCream)
                         
                         HStack(spacing: 4) {
@@ -957,7 +1026,8 @@ struct NotificationsSheetView: View {
                                 .font(Font.bodySans(14, weight: .regular))
                                 .foregroundColor(Color.luxuryMuted)
                             Text("magical!")
-                                .font(Font.special(22, weight: .bold))
+                                .font(Font.tangerine(26, weight: .bold))
+                                .italic()
                                 .foregroundColor(Color.luxuryGold)
                         }
                         .multilineTextAlignment(.center)
@@ -1204,7 +1274,7 @@ struct ExperienceCard: View {
             
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
-                    .font(Font.subheader(14, weight: .semibold))
+                    .font(Font.header(14, weight: .bold))
                     .foregroundColor(Color.luxuryCream)
                     .lineLimit(1)
                 
@@ -1292,7 +1362,7 @@ struct LuxurySavedPlanCard: View {
                 
                 VStack(alignment: .leading, spacing: 6) {
                     Text(plan.title)
-                        .font(Font.subheader(16, weight: .semibold))
+                        .font(Font.header(15, weight: .bold))
                         .foregroundColor(Color.luxuryCream)
                         .lineLimit(1)
                     
@@ -1377,21 +1447,28 @@ struct LuxuryExploreTabView: View {
                     VStack(spacing: 24) {
                         VStack(spacing: 8) {
                             Text("Explore")
-                                .font(Font.header(32, weight: .bold))
+                                .font(Font.tangerine(52, weight: .bold))
+                                .italic()
                                 .foregroundColor(Color.luxuryGold)
                             
                             Text("Discover new date ideas")
-                                .font(Font.subheader(15, weight: .regular))
+                                .font(Font.bodySans(15, weight: .regular))
                                 .foregroundColor(Color.luxuryCreamMuted)
                         }
                         .padding(.top, 16)
                         
                         // Date Types
                         VStack(alignment: .leading, spacing: 12) {
-                            Text("Date Types")
-                                .font(Font.subheader(17, weight: .semibold))
-                                .foregroundColor(Color.luxuryCream)
-                                .padding(.horizontal, 20)
+                            HStack(spacing: 6) {
+                                Text("Date")
+                                    .font(Font.header(17, weight: .regular))
+                                    .foregroundColor(Color.luxuryCream)
+                                Text("Types")
+                                    .font(Font.tangerine(28, weight: .bold))
+                                    .italic()
+                                    .foregroundColor(Color.luxuryGold)
+                            }
+                            .padding(.horizontal, 20)
                             
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(spacing: 12) {
@@ -1407,10 +1484,16 @@ struct LuxuryExploreTabView: View {
                         
                         // Inspiration
                         VStack(alignment: .leading, spacing: 12) {
-                            Text("Get Inspired")
-                                .font(Font.subheader(17, weight: .semibold))
-                                .foregroundColor(Color.luxuryCream)
-                                .padding(.horizontal, 20)
+                            HStack(spacing: 6) {
+                                Text("Get")
+                                    .font(Font.header(17, weight: .regular))
+                                    .foregroundColor(Color.luxuryCream)
+                                Text("Inspired")
+                                    .font(Font.tangerine(28, weight: .bold))
+                                    .italic()
+                                    .foregroundColor(Color.luxuryGold)
+                            }
+                            .padding(.horizontal, 20)
                             
                             VStack(spacing: 12) {
                                 LuxuryInspirationCard(
@@ -1535,7 +1618,7 @@ struct LuxuryInspirationCard: View {
             
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
-                    .font(Font.subheader(17, weight: .semibold))
+                    .font(Font.header(16, weight: .bold))
                     .foregroundColor(Color.luxuryGold)
                 
                 Text(description)
@@ -1592,7 +1675,7 @@ struct LuxuryProfileTabView: View {
                             
                             VStack(spacing: 4) {
                                 Text(userProfile?.displayName ?? "Date Enthusiast")
-                                    .font(Font.subheader(22, weight: .bold))
+                                    .font(Font.header(22, weight: .bold))
                                     .foregroundColor(Color.luxuryCream)
                                 
                                 if let email = userProfile?.email, !email.isEmpty {
@@ -1715,9 +1798,15 @@ struct PreferencesSummaryCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
-                Text("Your Preferences")
-                    .font(Font.subheader(17, weight: .semibold))
-                    .foregroundColor(Color.luxuryGold)
+                HStack(spacing: 6) {
+                    Text("Your")
+                        .font(Font.header(16, weight: .regular))
+                        .foregroundColor(Color.luxuryCream)
+                    Text("Preferences")
+                        .font(Font.tangerine(26, weight: .bold))
+                        .italic()
+                        .foregroundColor(Color.luxuryGold)
+                }
                 
                 Spacer()
                 

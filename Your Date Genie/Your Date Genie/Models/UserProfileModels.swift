@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import CommonCrypto
 
 // MARK: - User Profile Model
 struct UserProfile: Codable, Equatable {
@@ -133,6 +134,31 @@ enum LoveLanguage: String, Codable, CaseIterable {
     }
 }
 
+// MARK: - User Credentials Model
+struct UserCredentials: Codable {
+    var email: String
+    var passwordHash: String
+}
+
+// MARK: - Authentication Error
+enum AuthenticationError: Error, LocalizedError {
+    case invalidCredentials
+    case emailAlreadyExists
+    case userNotFound
+    case invalidEmail
+    case weakPassword
+    
+    var errorDescription: String? {
+        switch self {
+        case .invalidCredentials: return "Invalid email or password"
+        case .emailAlreadyExists: return "An account with this email already exists"
+        case .userNotFound: return "No account found with this email"
+        case .invalidEmail: return "Please enter a valid email address"
+        case .weakPassword: return "Password must be at least 6 characters"
+        }
+    }
+}
+
 // MARK: - User Profile Manager
 class UserProfileManager: ObservableObject {
     static let shared = UserProfileManager()
@@ -145,9 +171,12 @@ class UserProfileManager: ObservableObject {
     
     @Published var isProfileComplete: Bool = false
     @Published var hasCompletedPreferences: Bool = false
+    @Published var isLoggedIn: Bool = false
     
     private let userProfileKey = "userProfile"
     private let preferencesCompleteKey = "hasCompletedPreferences"
+    private let credentialsKey = "userCredentials"
+    private let loggedInKey = "isLoggedIn"
     
     private init() {
         loadProfile()
@@ -156,6 +185,8 @@ class UserProfileManager: ObservableObject {
     // MARK: - Persistence
     
     private func loadProfile() {
+        isLoggedIn = UserDefaults.standard.bool(forKey: loggedInKey)
+        
         if let data = UserDefaults.standard.data(forKey: userProfileKey),
            let profile = try? JSONDecoder().decode(UserProfile.self, from: data) {
             currentUser = profile
@@ -175,6 +206,107 @@ class UserProfileManager: ObservableObject {
     private func isBasicInfoComplete(_ profile: UserProfile) -> Bool {
         !profile.firstName.isEmpty &&
         !profile.email.isEmpty
+    }
+    
+    // MARK: - Authentication
+    
+    func signUp(
+        firstName: String,
+        lastName: String,
+        email: String,
+        password: String,
+        phoneNumber: String = "",
+        dateOfBirth: Date? = nil,
+        location: String = ""
+    ) throws {
+        guard isValidEmail(email) else {
+            throw AuthenticationError.invalidEmail
+        }
+        
+        guard password.count >= 6 else {
+            throw AuthenticationError.weakPassword
+        }
+        
+        if let existingCreds = loadCredentials(), existingCreds.email.lowercased() == email.lowercased() {
+            throw AuthenticationError.emailAlreadyExists
+        }
+        
+        let credentials = UserCredentials(
+            email: email.lowercased(),
+            passwordHash: hashPassword(password)
+        )
+        saveCredentials(credentials)
+        
+        var profile = UserProfile()
+        profile.firstName = firstName
+        profile.lastName = lastName
+        profile.email = email
+        profile.phoneNumber = phoneNumber
+        profile.dateOfBirth = dateOfBirth
+        profile.location = location
+        currentUser = profile
+        
+        isLoggedIn = true
+        UserDefaults.standard.set(true, forKey: loggedInKey)
+    }
+    
+    func signIn(email: String, password: String) throws {
+        guard isValidEmail(email) else {
+            throw AuthenticationError.invalidEmail
+        }
+        
+        guard let credentials = loadCredentials() else {
+            throw AuthenticationError.userNotFound
+        }
+        
+        guard credentials.email.lowercased() == email.lowercased() else {
+            throw AuthenticationError.userNotFound
+        }
+        
+        guard credentials.passwordHash == hashPassword(password) else {
+            throw AuthenticationError.invalidCredentials
+        }
+        
+        isLoggedIn = true
+        UserDefaults.standard.set(true, forKey: loggedInKey)
+    }
+    
+    func signOut() {
+        isLoggedIn = false
+        UserDefaults.standard.set(false, forKey: loggedInKey)
+    }
+    
+    func accountExists(for email: String) -> Bool {
+        guard let credentials = loadCredentials() else { return false }
+        return credentials.email.lowercased() == email.lowercased()
+    }
+    
+    private func loadCredentials() -> UserCredentials? {
+        guard let data = UserDefaults.standard.data(forKey: credentialsKey),
+              let credentials = try? JSONDecoder().decode(UserCredentials.self, from: data) else {
+            return nil
+        }
+        return credentials
+    }
+    
+    private func saveCredentials(_ credentials: UserCredentials) {
+        if let data = try? JSONEncoder().encode(credentials) {
+            UserDefaults.standard.set(data, forKey: credentialsKey)
+        }
+    }
+    
+    private func hashPassword(_ password: String) -> String {
+        let data = Data(password.utf8)
+        var hash = [UInt8](repeating: 0, count: Int(CC_SHA256_DIGEST_LENGTH))
+        data.withUnsafeBytes {
+            _ = CC_SHA256($0.baseAddress, CC_LONG(data.count), &hash)
+        }
+        return hash.map { String(format: "%02x", $0) }.joined()
+    }
+    
+    private func isValidEmail(_ email: String) -> Bool {
+        let emailRegex = "[A-Z0-9a-z._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,64}"
+        return NSPredicate(format: "SELF MATCHES %@", emailRegex).evaluate(with: email)
     }
     
     // MARK: - Profile Actions
@@ -208,8 +340,11 @@ class UserProfileManager: ObservableObject {
     func clearProfile() {
         currentUser = nil
         hasCompletedPreferences = false
+        isLoggedIn = false
         UserDefaults.standard.removeObject(forKey: userProfileKey)
+        UserDefaults.standard.removeObject(forKey: credentialsKey)
         UserDefaults.standard.set(false, forKey: preferencesCompleteKey)
+        UserDefaults.standard.set(false, forKey: loggedInKey)
     }
     
     // MARK: - Questionnaire Pre-population

@@ -24,6 +24,12 @@ extension Color {
     static let luxuryError = Color(hex: "C75050")            // Muted red
     static let luxuryWarning = Color(hex: "D4A84B")          // Warm yellow
     
+    // Polaroid/Memory Colors
+    static let polaroidWhite = Color(hex: "FFFDF7")          // Warm white for polaroid frame
+    static let polaroidCream = Color(hex: "FAF6F0")          // Cream tint for inner area
+    static let polaroidCaption = Color(hex: "2C2C2C")        // Dark charcoal for caption text
+    static let polaroidShadow = Color(hex: "1A0808")         // Deep shadow for polaroid
+    
     // Legacy aliases for backward compatibility
     static let brandPrimary = luxuryMaroon
     static let brandGold = luxuryGold
@@ -311,15 +317,21 @@ extension Font {
         .custom("PlayfairDisplay-Italic", size: size)
     }
     
-    // MARK: - Special Font (Tangerine)
-    /// Special accent font - Tangerine for magical/romantic words
-    static func special(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
-        let weightName: String
-        switch weight {
-        case .bold: weightName = "Tangerine-Bold"
-        default: weightName = "Tangerine-Regular"
+    // MARK: - Tangerine Font (Special/Magical Text)
+    /// Tangerine handwritten font for magical/romantic words
+    static func tangerine(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
+        let fontName: String
+        if weight == .bold {
+            fontName = "Tangerine-Bold"
+        } else {
+            fontName = "Tangerine-Regular"
         }
-        return .custom(weightName, size: size)
+        return Font.custom(fontName, size: size)
+    }
+    
+    /// Special accent font - alias for tangerine
+    static func special(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
+        return Font.tangerine(size, weight: weight)
     }
     
     // MARK: - Body Font (Serif - Georgia)
@@ -456,16 +468,19 @@ extension Font {
     }
 }
 
-// MARK: - Special Text View for Magical Words
+// MARK: - Special Text Views for Mixed Typography
+
 /// A view that renders text in the special Tangerine font
 struct MagicalText: View {
     let text: String
     var size: CGFloat = 28
     var color: Color = .luxuryGold
+    var italic: Bool = true
     
     var body: some View {
         Text(text)
-            .font(Font.special(size))
+            .font(Font.tangerine(size, weight: .bold))
+            .italic(italic)
             .foregroundColor(color)
     }
 }
@@ -476,24 +491,132 @@ struct MagicalInlineText: View {
     let magical: String
     let suffix: String
     var magicalSize: CGFloat = 32
-    var regularFont: Font = .subheader(18, weight: .regular)
+    var regularFont: Font = .header(18, weight: .regular)
     var color: Color = .luxuryCream
     var magicalColor: Color = .luxuryGold
     
     var body: some View {
         HStack(spacing: 4) {
-            Text(prefix)
-                .font(regularFont)
-                .foregroundColor(color)
+            if !prefix.isEmpty {
+                Text(prefix)
+                    .font(regularFont)
+                    .foregroundColor(color)
+            }
             
             Text(magical)
-                .font(Font.special(magicalSize, weight: .bold))
+                .font(Font.tangerine(magicalSize, weight: .bold))
+                .italic()
                 .foregroundColor(magicalColor)
             
-            Text(suffix)
-                .font(regularFont)
-                .foregroundColor(color)
+            if !suffix.isEmpty {
+                Text(suffix)
+                    .font(regularFont)
+                    .foregroundColor(color)
+            }
         }
+    }
+}
+
+/// Header with magical word - "Get Early Access - Join The Waitlist!" style
+struct HeaderWithMagical: View {
+    let headerText: String
+    let magicalText: String
+    var headerSize: CGFloat = 24
+    var magicalSize: CGFloat = 36
+    var headerColor: Color = .luxuryCream
+    var magicalColor: Color = .luxuryGold
+    var separator: String = " - "
+    var showSeparator: Bool = true
+    
+    var body: some View {
+        HStack(spacing: 4) {
+            Text(headerText)
+                .font(Font.header(headerSize, weight: .regular))
+                .foregroundColor(headerColor)
+            
+            if showSeparator {
+                Text(separator)
+                    .font(Font.header(headerSize, weight: .regular))
+                    .foregroundColor(headerColor)
+            }
+            
+            Text(magicalText)
+                .font(Font.tangerine(magicalSize, weight: .bold))
+                .italic()
+                .foregroundColor(magicalColor)
+        }
+    }
+}
+
+/// Multi-line header with mixed fonts - like "Designed to make Romance feel Natural, not Complicated"
+struct MixedStyleHeader: View {
+    let segments: [TextSegment]
+    var alignment: HorizontalAlignment = .center
+    
+    struct TextSegment {
+        let text: String
+        let isMagical: Bool
+        var newLine: Bool = false
+        
+        static func regular(_ text: String, newLine: Bool = false) -> TextSegment {
+            TextSegment(text: text, isMagical: false, newLine: newLine)
+        }
+        
+        static func magical(_ text: String, newLine: Bool = false) -> TextSegment {
+            TextSegment(text: text, isMagical: true, newLine: newLine)
+        }
+    }
+    
+    var body: some View {
+        VStack(alignment: alignment, spacing: 4) {
+            flowLayout
+        }
+    }
+    
+    @ViewBuilder
+    private var flowLayout: some View {
+        let lines = groupIntoLines()
+        ForEach(Array(lines.enumerated()), id: \.offset) { _, lineSegments in
+            HStack(spacing: 4) {
+                ForEach(Array(lineSegments.enumerated()), id: \.offset) { _, segment in
+                    if segment.isMagical {
+                        Text(segment.text)
+                            .font(Font.tangerine(36, weight: .bold))
+                            .italic()
+                            .foregroundColor(.luxuryGold)
+                    } else {
+                        Text(segment.text)
+                            .font(Font.header(20, weight: .regular))
+                            .foregroundColor(.luxuryCream)
+                    }
+                }
+            }
+        }
+    }
+    
+    private func groupIntoLines() -> [[TextSegment]] {
+        var lines: [[TextSegment]] = [[]]
+        for segment in segments {
+            if segment.newLine && !lines.last!.isEmpty {
+                lines.append([segment])
+            } else {
+                lines[lines.count - 1].append(segment)
+            }
+        }
+        return lines
+    }
+}
+
+/// Section label in uppercase sans-serif
+struct SectionLabel: View {
+    let text: String
+    var color: Color = .luxuryGold
+    
+    var body: some View {
+        Text(text.uppercased())
+            .font(Font.bodySans(12, weight: .semibold))
+            .tracking(2)
+            .foregroundColor(color)
     }
 }
 
@@ -557,4 +680,39 @@ extension View {
     func withSparkles() -> some View {
         modifier(SparkleModifier())
     }
+}
+
+// MARK: - Polaroid Styles
+struct PolaroidModifier: ViewModifier {
+    var rotation: Double = 0
+    
+    func body(content: Content) -> some View {
+        content
+            .background(Color.polaroidWhite)
+            .cornerRadius(4)
+            .shadow(color: Color.polaroidShadow.opacity(0.3), radius: 8, x: 2, y: 4)
+            .shadow(color: Color.black.opacity(0.15), radius: 20, x: 5, y: 10)
+            .rotationEffect(.degrees(rotation))
+    }
+}
+
+extension View {
+    func polaroidStyle(rotation: Double = 0) -> some View {
+        modifier(PolaroidModifier(rotation: rotation))
+    }
+}
+
+// MARK: - Timeline Gradient
+extension LinearGradient {
+    static let timelineGold = LinearGradient(
+        gradient: Gradient(colors: [
+            Color.luxuryGold.opacity(0.3),
+            Color.luxuryGold,
+            Color.luxuryGoldLight,
+            Color.luxuryGold,
+            Color.luxuryGold.opacity(0.3)
+        ]),
+        startPoint: .top,
+        endPoint: .bottom
+    )
 }

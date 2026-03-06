@@ -438,9 +438,16 @@ struct CompactStopRow: View {
             
             // Content
             VStack(alignment: .leading, spacing: 4) {
-                Text(stop.name)
-                    .font(Font.playfair(16, weight: .semibold))
-                    .foregroundColor(Color.luxuryCream)
+                HStack(spacing: 6) {
+                    Text(stop.name)
+                        .font(Font.playfair(16, weight: .semibold))
+                        .foregroundColor(Color.luxuryCream)
+                    
+                    // Verified badge
+                    if stop.isVerified {
+                        VerifiedBadge()
+                    }
+                }
                 
                 HStack(spacing: 8) {
                     HStack(spacing: 4) {
@@ -454,10 +461,36 @@ struct CompactStopRow: View {
                     Text("·")
                         .foregroundColor(Color.luxuryMuted)
                     
-                    Text(stop.address ?? stop.venueType)
+                    Text(stop.formattedAddress)
                         .font(Font.inter(12, weight: .regular))
                         .foregroundColor(Color.luxuryMuted)
                         .lineLimit(1)
+                }
+                
+                // Phone & Website if verified
+                if stop.isVerified {
+                    HStack(spacing: 12) {
+                        if let phone = stop.phoneNumber {
+                            HStack(spacing: 4) {
+                                Image(systemName: "phone.fill")
+                                    .font(.system(size: 9))
+                                Text(phone)
+                                    .font(Font.inter(10, weight: .regular))
+                            }
+                            .foregroundColor(Color.luxuryGoldLight)
+                        }
+                        
+                        if stop.websiteUrl != nil {
+                            HStack(spacing: 4) {
+                                Image(systemName: "globe")
+                                    .font(.system(size: 9))
+                                Text("Website")
+                                    .font(Font.inter(10, weight: .regular))
+                            }
+                            .foregroundColor(Color.luxuryGoldLight)
+                        }
+                    }
+                    .padding(.top, 2)
                 }
                 
                 // Special note (romanticTip as feature)
@@ -498,6 +531,39 @@ struct CompactStopRow: View {
         if tip.contains("access") || tip.contains("wheelchair") { return "figure.roll" }
         if tip.contains("vegan") || tip.contains("menu") { return "leaf.fill" }
         return "sparkle"
+    }
+}
+
+// MARK: - Verified Badge
+struct VerifiedBadge: View {
+    @State private var isAnimating = false
+    
+    var body: some View {
+        HStack(spacing: 3) {
+            Image(systemName: "checkmark.seal.fill")
+                .font(.system(size: 12))
+                .foregroundColor(Color(hex: "4CAF50"))
+            
+            Text("Verified")
+                .font(Font.inter(9, weight: .semibold))
+                .foregroundColor(Color(hex: "4CAF50"))
+        }
+        .padding(.horizontal, 6)
+        .padding(.vertical, 3)
+        .background(
+            Capsule()
+                .fill(Color(hex: "4CAF50").opacity(0.15))
+        )
+        .overlay(
+            Capsule()
+                .stroke(Color(hex: "4CAF50").opacity(0.3), lineWidth: 0.5)
+        )
+        .scaleEffect(isAnimating ? 1.05 : 1.0)
+        .onAppear {
+            withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
+                isAnimating = true
+            }
+        }
     }
 }
 

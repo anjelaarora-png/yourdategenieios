@@ -1,35 +1,30 @@
 import SwiftUI
 import PhotosUI
 
+// MARK: - Memory Gallery View with Polaroid Timeline
+
 struct MemoryGalleryView: View {
     var showCloseButton: Bool = false
     
     @Environment(\.dismiss) private var dismiss
-    @State private var memories: [DateMemory] = []
-    @State private var selectedItem: PhotosPickerItem?
+    @StateObject private var memoryManager = MemoryManager.shared
     @State private var showAddMemory = false
     @State private var selectedMemory: DateMemory?
-    
-    private let columns = [
-        GridItem(.flexible(), spacing: 3),
-        GridItem(.flexible(), spacing: 3),
-        GridItem(.flexible(), spacing: 3)
-    ]
+    @State private var hasAppeared = false
     
     var body: some View {
         NavigationStack {
             ZStack {
-                // Luxurious background
-                Color.luxuryMaroon
-                    .ignoresSafeArea()
+                luxuryBackground
                 
-                if memories.isEmpty {
-                    emptyState
+                if memoryManager.memories.isEmpty {
+                    emptyStateView
                 } else {
-                    galleryGrid
+                    timelineView
                 }
+                
+                floatingAddButton
             }
-            .navigationTitle("Memories")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 if showCloseButton {
@@ -41,191 +36,578 @@ struct MemoryGalleryView: View {
                         .foregroundColor(Color.luxuryGold)
                     }
                 }
-                
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    PhotosPicker(selection: $selectedItem, matching: .images) {
-                        Image(systemName: "plus.circle.fill")
-                            .font(.system(size: 22))
-                            .foregroundStyle(LinearGradient.goldShimmer)
-                    }
-                }
             }
             .toolbarBackground(Color.luxuryMaroon, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
-            .onChange(of: selectedItem) { newValue in
-                if newValue != nil {
-                    addMemory()
-                }
+            .sheet(isPresented: $showAddMemory) {
+                AddMemorySheet()
             }
             .sheet(item: $selectedMemory) { memory in
-                MemoryDetailView(memory: memory) {
-                    deleteMemory(memory)
+                MemoryDetailView(memory: memory)
+            }
+            .onAppear {
+                withAnimation(.easeOut(duration: 0.5)) {
+                    hasAppeared = true
                 }
             }
         }
     }
     
-    private var emptyState: some View {
-        VStack(spacing: 24) {
+    // MARK: - Luxury Background
+    private var luxuryBackground: some View {
+        ZStack {
+            Color.luxuryMaroon
+                .ignoresSafeArea()
+            
+            FloatingSparklesView()
+                .ignoresSafeArea()
+        }
+    }
+    
+    // MARK: - Floating Add Button
+    private var floatingAddButton: some View {
+        VStack {
+            Spacer()
+            HStack {
+                Spacer()
+                Button {
+                    showAddMemory = true
+                } label: {
+                    ZStack {
+                        Circle()
+                            .fill(LinearGradient.goldShimmer)
+                            .frame(width: 60, height: 60)
+                            .shadow(color: Color.luxuryGold.opacity(0.5), radius: 12, y: 4)
+                        
+                        Image(systemName: "plus")
+                            .font(.system(size: 24, weight: .bold))
+                            .foregroundColor(Color.luxuryMaroon)
+                    }
+                }
+                .padding(.trailing, 24)
+                .padding(.bottom, 24)
+            }
+        }
+    }
+    
+    // MARK: - Empty State View
+    private var emptyStateView: some View {
+        VStack(spacing: 32) {
+            Spacer()
+            
             ZStack {
                 Circle()
                     .fill(Color.luxuryGold.opacity(0.1))
-                    .frame(width: 120, height: 120)
+                    .frame(width: 160, height: 160)
                 
-                Image(systemName: "photo.stack.fill")
-                    .font(.system(size: 50))
+                Circle()
+                    .fill(Color.luxuryGold.opacity(0.05))
+                    .frame(width: 200, height: 200)
+                
+                Image(systemName: "sparkles")
+                    .font(.system(size: 60))
                     .foregroundStyle(LinearGradient.goldShimmer)
+                    .symbolEffect(.pulse)
             }
             
-            VStack(spacing: 10) {
-                Text("Capture Your Moments")
-                    .font(Font.header(32, weight: .bold))
-                    .foregroundColor(Color.luxuryGold)
+            VStack(spacing: 16) {
+                HStack(spacing: 6) {
+                    Text("Your")
+                        .font(Font.header(24, weight: .regular))
+                        .foregroundColor(Color.luxuryCream)
+                    Text("love story")
+                        .font(Font.tangerine(36, weight: .bold))
+                        .italic()
+                        .foregroundColor(Color.luxuryGold)
+                    Text("begins here")
+                        .font(Font.header(24, weight: .regular))
+                        .foregroundColor(Color.luxuryCream)
+                }
+                .multilineTextAlignment(.center)
                 
-                Text("Save photos from your special evenings together")
-                    .font(Font.subheader(15, weight: .regular))
+                Text("Capture memories from your magical dates together")
+                    .font(Font.bodySans(15, weight: .regular))
                     .foregroundColor(Color.luxuryCreamMuted)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 40)
             }
             
-            PhotosPicker(selection: $selectedItem, matching: .images) {
-                HStack(spacing: 10) {
-                    Image(systemName: "photo.badge.plus")
-                    Text("Add First Memory")
-                }
+            Button {
+                showAddMemory = true
+            } label: {
+                Text("Plan Your First Date")
+                    .font(Font.bodySans(16, weight: .semibold))
             }
-            .buttonStyle(LuxuryGoldButtonStyle())
+            .buttonStyle(LuxuryOutlineButtonStyle())
+            
+            Spacer()
         }
     }
     
-    private var galleryGrid: some View {
+    // MARK: - Timeline View
+    private var timelineView: some View {
         ScrollView(showsIndicators: false) {
-            VStack(spacing: 24) {
-                // Stats header
-                HStack(spacing: 0) {
-                    VStack(spacing: 6) {
-                        Text("\(memories.count)")
-                            .font(Font.header(28, weight: .bold))
-                            .foregroundColor(Color.luxuryGold)
-                        Text("memories")
-                            .font(Font.bodySans(12, weight: .regular))
-                            .foregroundColor(Color.luxuryMuted)
-                    }
-                    .frame(maxWidth: .infinity)
-                    
-                    Rectangle()
-                        .fill(Color.luxuryGold.opacity(0.3))
-                        .frame(width: 1, height: 40)
-                    
-                    VStack(spacing: 6) {
-                        Text(uniqueDatesCount)
-                            .font(Font.header(28, weight: .bold))
-                            .foregroundColor(Color.luxuryGold)
-                        Text("dates")
-                            .font(Font.bodySans(12, weight: .regular))
-                            .foregroundColor(Color.luxuryMuted)
-                    }
-                    .frame(maxWidth: .infinity)
-                }
-                .padding(.vertical, 20)
-                .luxuryCard()
-                .padding(.horizontal, 20)
-                .padding(.top, 16)
+            VStack(spacing: 0) {
+                headerSection
+                    .padding(.bottom, 32)
                 
-                // Grid
-                LazyVGrid(columns: columns, spacing: 3) {
-                    ForEach(memories) { memory in
-                        MemoryThumbnail(memory: memory)
-                            .aspectRatio(1, contentMode: .fill)
-                            .onTapGesture {
-                                selectedMemory = memory
-                            }
+                PolaroidTimelineView(
+                    memories: memoryManager.memoriesSortedByDate,
+                    onSelect: { memory in
+                        selectedMemory = memory
                     }
-                }
-                .padding(.horizontal, 3)
-                
-                // Add more button
-                PhotosPicker(selection: $selectedItem, matching: .images) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "plus.circle")
-                        Text("Add More Memories")
-                    }
-                    .font(Font.bodySans(14, weight: .medium))
-                    .foregroundColor(Color.luxuryGold)
-                    .padding(.vertical, 14)
-                    .frame(maxWidth: .infinity)
-                    .background(Color.luxuryMaroonLight)
-                    .cornerRadius(14)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 14)
-                            .stroke(Color.luxuryGold.opacity(0.3), lineWidth: 1)
-                    )
-                }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 20)
+                )
+                .padding(.bottom, 100)
             }
         }
     }
     
-    private var uniqueDatesCount: String {
-        let uniqueDates = Set(memories.map { Calendar.current.startOfDay(for: $0.date) })
-        return "\(uniqueDates.count)"
-    }
-    
-    private func addMemory() {
-        let newMemory = DateMemory(
-            id: UUID(),
-            imageData: nil,
-            date: Date(),
-            caption: "",
-            location: "Recent Date"
-        )
-        memories.append(newMemory)
-        selectedItem = nil
-    }
-    
-    private func deleteMemory(_ memory: DateMemory) {
-        memories.removeAll { $0.id == memory.id }
-        selectedMemory = nil
+    // MARK: - Header Section
+    private var headerSection: some View {
+        VStack(spacing: 16) {
+            Spacer().frame(height: 16)
+            
+            HStack(spacing: 6) {
+                Text("Our")
+                    .font(Font.header(30, weight: .regular))
+                    .foregroundColor(Color.luxuryCream)
+                Text("Memories")
+                    .font(Font.tangerine(48, weight: .bold))
+                    .italic()
+                    .foregroundColor(Color.luxuryGold)
+            }
+            
+            Text("Every date, beautifully remembered")
+                .font(Font.bodySans(16, weight: .regular))
+                .foregroundColor(Color.luxuryCreamMuted)
+            
+            HStack(spacing: 8) {
+                Image(systemName: "heart.fill")
+                    .font(.system(size: 12))
+                Text("\(memoryManager.totalMemoriesCount) dates together")
+                    .font(Font.bodySans(14, weight: .medium))
+            }
+            .foregroundColor(Color.luxuryMaroon)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 10)
+            .background(
+                Capsule()
+                    .fill(Color.luxuryGold.opacity(0.9))
+            )
+            .padding(.top, 8)
+        }
     }
 }
 
-// MARK: - Memory Thumbnail
-struct MemoryThumbnail: View {
-    let memory: DateMemory
+// MARK: - Polaroid Timeline View
+
+struct PolaroidTimelineView: View {
+    let memories: [DateMemory]
+    let onSelect: (DateMemory) -> Void
     
     var body: some View {
+        ZStack(alignment: .leading) {
+            timelineLine
+                .padding(.leading, 40)
+            
+            VStack(spacing: 40) {
+                ForEach(Array(memories.enumerated()), id: \.element.id) { index, memory in
+                    PolaroidTimelineItem(
+                        memory: memory,
+                        isLeft: index % 2 == 0,
+                        rotation: Double.random(in: -3...3),
+                        delay: Double(index) * 0.1
+                    )
+                    .onTapGesture {
+                        onSelect(memory)
+                    }
+                }
+            }
+            .padding(.horizontal, 20)
+        }
+    }
+    
+    private var timelineLine: some View {
+        GeometryReader { geometry in
+            Rectangle()
+                .fill(LinearGradient.timelineGold)
+                .frame(width: 3)
+                .shadow(color: Color.luxuryGold.opacity(0.6), radius: 8)
+                .shadow(color: Color.luxuryGold.opacity(0.3), radius: 16)
+        }
+    }
+}
+
+// MARK: - Polaroid Timeline Item
+
+struct PolaroidTimelineItem: View {
+    let memory: DateMemory
+    let isLeft: Bool
+    let rotation: Double
+    let delay: Double
+    
+    @State private var isVisible = false
+    
+    var body: some View {
+        HStack(spacing: 16) {
+            if !isLeft {
+                Spacer()
+            }
+            
+            timelineDot
+            
+            polaroidCard
+            
+            if isLeft {
+                Spacer()
+            }
+        }
+        .opacity(isVisible ? 1 : 0)
+        .offset(x: isVisible ? 0 : (isLeft ? -50 : 50))
+        .onAppear {
+            withAnimation(.spring(response: 0.6, dampingFraction: 0.8).delay(delay)) {
+                isVisible = true
+            }
+        }
+    }
+    
+    private var timelineDot: some View {
         ZStack {
-            if let imageData = memory.imageData, let uiImage = UIImage(data: imageData) {
+            Circle()
+                .fill(Color.luxuryGold)
+                .frame(width: 16, height: 16)
+                .shadow(color: Color.luxuryGold.opacity(0.6), radius: 6)
+            
+            Circle()
+                .fill(Color.luxuryMaroon)
+                .frame(width: 6, height: 6)
+        }
+    }
+    
+    private var polaroidCard: some View {
+        VStack(spacing: 0) {
+            photoArea
+            
+            captionArea
+        }
+        .frame(width: 200)
+        .background(Color.polaroidWhite)
+        .cornerRadius(4)
+        .shadow(color: Color.polaroidShadow.opacity(0.25), radius: 8, x: 2, y: 4)
+        .shadow(color: Color.black.opacity(0.12), radius: 20, x: 4, y: 8)
+        .rotationEffect(.degrees(rotation))
+    }
+    
+    private var photoArea: some View {
+        ZStack {
+            Rectangle()
+                .fill(Color.polaroidCream)
+            
+            if let uiImage = memory.uiImage {
                 Image(uiImage: uiImage)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
             } else {
-                LinearGradient(
-                    colors: [Color.luxuryMaroonLight, Color.luxuryMaroonMedium],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-                
-                Image(systemName: "photo")
-                    .font(.system(size: 28))
-                    .foregroundColor(Color.luxuryGold.opacity(0.4))
+                placeholderPhoto
             }
         }
-        .frame(minWidth: 0, maxWidth: .infinity)
-        .aspectRatio(1, contentMode: .fill)
+        .frame(width: 180, height: 180)
         .clipped()
+        .padding(.top, 10)
+        .padding(.horizontal, 10)
+    }
+    
+    private var placeholderPhoto: some View {
+        ZStack {
+            LinearGradient(
+                colors: [Color.luxuryMaroonLight.opacity(0.3), Color.luxuryMaroonMedium.opacity(0.2)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            
+            Image(systemName: "sparkle")
+                .font(.system(size: 40))
+                .foregroundStyle(LinearGradient.goldShimmer)
+                .opacity(0.6)
+        }
+    }
+    
+    private var captionArea: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(memory.caption ?? memory.title)
+                .font(Font.tangerine(22, weight: .bold))
+                .foregroundColor(Color.polaroidCaption)
+                .lineLimit(2)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            
+            HStack(spacing: 4) {
+                Image(systemName: "mappin")
+                    .font(.system(size: 10))
+                Text(memory.shortFormattedDate)
+                if !memory.location.isEmpty {
+                    Text("•")
+                    Text(memory.location)
+                        .lineLimit(1)
+                }
+            }
+            .font(Font.bodySans(10, weight: .regular))
+            .foregroundColor(Color.polaroidCaption.opacity(0.6))
+        }
+        .padding(.horizontal, 12)
+        .padding(.top, 8)
+        .padding(.bottom, 16)
+    }
+}
+
+// MARK: - Floating Sparkles View
+
+struct FloatingSparklesView: View {
+    @State private var sparkles: [SparkleData] = []
+    
+    var body: some View {
+        GeometryReader { geometry in
+            ForEach(sparkles) { sparkle in
+                Image(systemName: "sparkle")
+                    .font(.system(size: sparkle.size))
+                    .foregroundColor(Color.luxuryGold.opacity(sparkle.opacity))
+                    .position(x: sparkle.x, y: sparkle.y)
+                    .animation(
+                        .easeInOut(duration: sparkle.animationDuration)
+                        .repeatForever(autoreverses: true),
+                        value: sparkle.opacity
+                    )
+            }
+            .onAppear {
+                createSparkles(in: geometry.size)
+            }
+        }
+    }
+    
+    private func createSparkles(in size: CGSize) {
+        sparkles = (0..<15).map { _ in
+            SparkleData(
+                x: CGFloat.random(in: 0...size.width),
+                y: CGFloat.random(in: 0...size.height),
+                size: CGFloat.random(in: 6...14),
+                opacity: Double.random(in: 0.1...0.4),
+                animationDuration: Double.random(in: 2...4)
+            )
+        }
+    }
+}
+
+struct SparkleData: Identifiable {
+    let id = UUID()
+    let x: CGFloat
+    let y: CGFloat
+    let size: CGFloat
+    var opacity: Double
+    let animationDuration: Double
+}
+
+// MARK: - Add Memory Sheet
+
+struct AddMemorySheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @StateObject private var memoryManager = MemoryManager.shared
+    
+    @State private var title = ""
+    @State private var date = Date()
+    @State private var location = ""
+    @State private var caption = ""
+    @State private var selectedItem: PhotosPickerItem?
+    @State private var selectedImageData: Data?
+    
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                Color.luxuryMaroon
+                    .ignoresSafeArea()
+                
+                ScrollView(showsIndicators: false) {
+                    VStack(spacing: 28) {
+                        headerSection
+                        
+                        photoPickerSection
+                        
+                        formFieldsSection
+                        
+                        saveButton
+                    }
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 20)
+                }
+            }
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                    .font(Font.bodySans(16, weight: .medium))
+                    .foregroundColor(Color.luxuryGold)
+                }
+            }
+            .toolbarBackground(Color.luxuryMaroon, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .onChange(of: selectedItem) { newValue in
+                Task {
+                    if let data = try? await newValue?.loadTransferable(type: Data.self) {
+                        selectedImageData = data
+                    }
+                }
+            }
+        }
+    }
+    
+    private var headerSection: some View {
+        VStack(spacing: 8) {
+            Text("Add Memory")
+                .font(Font.cormorant(28, weight: .bold))
+                .foregroundColor(Color.luxuryGold)
+            
+            Text("Capture this beautiful moment")
+                .font(Font.cormorantItalic(16))
+                .foregroundColor(Color.luxuryCreamMuted)
+        }
+    }
+    
+    private var photoPickerSection: some View {
+        PhotosPicker(selection: $selectedItem, matching: .images) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color.luxuryMaroonLight)
+                    .frame(height: 200)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(
+                                LinearGradient.goldShimmer,
+                                style: StrokeStyle(lineWidth: 2, dash: [8, 4])
+                            )
+                    )
+                
+                if let data = selectedImageData, let uiImage = UIImage(data: data) {
+                    Image(uiImage: uiImage)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(height: 200)
+                        .clipShape(RoundedRectangle(cornerRadius: 16))
+                } else {
+                    VStack(spacing: 12) {
+                        Image(systemName: "photo.badge.plus")
+                            .font(.system(size: 40))
+                            .foregroundStyle(LinearGradient.goldShimmer)
+                        
+                        Text("Tap to add photo")
+                            .font(Font.bodySans(14, weight: .medium))
+                            .foregroundColor(Color.luxuryGold)
+                    }
+                }
+            }
+        }
+    }
+    
+    private var formFieldsSection: some View {
+        VStack(spacing: 20) {
+            formField(title: "Memory Title", placeholder: "e.g., Dinner at La Belle", text: $title)
+            
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Date")
+                    .font(Font.bodySans(13, weight: .medium))
+                    .foregroundColor(Color.luxuryGold)
+                
+                DatePicker("", selection: $date, displayedComponents: .date)
+                    .datePickerStyle(.compact)
+                    .labelsHidden()
+                    .tint(Color.luxuryGold)
+                    .padding(14)
+                    .background(Color.luxuryMaroonLight)
+                    .cornerRadius(12)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color.luxuryGold.opacity(0.3), lineWidth: 1)
+                    )
+            }
+            
+            formField(title: "Location", placeholder: "e.g., San Francisco, CA", text: $location)
+            
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Caption")
+                    .font(Font.bodySans(13, weight: .medium))
+                    .foregroundColor(Color.luxuryGold)
+                
+                TextField("Write something memorable...", text: $caption, axis: .vertical)
+                    .font(Font.bodySans(15, weight: .regular))
+                    .foregroundColor(Color.luxuryCream)
+                    .lineLimit(3...6)
+                    .padding(14)
+                    .background(Color.luxuryMaroonLight)
+                    .cornerRadius(12)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color.luxuryGold.opacity(0.3), lineWidth: 1)
+                    )
+            }
+        }
+    }
+    
+    private func formField(title: String, placeholder: String, text: Binding<String>) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(Font.bodySans(13, weight: .medium))
+                .foregroundColor(Color.luxuryGold)
+            
+            TextField(placeholder, text: text)
+                .font(Font.bodySans(15, weight: .regular))
+                .foregroundColor(Color.luxuryCream)
+                .padding(14)
+                .background(Color.luxuryMaroonLight)
+                .cornerRadius(12)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(Color.luxuryGold.opacity(0.3), lineWidth: 1)
+                )
+        }
+    }
+    
+    private var saveButton: some View {
+        Button {
+            saveMemory()
+        } label: {
+            Text("Save Memory")
+                .font(Font.cormorant(18, weight: .bold))
+                .foregroundColor(Color.luxuryMaroon)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 16)
+                .background(LinearGradient.goldShimmer)
+                .cornerRadius(14)
+                .shadow(color: Color.luxuryGold.opacity(0.4), radius: 12, y: 4)
+        }
+        .disabled(title.isEmpty)
+        .opacity(title.isEmpty ? 0.6 : 1)
+        .padding(.top, 8)
+    }
+    
+    private func saveMemory() {
+        let memory = DateMemory(
+            title: title,
+            date: date,
+            location: location,
+            photoData: selectedImageData,
+            caption: caption.isEmpty ? nil : caption
+        )
+        memoryManager.addMemory(memory)
+        dismiss()
     }
 }
 
 // MARK: - Memory Detail View
+
 struct MemoryDetailView: View {
     let memory: DateMemory
-    let onDelete: () -> Void
     
     @Environment(\.dismiss) private var dismiss
-    @State private var caption: String = ""
+    @StateObject private var memoryManager = MemoryManager.shared
     @State private var showDeleteConfirmation = false
     
     var body: some View {
@@ -234,91 +616,18 @@ struct MemoryDetailView: View {
                 Color.luxuryMaroon
                     .ignoresSafeArea()
                 
-                VStack(spacing: 0) {
-                    // Image
-                    ZStack {
-                        if let imageData = memory.imageData, let uiImage = UIImage(data: imageData) {
-                            Image(uiImage: uiImage)
-                                .resizable()
-                                .aspectRatio(contentMode: .fit)
-                        } else {
-                            Rectangle()
-                                .fill(Color.luxuryMaroonLight)
-                                .aspectRatio(4/3, contentMode: .fit)
-                                .overlay(
-                                    Image(systemName: "photo")
-                                        .font(.system(size: 60))
-                                        .foregroundColor(Color.luxuryGold.opacity(0.3))
-                                )
-                        }
+                ScrollView(showsIndicators: false) {
+                    VStack(spacing: 24) {
+                        polaroidDisplay
+                        
+                        memoryDetails
+                        
+                        deleteButton
                     }
-                    .frame(maxWidth: .infinity)
-                    
-                    // Details
-                    VStack(alignment: .leading, spacing: 20) {
-                        // Date & location
-                        HStack(spacing: 20) {
-                            HStack(spacing: 8) {
-                                Image(systemName: "calendar")
-                                    .foregroundColor(Color.luxuryGold)
-                                Text(formattedDate)
-                                    .font(Font.bodySans(14, weight: .medium))
-                                    .foregroundColor(Color.luxuryCream)
-                            }
-                            
-                            HStack(spacing: 8) {
-                                Image(systemName: "mappin.circle")
-                                    .foregroundColor(Color.luxuryGold)
-                                Text(memory.location)
-                                    .font(Font.bodySans(14, weight: .medium))
-                                    .foregroundColor(Color.luxuryCream)
-                            }
-                        }
-                        
-                        // Caption editor
-                        VStack(alignment: .leading, spacing: 10) {
-                            Text("Caption")
-                                .font(Font.subheader(16, weight: .semibold))
-                                .foregroundColor(Color.luxuryGold)
-                            
-                            TextField("Add a caption...", text: $caption)
-                                .font(Font.bodySans(15, weight: .regular))
-                                .foregroundColor(Color.luxuryCream)
-                                .padding(14)
-                                .background(Color.luxuryMaroonLight)
-                                .cornerRadius(12)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 12)
-                                        .stroke(Color.luxuryGold.opacity(0.3), lineWidth: 1)
-                                )
-                        }
-                        
-                        Spacer()
-                        
-                        // Delete button
-                        Button {
-                            showDeleteConfirmation = true
-                        } label: {
-                            HStack(spacing: 8) {
-                                Image(systemName: "trash")
-                                Text("Delete Memory")
-                            }
-                            .font(Font.bodySans(14, weight: .medium))
-                            .foregroundColor(Color.luxuryError)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 14)
-                            .background(Color.luxuryError.opacity(0.1))
-                            .cornerRadius(12)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .stroke(Color.luxuryError.opacity(0.3), lineWidth: 1)
-                            )
-                        }
-                    }
-                    .padding(20)
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 20)
                 }
             }
-            .navigationTitle("Memory")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
@@ -328,45 +637,132 @@ struct MemoryDetailView: View {
                     .font(Font.bodySans(16, weight: .medium))
                     .foregroundColor(Color.luxuryGold)
                 }
-                
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Save") {
-                        dismiss()
-                    }
-                    .font(Font.bodySans(16, weight: .semibold))
-                    .foregroundColor(Color.luxuryGold)
-                }
             }
             .toolbarBackground(Color.luxuryMaroon, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .alert("Delete Memory?", isPresented: $showDeleteConfirmation) {
                 Button("Cancel", role: .cancel) { }
                 Button("Delete", role: .destructive) {
-                    onDelete()
+                    memoryManager.deleteMemory(memory)
+                    dismiss()
                 }
             } message: {
                 Text("This action cannot be undone.")
             }
-            .onAppear {
-                caption = memory.caption
+        }
+    }
+    
+    private var polaroidDisplay: some View {
+        VStack(spacing: 0) {
+            ZStack {
+                Rectangle()
+                    .fill(Color.polaroidCream)
+                
+                if let uiImage = memory.uiImage {
+                    Image(uiImage: uiImage)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                } else {
+                    ZStack {
+                        LinearGradient(
+                            colors: [Color.luxuryMaroonLight.opacity(0.3), Color.luxuryMaroonMedium.opacity(0.2)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                        
+                        Image(systemName: "sparkle")
+                            .font(.system(size: 60))
+                            .foregroundStyle(LinearGradient.goldShimmer)
+                            .opacity(0.6)
+                    }
+                }
+            }
+            .frame(height: 280)
+            .clipped()
+            .padding(.top, 16)
+            .padding(.horizontal, 16)
+            
+            VStack(alignment: .leading, spacing: 8) {
+                Text(memory.caption ?? memory.title)
+                    .font(Font.tangerine(32, weight: .bold))
+                    .foregroundColor(Color.polaroidCaption)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 12)
+            .padding(.bottom, 24)
+        }
+        .background(Color.polaroidWhite)
+        .cornerRadius(6)
+        .shadow(color: Color.polaroidShadow.opacity(0.3), radius: 12, x: 3, y: 6)
+        .shadow(color: Color.black.opacity(0.15), radius: 24, x: 6, y: 12)
+        .rotationEffect(.degrees(-1.5))
+        .padding(.top, 20)
+    }
+    
+    private var memoryDetails: some View {
+        VStack(spacing: 16) {
+            HStack {
+                detailItem(icon: "calendar", title: "Date", value: memory.formattedDate)
+                Spacer()
+            }
+            
+            if !memory.location.isEmpty {
+                HStack {
+                    detailItem(icon: "mappin.circle.fill", title: "Location", value: memory.location)
+                    Spacer()
+                }
+            }
+            
+            HStack {
+                detailItem(icon: "heart.fill", title: "Memory", value: memory.title)
+                Spacer()
+            }
+        }
+        .padding(20)
+        .luxuryCard()
+    }
+    
+    private func detailItem(icon: String, title: String, value: String) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(size: 18))
+                .foregroundColor(Color.luxuryGold)
+                .frame(width: 24)
+            
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(Font.bodySans(12, weight: .medium))
+                    .foregroundColor(Color.luxuryMuted)
+                
+                Text(value)
+                    .font(Font.subheader(16, weight: .regular))
+                    .foregroundColor(Color.luxuryCream)
             }
         }
     }
     
-    private var formattedDate: String {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .medium
-        return formatter.string(from: memory.date)
+    private var deleteButton: some View {
+        Button {
+            showDeleteConfirmation = true
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "trash")
+                Text("Delete Memory")
+            }
+            .font(Font.bodySans(14, weight: .medium))
+            .foregroundColor(Color.luxuryError)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 14)
+            .background(Color.luxuryError.opacity(0.1))
+            .cornerRadius(12)
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(Color.luxuryError.opacity(0.3), lineWidth: 1)
+            )
+        }
+        .padding(.bottom, 20)
     }
-}
-
-// MARK: - Memory Model
-struct DateMemory: Identifiable {
-    let id: UUID
-    var imageData: Data?
-    var date: Date
-    var caption: String
-    var location: String
 }
 
 #Preview {

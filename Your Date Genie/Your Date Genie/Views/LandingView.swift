@@ -78,19 +78,29 @@ struct LandingView: View {
                 
                 // Title
                 VStack(spacing: 8) {
-                    HStack(spacing: 4) {
+                    HStack(spacing: 6) {
                         Text("Your Date")
-                            .font(Font.header(32, weight: .bold))
+                            .font(Font.header(28, weight: .regular))
                             .foregroundColor(Color.luxuryGold)
                         Text("Genie")
-                            .font(Font.special(48, weight: .bold))
+                            .font(Font.tangerine(52, weight: .bold))
+                            .italic()
                             .foregroundColor(Color.luxuryGold)
                     }
                     .shadow(color: Color.black.opacity(0.5), radius: 4, y: 2)
                     
-                    Text("Date nights, planned for you.")
-                        .font(Font.subheader(18, weight: .regular))
-                        .foregroundColor(Color.luxuryCream.opacity(0.9))
+                    HStack(spacing: 6) {
+                        Text("Date nights,")
+                            .font(Font.header(20, weight: .regular))
+                            .foregroundColor(Color.luxuryCream.opacity(0.9))
+                        Text("planned")
+                            .font(Font.tangerine(32, weight: .bold))
+                            .italic()
+                            .foregroundColor(Color.luxuryGold)
+                        Text("for you.")
+                            .font(Font.header(20, weight: .regular))
+                            .foregroundColor(Color.luxuryCream.opacity(0.9))
+                    }
                 }
                 
                 // CTA Button
@@ -120,13 +130,15 @@ struct LandingView: View {
                     .fill(Color.luxuryGold)
                     .frame(width: 40, height: 1)
                 
-                Text("About")
-                    .font(Font.header(28, weight: .bold))
-                    .foregroundColor(Color.luxuryGold)
-                +
-                Text(" Us")
-                    .font(Font.headerItalic(28))
-                    .foregroundColor(Color.luxuryCream)
+                HStack(spacing: 6) {
+                    Text("About")
+                        .font(Font.header(26, weight: .regular))
+                        .foregroundColor(Color.luxuryCream)
+                    Text("Us")
+                        .font(Font.tangerine(40, weight: .bold))
+                        .italic()
+                        .foregroundColor(Color.luxuryGold)
+                }
                 
                 Rectangle()
                     .fill(Color.luxuryGold)
@@ -160,24 +172,25 @@ struct LandingView: View {
             // Description
             VStack(spacing: 16) {
                 Text("Your Date Genie was created for people who love with intention but juggle full-demanding lives.")
-                    .font(Font.bodySerif(16, weight: .regular))
+                    .font(Font.bodySans(15, weight: .regular))
                     .foregroundColor(Color.luxuryCreamMuted)
                     .lineSpacing(6)
                 
                 HStack(spacing: 4) {
                     Text("That's where your")
-                        .font(Font.bodySerif(16, weight: .regular))
+                        .font(Font.bodySans(15, weight: .regular))
                         .foregroundColor(Color.luxuryCreamMuted)
                     Text("Genie")
-                        .font(Font.special(28, weight: .bold))
+                        .font(Font.tangerine(32, weight: .bold))
+                        .italic()
                         .foregroundColor(Color.luxuryGold)
                     Text("steps in.")
-                        .font(Font.bodySerif(16, weight: .regular))
+                        .font(Font.bodySans(15, weight: .regular))
                         .foregroundColor(Color.luxuryCreamMuted)
                 }
                 
                 Text("We take the details that define you and shape them into moments that feel thoughtful, easy, and beautifully personal.")
-                    .font(Font.bodySerif(16, weight: .regular))
+                    .font(Font.bodySans(15, weight: .regular))
                     .foregroundColor(Color.luxuryCreamMuted)
                     .lineSpacing(6)
             }
@@ -191,9 +204,15 @@ struct LandingView: View {
     private var howItWorksSection: some View {
         VStack(spacing: 36) {
             // Section Title
-            Text("How It Works")
-                .font(Font.header(28, weight: .bold))
-                .foregroundColor(Color.luxuryGold)
+            HStack(spacing: 6) {
+                Text("How It")
+                    .font(Font.header(26, weight: .regular))
+                    .foregroundColor(Color.luxuryCream)
+                Text("Works")
+                    .font(Font.tangerine(40, weight: .bold))
+                    .italic()
+                    .foregroundColor(Color.luxuryGold)
+            }
             
             VStack(spacing: 20) {
                 LuxuryStepCard(
@@ -226,9 +245,15 @@ struct LandingView: View {
     // MARK: - Features Section
     private var featuresSection: some View {
         VStack(spacing: 36) {
-            Text("Everything You Need")
-                .font(Font.header(28, weight: .bold))
-                .foregroundColor(Color.luxuryGold)
+            HStack(spacing: 6) {
+                Text("Everything")
+                    .font(Font.tangerine(40, weight: .bold))
+                    .italic()
+                    .foregroundColor(Color.luxuryGold)
+                Text("You Need")
+                    .font(Font.header(26, weight: .regular))
+                    .foregroundColor(Color.luxuryCream)
+            }
             
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
                 LuxuryFeatureCard(icon: "map.fill", title: "Verified Venues")
@@ -249,12 +274,18 @@ struct LandingView: View {
                 .font(.system(size: 32))
                 .foregroundColor(Color.luxuryGold)
             
-            Text("Ready for Better Dates?")
-                .font(Font.header(28, weight: .bold))
-                .foregroundColor(Color.luxuryGold)
+            HStack(spacing: 6) {
+                Text("Ready for")
+                    .font(Font.header(26, weight: .regular))
+                    .foregroundColor(Color.luxuryCream)
+                Text("Better Dates?")
+                    .font(Font.tangerine(40, weight: .bold))
+                    .italic()
+                    .foregroundColor(Color.luxuryGold)
+            }
             
             Text("Join couples planning stress-free date nights")
-                .font(Font.subheader(16, weight: .regular))
+                .font(Font.bodySans(15, weight: .regular))
                 .foregroundColor(Color.luxuryCreamMuted)
             
             Button {
@@ -304,7 +335,7 @@ struct LuxuryStepCard: View {
             
             VStack(alignment: .leading, spacing: 8) {
                 Text(title)
-                    .font(Font.subheader(18, weight: .semibold))
+                    .font(Font.header(17, weight: .bold))
                     .foregroundColor(Color.luxuryCream)
                 
                 Text(description)

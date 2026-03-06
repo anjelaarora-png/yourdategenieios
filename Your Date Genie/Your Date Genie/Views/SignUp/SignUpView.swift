@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 
 struct SignUpView: View {
     @EnvironmentObject var coordinator: NavigationCoordinator
@@ -56,24 +57,26 @@ struct SignUpView: View {
                 .font(.system(size: 36))
                 .foregroundStyle(LinearGradient.goldShimmer)
             
-            HStack(spacing: 4) {
+            HStack(spacing: 6) {
                 Text("Join Your Date")
-                    .font(Font.header(24, weight: .bold))
+                    .font(Font.header(22, weight: .regular))
                     .foregroundColor(Color.luxuryGold)
                 Text("Genie")
-                    .font(Font.special(42, weight: .bold))
+                    .font(Font.tangerine(42, weight: .bold))
+                    .italic()
                     .foregroundColor(Color.luxuryGold)
             }
             
             HStack(spacing: 4) {
                 Text("Create your account to start planning")
-                    .font(Font.subheader(14, weight: .regular))
+                    .font(Font.bodySans(14, weight: .regular))
                     .foregroundColor(Color.luxuryCreamMuted)
                 Text("magical")
-                    .font(Font.special(22, weight: .bold))
+                    .font(Font.tangerine(26, weight: .bold))
+                    .italic()
                     .foregroundColor(Color.luxuryGold)
                 Text("dates")
-                    .font(Font.subheader(14, weight: .regular))
+                    .font(Font.bodySans(14, weight: .regular))
                     .foregroundColor(Color.luxuryCreamMuted)
             }
             .multilineTextAlignment(.center)
@@ -199,9 +202,15 @@ struct SignUpBasicInfoStep: View {
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 24) {
-                Text("Tell us about yourself")
-                    .font(Font.subheader(22, weight: .semibold))
-                    .foregroundColor(Color.luxuryCream)
+                HStack(spacing: 6) {
+                    Text("Tell us about")
+                        .font(Font.header(20, weight: .regular))
+                        .foregroundColor(Color.luxuryCream)
+                    Text("yourself")
+                        .font(Font.tangerine(32, weight: .bold))
+                        .italic()
+                        .foregroundColor(Color.luxuryGold)
+                }
                 
                 VStack(spacing: 20) {
                     LuxuryTextField(
@@ -244,9 +253,15 @@ struct SignUpContactStep: View {
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 24) {
-                Text("How can we reach you?")
-                    .font(Font.subheader(22, weight: .semibold))
-                    .foregroundColor(Color.luxuryCream)
+                HStack(spacing: 6) {
+                    Text("How can we")
+                        .font(Font.header(20, weight: .regular))
+                        .foregroundColor(Color.luxuryCream)
+                    Text("reach you?")
+                        .font(Font.tangerine(32, weight: .bold))
+                        .italic()
+                        .foregroundColor(Color.luxuryGold)
+                }
                 
                 Text("We'll use this to send you date reminders and plan updates")
                     .font(Font.bodySans(14, weight: .regular))
@@ -290,9 +305,15 @@ struct SignUpLocationStep: View {
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 24) {
-                Text("Where are you based?")
-                    .font(Font.subheader(22, weight: .semibold))
-                    .foregroundColor(Color.luxuryCream)
+                HStack(spacing: 6) {
+                    Text("Where are you")
+                        .font(Font.header(20, weight: .regular))
+                        .foregroundColor(Color.luxuryCream)
+                    Text("based?")
+                        .font(Font.tangerine(32, weight: .bold))
+                        .italic()
+                        .foregroundColor(Color.luxuryGold)
+                }
                 
                 Text("This helps us find the best date spots near you")
                     .font(Font.bodySans(14, weight: .regular))
@@ -474,7 +495,7 @@ struct DatePickerSheet: View {
                     Spacer()
                     
                     Text("Date of Birth")
-                        .font(Font.subheader(17, weight: .semibold))
+                        .font(Font.header(17, weight: .bold))
                         .foregroundColor(Color.luxuryGold)
                     
                     Spacer()

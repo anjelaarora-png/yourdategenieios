@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 
 struct PreferencesSetupView: View {
     @EnvironmentObject var coordinator: NavigationCoordinator
@@ -50,12 +51,18 @@ struct PreferencesSetupView: View {
                 .font(.system(size: 36))
                 .foregroundStyle(LinearGradient.goldShimmer)
             
-            Text("Your Preferences")
-                .font(Font.header(28, weight: .bold))
-                .foregroundColor(Color.luxuryGold)
+            HStack(spacing: 6) {
+                Text("Your")
+                    .font(Font.header(24, weight: .regular))
+                    .foregroundColor(Color.luxuryCream)
+                Text("Preferences")
+                    .font(Font.tangerine(42, weight: .bold))
+                    .italic()
+                    .foregroundColor(Color.luxuryGold)
+            }
             
             Text("Help us create personalized date plans")
-                .font(Font.subheader(14, weight: .regular))
+                .font(Font.bodySans(14, weight: .regular))
                 .foregroundColor(Color.luxuryCreamMuted)
                 .multilineTextAlignment(.center)
         }
@@ -177,9 +184,15 @@ struct PreferencesPersonalStep: View {
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 24) {
-                Text("About you & your partner")
-                    .font(Font.subheader(22, weight: .semibold))
-                    .foregroundColor(Color.luxuryCream)
+                HStack(spacing: 6) {
+                    Text("About you &")
+                        .font(Font.header(20, weight: .regular))
+                        .foregroundColor(Color.luxuryCream)
+                    Text("your partner")
+                        .font(Font.tangerine(32, weight: .bold))
+                        .italic()
+                        .foregroundColor(Color.luxuryGold)
+                }
                 
                 // Gender
                 VStack(alignment: .leading, spacing: 12) {
@@ -242,9 +255,15 @@ struct PreferencesActivitiesStep: View {
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 24) {
-                Text("Favorite Activities")
-                    .font(Font.subheader(22, weight: .semibold))
-                    .foregroundColor(Color.luxuryCream)
+                HStack(spacing: 6) {
+                    Text("Favorite")
+                        .font(Font.tangerine(32, weight: .bold))
+                        .italic()
+                        .foregroundColor(Color.luxuryGold)
+                    Text("Activities")
+                        .font(Font.header(20, weight: .regular))
+                        .foregroundColor(Color.luxuryCream)
+                }
                 
                 Text("Select all the activities you enjoy on dates")
                     .font(Font.bodySans(14, weight: .regular))
@@ -300,9 +319,15 @@ struct PreferencesLocationStep: View {
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 24) {
-                Text("Default location settings")
-                    .font(Font.subheader(22, weight: .semibold))
-                    .foregroundColor(Color.luxuryCream)
+                HStack(spacing: 6) {
+                    Text("Default")
+                        .font(Font.tangerine(32, weight: .bold))
+                        .italic()
+                        .foregroundColor(Color.luxuryGold)
+                    Text("location settings")
+                        .font(Font.header(20, weight: .regular))
+                        .foregroundColor(Color.luxuryCream)
+                }
                 
                 Text("These will be pre-filled when you create new date plans")
                     .font(Font.bodySans(14, weight: .regular))
@@ -367,9 +392,15 @@ struct PreferencesCuisineStep: View {
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 24) {
-                Text("Food & Drinks")
-                    .font(Font.subheader(22, weight: .semibold))
-                    .foregroundColor(Color.luxuryCream)
+                HStack(spacing: 6) {
+                    Text("Food &")
+                        .font(Font.header(20, weight: .regular))
+                        .foregroundColor(Color.luxuryCream)
+                    Text("Drinks")
+                        .font(Font.tangerine(32, weight: .bold))
+                        .italic()
+                        .foregroundColor(Color.luxuryGold)
+                }
                 
                 // Favorite Cuisines
                 VStack(alignment: .leading, spacing: 12) {
@@ -443,9 +474,15 @@ struct PreferencesAccessibilityStep: View {
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 24) {
-                Text("Comfort & Accessibility")
-                    .font(Font.subheader(22, weight: .semibold))
-                    .foregroundColor(Color.luxuryCream)
+                HStack(spacing: 6) {
+                    Text("Comfort &")
+                        .font(Font.header(20, weight: .regular))
+                        .foregroundColor(Color.luxuryCream)
+                    Text("Accessibility")
+                        .font(Font.tangerine(32, weight: .bold))
+                        .italic()
+                        .foregroundColor(Color.luxuryGold)
+                }
                 
                 Text("Help us create dates that work perfectly for you")
                     .font(Font.bodySans(14, weight: .regular))

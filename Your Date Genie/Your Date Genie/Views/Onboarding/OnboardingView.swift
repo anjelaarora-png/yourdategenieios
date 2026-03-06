@@ -163,13 +163,13 @@ struct LuxurySlideWelcome: View {
                 .animation(.spring(response: 0.6).delay(0.2), value: showContent)
                 
                 // Brand text
-                VStack(spacing: 6) {
-                    Text("Your Date ")
-                        .font(Font.header(14, weight: .bold))
+                HStack(spacing: 4) {
+                    Text("Your Date")
+                        .font(Font.header(16, weight: .regular))
                         .foregroundColor(Color.luxuryGold.opacity(0.8))
-                    +
                     Text("Genie")
-                        .font(Font.special(32, weight: .bold))
+                        .font(Font.tangerine(36, weight: .bold))
+                        .italic()
                         .foregroundColor(Color.luxuryGold)
                 }
                 .opacity(showContent ? 1 : 0)
@@ -177,13 +177,21 @@ struct LuxurySlideWelcome: View {
                 
                 // Title
                 VStack(spacing: 8) {
-                    Text("Date nights,")
-                        .font(Font.header(34, weight: .bold))
-                        .foregroundColor(Color.luxuryCream)
+                    HStack(spacing: 6) {
+                        Text("Date nights,")
+                            .font(Font.header(32, weight: .regular))
+                            .foregroundColor(Color.luxuryCream)
+                    }
                     
-                    Text("planned for you.")
-                        .font(Font.header(34, weight: .bold))
-                        .foregroundStyle(LinearGradient.goldShimmer)
+                    HStack(spacing: 6) {
+                        Text("planned")
+                            .font(Font.tangerine(48, weight: .bold))
+                            .italic()
+                            .foregroundStyle(LinearGradient.goldShimmer)
+                        Text("for you.")
+                            .font(Font.header(32, weight: .regular))
+                            .foregroundColor(Color.luxuryCream)
+                    }
                 }
                 .opacity(showContent ? 1 : 0)
                 .offset(y: showContent ? 0 : 20)
@@ -191,7 +199,7 @@ struct LuxurySlideWelcome: View {
                 
                 // Description
                 Text("Tell us what you love. We'll create a complete evening — venues, timing, and all the details.")
-                    .font(Font.subheader(16, weight: .regular))
+                    .font(Font.bodySans(15, weight: .regular))
                     .foregroundColor(Color.luxuryCreamMuted)
                     .multilineTextAlignment(.center)
                     .lineSpacing(5)
@@ -224,13 +232,17 @@ struct LuxurySlideChaos: View {
         VStack(spacing: 0) {
             // Header
             VStack(spacing: 6) {
-                Text("Sound familiar?")
-                    .font(Font.bodySans(13, weight: .regular))
-                    .foregroundColor(Color.luxuryMuted)
+                SectionLabel(text: "Sound familiar?", color: Color.luxuryMuted)
                 
-                Text("Friday night. No plan.")
-                    .font(Font.header(26, weight: .bold))
-                    .foregroundColor(Color.luxuryGold)
+                HStack(spacing: 6) {
+                    Text("Friday night.")
+                        .font(Font.header(26, weight: .regular))
+                        .foregroundColor(Color.luxuryCream)
+                    Text("No plan.")
+                        .font(Font.tangerine(40, weight: .bold))
+                        .italic()
+                        .foregroundColor(Color.luxuryGold)
+                }
             }
             .padding(.top, 12)
             .opacity(showContent ? 1 : 0)
@@ -359,12 +371,18 @@ struct LuxurySlideChaos: View {
             // Pain point text
             VStack(spacing: 6) {
                 Text("Too many apps. Too many reviews.")
-                    .font(Font.subheader(15, weight: .regular))
+                    .font(Font.bodySans(15, weight: .regular))
                     .foregroundColor(Color.luxuryCreamMuted)
                 
-                Text("After work, who has time?")
-                    .font(Font.subheaderItalic(15))
-                    .foregroundColor(Color.luxuryGold.opacity(0.8))
+                HStack(spacing: 4) {
+                    Text("After work,")
+                        .font(Font.bodySans(15, weight: .regular))
+                        .foregroundColor(Color.luxuryCreamMuted)
+                    Text("who has time?")
+                        .font(Font.tangerine(28, weight: .bold))
+                        .italic()
+                        .foregroundColor(Color.luxuryGold)
+                }
             }
             .multilineTextAlignment(.center)
             .opacity(showContent ? 1 : 0)
@@ -384,13 +402,20 @@ struct LuxurySlideItinerary: View {
         VStack(spacing: 0) {
             // Header
             VStack(spacing: 6) {
-                Text("What you get")
-                    .font(Font.bodySans(13, weight: .regular))
-                    .foregroundColor(Color.luxuryMuted)
+                SectionLabel(text: "What you get", color: Color.luxuryMuted)
                 
-                Text("A complete date plan")
-                    .font(Font.header(26, weight: .bold))
-                    .foregroundColor(Color.luxuryGold)
+                HStack(spacing: 6) {
+                    Text("A")
+                        .font(Font.header(26, weight: .regular))
+                        .foregroundColor(Color.luxuryCream)
+                    Text("complete")
+                        .font(Font.tangerine(40, weight: .bold))
+                        .italic()
+                        .foregroundColor(Color.luxuryGold)
+                    Text("date plan")
+                        .font(Font.header(26, weight: .regular))
+                        .foregroundColor(Color.luxuryCream)
+                }
             }
             .padding(.top, 12)
             .opacity(showContent ? 1 : 0)
@@ -401,9 +426,15 @@ struct LuxurySlideItinerary: View {
                 // Header
                 HStack {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Romantic Italian Night")
-                            .font(Font.subheader(18, weight: .semibold))
-                            .foregroundColor(Color.luxuryGold)
+                        HStack(spacing: 4) {
+                            Text("Romantic")
+                                .font(Font.tangerine(28, weight: .bold))
+                                .italic()
+                                .foregroundColor(Color.luxuryGold)
+                            Text("Italian Night")
+                                .font(Font.header(18, weight: .regular))
+                                .foregroundColor(Color.luxuryGold)
+                        }
                         
                         Text("Saturday · 3 stops · ~$150")
                             .font(Font.bodySans(12, weight: .regular))
@@ -526,11 +557,12 @@ struct OnboardingItineraryStop: View {
                     .foregroundColor(Color.luxuryGold)
                 
                 Text(name)
-                    .font(Font.subheader(15, weight: .semibold))
+                    .font(Font.header(15, weight: .bold))
                     .foregroundColor(Color.luxuryCream)
                 
                 Text(tip)
-                    .font(Font.subheaderItalic(12))
+                    .font(Font.tangerine(20, weight: .bold))
+                    .italic()
                     .foregroundColor(Color.luxuryMuted)
             }
             .opacity(isActive ? 1 : 0.5)
@@ -619,10 +651,11 @@ struct LuxurySlideGetStarted: View {
                     }
                     
                     Text("Magical")
-                        .font(Font.special(24, weight: .bold))
+                        .font(Font.tangerine(32, weight: .bold))
+                        .italic()
                         .foregroundColor(Color.luxuryGold)
                     Text("evenings")
-                        .font(Font.subheaderItalic(13))
+                        .font(Font.header(14, weight: .regular))
                         .foregroundColor(Color.luxuryCream)
                 }
                 .padding(16)
@@ -635,19 +668,26 @@ struct LuxurySlideGetStarted: View {
             
             // Title
             VStack(spacing: 8) {
-                Text("Ready for better dates?")
-                    .font(Font.header(28, weight: .bold))
-                    .foregroundColor(Color.luxuryGold)
+                HStack(spacing: 6) {
+                    Text("Ready for")
+                        .font(Font.header(26, weight: .regular))
+                        .foregroundColor(Color.luxuryCream)
+                    Text("better dates?")
+                        .font(Font.tangerine(42, weight: .bold))
+                        .italic()
+                        .foregroundColor(Color.luxuryGold)
+                }
                 
                 HStack(spacing: 4) {
                     Text("Answer a few questions. Get")
-                        .font(Font.subheader(15, weight: .regular))
+                        .font(Font.bodySans(15, weight: .regular))
                         .foregroundColor(Color.luxuryCreamMuted)
                     Text("magic")
-                        .font(Font.special(26, weight: .bold))
+                        .font(Font.tangerine(28, weight: .bold))
+                        .italic()
                         .foregroundColor(Color.luxuryGold)
                     Text("in seconds.")
-                        .font(Font.subheader(15, weight: .regular))
+                        .font(Font.bodySans(15, weight: .regular))
                         .foregroundColor(Color.luxuryCreamMuted)
                 }
             }
@@ -763,7 +803,7 @@ struct OnboardingBenefitRow: View {
             }
             
             Text(text)
-                .font(Font.subheader(15, weight: .regular))
+                .font(Font.bodySans(15, weight: .regular))
                 .foregroundColor(isChecked ? Color.luxuryCream : Color.luxuryMuted)
             
             Spacer()

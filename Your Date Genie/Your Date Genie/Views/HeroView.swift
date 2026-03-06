@@ -61,26 +61,35 @@ struct HeroView: View {
                 VStack(spacing: 10) {
                     HStack(spacing: 4) {
                         Text("Your Date")
-                            .font(Font.header(14, weight: .bold))
+                            .font(Font.header(16, weight: .regular))
                             .foregroundColor(Color.luxuryGold.opacity(0.8))
                         Text("Genie")
-                            .font(Font.special(32, weight: .bold))
+                            .font(Font.tangerine(36, weight: .bold))
+                            .italic()
                             .foregroundColor(Color.luxuryGold)
                     }
                     
-                    Text("Date nights,")
-                        .font(Font.header(38, weight: .bold))
-                        .foregroundColor(Color.luxuryCream)
-                    +
-                    Text("\nplanned for you.")
-                        .font(Font.header(38, weight: .bold))
-                        .foregroundStyle(LinearGradient.goldShimmer)
+                    VStack(spacing: 4) {
+                        Text("Date nights,")
+                            .font(Font.header(36, weight: .regular))
+                            .foregroundColor(Color.luxuryCream)
+                        
+                        HStack(spacing: 6) {
+                            Text("planned")
+                                .font(Font.tangerine(52, weight: .bold))
+                                .italic()
+                                .foregroundStyle(LinearGradient.goldShimmer)
+                            Text("for you.")
+                                .font(Font.header(36, weight: .regular))
+                                .foregroundColor(Color.luxuryCream)
+                        }
+                    }
                 }
                 .multilineTextAlignment(.center)
                 
                 // Description
                 Text("Tell us what you love. We'll create a complete evening — venues, timing, and all the details.")
-                    .font(Font.subheader(16, weight: .regular))
+                    .font(Font.bodySans(15, weight: .regular))
                     .foregroundColor(Color.luxuryCreamMuted)
                     .multilineTextAlignment(.center)
                     .lineSpacing(5)
@@ -106,7 +115,8 @@ struct HeroView: View {
                         .font(Font.bodySans(12, weight: .regular))
                         .foregroundColor(Color.luxuryMuted)
                     Text("magical")
-                        .font(Font.special(20))
+                        .font(Font.tangerine(24, weight: .bold))
+                        .italic()
                         .foregroundColor(Color.luxuryGold)
                     Text("dates")
                         .font(Font.bodySans(12, weight: .regular))

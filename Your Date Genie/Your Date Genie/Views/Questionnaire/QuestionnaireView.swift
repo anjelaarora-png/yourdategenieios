@@ -4,6 +4,9 @@ import Combine
 struct QuestionnaireView: View {
     @Environment(\.dismiss) private var dismiss
     @StateObject private var viewModel = QuestionnaireViewModel()
+    @StateObject private var generator = DatePlanGeneratorService.shared
+    @State private var isGenerating = false
+    @State private var showError = false
     
     var onComplete: ((QuestionnaireData) -> Void)?
     
@@ -14,52 +17,79 @@ struct QuestionnaireView: View {
                 Color.luxuryMaroon
                     .ignoresSafeArea()
                 
-                VStack(spacing: 0) {
-                    // Progress indicator
-                    StepProgressView(currentStep: viewModel.currentStep, totalSteps: 6)
-                        .padding(.horizontal)
-                        .padding(.top, 8)
-                    
-                    // Step content
-                    TabView(selection: $viewModel.currentStep) {
-                        Step1LocationView(data: $viewModel.data)
-                            .tag(1)
-                        Step2TransportationView(data: $viewModel.data)
-                            .tag(2)
-                        Step3VibeView(data: $viewModel.data)
-                            .tag(3)
-                        Step4FoodView(data: $viewModel.data)
-                            .tag(4)
-                        Step5DealBreakersView(data: $viewModel.data)
-                            .tag(5)
-                        Step6ExtrasView(data: $viewModel.data)
-                            .tag(6)
+                if isGenerating {
+                    MagicalLoadingView(generator: generator)
+                } else {
+                    VStack(spacing: 0) {
+                        // Progress indicator
+                        StepProgressView(currentStep: viewModel.currentStep, totalSteps: 6)
+                            .padding(.horizontal)
+                            .padding(.top, 8)
+                        
+                        // Step content
+                        TabView(selection: $viewModel.currentStep) {
+                            Step1LocationView(data: $viewModel.data)
+                                .tag(1)
+                            Step2TransportationView(data: $viewModel.data)
+                                .tag(2)
+                            Step3VibeView(data: $viewModel.data)
+                                .tag(3)
+                            Step4FoodView(data: $viewModel.data)
+                                .tag(4)
+                            Step5DealBreakersView(data: $viewModel.data)
+                                .tag(5)
+                            Step6ExtrasView(data: $viewModel.data)
+                                .tag(6)
+                        }
+                        .tabViewStyle(.page(indexDisplayMode: .never))
+                        .animation(.easeInOut(duration: 0.3), value: viewModel.currentStep)
+                        
+                        // Navigation buttons
+                        navigationButtons
                     }
-                    .tabViewStyle(.page(indexDisplayMode: .never))
-                    .animation(.easeInOut(duration: 0.3), value: viewModel.currentStep)
-                    
-                    // Navigation buttons
-                    navigationButtons
                 }
             }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") {
-                        dismiss()
-                    }
-                    .font(Font.bodySans(16, weight: .medium))
-                    .foregroundColor(Color.luxuryGold)
-                }
-                
-                ToolbarItem(placement: .principal) {
-                    Text(viewModel.stepTitle)
-                        .font(Font.subheader(17, weight: .semibold))
+                if !isGenerating {
+                    ToolbarItem(placement: .navigationBarLeading) {
+                        Button("Cancel") {
+                            dismiss()
+                        }
+                        .font(Font.bodySans(16, weight: .medium))
                         .foregroundColor(Color.luxuryGold)
+                    }
+                    
+                    ToolbarItem(placement: .principal) {
+                        Text(viewModel.stepTitle)
+                            .font(Font.subheader(17, weight: .semibold))
+                            .foregroundColor(Color.luxuryGold)
+                    }
                 }
             }
             .toolbarBackground(Color.luxuryMaroon, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
+            .alert("Generation Error", isPresented: $showError) {
+                Button("Try Again") {
+                    generateDatePlan()
+                }
+                Button("Cancel", role: .cancel) {
+                    isGenerating = false
+                }
+            } message: {
+                Text(generator.error?.localizedDescription ?? "Something went wrong. Please try again.")
+            }
+            .onChange(of: generator.generatedPlans) { plans in
+                if !plans.isEmpty && isGenerating {
+                    onComplete?(viewModel.data)
+                    dismiss()
+                }
+            }
+            .onChange(of: generator.error) { error in
+                if error != nil {
+                    showError = true
+                }
+            }
         }
     }
     
@@ -85,8 +115,7 @@ struct QuestionnaireView: View {
             // Next/Submit button
             Button {
                 if viewModel.currentStep == 6 {
-                    onComplete?(viewModel.data)
-                    dismiss()
+                    generateDatePlan()
                 } else {
                     withAnimation {
                         viewModel.nextStep()
@@ -114,6 +143,22 @@ struct QuestionnaireView: View {
             Color.luxuryMaroon
                 .shadow(color: Color.black.opacity(0.3), radius: 10, y: -5)
         )
+    }
+    
+    private func generateDatePlan() {
+        withAnimation {
+            isGenerating = true
+        }
+        
+        Task {
+            do {
+                let _ = try await generator.generateDatePlan(from: viewModel.data)
+            } catch {
+                await MainActor.run {
+                    showError = true
+                }
+            }
+        }
     }
 }
 
