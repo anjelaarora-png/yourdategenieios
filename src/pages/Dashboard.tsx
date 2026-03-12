@@ -65,6 +65,7 @@ const Dashboard = () => {
   const [photoPromptOpen, setPhotoPromptOpen] = useState(false);
   const [saveTheDateOpen, setSaveTheDateOpen] = useState(false);
   const [lastSavedPlan, setLastSavedPlan] = useState<typeof datePlans[0] | null>(null);
+  const [activeTab, setActiveTab] = useState("history");
 
   // Redirect if not authenticated
   if (!authLoading && !user) {
@@ -211,7 +212,7 @@ const Dashboard = () => {
             </Button>
           </div>
 
-          <Tabs defaultValue="history" className="space-y-4 sm:space-y-6">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-6">
             <TabsList className="grid w-full grid-cols-6 h-auto p-1">
               <TabsTrigger value="history" className="gap-1 sm:gap-2 py-2 sm:py-2.5 text-xs sm:text-sm flex-col sm:flex-row">
                 <History className="w-4 h-4" />
@@ -265,6 +266,9 @@ const Dashboard = () => {
 
             <TabsContent value="gifts">
               <ErrorBoundary fallback={<SectionFallback message="Unable to load gift suggestions" />}>
+                <p className="text-sm text-muted-foreground mb-3">
+                  Saved gifts from date plans and the finder appear here. Your questionnaire preferences (recipient, interests, budget) are used when you search for gifts.
+                </p>
                 <GiftSuggestionsList plans={plans} />
               </ErrorBoundary>
             </TabsContent>
@@ -320,6 +324,8 @@ const Dashboard = () => {
         scheduledDate={savedPreferences?.dateScheduled}
         startTime={savedPreferences?.startTime}
         onUpdatePlanGifts={isViewingMode ? undefined : updatePlanGifts}
+        onNavigateToGifts={() => { setActiveTab("gifts"); setResultOpen(false); }}
+        transportationMode={savedPreferences?.transportationMode}
       />
 
       <PhotoPrompt

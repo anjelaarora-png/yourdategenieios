@@ -1,10 +1,12 @@
-import { DatePlan } from "@/types/datePlan";
+import { DatePlan, GiftSuggestion } from "@/types/datePlan";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Clock, DollarSign, Sparkles, Package, Cloud, Calendar, CheckCircle, AlertCircle, MapPin, Car, Footprints, Train, Bike, Phone, Navigation, Globe } from "lucide-react";
+import { Clock, DollarSign, Sparkles, Package, Cloud, Calendar, CheckCircle, AlertCircle, MapPin, Car, Footprints, Train, Bike, Phone, Navigation, Globe, Heart, ExternalLink, ShoppingBag } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { generateVenueSearchUrl } from "@/lib/linkUtils";
+import { useSavedGifts } from "@/hooks/useSavedGifts";
+import { useToast } from "@/hooks/use-toast";
 
 interface VenueReservationInfo {
   name: string;
@@ -22,6 +24,22 @@ interface DatePlanCardProps {
 }
 
 const DatePlanCard = ({ plan, onMakeReservation, onGetMoreGifts }: DatePlanCardProps) => {
+  const { toast } = useToast();
+  const { toggleSavedGift, isSaved, markAsPurchased, isPurchased } = useSavedGifts();
+
+  const handleSaveGift = (gift: GiftSuggestion) => {
+    const wasSaved = isSaved(gift);
+    toggleSavedGift(gift);
+    toast({
+      title: wasSaved ? "Removed from saved gifts" : "Saved to My Gifts",
+      description: wasSaved ? undefined : "Find it anytime under the Gifts tab.",
+    });
+  };
+
+  const handleMarkAsBought = (gift: GiftSuggestion) => {
+    markAsPurchased(gift);
+    toast({ title: "Marked as bought", description: "Won't be recommended again." });
+  };
 
   // Defensive check for plan object
   if (!plan || typeof plan !== 'object') {
@@ -143,12 +161,12 @@ const DatePlanCard = ({ plan, onMakeReservation, onGetMoreGifts }: DatePlanCardP
                           {stop.address}
                         </p>
                       )}
-                      {/* Hours - Always visible when available */}
+                      {/* Hours - Verified from Google when available */}
                       {stop.openingHours && stop.openingHours.length > 0 && (
                         <div className="mt-2 text-xs text-muted-foreground">
                           <div className="flex items-center gap-1 mb-1">
                             <Clock className="w-3 h-3" />
-                            <span className="font-medium">Hours:</span>
+                            <span className="font-medium">Hours{stop.validated ? " (from Google)" : ""}:</span>
                           </div>
                           <div className="ml-4 space-y-0.5">
                             {stop.openingHours.map((line, i) => (
@@ -157,24 +175,33 @@ const DatePlanCard = ({ plan, onMakeReservation, onGetMoreGifts }: DatePlanCardP
                           </div>
                         </div>
                       )}
-                      {/* Venue links */}
+                      {/* Venue links - prefer business profile (place_id) so Maps opens the correct location */}
                       <div className="flex flex-wrap items-center gap-2 mt-2">
-                        {/* Website or Google Maps profile */}
+                        {stop.websiteUrl && (
+                          <a
+                            href={stop.websiteUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs text-primary hover:underline flex items-center gap-1"
+                          >
+                            <Globe className="w-3 h-3" />
+                            Website{stop.validated ? " (Google)" : ""}
+                          </a>
+                        )}
                         <a
-                          href={stop.websiteUrl || (stop.placeId 
+                          href={stop.placeId
                             ? `https://www.google.com/maps/place/?q=place_id:${stop.placeId}`
-                            : generateVenueSearchUrl(stop.name, stop.address?.split(",").pop()?.trim()))}
+                            : generateVenueSearchUrl(stop.name, stop.address?.split(",").pop()?.trim())}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="text-xs text-primary hover:underline flex items-center gap-1"
                         >
-                          <Globe className="w-3 h-3" />
-                          {stop.websiteUrl ? "Website" : "Google Maps Profile"}
+                          <MapPin className="w-3 h-3" />
+                          {stop.placeId ? "View on Maps (business)" : "Search on Maps"}
                         </a>
-                        {/* View on Google Maps */}
                         <button
                           onClick={() => {
-                            const mapUrl = stop.placeId 
+                            const mapUrl = stop.placeId
                               ? `https://www.google.com/maps/place/?q=place_id:${stop.placeId}`
                               : generateVenueSearchUrl(stop.name, stop.address?.split(",").pop()?.trim());
                             window.open(mapUrl, "_blank", "noopener,noreferrer");
@@ -314,13 +341,13 @@ const DatePlanCard = ({ plan, onMakeReservation, onGetMoreGifts }: DatePlanCardP
             <div className="space-y-3">
               {safeGiftSuggestions.map((gift, i) => (
                 <div key={i} className="bg-background/50 rounded-lg p-3 space-y-1">
-                  <div className="flex items-center justify-between">
-                    <span className="font-medium flex items-center gap-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-medium flex items-center gap-2 flex-wrap">
                       <span>{gift.emoji}</span>
                       {gift.purchaseUrl ? (
-                        <a 
-                          href={gift.purchaseUrl} 
-                          target="_blank" 
+                        <a
+                          href={gift.purchaseUrl}
+                          target="_blank"
                           rel="noopener noreferrer"
                           className="hover:text-primary hover:underline"
                         >
@@ -330,7 +357,55 @@ const DatePlanCard = ({ plan, onMakeReservation, onGetMoreGifts }: DatePlanCardP
                         gift.name
                       )}
                     </span>
-                    <Badge variant="outline" className="text-xs">{gift.priceRange}</Badge>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => handleSaveGift(gift)}
+                            >
+                              <Heart
+                                className={`w-4 h-4 ${
+                                  isSaved(gift) ? "text-primary fill-primary" : "text-muted-foreground"
+                                }`}
+                              />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            {isSaved(gift) ? "Remove from Saved Gifts" : "Save to Gifts tab"}
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                      {!isPurchased(gift) ? (
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 gap-1 text-xs"
+                                onClick={() => handleMarkAsBought(gift)}
+                              >
+                                <ShoppingBag className="w-3.5 h-3.5" />
+                                Bought
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Mark as bought so it won&apos;t be recommended again</TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      ) : (
+                        <Badge variant="secondary" className="text-xs gap-0.5">
+                          <CheckCircle className="w-3 h-3" />
+                          Bought
+                        </Badge>
+                      )}
+                      <Badge variant="outline" className="text-xs">{gift.priceRange}</Badge>
+                    </div>
                   </div>
                   <p className="text-sm text-muted-foreground">{gift.description}</p>
                   <p className="text-xs text-muted-foreground">

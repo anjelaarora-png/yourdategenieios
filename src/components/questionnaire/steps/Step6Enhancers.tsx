@@ -95,7 +95,7 @@ const Step6Enhancers = ({ data, onChange }: Step6EnhancersProps) => {
                   className={`w-full flex items-center gap-2 sm:gap-3 px-2 sm:px-3 py-2 rounded-lg border text-xs sm:text-sm transition-all text-left ${
                     data.userLoveLanguages?.includes(lang.value)
                       ? "border-primary bg-primary/10 text-foreground"
-                      : "border-border bg-background text-muted-foreground hover:border-primary/50"
+                      : "border-border bg-card text-foreground hover:border-primary/50"
                   }`}
                 >
                   <span className="text-base sm:text-lg">{lang.emoji}</span>
@@ -120,7 +120,7 @@ const Step6Enhancers = ({ data, onChange }: Step6EnhancersProps) => {
                     className={`w-full flex items-center gap-2 sm:gap-3 px-2 sm:px-3 py-2 rounded-lg border text-xs sm:text-sm transition-all text-left ${
                       data.partnerLoveLanguages?.includes(lang.value)
                         ? "border-primary bg-primary/10 text-foreground"
-                        : "border-border bg-background text-muted-foreground hover:border-primary/50"
+                        : "border-border bg-card text-foreground hover:border-primary/50"
                     }`}
                   >
                     <span className="text-base sm:text-lg">{lang.emoji}</span>
@@ -198,7 +198,7 @@ const Step6Enhancers = ({ data, onChange }: Step6EnhancersProps) => {
                     className={`flex items-center gap-1 sm:gap-2 px-2 py-1.5 sm:py-2 rounded-lg border text-xs sm:text-sm transition-all ${
                       data.partnerInterests?.includes(interest.value)
                         ? "border-primary bg-primary/10 text-foreground"
-                        : "border-border bg-background text-muted-foreground hover:border-primary/50"
+                        : "border-border bg-card text-foreground hover:border-primary/50"
                     }`}
                   >
                     <span className="text-sm sm:text-base">{interest.emoji}</span>
@@ -299,7 +299,7 @@ const Step6Enhancers = ({ data, onChange }: Step6EnhancersProps) => {
                     className={`flex flex-col items-center gap-0.5 sm:gap-1 p-2 sm:p-3 rounded-lg border text-xs sm:text-sm transition-all ${
                       data.conversationTopics?.includes(topic.value)
                         ? "border-primary bg-primary/10 text-foreground"
-                        : "border-border bg-background text-muted-foreground hover:border-primary/50"
+                        : "border-border bg-card text-foreground hover:border-primary/50"
                     }`}
                   >
                     <span className="text-lg sm:text-xl">{topic.emoji}</span>

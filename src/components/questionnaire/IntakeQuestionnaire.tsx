@@ -50,6 +50,7 @@ const IntakeQuestionnaire = ({
 }: IntakeQuestionnaireProps) => {
   const [step, setStep] = useState(1);
   const [data, setData] = useState<QuestionnaireData>(initialQuestionnaireData);
+  const [showWelcomePrompt, setShowWelcomePrompt] = useState(false);
   const [showExistingPrompt, setShowExistingPrompt] = useState(false);
   const [showResumePrompt, setShowResumePrompt] = useState(false);
   const [showQuickDetails, setShowQuickDetails] = useState(false);
@@ -98,9 +99,14 @@ const IntakeQuestionnaire = ({
       if (existingData) {
         // User has saved preferences
         setShowExistingPrompt(true);
+        setShowWelcomePrompt(false);
       } else if (progress && progress.step > 1) {
         // User has in-progress questionnaire
         setShowResumePrompt(true);
+        setShowWelcomePrompt(false);
+      } else if (!existingData && !progress) {
+        // First-time user - show welcome
+        setShowWelcomePrompt(true);
       } else {
         setData(initialQuestionnaireData);
         setStep(1);
@@ -110,10 +116,10 @@ const IntakeQuestionnaire = ({
 
   // Save progress whenever data or step changes
   useEffect(() => {
-    if (open && !showExistingPrompt && !showResumePrompt) {
+    if (open && !showWelcomePrompt && !showExistingPrompt && !showResumePrompt) {
       saveProgress(data, step);
     }
-  }, [data, step, open, showExistingPrompt, showResumePrompt, saveProgress]);
+  }, [data, step, open, showWelcomePrompt, showExistingPrompt, showResumePrompt, saveProgress]);
 
   // Reset viewed state when step changes
   useEffect(() => {
@@ -219,7 +225,7 @@ const IntakeQuestionnaire = ({
       case 2:
         return data.transportationMode !== "" && data.travelRadius !== "";
       case 3:
-        return data.energyLevel !== "" && data.timeOfDay !== "";
+        return data.energyLevel !== "";
       case 4:
         return data.budgetRange !== "";
       case 5:
@@ -257,6 +263,62 @@ const IntakeQuestionnaire = ({
     onOpenChange(false);
     setStep(1);
   };
+
+  // Welcome prompt for first-time users
+  if (showWelcomePrompt) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="font-display text-2xl">Your Perfect Date Awaits ✨</DialogTitle>
+            <DialogDescription>
+              We&apos;re so excited to help you plan something special. To create a personalized itinerary that feels <em>just right</em>, we need to learn a bit about your preferences.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-3 my-4">
+            <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/50">
+              <span className="text-lg">📍</span>
+              <div>
+                <p className="font-medium text-sm">Where you love to go</p>
+                <p className="text-xs text-muted-foreground">Your favorite neighborhoods and travel style</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/50">
+              <span className="text-lg">🍽️</span>
+              <div>
+                <p className="font-medium text-sm">Food & vibe preferences</p>
+                <p className="text-xs text-muted-foreground">Cuisines, budget, and the energy you&apos;re after</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/50">
+              <span className="text-lg">✨</span>
+              <div>
+                <p className="font-medium text-sm">Your personal touch</p>
+                <p className="text-xs text-muted-foreground">Deal-breakers, extras, and what makes it magical</p>
+              </div>
+            </div>
+          </div>
+
+          <p className="text-xs text-muted-foreground text-center mb-4">
+            It only takes a few minutes — and we&apos;ll remember your answers for next time.
+          </p>
+
+          <Button
+            className="w-full gradient-gold text-primary-foreground hover:opacity-90"
+            onClick={() => {
+              setShowWelcomePrompt(false);
+              setData(initialQuestionnaireData);
+              setStep(1);
+            }}
+          >
+            <Sparkles className="w-4 h-4 mr-2" />
+            Let&apos;s Get Started
+          </Button>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   // Existing preferences prompt
   if (showExistingPrompt && existingData) {

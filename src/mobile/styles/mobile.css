@@ -181,6 +181,13 @@
 .ios-button-secondary {
   background: hsl(var(--secondary));
   color: hsl(var(--secondary-foreground));
+  /* Explicit text color - ensure visibility on light or dark backgrounds */
+  --tw-text-opacity: 1;
+}
+
+/* Fallback: if secondary is light (cream/white), use dark text */
+.light .ios-button-secondary {
+  color: hsl(345 45% 20%);
 }
 
 /* iOS Input styles */

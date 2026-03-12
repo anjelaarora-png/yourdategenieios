@@ -4,7 +4,6 @@ import {
   QuestionnaireData,
   ENERGY_LEVELS,
   ACTIVITIES,
-  TIME_OF_DAY,
   DURATIONS,
 } from "../types";
 
@@ -60,24 +59,6 @@ const Step2Energy = ({ data, onChange }: Step2Props) => {
               onClick={() => toggleActivity(activity.value)}
               emoji={activity.emoji}
               label={activity.label}
-              compact
-            />
-          ))}
-        </div>
-      </div>
-
-      {/* Time of Day */}
-      <div className="space-y-3">
-        <Label className="text-sm sm:text-base font-medium">🕐 When are you thinking?</Label>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
-          {TIME_OF_DAY.map((time) => (
-            <OptionCard
-              key={time.value}
-              selected={data.timeOfDay === time.value}
-              onClick={() => onChange({ timeOfDay: time.value })}
-              emoji={time.emoji}
-              label={time.label}
-              description={time.time}
               compact
             />
           ))}

@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
-import { Calendar, Clock, Users, ExternalLink, Phone, AlertCircle } from "lucide-react";
+import { Calendar, Clock, Users, ExternalLink, Phone, AlertCircle, MapPin } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -219,6 +219,15 @@ const ReservationWidget = ({
     window.open(`https://www.google.com/search?q=${searchQuery}`, "_blank", "noopener,noreferrer");
   };
 
+  const handleViewOnMaps = () => {
+    if (placeId) {
+      window.open(`https://www.google.com/maps/place/?q=place_id:${placeId}`, "_blank", "noopener,noreferrer");
+    } else if (address) {
+      const query = encodeURIComponent(address);
+      window.open(`https://www.google.com/maps/search/?api=1&query=${query}`, "_blank", "noopener,noreferrer");
+    }
+  };
+
   // Generate time slots
   const timeSlots = [];
   for (let h = 11; h <= 22; h++) {
@@ -334,6 +343,10 @@ const ReservationWidget = ({
                     Call Restaurant
                   </Button>
                 )}
+                <Button variant="outline" size="sm" onClick={handleViewOnMaps} className="gap-1">
+                  <MapPin className="w-3 h-3" />
+                  {placeId ? "View on Google Maps" : "View on Maps"}
+                </Button>
                 <Button variant="outline" size="sm" onClick={handleGoogleSearch} className="gap-1">
                   <ExternalLink className="w-3 h-3" />
                   Find Website

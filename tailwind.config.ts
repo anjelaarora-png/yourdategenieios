@@ -81,7 +81,7 @@ export default {
         },
       },
       fontFamily: {
-        display: ['Cormorant Garamond', 'serif'],
+        display: ['Times New Roman', 'Times', 'Georgia', 'serif'],
         body: ['Inter', 'sans-serif'],
       },
       borderRadius: {

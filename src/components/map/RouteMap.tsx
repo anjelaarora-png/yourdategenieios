@@ -193,11 +193,13 @@ const LeafletRouteMap = ({
   const openInGoogleMaps = () => {
     if (verifiedStops.length === 0) return;
 
-    const origin = `${verifiedStops[0].latitude},${verifiedStops[0].longitude}`;
-    const destination = `${verifiedStops[verifiedStops.length - 1].latitude},${verifiedStops[verifiedStops.length - 1].longitude}`;
-    const waypoints = verifiedStops
-      .slice(1, -1)
-      .map((stop) => `${stop.latitude},${stop.longitude}`)
+    const o = verifiedStops[0];
+    const d = verifiedStops[verifiedStops.length - 1];
+    const wayStops = verifiedStops.slice(1, -1);
+    const origin = o.placeId ? `place_id:${o.placeId}` : `${o.latitude},${o.longitude}`;
+    const destination = d.placeId ? `place_id:${d.placeId}` : `${d.latitude},${d.longitude}`;
+    const waypoints = wayStops
+      .map((s) => (s.placeId ? `place_id:${s.placeId}` : `${s.latitude},${s.longitude}`))
       .join("|");
 
     const getGoogleMapsTravelMode = (mode?: string) => {
@@ -212,12 +214,9 @@ const LeafletRouteMap = ({
       }
     };
 
-    let url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&travelmode=${getGoogleMapsTravelMode(effectiveMode)}`;
-    if (waypoints) {
-      url += `&waypoints=${waypoints}`;
-    }
-
-    window.open(url, "_blank");
+    const q = new URLSearchParams({ api: "1", origin, destination, travelmode: getGoogleMapsTravelMode(effectiveMode) });
+    if (waypoints) q.set("waypoints", waypoints);
+    window.open(`https://www.google.com/maps/dir/?${q.toString()}`, "_blank");
   };
 
   return (
@@ -247,7 +246,7 @@ const LeafletRouteMap = ({
             variant="default"
             size="sm"
             onClick={openInGoogleMaps}
-            className="gap-2 gradient-gold text-primary-foreground"
+            className="gap-2 gradient-gold text-primary-foreground hover:opacity-90 border-0"
           >
             <ExternalLink className="w-4 h-4" />
             Get Directions
@@ -262,17 +261,23 @@ const RouteMap = ({ stops, transportationMode, className = "" }: RouteMapProps) 
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<GoogleMap | null>(null);
   const directionsRendererRef = useRef<DirectionsRenderer | null>(null);
-  const markersRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([]);
   const overlaysRef = useRef<google.maps.OverlayView[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [mapReady, setMapReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [totalDistance, setTotalDistance] = useState<string>("");
   const [totalDuration, setTotalDuration] = useState<string>("");
+  const [routeLegs, setRouteLegs] = useState<Array<{ from: number; to: number; distance: string; duration: string }>>([]);
+  const [selectedMode, setSelectedMode] = useState<string>(() => transportationMode || "walking");
   const [useLeaflet, setUseLeaflet] = useState(!GOOGLE_MAPS_API_KEY);
   
-  // Determine the travel mode from the first stop's travel mode or prop
-  const effectiveMode = transportationMode || stops.find(s => s.travelMode)?.travelMode || "walking";
+  // Keep selectedMode in sync when prop changes (e.g. from questionnaire)
+  useEffect(() => {
+    if (transportationMode) setSelectedMode(transportationMode);
+  }, [transportationMode]);
+
+  // Use selected mode for directions (user can override via selector)
+  const effectiveMode = selectedMode || transportationMode || stops.find(s => s.travelMode)?.travelMode || "walking";
 
   // Filter stops with coordinates (don't require validated flag)
   const stopsWithCoords = stops.filter((stop) => {
@@ -383,12 +388,12 @@ const RouteMap = ({ stops, transportationMode, className = "" }: RouteMapProps) 
     };
   }, [useLeaflet]);
 
-  // Effect 2: Recalculate route when stops or transportation mode changes
+  // Effect 2: Recalculate route when stops or selected transport mode changes
   useEffect(() => {
     if (!mapReady || !mapInstanceRef.current) return;
     
     calculateRoute();
-  }, [mapReady, stops, transportationMode]);
+  }, [mapReady, stops, effectiveMode]);
 
   // Clear previous markers and overlays
   const clearMarkers = () => {
@@ -410,9 +415,10 @@ const RouteMap = ({ stops, transportationMode, className = "" }: RouteMapProps) 
       directionsRendererRef.current.set("directions", null);
     }
 
-    // Reset totals
+    // Reset totals and legs
     setTotalDistance("");
     setTotalDuration("");
+    setRouteLegs([]);
 
     if (stopsWithCoords.length === 0) {
       setIsLoading(false);
@@ -464,14 +470,22 @@ const RouteMap = ({ stops, transportationMode, className = "" }: RouteMapProps) 
         addCustomMarker(stop, index + 1);
       });
 
-      // Calculate totals
+      // Calculate totals and per-leg info
       let distance = 0;
       let duration = 0;
-      result.routes[0].legs.forEach((leg) => {
-        distance += leg.distance?.value || 0;
-        duration += leg.duration?.value || 0;
+      const legs = result.routes[0].legs.map((leg, i) => {
+        const d = leg.distance?.value || 0;
+        const t = leg.duration?.value || 0;
+        distance += d;
+        duration += t;
+        return {
+          from: i + 1,
+          to: i + 2,
+          distance: leg.distance?.text || "",
+          duration: leg.duration?.text || "",
+        };
       });
-
+      setRouteLegs(legs);
       setTotalDistance(`${(distance / 1000).toFixed(1)} km`);
       setTotalDuration(`${Math.round(duration / 60)} min ${getTravelModeLabel(effectiveMode)}`);
     } catch (err) {
@@ -565,14 +579,15 @@ const RouteMap = ({ stops, transportationMode, className = "" }: RouteMapProps) 
   const openInGoogleMaps = () => {
     if (stopsWithCoords.length === 0) return;
 
-    const origin = `${stopsWithCoords[0].latitude},${stopsWithCoords[0].longitude}`;
-    const destination = `${stopsWithCoords[stopsWithCoords.length - 1].latitude},${stopsWithCoords[stopsWithCoords.length - 1].longitude}`;
-    const waypoints = stopsWithCoords
-      .slice(1, -1)
-      .map((stop) => `${stop.latitude},${stop.longitude}`)
+    const o = stopsWithCoords[0];
+    const d = stopsWithCoords[stopsWithCoords.length - 1];
+    const wayStops = stopsWithCoords.slice(1, -1);
+    const origin = o.placeId ? `place_id:${o.placeId}` : `${o.latitude},${o.longitude}`;
+    const destination = d.placeId ? `place_id:${d.placeId}` : `${d.latitude},${d.longitude}`;
+    const waypoints = wayStops
+      .map((s) => (s.placeId ? `place_id:${s.placeId}` : `${s.latitude},${s.longitude}`))
       .join("|");
 
-    // Map our modes to Google Maps URL travel modes
     const getGoogleMapsTravelMode = (mode?: string) => {
       switch (mode?.toLowerCase()) {
         case "walking": return "walking";
@@ -585,12 +600,9 @@ const RouteMap = ({ stops, transportationMode, className = "" }: RouteMapProps) 
       }
     };
 
-    let url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&travelmode=${getGoogleMapsTravelMode(effectiveMode)}`;
-    if (waypoints) {
-      url += `&waypoints=${waypoints}`;
-    }
-
-    window.open(url, "_blank");
+    const q = new URLSearchParams({ api: "1", origin, destination, travelmode: getGoogleMapsTravelMode(effectiveMode) });
+    if (waypoints) q.set("waypoints", waypoints);
+    window.open(`https://www.google.com/maps/dir/?${q.toString()}`, "_blank");
   };
 
   // If we have an error or no API key, fall back to Leaflet
@@ -671,32 +683,95 @@ const RouteMap = ({ stops, transportationMode, className = "" }: RouteMapProps) 
       />
       
       {!isLoading && (
-        <div className="flex items-center justify-between mt-3 flex-wrap gap-2">
-          <div className="flex items-center gap-4 text-sm text-muted-foreground">
-            {totalDistance && (
-              <span className="flex items-center gap-1.5">
-                📍 {totalDistance}
-              </span>
-            )}
-            {totalDuration && (
-              <span className="flex items-center gap-1.5">
-                {getTravelModeIcon(effectiveMode)} {totalDuration}
-              </span>
-            )}
-            <span className="text-xs">
-              ({stopsWithCoords.length} stop{stopsWithCoords.length !== 1 ? "s" : ""} on map)
-            </span>
+        <>
+          {/* Transport mode selector */}
+          <div className="flex items-center gap-1 mt-3 p-1.5 rounded-lg bg-muted/50 w-fit">
+            <button
+              type="button"
+              onClick={() => setSelectedMode("walking")}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                effectiveMode === "walking" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"
+              }`}
+            >
+              <Footprints className="w-4 h-4" />
+              Walk
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedMode("driving")}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                effectiveMode === "driving" || effectiveMode === "rideshare" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"
+              }`}
+            >
+              <Car className="w-4 h-4" />
+              Drive
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedMode("public-transit")}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                effectiveMode === "public-transit" || effectiveMode === "transit" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"
+              }`}
+            >
+              <Train className="w-4 h-4" />
+              Transit
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedMode("biking")}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                effectiveMode === "biking" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"
+              }`}
+            >
+              <Bike className="w-4 h-4" />
+              Bike
+            </button>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={openInGoogleMaps}
-            className="gap-2"
-          >
-            <Navigation className="w-4 h-4" />
-            Open in Google Maps
-          </Button>
-        </div>
+
+          {/* Per-leg distance & time */}
+          {routeLegs.length > 0 && (
+            <div className="mt-3 space-y-1.5">
+              <p className="text-xs font-medium text-muted-foreground">Time & distance between stops</p>
+              <ul className="space-y-1">
+                {routeLegs.map((leg, i) => (
+                  <li key={i} className="flex items-center gap-2 text-sm">
+                    <span className="font-medium text-foreground">Stop {leg.from} → {leg.to}</span>
+                    <span className="text-muted-foreground">
+                      {leg.duration}{leg.distance ? ` · ${leg.distance}` : ""}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          <div className="flex items-center justify-between mt-3 flex-wrap gap-2">
+            <div className="flex items-center gap-4 text-sm text-muted-foreground">
+              {totalDistance && (
+                <span className="flex items-center gap-1.5">
+                  📍 {totalDistance}
+                </span>
+              )}
+              {totalDuration && (
+                <span className="flex items-center gap-1.5">
+                  {getTravelModeIcon(effectiveMode)} {totalDuration}
+                </span>
+              )}
+              <span className="text-xs">
+                ({stopsWithCoords.length} stop{stopsWithCoords.length !== 1 ? "s" : ""} on map)
+              </span>
+            </div>
+            <Button
+              variant="default"
+              size="sm"
+              onClick={openInGoogleMaps}
+              className="gap-2 gradient-gold text-primary-foreground hover:opacity-90 border-0"
+            >
+              <Navigation className="w-4 h-4" />
+              Open in Google Maps
+            </Button>
+          </div>
+        </>
       )}
     </div>
   );

@@ -26,11 +26,19 @@ serve(async (req) => {
       existingGifts, 
       partnerInterests, 
       giftBudget,
-      // New standalone gift finder params
+      // Standalone gift finder params
       interests,
       priceRange,
       partnerDescription,
       count = 3,
+      // Location & preference refinement
+      location,
+      city,
+      country,
+      loveLanguages,
+      relationshipStage,
+      giftRecipient,
+      purchasedGiftNames,
     } = await req.json();
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
@@ -40,39 +48,65 @@ serve(async (req) => {
     }
 
     const existingGiftNames = existingGifts?.map((g: any) => g.name).join(", ") || "none";
-    const giftCount = Math.min(Math.max(count, 3), 6); // 3-6 gifts
+    const purchasedNames =
+      Array.isArray(purchasedGiftNames) && purchasedGiftNames.length > 0
+        ? purchasedGiftNames.join(", ")
+        : "";
+    const giftCount = Math.min(Math.max(Number(count) || 3, 1), 6);
 
-    // Build context based on whether this is a date plan gift or standalone search
+    const userLocation = location || city || "";
+    const userCountry = (country || "").toLowerCase();
+    const locationHint = userLocation
+      ? `${userLocation}${userCountry ? `, ${userCountry}` : ""}`
+      : "United States";
+
+    // Build context from ALL provided preferences for accurate personalization
     const isStandalone = !planTitle || planTitle.includes("Gift Ideas for");
     
     let contextSection = "";
     if (isStandalone) {
       contextSection = `
 Occasion: ${occasion || "Just because"}
+Who you're shopping for: ${giftRecipient || "not specified"}
 Partner's interests: ${interests || "not specified"}
-Partner description: ${partnerDescription || "not specified"}
-Budget preference: ${priceRange || "any"}`;
+Partner description / notes: ${partnerDescription || "not specified"}
+Budget: ${priceRange || "any"}
+Location (for where to buy): ${locationHint}
+${loveLanguages?.length ? `Love languages (tailor gift style): ${Array.isArray(loveLanguages) ? loveLanguages.join(", ") : loveLanguages}` : ""}
+${relationshipStage ? `Relationship stage: ${relationshipStage}` : ""}`;
     } else {
       contextSection = `
 Date theme: ${planTitle}
 Occasion: ${occasion || "Just because"}
+Who you're shopping for: ${giftRecipient || "partner"}
 Partner interests: ${partnerInterests?.join(", ") || interests || "not specified"}
-Budget: ${giftBudget || priceRange || "moderate"}`;
+Budget: ${giftBudget || priceRange || "moderate"}
+Location (for where to buy): ${locationHint}
+${loveLanguages?.length ? `Love languages: ${Array.isArray(loveLanguages) ? loveLanguages.join(", ") : loveLanguages}` : ""}
+${relationshipStage ? `Relationship stage: ${relationshipStage}` : ""}`;
     }
 
-    const prompt = `You are a thoughtful gift advisor. Generate ${giftCount} creative, romantic gift suggestions.
+    const prompt = `You are a thoughtful gift advisor. Generate ${giftCount} personalized, UNIQUE gift suggestions. Avoid generic ideas—mix surprising finds, niche brands, and memorable options.
 
 Context:${contextSection}
 
 ${existingGiftNames !== "none" ? `Existing gifts already suggested (DO NOT repeat these): ${existingGiftNames}` : ""}
+${purchasedNames ? `\nAlready bought by the user (DO NOT suggest these again): ${purchasedNames}` : ""}
 
-Generate ${giftCount} thoughtful gift ideas. Each gift should be:
-- Romantic, thoughtful, and memorable
-- Practically purchasable (available online or in common stores)
-- Include specific product recommendations when possible
-- Match the occasion and any mentioned interests
+Requirements:
+- Be UNIQUE: suggest a mix of Etsy finds, Amazon bestsellers, Uncommon Goods, local boutiques, experience gifts, and personalized items. Vary retailers (e.g. Etsy, Amazon, Target, small shops, Bookshop.org, Crate & Barrel).
+- Use EVERY detail above: occasion, who they're shopping for, interests, notes, budget, and location.
+- Each gift MUST have a purchaseUrl: a real link where they can buy it. Use real search or store URLs:
+  - Etsy: https://www.etsy.com/search?q=PRODUCT_QUERY
+  - Amazon US: https://www.amazon.com/s?k=PRODUCT_QUERY
+  - Amazon UK: https://www.amazon.co.uk/s?k=PRODUCT_QUERY
+  - Target: https://www.target.com/s?searchTerm=PRODUCT_QUERY
+  - Uncommon Goods / niche: use the retailer's search URL or a specific product category URL.
+- whereToBuy must name the actual retailer(s) you used for purchaseUrl (e.g. "Etsy", "Amazon", "Uncommon Goods").
+- Match the occasion and interests; tailor "whyItFits" to the person.
+- Mix variety: physical gifts, experiences, and personalized options.
 
-Focus on variety: mix experience gifts, physical items, and personalized options.`;
+Generate exactly ${giftCount} gifts. Every gift must have: name, description, priceRange, whereToBuy, purchaseUrl (required), whyItFits, and emoji.`;
 
     console.log("[generate-more-gifts] Generating gifts with context:", contextSection);
 
@@ -104,12 +138,12 @@ Focus on variety: mix experience gifts, physical items, and personalized options
                       name: { type: "string", description: "Name of the gift" },
                       description: { type: "string", description: "Why this gift is special" },
                       priceRange: { type: "string", description: "Price range like '$30-50'" },
-                      whereToBuy: { type: "string", description: "Store name or 'Amazon', 'Etsy'" },
-                      purchaseUrl: { type: "string", description: "Direct URL to buy (optional)" },
+                      whereToBuy: { type: "string", description: "1-2 retailers accessible in user's location (e.g. 'Amazon, Target' or 'Amazon, John Lewis')" },
+                      purchaseUrl: { type: "string", description: "REQUIRED: Direct search or product URL where they can buy (e.g. Amazon search link for the product, in user's region)" },
                       whyItFits: { type: "string", description: "Why it matches the occasion" },
                       emoji: { type: "string" },
                     },
-                    required: ["name", "description", "priceRange", "whereToBuy", "whyItFits", "emoji"],
+                    required: ["name", "description", "priceRange", "whereToBuy", "purchaseUrl", "whyItFits", "emoji"],
                   },
                 },
               },
@@ -144,8 +178,17 @@ Focus on variety: mix experience gifts, physical items, and personalized options
     }
 
     const parsed = JSON.parse(toolCall.function.arguments);
-    console.log("[generate-more-gifts] Generated", parsed.gifts?.length, "gifts");
-    return jsonResponse(200, { gifts: parsed.gifts });
+    const gifts = Array.isArray(parsed.gifts) ? parsed.gifts : [];
+    const isUK = userCountry === "uk" || userCountry === "united kingdom" || locationHint.toLowerCase().includes("uk");
+    const amazonBase = isUK ? "https://www.amazon.co.uk/s?k=" : "https://www.amazon.com/s?k=";
+    for (const g of gifts) {
+      if (!g.purchaseUrl || typeof g.purchaseUrl !== "string" || !g.purchaseUrl.startsWith("http")) {
+        const query = encodeURIComponent((g.name || "gift").replace(/\s+/g, " ").trim());
+        g.purchaseUrl = `${amazonBase}${query}`;
+      }
+    }
+    console.log("[generate-more-gifts] Generated", gifts.length, "gifts");
+    return jsonResponse(200, { gifts });
   } catch (error) {
     console.error("Error generating gifts:", error);
     return jsonResponse(500, {

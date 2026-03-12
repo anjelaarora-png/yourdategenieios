@@ -91,87 +91,127 @@ Deno.serve(async (req) => {
 
     console.log("Sending welcome email to:", email);
 
-    // Send welcome email to the new user
+    // Send luxurious welcome email to the new user
     const welcomeEmailResponse = await resend.emails.send({
       from: "Your Date Genie <onboarding@resend.dev>",
       to: [email],
-      subject: `Welcome to Your Date Genie, ${escapeHtml(greeting)}! 💕`,
+      subject: `Welcome to the magic ✨`,
       html: `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta charset="utf-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        </head>
-        <body style="margin: 0; padding: 0; background-color: #fef7f0; font-family: 'Georgia', serif;">
-          <div style="max-width: 600px; margin: 0 auto; padding: 40px 20px;">
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <title>Welcome to Your Date Genie</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Tangerine:wght@400;700&display=swap');
+  </style>
+</head>
+<body style="margin: 0; padding: 0; background-color: #4A0E0E; font-family: 'Times New Roman', Times, Georgia, serif; -webkit-font-smoothing: antialiased;">
+  <div style="width: 100%; background-color: #4A0E0E; padding: 40px 0;">
+    <table cellpadding="0" cellspacing="0" border="0" width="100%">
+      <tr>
+        <td align="center">
+          <div style="max-width: 600px; margin: 0 auto; background: linear-gradient(180deg, #4A0E0E 0%, #2D0808 100%); border-radius: 24px; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);">
             <!-- Header -->
-            <div style="text-align: center; margin-bottom: 40px;">
-              <h1 style="color: #8B5CF6; font-size: 32px; margin: 0; font-weight: normal;">
+            <div style="text-align: center; padding: 48px 40px 32px; background: linear-gradient(180deg, rgba(199, 166, 119, 0.15) 0%, transparent 100%);">
+              <img src="https://jhpwacmsocjmzhimtbxj.supabase.co/storage/v1/object/public/assets/logo.png" 
+                   alt="Your Date Genie" 
+                   style="width: 80px; height: 80px; margin-bottom: 16px;">
+              <h1 style="font-family: 'Tangerine', cursive; font-size: 52px; font-weight: 700; color: #C7A677; letter-spacing: 2px; margin: 0; line-height: 1.1;">
                 ✨ Your Date Genie ✨
               </h1>
-              <p style="color: #a78bfa; font-size: 14px; margin-top: 8px; letter-spacing: 2px;">
-                STOP PLANNING. START DATING.
-              </p>
-            </div>
-            
-            <!-- Welcome Message -->
-            <div style="background: linear-gradient(135deg, #8B5CF6 0%, #a78bfa 100%); padding: 40px; border-radius: 16px; margin-bottom: 30px; text-align: center;">
-              <h2 style="color: #ffffff; font-size: 28px; margin: 0 0 16px 0; font-weight: normal;">
-                Welcome, ${escapeHtml(greeting)}! 💕
-              </h2>
-              <p style="color: #e9d5ff; font-size: 18px; margin: 0; line-height: 1.6;">
-                Your romantic adventure begins now!
-              </p>
+              <p style="font-family: 'Times New Roman', Times, Georgia, serif; font-size: 13px; font-weight: 400; color: #B8A090; letter-spacing: 3px; text-transform: uppercase; margin: 8px 0 0;">Crafting Unforgettable Moments</p>
+              <div style="width: 80px; height: 1px; background: linear-gradient(90deg, transparent, #C7A677, transparent); margin: 28px auto;"></div>
             </div>
             
             <!-- Content -->
-            <div style="background: #ffffff; padding: 32px; border-radius: 16px; margin-bottom: 30px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
-              <h3 style="color: #7c3aed; font-size: 20px; margin: 0 0 20px 0;">
-                🧞‍♂️ What Your Genie Can Do:
-              </h3>
+            <div style="padding: 0 48px 48px; text-align: center;">
+              <p style="font-family: 'Tangerine', cursive; font-size: 36px; font-weight: 400; color: #C7A677; margin: 0 0 8px;">Dear ${escapeHtml(greeting)},</p>
+              <h2 style="font-family: 'Times New Roman', Times, Georgia, serif; font-size: 36px; font-weight: 600; color: #FFF8F0; margin: 0 0 24px; line-height: 1.2; font-style: italic;">Your Genie Is Ready</h2>
               
-              <div style="margin-bottom: 20px; padding-left: 16px; border-left: 3px solid #e9d5ff;">
-                <p style="color: #4b5563; margin: 0 0 8px 0; font-weight: bold;">🌹 Romantic Date Plans</p>
-                <p style="color: #6b7280; margin: 0; font-size: 14px;">Complete itineraries tailored to your preferences</p>
+              <p style="font-family: 'Times New Roman', Times, Georgia, serif; font-size: 16px; font-weight: 400; color: #E8D5C4; line-height: 1.9; margin: 0 0 40px;">
+                Welcome to an exclusive world where every date becomes an 
+                unforgettable experience. Your personal Date Genie is now at your 
+                service, ready to craft magical moments tailored just for you.
+              </p>
+              
+              <!-- Features -->
+              <table cellpadding="0" cellspacing="0" border="0" width="100%" style="margin: 0 0 40px;">
+                <tr>
+                  <td>
+                    <div style="display: block; text-align: left; margin-bottom: 16px; padding: 20px 24px; background: rgba(199, 166, 119, 0.05); border-radius: 16px; border: 1px solid rgba(199, 166, 119, 0.1);">
+                      <span style="font-size: 24px; margin-right: 12px;">🎯</span>
+                      <span style="font-family: 'Times New Roman', Times, Georgia, serif; font-size: 18px; font-weight: 600; color: #FFF8F0;">Personalized Date Plans</span>
+                      <p style="font-family: 'Times New Roman', Times, Georgia, serif; font-size: 13px; font-weight: 400; color: #B8A090; margin: 8px 0 0 36px; line-height: 1.5;">AI-crafted experiences based on your unique preferences</p>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td>
+                    <div style="display: block; text-align: left; margin-bottom: 16px; padding: 20px 24px; background: rgba(199, 166, 119, 0.05); border-radius: 16px; border: 1px solid rgba(199, 166, 119, 0.1);">
+                      <span style="font-size: 24px; margin-right: 12px;">🗺️</span>
+                      <span style="font-family: 'Times New Roman', Times, Georgia, serif; font-size: 18px; font-weight: 600; color: #FFF8F0;">Curated Routes</span>
+                      <p style="font-family: 'Times New Roman', Times, Georgia, serif; font-size: 13px; font-weight: 400; color: #B8A090; margin: 8px 0 0 36px; line-height: 1.5;">Seamlessly planned itineraries with perfect venues</p>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td>
+                    <div style="display: block; text-align: left; margin-bottom: 16px; padding: 20px 24px; background: rgba(199, 166, 119, 0.05); border-radius: 16px; border: 1px solid rgba(199, 166, 119, 0.1);">
+                      <span style="font-size: 24px; margin-right: 12px;">🎁</span>
+                      <span style="font-family: 'Times New Roman', Times, Georgia, serif; font-size: 18px; font-weight: 600; color: #FFF8F0;">Thoughtful Gift Suggestions</span>
+                      <p style="font-family: 'Times New Roman', Times, Georgia, serif; font-size: 13px; font-weight: 400; color: #B8A090; margin: 8px 0 0 36px; line-height: 1.5;">Perfectly matched presents that speak from the heart</p>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td>
+                    <div style="display: block; text-align: left; padding: 20px 24px; background: rgba(199, 166, 119, 0.05); border-radius: 16px; border: 1px solid rgba(199, 166, 119, 0.1);">
+                      <span style="font-size: 24px; margin-right: 12px;">📸</span>
+                      <span style="font-family: 'Times New Roman', Times, Georgia, serif; font-size: 18px; font-weight: 600; color: #FFF8F0;">Memory Capture</span>
+                      <p style="font-family: 'Times New Roman', Times, Georgia, serif; font-size: 13px; font-weight: 400; color: #B8A090; margin: 8px 0 0 36px; line-height: 1.5;">Beautiful journals to preserve your cherished moments</p>
+                    </div>
+                  </td>
+                </tr>
+              </table>
+              
+              <!-- CTA Section -->
+              <div style="text-align: center; padding: 32px; background: linear-gradient(180deg, rgba(199, 166, 119, 0.08) 0%, rgba(199, 166, 119, 0.02) 100%); border-radius: 20px; margin: 0 0 32px;">
+                <h3 style="font-family: 'Times New Roman', Times, Georgia, serif; font-size: 22px; font-weight: 500; color: #FFF8F0; margin: 0 0 16px; font-style: italic;">Ready to Create Magic?</h3>
+                <a href="yourdategenie://home" style="display: inline-block; padding: 18px 48px; background: linear-gradient(135deg, #C7A677 0%, #D4B88A 50%, #C7A677 100%); color: #4A0E0E; text-decoration: none; font-family: 'Times New Roman', Times, Georgia, serif; font-size: 14px; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase; border-radius: 50px; box-shadow: 0 8px 24px rgba(199, 166, 119, 0.3);">
+                  Start Planning Magic
+                </a>
               </div>
               
-              <div style="margin-bottom: 20px; padding-left: 16px; border-left: 3px solid #e9d5ff;">
-                <p style="color: #4b5563; margin: 0 0 8px 0; font-weight: bold;">💝 Thoughtful Gift Ideas</p>
-                <p style="color: #6b7280; margin: 0; font-size: 14px;">Personalized suggestions that show you care</p>
+              <!-- Sign-off -->
+              <div style="text-align: center; margin-top: 32px;">
+                <p style="font-family: 'Tangerine', cursive; font-size: 28px; color: #C7A677; margin: 0 0 8px;">Here's to unforgettable moments,</p>
+                <p style="font-family: 'Times New Roman', Times, Georgia, serif; font-size: 14px; font-weight: 400; color: #A08070; margin: 0; font-style: italic;">The Your Date Genie Team</p>
               </div>
-              
-              <div style="margin-bottom: 20px; padding-left: 16px; border-left: 3px solid #e9d5ff;">
-                <p style="color: #4b5563; margin: 0 0 8px 0; font-weight: bold;">💬 Conversation Starters</p>
-                <p style="color: #6b7280; margin: 0; font-size: 14px;">Break the ice and deepen your connection</p>
-              </div>
-              
-              <div style="padding-left: 16px; border-left: 3px solid #e9d5ff;">
-                <p style="color: #4b5563; margin: 0 0 8px 0; font-weight: bold;">🧘‍♀️ Solo Self-Care Dates</p>
-                <p style="color: #6b7280; margin: 0; font-size: 14px;">Because you deserve to treat yourself too</p>
-              </div>
-            </div>
-            
-            <!-- CTA Button -->
-            <div style="text-align: center; margin-bottom: 30px;">
-              <a href="https://yourdategenie.lovable.app/dashboard" 
-                 style="display: inline-block; background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%); color: #78350f; padding: 16px 40px; border-radius: 50px; text-decoration: none; font-size: 18px; font-weight: bold; box-shadow: 0 4px 14px rgba(245, 158, 11, 0.4);">
-                Plan Your First Date ✨
-              </a>
             </div>
             
             <!-- Footer -->
-            <div style="text-align: center; padding-top: 20px; border-top: 1px solid #e5e7eb;">
-              <p style="color: #9ca3af; font-size: 14px; margin: 0 0 8px 0;">
-                Questions? Just reply to this email!
+            <div style="padding: 32px 48px; text-align: center; border-top: 1px solid rgba(199, 166, 119, 0.1);">
+              <div style="color: #C7A677; font-size: 24px; margin: 16px 0;">❧</div>
+              <p style="font-family: 'Times New Roman', Times, Georgia, serif; font-size: 12px; color: #8A6A5A; margin: 0 0 8px;">
+                Crafted with love for unforgettable moments
               </p>
-              <p style="color: #d1d5db; font-size: 12px; margin: 0;">
-                © ${new Date().getFullYear()} Your Date Genie. Made with 💕
+              <p style="font-family: 'Times New Roman', Times, Georgia, serif; font-size: 12px; color: #8A6A5A; margin: 0;">
+                <a href="https://yourdategenie.com" style="color: #C7A677; text-decoration: none;">yourdategenie.com</a>
+              </p>
+              <p style="font-family: 'Times New Roman', Times, Georgia, serif; font-size: 11px; color: #8A6A5A; margin: 16px 0 0;">
+                © ${new Date().getFullYear()} Your Date Genie. All rights reserved.
               </p>
             </div>
           </div>
-        </body>
-        </html>
+        </td>
+      </tr>
+    </table>
+  </div>
+</body>
+</html>
       `,
     });
 

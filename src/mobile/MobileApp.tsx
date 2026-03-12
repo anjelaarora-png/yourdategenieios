@@ -2,22 +2,29 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import MobileOnboarding from "./screens/MobileOnboarding";
 import MobileAuth from "./screens/MobileAuth";
+import MobilePlanDateWelcome from "./screens/MobilePlanDateWelcome";
 import MobileHome from "./screens/MobileHome";
 import MobileQuestionnaire from "./screens/MobileQuestionnaire";
 import MobileDatePlanResult from "./screens/MobileDatePlanResult";
 import MobileHistory from "./screens/MobileHistory";
 import MobileProfile from "./screens/MobileProfile";
 import MobilePlaylists from "./screens/MobilePlaylists";
+import MobileSettingsScreen from "./screens/MobileSettingsScreen";
+import MobileNotificationsScreen from "./screens/MobileNotificationsScreen";
+import MobileHelpScreen from "./screens/MobileHelpScreen";
 import MobileTabBar from "./components/MobileTabBar";
 import { QuestionnaireData } from "@/components/questionnaire/types";
 import { useGenerateDatePlan } from "@/hooks/useGenerateDatePlan";
 import { useDatePlans, SavedDatePlan } from "@/hooks/useDatePlans";
+import { useUserPreferences } from "@/hooks/useUserPreferences";
 import { savedPlanToDatePlan } from "@/lib/planUtils";
+import type { PlanIntent } from "./screens/MobileHome";
 import "./styles/mobile.css";
 
 export type MobileScreen = 
   | "onboarding"
   | "auth"
+  | "welcome"
   | "home"
   | "questionnaire"
   | "result"
@@ -27,7 +34,10 @@ export type MobileScreen =
   | "music"
   | "memories"
   | "profile"
-  | "preferences";
+  | "preferences"
+  | "notifications"
+  | "settings"
+  | "help";
 
 export type TabId = "home" | "history" | "create" | "music" | "profile";
 
@@ -57,10 +67,14 @@ const MobileApp = () => {
     datePlans, 
     selectedPlanIndex, 
     selectPlan,
-    setViewingPlan 
+    setViewingPlan,
+    hasPendingPlans,
   } = useGenerateDatePlan();
   
   const { plans: savedPlans, savePlan, deletePlan, updatePlanStatus } = useDatePlans();
+  const { getQuestionnaireDefaults, savePreferences, loading: prefsLoading } = useUserPreferences();
+
+  const isNewUser = !prefsLoading && !getQuestionnaireDefaults() && savedPlans.length === 0;
 
   // Update screen when auth state changes
   useEffect(() => {
@@ -69,11 +83,13 @@ const MobileApp = () => {
         setCurrentScreen("onboarding");
       } else if (!user) {
         setCurrentScreen("auth");
+      } else if (isNewUser) {
+        setCurrentScreen("welcome");
       } else {
         setCurrentScreen("home");
       }
     }
-  }, [user, authLoading, hasSeenOnboarding]);
+  }, [user, authLoading, hasSeenOnboarding, isNewUser]);
 
   const handleOnboardingComplete = () => {
     localStorage.setItem("dateGenie_onboardingSeen", "true");
@@ -82,14 +98,26 @@ const MobileApp = () => {
   };
 
   const handleAuthSuccess = () => {
-    setCurrentScreen("home");
+    if (isNewUser) {
+      setCurrentScreen("welcome");
+    } else {
+      setCurrentScreen("home");
+    }
   };
 
-  const handleCreatePlan = () => {
+  const handleWelcomeContinue = () => {
+    setCurrentScreen("questionnaire");
+  };
+
+  const [questionnaireIntent, setQuestionnaireIntent] = useState<PlanIntent | undefined>();
+
+  const handleCreatePlan = (intent?: PlanIntent) => {
+    setQuestionnaireIntent(intent);
     setCurrentScreen("questionnaire");
   };
 
   const handleQuestionnaireSubmit = async (data: QuestionnaireData) => {
+    savePreferences(data);
     const plans = await generatePlans(data);
     if (plans && plans.length > 0) {
       setCurrentScreen("result");
@@ -101,9 +129,15 @@ const MobileApp = () => {
     setCurrentScreen("result");
   };
 
+  const handleReviewUnsavedPlans = () => {
+    setCurrentScreen("result");
+    setActiveTab("home");
+  };
+
   const handleTabChange = (tab: TabId) => {
     setActiveTab(tab);
     if (tab === "create") {
+      setQuestionnaireIntent(undefined);
       setCurrentScreen("questionnaire");
     } else if (tab === "home") {
       setCurrentScreen("home");
@@ -125,6 +159,10 @@ const MobileApp = () => {
     setCurrentScreen(screen as MobileScreen);
   };
 
+  const handleBackToProfile = () => {
+    setCurrentScreen("profile");
+  };
+
   if (authLoading) {
     return (
       <div className="mobile-container flex items-center justify-center min-h-screen">
@@ -133,7 +171,7 @@ const MobileApp = () => {
     );
   }
 
-  const showTabBar = user && !["onboarding", "auth", "questionnaire", "result"].includes(currentScreen);
+  const showTabBar = user && !["onboarding", "auth", "welcome", "questionnaire", "result", "preferences"].includes(currentScreen);
 
   return (
     <div className="mobile-container bg-background">
@@ -144,11 +182,19 @@ const MobileApp = () => {
       {currentScreen === "auth" && (
         <MobileAuth onSuccess={handleAuthSuccess} />
       )}
+
+      {currentScreen === "welcome" && (
+        <MobilePlanDateWelcome onContinue={handleWelcomeContinue} />
+      )}
       
       {currentScreen === "home" && (
         <MobileHome 
           savedPlans={savedPlans}
           onCreatePlan={handleCreatePlan}
+          hasPendingPlans={hasPendingPlans}
+          onReviewUnsavedPlans={handleReviewUnsavedPlans}
+          hasSavedPreferences={!!getQuestionnaireDefaults()}
+          savedPreferences={getQuestionnaireDefaults()}
         />
       )}
       
@@ -157,6 +203,8 @@ const MobileApp = () => {
           onSubmit={handleQuestionnaireSubmit}
           onBack={handleBack}
           isGenerating={isGenerating}
+          existingData={questionnaireIntent === "fresh" ? null : getQuestionnaireDefaults()}
+          intent={questionnaireIntent}
         />
       )}
       
@@ -185,6 +233,31 @@ const MobileApp = () => {
 
       {currentScreen === "profile" && (
         <MobileProfile onNavigate={handleNavigate} />
+      )}
+
+      {currentScreen === "preferences" && (
+        <MobileQuestionnaire
+          existingData={getQuestionnaireDefaults()}
+          intent="useLast"
+          onSubmit={async (data) => {
+            await savePreferences(data);
+            setCurrentScreen("profile");
+          }}
+          onBack={handleBackToProfile}
+          isGenerating={false}
+        />
+      )}
+
+      {currentScreen === "notifications" && (
+        <MobileNotificationsScreen onBack={handleBackToProfile} />
+      )}
+
+      {currentScreen === "settings" && (
+        <MobileSettingsScreen onBack={handleBackToProfile} />
+      )}
+
+      {currentScreen === "help" && (
+        <MobileHelpScreen onBack={handleBackToProfile} />
       )}
 
       {showTabBar && (

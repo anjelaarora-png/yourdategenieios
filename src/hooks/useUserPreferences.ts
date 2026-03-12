@@ -98,6 +98,12 @@ export function useUserPreferences() {
       accessibility_needs: questionnaireData.accessibilityNeeds?.filter(a => a !== "none") || [],
       smoking_preference: questionnaireData.smokingPreference || null,
       smoking_activities: questionnaireData.smokingActivities?.filter(s => s !== "none") || [],
+      // Gift preferences (from questionnaire Step 6)
+      gift_recipient: questionnaireData.giftRecipient || null,
+      gift_interests: questionnaireData.partnerInterests || [],
+      gift_budget: questionnaireData.giftBudget || null,
+      gift_occasion: questionnaireData.occasion || null,
+      gift_notes: questionnaireData.giftRecipientNotes || null,
     };
 
     try {
@@ -168,6 +174,11 @@ export function useUserPreferences() {
         : [],
       smokingPreference: preferences.smoking_preference || "",
       smokingActivities: preferences.smoking_activities || [],
+      // Gift preferences (Step 6) – carried to Gifts tab and next questionnaire
+      giftRecipient: preferences.gift_recipient || "",
+      partnerInterests: preferences.gift_interests || [],
+      giftBudget: preferences.gift_budget || "",
+      giftRecipientNotes: preferences.gift_notes || "",
     };
   }, [preferences]);
 

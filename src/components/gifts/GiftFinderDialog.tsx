@@ -99,7 +99,7 @@ const GiftFinderDialog = ({ open, onOpenChange }: GiftFinderDialogProps) => {
           interests: interests,
           partnerDescription: partnerDescription,
           existingGifts: [],
-          count: 6,
+          count: 3,
         },
       });
 

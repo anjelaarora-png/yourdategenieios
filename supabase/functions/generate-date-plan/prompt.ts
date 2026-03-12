@@ -1,6 +1,7 @@
 export interface QuestionnaireData {
   city: string;
   neighborhood: string;
+  startingAddress?: string;
   dateType: string;
   occasion: string;
   dateScheduled?: string;
@@ -298,6 +299,7 @@ Use their love languages to suggest activities, gestures, and date elements that
       ? getInterestLabels(data.partnerInterests)
       : "not specified";
     const notes = data.giftRecipientNotes ? `\n- Special notes: ${data.giftRecipientNotes}` : "";
+    const userLocation = data.city ? `${data.city}${data.neighborhood ? `, ${data.neighborhood}` : ""}` : "user's area";
     
     if (isSoloDate) {
       giftSection = `
@@ -306,7 +308,8 @@ SELF-CARE TREAT SUGGESTIONS REQUIRED (ALWAYS INCLUDE):
 - Their interests: ${interests}
 - Budget: ${data.giftBudget || "moderate"}
 - Occasion: ${data.occasion || "Self-care day"}${notes}
-IMPORTANT: You MUST include at least 3 thoughtful self-care treat suggestions (ideally 5). Focus on items that promote relaxation, joy, and personal fulfillment. Each should have a name, description, price range, where to buy, purchase URL if available, and why it fits their self-care journey.`;
+- User location (for where to buy): ${userLocation}
+IMPORTANT: You MUST include at least 3 thoughtful self-care treat suggestions (ideally 5). Each must have: name, description, priceRange, whereToBuy (1-2 retailers easy to find in ${userLocation}), purchaseUrl (REQUIRED - use a search link that works in the user's region, e.g. Amazon or Target search for the product), and whyItFits. Prefer retailers that are widely accessible (e.g. Amazon, Target, Walmart in US; Amazon UK, John Lewis in UK).`;
     } else {
       giftSection = `
 GIFT SUGGESTIONS REQUIRED (ALWAYS INCLUDE):
@@ -314,7 +317,8 @@ GIFT SUGGESTIONS REQUIRED (ALWAYS INCLUDE):
 - Their interests: ${interests}
 - Gift budget: ${data.giftBudget || "moderate"}
 - Occasion: ${data.occasion || "Just because"}${notes}
-IMPORTANT: You MUST include at least 3 thoughtful gift suggestions (ideally 5). Each gift should have a name, description, price range, where to buy, purchase URL if available, and why it fits.`;
+- User location (for where to buy): ${userLocation}
+IMPORTANT: You MUST include at least 3 thoughtful gift suggestions (ideally 5). Each must have: name, description, priceRange, whereToBuy (1-2 retailers easy to find in ${userLocation}), purchaseUrl (REQUIRED - direct search or product URL where they can buy, e.g. Amazon or Target search link for the product in the user's region), and whyItFits. Match gifts to their stated interests and notes. Prefer retailers that are widely accessible in the user's location.`;
     }
   }
 
@@ -347,6 +351,7 @@ Please include 10-15 thoughtful conversation starters tailored to deepen their c
   return `${planDescription} with these preferences:
 
 LOCATION: ${data.city}${data.neighborhood ? `, ${data.neighborhood}` : ""}
+STARTING POINT (departure address): ${data.startingAddress?.trim() || "Not specified"}
 DATE TYPE: ${dateTypeLabel}
 OCCASION: ${data.occasion || (isSoloDate ? "Self-care day" : "Just because")}
 ${dateTimeInfo}

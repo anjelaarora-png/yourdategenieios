@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { GiftSuggestion } from "@/types/datePlan";
 import { SavedDatePlan } from "@/hooks/useDatePlans";
 import { Card, CardContent } from "@/components/ui/card";
@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Gift, ExternalLink, Search, Filter, ChevronDown, ChevronUp, Sparkles, Loader2, Heart, RefreshCw } from "lucide-react";
+import { Gift, ExternalLink, Search, Filter, ChevronDown, ChevronUp, Sparkles, Loader2, Heart, RefreshCw, CheckCircle, ShoppingBag, ChevronLeft } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,6 +19,8 @@ import { useToast } from "@/hooks/use-toast";
 import OptionCard from "@/components/questionnaire/OptionCard";
 import { PARTNER_INTERESTS, GIFT_BUDGETS, GIFT_RECIPIENTS } from "@/components/questionnaire/types";
 import { useUserPreferences } from "@/hooks/useUserPreferences";
+import { useSavedGifts } from "@/hooks/useSavedGifts";
+import type { SavedGift } from "@/hooks/useSavedGifts";
 
 interface GiftSuggestionsListProps {
   plans: SavedDatePlan[];
@@ -28,64 +30,6 @@ interface UniqueGift {
   gift: GiftSuggestion;
   planTitles: string[];
 }
-
-// Local storage key for favorites
-const FAVORITES_STORAGE_KEY = "date_genie_favorite_gifts";
-const FAVORITES_VERSION_KEY = "date_genie_favorites_version";
-
-// Helper to get favorites from localStorage with validation
-const getFavorites = (): GiftSuggestion[] => {
-  try {
-    const stored = localStorage.getItem(FAVORITES_STORAGE_KEY);
-    if (!stored) return [];
-    
-    const parsed = JSON.parse(stored);
-    
-    // Validate that it's an array with valid gift objects
-    if (!Array.isArray(parsed)) {
-      console.warn("[GiftFavorites] Invalid favorites format, resetting");
-      localStorage.removeItem(FAVORITES_STORAGE_KEY);
-      return [];
-    }
-    
-    // Filter out any malformed entries
-    return parsed.filter((gift): gift is GiftSuggestion => 
-      gift && 
-      typeof gift === 'object' && 
-      typeof gift.name === 'string' && 
-      gift.name.trim() !== ''
-    );
-  } catch (err) {
-    console.error("[GiftFavorites] Error loading favorites:", err);
-    // Don't remove on parse error - might be temporary issue
-    return [];
-  }
-};
-
-// Helper to save favorites to localStorage with sync protection
-const saveFavorites = (gifts: GiftSuggestion[]): boolean => {
-  try {
-    // Validate input
-    if (!Array.isArray(gifts)) {
-      console.error("[GiftFavorites] Invalid save attempt - not an array");
-      return false;
-    }
-    
-    // Clean the data before saving (remove any undefined/null entries)
-    const cleanGifts = gifts.filter(g => g && typeof g.name === 'string');
-    
-    const serialized = JSON.stringify(cleanGifts);
-    localStorage.setItem(FAVORITES_STORAGE_KEY, serialized);
-    
-    // Update version for potential cross-tab sync
-    localStorage.setItem(FAVORITES_VERSION_KEY, Date.now().toString());
-    
-    return true;
-  } catch (err) {
-    console.error("[GiftFavorites] Error saving favorites:", err);
-    return false;
-  }
-};
 
 // Occasions matching the questionnaire style
 const OCCASIONS = [
@@ -97,49 +41,92 @@ const OCCASIONS = [
   { value: "date-night", label: "Date Night", emoji: "🌙", desc: "Perfect pairing" },
 ];
 
-// Retailer configs with direct search URLs
-const RETAILER_CONFIGS: Record<string, { url: string; icon?: string }> = {
-  amazon: { url: "https://www.amazon.com/s?k=" },
+// Retailer configs: US and UK (and shared) with search URL templates
+const RETAILER_CONFIGS: Record<string, { url: string; icon?: string; region?: "us" | "uk" }> = {
+  amazon: { url: "https://www.amazon.com/s?k=", region: "us" },
   etsy: { url: "https://www.etsy.com/search?q=" },
-  target: { url: "https://www.target.com/s?searchTerm=" },
-  walmart: { url: "https://www.walmart.com/search?q=" },
-  nordstrom: { url: "https://www.nordstrom.com/sr?keyword=" },
-  sephora: { url: "https://www.sephora.com/search?keyword=" },
-  "best buy": { url: "https://www.bestbuy.com/site/searchpage.jsp?st=" },
-  bestbuy: { url: "https://www.bestbuy.com/site/searchpage.jsp?st=" },
+  target: { url: "https://www.target.com/s?searchTerm=", region: "us" },
+  walmart: { url: "https://www.walmart.com/search?q=", region: "us" },
+  nordstrom: { url: "https://www.nordstrom.com/sr?keyword=", region: "us" },
+  sephora: { url: "https://www.sephora.com/search?keyword=", region: "us" },
+  "best buy": { url: "https://www.bestbuy.com/site/searchpage.jsp?st=", region: "us" },
+  bestbuy: { url: "https://www.bestbuy.com/site/searchpage.jsp?st=", region: "us" },
   ebay: { url: "https://www.ebay.com/sch/i.html?_nkw=" },
-  ulta: { url: "https://www.ulta.com/search?search=" },
-  macys: { url: "https://www.macys.com/shop/featured/" },
-  "macy's": { url: "https://www.macys.com/shop/featured/" },
-  "home depot": { url: "https://www.homedepot.com/s/" },
-  "lowe's": { url: "https://www.lowes.com/search?searchTerm=" },
-  lowes: { url: "https://www.lowes.com/search?searchTerm=" },
-  wayfair: { url: "https://www.wayfair.com/keyword.html?keyword=" },
-  overstock: { url: "https://www.overstock.com/search?keywords=" },
-  zappos: { url: "https://www.zappos.com/search?term=" },
-  chewy: { url: "https://www.chewy.com/s?query=" },
+  ulta: { url: "https://www.ulta.com/search?search=", region: "us" },
+  macys: { url: "https://www.macys.com/shop/featured/", region: "us" },
+  "macy's": { url: "https://www.macys.com/shop/featured/", region: "us" },
+  "home depot": { url: "https://www.homedepot.com/s/", region: "us" },
+  "lowe's": { url: "https://www.lowes.com/search?searchTerm=", region: "us" },
+  lowes: { url: "https://www.lowes.com/search?searchTerm=", region: "us" },
+  wayfair: { url: "https://www.wayfair.com/keyword.html?keyword=", region: "us" },
+  overstock: { url: "https://www.overstock.com/search?keywords=", region: "us" },
+  zappos: { url: "https://www.zappos.com/search?term=", region: "us" },
+  chewy: { url: "https://www.chewy.com/s?query=", region: "us" },
   bookshop: { url: "https://bookshop.org/search?keywords=" },
-  "barnes & noble": { url: "https://www.barnesandnoble.com/s/" },
+  "barnes & noble": { url: "https://www.barnesandnoble.com/s/", region: "us" },
+  "amazon.co.uk": { url: "https://www.amazon.co.uk/s?k=", region: "uk" },
+  "john lewis": { url: "https://www.johnlewis.com/search?search-term=", region: "uk" },
+  johnlewis: { url: "https://www.johnlewis.com/search?search-term=", region: "uk" },
+  "argos": { url: "https://www.argos.co.uk/search/", region: "uk" },
+  "boots": { url: "https://www.boots.com/search?search=", region: "uk" },
 };
 
-const generateSearchUrl = (giftName: string, whereToBuy: string): string => {
+// Infer region from location string (city/country) for retailer links
+function inferRegion(location: string): "us" | "uk" | undefined {
+  if (!location) return undefined;
+  const lower = location.toLowerCase();
+  if (/\b(uk|united kingdom|england|scotland|wales|london|manchester|birmingham)\b/.test(lower)) return "uk";
+  return "us";
+}
+
+const generateSearchUrl = (giftName: string, whereToBuy: string, region?: "us" | "uk"): string => {
   const whereToBuyLower = whereToBuy.toLowerCase();
   const searchQuery = encodeURIComponent(giftName);
-  
-  // Check for known retailers
+  const preferUK = region === "uk";
+
   for (const [retailer, config] of Object.entries(RETAILER_CONFIGS)) {
-    if (whereToBuyLower.includes(retailer)) {
-      return `${config.url}${searchQuery}`;
-    }
+    if (!whereToBuyLower.includes(retailer)) continue;
+    if (config.region && config.region !== region && (region === "uk" || region === "us")) continue;
+    if (preferUK && retailer === "amazon") return `https://www.amazon.co.uk/s?k=${searchQuery}`;
+    if (preferUK && config.region === "us") continue;
+    return `${config.url}${searchQuery}`;
   }
-  
-  // Default to Google Shopping for faster, more reliable results
+  if (preferUK) return `https://www.amazon.co.uk/s?k=${searchQuery}`;
   return `https://www.google.com/search?tbm=shop&q=${searchQuery}`;
 };
 
+// Build multiple shop links for a gift (primary + alternates by location)
+function getShopLinks(gift: GiftSuggestion, locationHint: string): { label: string; url: string }[] {
+  const region = inferRegion(locationHint);
+  const primaryUrl = gift.purchaseUrl || generateSearchUrl(gift.name, gift.whereToBuy, region);
+  const links: { label: string; url: string }[] = [{ label: "Shop now", url: primaryUrl }];
+  const seenUrls = new Set<string>([primaryUrl]);
+  const stores = gift.whereToBuy.split(/[,&]|\band\b/).map((s) => s.trim().toLowerCase()).filter(Boolean);
+  const seenRetailers = new Set<string>();
+  for (const store of stores) {
+    for (const [retailer, config] of Object.entries(RETAILER_CONFIGS)) {
+      if (!store.includes(retailer) || seenRetailers.has(retailer)) continue;
+      if (config.region && region && config.region !== region) continue;
+      const url = retailer === "amazon" && region === "uk"
+        ? `https://www.amazon.co.uk/s?k=${encodeURIComponent(gift.name)}`
+        : `${config.url}${encodeURIComponent(gift.name)}`;
+      const label = retailer === "amazon" && region === "uk" ? "Amazon UK" : retailer.replace(/\b\w/g, (c) => c.toUpperCase());
+      if (!seenUrls.has(url)) {
+        links.push({ label, url });
+        seenUrls.add(url);
+        seenRetailers.add(retailer);
+      }
+      break;
+    }
+  }
+  return links.length > 1 ? links : [{ label: "Shop now", url: primaryUrl }];
+}
+
 const GiftSuggestionsList = ({ plans }: GiftSuggestionsListProps) => {
   const { toast } = useToast();
-  const { getGiftPreferences, saveGiftPreferences, loading: prefsLoading } = useUserPreferences();
+  const { getGiftPreferences, saveGiftPreferences, loading: prefsLoading, preferences } = useUserPreferences();
+  const { savedGifts, toggleSavedGift, isSaved, markAsPurchased, unmarkAsPurchased, isPurchased, purchasedGiftNames } = useSavedGifts();
+  const locationHint = preferences?.preferred_location || preferences?.default_city || "";
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedPriceRanges, setSelectedPriceRanges] = useState<string[]>([]);
   const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
@@ -154,47 +141,13 @@ const GiftSuggestionsList = ({ plans }: GiftSuggestionsListProps) => {
   const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
   const [giftBudget, setGiftBudget] = useState("");
   const [giftNotes, setGiftNotes] = useState("");
-  
-  // Favorites state
-  const [favoriteGifts, setFavoriteGifts] = useState<GiftSuggestion[]>([]);
-  
-  // Load favorites on mount and sync across tabs/visibility changes
-  useEffect(() => {
-    // Initial load
-    setFavoriteGifts(getFavorites());
-    
-    // Sync favorites when localStorage changes (cross-tab sync)
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === FAVORITES_STORAGE_KEY && e.newValue !== null) {
-        try {
-          const newFavorites = JSON.parse(e.newValue);
-          if (Array.isArray(newFavorites)) {
-            setFavoriteGifts(newFavorites);
-          }
-        } catch {
-          // Ignore parse errors from other tabs
-        }
-      }
-    };
-    
-    // Re-sync favorites when tab becomes visible (iOS WebView fix)
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        const freshFavorites = getFavorites();
-        setFavoriteGifts(freshFavorites);
-      }
-    };
-    
-    window.addEventListener('storage', handleStorageChange);
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, []);
+  const foundGiftsRef = useRef<GiftSuggestion[]>([]);
+  const refillingRef = useRef(false);
+  const swipeStartRef = useRef<{ x: number; y: number } | null>(null);
 
-  // Load saved gift preferences when opening the gift finder
+  useEffect(() => {
+    foundGiftsRef.current = foundGifts;
+  }, [foundGifts]); (questionnaire prefs carried over)
   useEffect(() => {
     if (showGiftFinder && !prefsLoading && !prefsLoaded) {
       const savedPrefs = getGiftPreferences();
@@ -283,47 +236,14 @@ const GiftSuggestionsList = ({ plans }: GiftSuggestionsListProps) => {
     );
   };
 
-  // Toggle favorite status with error handling
-  const toggleFavorite = (gift: GiftSuggestion) => {
-    if (!gift || !gift.name) {
-      console.error("[GiftFavorites] Invalid gift object");
-      return;
-    }
-    
-    const key = gift.name.toLowerCase().trim();
-    const isFavorite = favoriteGifts.some(
-      (f) => f.name.toLowerCase().trim() === key
-    );
-    
-    let updatedFavorites: GiftSuggestion[];
-    if (isFavorite) {
-      updatedFavorites = favoriteGifts.filter(
-        (f) => f.name.toLowerCase().trim() !== key
-      );
-    } else {
-      updatedFavorites = [...favoriteGifts, gift];
-    }
-    
-    // Save first, then update state if successful
-    const saved = saveFavorites(updatedFavorites);
-    
-    if (saved) {
-      setFavoriteGifts(updatedFavorites);
-      toast({ title: isFavorite ? "Removed from favorites" : "Added to favorites!" });
-    } else {
-      toast({ 
-        title: "Couldn't save favorite", 
-        description: "Please try again.",
-        variant: "destructive" 
-      });
-    }
-  };
-  
-  // Check if a gift is favorited
-  const isFavorited = (gift: GiftSuggestion) => {
-    return favoriteGifts.some(
-      (f) => f.name.toLowerCase().trim() === gift.name.toLowerCase().trim()
-    );
+  const toggleSavedGiftWithToast = (gift: GiftSuggestion) => {
+    if (!gift?.name) return;
+    const wasSaved = isSaved(gift);
+    toggleSavedGift(gift);
+    toast({
+      title: wasSaved ? "Removed from saved gifts" : "Saved to My Gifts",
+      description: wasSaved ? undefined : "Find it anytime under the Gifts tab.",
+    });
   };
 
   const handleFindGifts = async (refreshCompletely = false) => {
@@ -368,7 +288,11 @@ const GiftSuggestionsList = ({ plans }: GiftSuggestionsListProps) => {
           interests: interestLabels.join(", "),
           partnerDescription: `${recipientContext}${giftNotes}`.trim(),
           existingGifts: existingToExclude,
-          count: 6,
+          count: 3,
+          location: locationHint || undefined,
+          city: preferences?.default_city || undefined,
+          giftRecipient: giftRecipient || undefined,
+          purchasedGiftNames: purchasedGiftNames.length > 0 ? purchasedGiftNames : undefined,
         },
       });
 
@@ -399,6 +323,80 @@ const GiftSuggestionsList = ({ plans }: GiftSuggestionsListProps) => {
     setFoundGifts([]);
     // Don't reset the form values - keep saved preferences
     // User can manually change if needed
+  };
+
+  /** Keep exactly 3 suggestions: fetch more when deck has fewer than 3 after skip/save. */
+  const refillToThree = useCallback(async () => {
+    if (refillingRef.current || isSearching || !occasion) return;
+    const current = foundGiftsRef.current;
+    if (current.length >= 3) return;
+    const need = 3 - current.length;
+    refillingRef.current = true;
+    setIsSearching(true);
+    try {
+      const occasionLabel = OCCASIONS.find((o) => o.value === occasion)?.label || occasion;
+      const interestLabels = selectedInterests.map((i) => PARTNER_INTERESTS.find((p) => p.value === i)?.label || i);
+      const recipientLabel = GIFT_RECIPIENTS.find((r) => r.value === giftRecipient)?.label || "";
+      const recipientContext = recipientLabel ? `Shopping for: ${recipientLabel}. ` : "";
+      const { data, error } = await supabase.functions.invoke("generate-more-gifts", {
+        body: {
+          planTitle: `Gift Ideas for ${occasionLabel}`,
+          occasion,
+          priceRange: giftBudget || "any",
+          interests: interestLabels.join(", "),
+          partnerDescription: `${recipientContext}${giftNotes}`.trim(),
+          existingGifts: foundGiftsRef.current,
+          count: need,
+          location: locationHint || undefined,
+          city: preferences?.default_city || undefined,
+          giftRecipient: giftRecipient || undefined,
+          purchasedGiftNames: purchasedGiftNames.length > 0 ? purchasedGiftNames : undefined,
+        },
+      });
+      if (error) throw error;
+      if (data?.gifts && Array.isArray(data.gifts)) {
+        setFoundGifts((prev) => [...prev, ...data.gifts]);
+      }
+    } catch (e) {
+      console.error("Refill gifts error:", e);
+      toast({ title: "Couldn't load another suggestion", variant: "destructive" });
+    } finally {
+      setIsSearching(false);
+      refillingRef.current = false;
+    }
+  }, [occasion, selectedInterests, giftRecipient, giftBudget, giftNotes, locationHint, preferences?.default_city, purchasedGiftNames, isSearching]);
+
+  const handleSkipTop = useCallback(() => {
+    setFoundGifts((prev) => prev.slice(1));
+    toast({ title: "Skipped", description: "Loading next suggestion..." });
+  }, []);
+
+  const handleSaveTop = useCallback((gift: GiftSuggestion) => {
+    toggleSavedGiftWithToast(gift);
+    setFoundGifts((prev) => prev.slice(1));
+  }, [toggleSavedGiftWithToast]);
+
+  // Refill to 3 when deck has fewer than 3 after skip/save
+  useEffect(() => {
+    if (foundGifts.length > 0 && foundGifts.length < 3 && !isSearching && occasion && !refillingRef.current) {
+      refillToThree();
+    }
+  }, [foundGifts.length, occasion, isSearching, refillToThree]);
+
+  const handleSwipeStart = (e: React.TouchEvent) => {
+    swipeStartRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+  };
+  const handleSwipeMove = (e: React.TouchEvent) => {
+    if (!swipeStartRef.current) return;
+    const dx = e.touches[0].clientX - swipeStartRef.current.x;
+    if (Math.abs(dx) > 60) {
+      if (dx < 0) handleSkipTop();
+      else if (foundGifts[0]) handleSaveTop(foundGifts[0]);
+      swipeStartRef.current = null;
+    }
+  };
+  const handleSwipeEnd = () => {
+    swipeStartRef.current = null;
   };
 
   // Render the Gift Finder form (questionnaire-style)
@@ -538,29 +536,63 @@ const GiftSuggestionsList = ({ plans }: GiftSuggestionsListProps) => {
         </div>
       ) : (
         <div className="space-y-4">
-          {/* Favorites section at top */}
-          {favoriteGifts.length > 0 && (
+          {/* Saved Gifts section at top */}
+          {savedGifts.length > 0 && (
             <div className="space-y-3 p-4 rounded-lg border-2 border-primary/20 bg-primary/5">
               <div className="flex items-center gap-2">
                 <Heart className="w-4 h-4 text-primary fill-primary" />
-                <h4 className="font-medium text-sm">Your Favorites ({favoriteGifts.length})</h4>
+                <h4 className="font-medium text-sm">Saved Gifts ({savedGifts.length})</h4>
               </div>
               <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                {favoriteGifts.map((gift, i) => {
-                  const purchaseUrl = gift.purchaseUrl || generateSearchUrl(gift.name, gift.whereToBuy);
+                {savedGifts.map((gift, i) => {
+                  const shopLinks = getShopLinks(gift, locationHint);
+                  const primaryUrl = shopLinks[0].url;
+                  const bought = (gift as SavedGift).purchased;
                   return (
-                    <div key={`fav-${i}`} className="flex items-center justify-between gap-2 p-2 rounded-md bg-background border">
+                    <div key={`fav-${i}`} className={`flex items-center justify-between gap-2 p-2 rounded-md bg-background border ${bought ? "opacity-75" : ""}`}>
                       <div className="flex items-center gap-2 min-w-0">
                         <span>{gift.emoji}</span>
                         <span className="text-sm truncate">{gift.name}</span>
-                        <Badge variant="outline" className="text-xs shrink-0">{gift.priceRange}</Badge>
+                        {bought && (
+                          <Badge variant="secondary" className="text-xs shrink-0 gap-0.5">
+                            <CheckCircle className="w-3 h-3" />
+                            Bought
+                          </Badge>
+                        )}
+                        {!bought && <Badge variant="outline" className="text-xs shrink-0">{gift.priceRange}</Badge>}
                       </div>
                       <div className="flex items-center gap-1 shrink-0">
+                        {bought ? (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 text-xs"
+                            onClick={() => {
+                              unmarkAsPurchased(gift);
+                              toast({ title: "Marked as not bought", description: "It may be recommended again." });
+                            }}
+                          >
+                            Undo
+                          </Button>
+                        ) : (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 text-xs gap-1"
+                            onClick={() => {
+                              markAsPurchased(gift);
+                              toast({ title: "Marked as bought", description: "Won't be recommended again." });
+                            }}
+                          >
+                            <ShoppingBag className="w-3.5 h-3.5" />
+                            Bought
+                          </Button>
+                        )}
                         <Button
                           variant="ghost"
                           size="icon"
                           className="h-7 w-7"
-                          onClick={() => toggleFavorite(gift)}
+                          onClick={() => toggleSavedGiftWithToast(gift)}
                         >
                           <Heart className="w-3.5 h-3.5 text-primary fill-primary" />
                         </Button>
@@ -570,7 +602,7 @@ const GiftSuggestionsList = ({ plans }: GiftSuggestionsListProps) => {
                           className="h-7 w-7"
                           asChild
                         >
-                          <a href={purchaseUrl} target="_blank" rel="noopener noreferrer">
+                          <a href={primaryUrl} target="_blank" rel="noopener noreferrer">
                             <ExternalLink className="w-3.5 h-3.5" />
                           </a>
                         </Button>
@@ -584,7 +616,7 @@ const GiftSuggestionsList = ({ plans }: GiftSuggestionsListProps) => {
 
           <div className="flex items-center justify-between">
             <p className="text-sm text-muted-foreground">
-              {foundGifts.length} gift ideas for {OCCASIONS.find((o) => o.value === occasion)?.label}
+              3 suggestions — swipe or use buttons to skip or save
             </p>
             <div className="flex items-center gap-2">
               <Button variant="outline" size="sm" onClick={() => handleFindGifts(true)} disabled={isSearching}>
@@ -598,78 +630,116 @@ const GiftSuggestionsList = ({ plans }: GiftSuggestionsListProps) => {
             </div>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {foundGifts.map((gift, i) => {
-              const purchaseUrl = gift.purchaseUrl || generateSearchUrl(gift.name, gift.whereToBuy);
-              const favorited = isFavorited(gift);
-
+          {/* Swipeable 3-card stack: always show 3 suggestions; swipe left = skip, right = save */}
+          <div className="relative min-h-[320px] flex items-center justify-center">
+            {foundGifts.length === 0 && isSearching && (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <Loader2 className="w-10 h-10 animate-spin text-primary" />
+                <span className="ml-2 text-sm">Loading suggestions...</span>
+              </div>
+            )}
+            {foundGifts.slice(0, 3).map((gift, stackIndex) => {
+              const shopLinks = getShopLinks(gift, locationHint);
+              const primaryUrl = shopLinks[0].url;
+              const isTop = stackIndex === 0;
               return (
-                <Card key={i} className="border-border hover:shadow-md transition-shadow">
-                  <CardContent className="pt-4">
-                    <div className="flex items-start justify-between gap-2 mb-2">
-                      <h4 className="font-medium flex items-center gap-2">
-                        <span className="text-xl">{gift.emoji}</span>
-                        {gift.name}
-                      </h4>
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7"
-                          onClick={() => toggleFavorite(gift)}
-                        >
-                          <Heart className={`w-4 h-4 ${favorited ? 'text-primary fill-primary' : 'text-muted-foreground'}`} />
-                        </Button>
-                        <Badge variant="outline" className="text-xs">
-                          {gift.priceRange}
-                        </Badge>
+                <div
+                  key={`stack-${stackIndex}-${gift.name}`}
+                  className={`w-full max-w-md mx-auto transition-all duration-200 ${
+                    isTop ? "relative z-10 scale-100 opacity-100" : "absolute inset-0 z-0 scale-95 opacity-60 pointer-events-none"
+                  }`}
+                  style={!isTop ? { top: stackIndex * 12, left: 0, right: 0 } : undefined}
+                  {...(isTop && {
+                    onTouchStart: handleSwipeStart,
+                    onTouchMove: handleSwipeMove,
+                    onTouchEnd: handleSwipeEnd,
+                  })}
+                >
+                  <Card className="border-border shadow-lg overflow-hidden">
+                    <CardContent className="pt-4 pb-4">
+                      <div className="flex items-start justify-between gap-2 mb-2">
+                        <h4 className="font-medium flex items-center gap-2">
+                          <span className="text-2xl">{gift.emoji}</span>
+                          {gift.name}
+                        </h4>
+                        <Badge variant="outline" className="text-xs shrink-0">{gift.priceRange}</Badge>
                       </div>
-                    </div>
+                      <p className="text-sm text-muted-foreground mb-2">{gift.description}</p>
+                      <p className="text-xs text-muted-foreground mb-1">
+                        <span className="text-primary font-medium">Where to buy:</span> {gift.whereToBuy}
+                      </p>
+                      <p className="text-xs text-muted-foreground italic mb-4">{gift.whyItFits}</p>
 
-                    <p className="text-sm text-muted-foreground mb-3">{gift.description}</p>
+                      {isTop && (
+                        <>
+                          <a
+                            href={primaryUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center justify-center gap-2 w-full py-2.5 rounded-lg gradient-gold text-primary-foreground font-medium text-sm mb-4 hover:opacity-90"
+                          >
+                            <ExternalLink className="w-4 h-4" />
+                            Shop at {shopLinks[0].label}
+                          </a>
+                          <div className="flex items-center justify-center gap-4">
+                            <Button
+                              variant="outline"
+                              size="lg"
+                              className="gap-2 px-6"
+                              onClick={handleSkipTop}
+                              disabled={isSearching}
+                            >
+                              <ChevronLeft className="w-5 h-5" />
+                              Skip
+                            </Button>
+                            <Button
+                              variant="default"
+                              size="lg"
+                              className="gap-2 px-6 gradient-gold text-primary-foreground"
+                              onClick={() => handleSaveTop(gift)}
+                              disabled={isSearching}
+                            >
+                              <Heart className="w-5 h-5 fill-current" />
+                              Save
+                            </Button>
+                          </div>
+                          {!isPurchased(gift) && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="w-full mt-2 gap-1.5 text-xs"
+                              onClick={() => {
+                                markAsPurchased(gift);
+                                toast({ title: "Marked as bought", description: "Won't be recommended again." });
+                              }}
+                            >
+                              <ShoppingBag className="w-3.5 h-3.5" />
+                              Mark as bought
+                            </Button>
+                          )}
+                        </>
+                      )}
 
-                    <p className="text-xs text-muted-foreground mb-2">
-                      <span className="text-primary font-medium">Where to buy:</span>{" "}
-                      {gift.whereToBuy}
-                    </p>
-
-                    <p className="text-xs text-muted-foreground italic mb-3">{gift.whyItFits}</p>
-
-                    <Button
-                      variant="default"
-                      size="sm"
-                      className="w-full text-xs gap-1.5 gradient-gold text-primary-foreground hover:opacity-90"
-                      asChild
-                    >
-                      <a href={purchaseUrl} target="_blank" rel="noopener noreferrer">
-                        <ExternalLink className="w-3 h-3" />
-                        Shop Now
-                      </a>
-                    </Button>
-                  </CardContent>
-                </Card>
+                      {!isTop && (
+                        <a
+                          href={primaryUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-primary hover:underline"
+                        >
+                          Shop at {gift.whereToBuy}
+                        </a>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
               );
             })}
           </div>
 
-          <Button
-            variant="outline"
-            onClick={() => handleFindGifts(false)}
-            disabled={isSearching}
-            className="w-full"
-          >
-            {isSearching ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Finding more...
-              </>
-            ) : (
-              <>
-                <Sparkles className="w-4 h-4 mr-2" />
-                Get More Ideas
-              </>
-            )}
-          </Button>
+          <p className="text-center text-xs text-muted-foreground mt-2">
+            Swipe left to skip • Swipe right to save • Each suggestion has a shop link
+          </p>
         </div>
       )}
     </div>
@@ -703,39 +773,52 @@ const GiftSuggestionsList = ({ plans }: GiftSuggestionsListProps) => {
         renderGiftFinder()
       ) : (
         <div className="space-y-4">
-          {/* Favorites section at top */}
-          {favoriteGifts.length > 0 && (
+          {/* Saved Gifts section at top */}
+          {savedGifts.length > 0 && (
             <div className="space-y-3 p-4 rounded-lg border-2 border-primary/20 bg-primary/5">
               <div className="flex items-center gap-2">
                 <Heart className="w-4 h-4 text-primary fill-primary" />
-                <h4 className="font-medium text-sm">Your Favorites ({favoriteGifts.length})</h4>
+                <h4 className="font-medium text-sm">Saved Gifts ({savedGifts.length})</h4>
               </div>
               <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                {favoriteGifts.map((gift, i) => {
-                  const purchaseUrl = gift.purchaseUrl || generateSearchUrl(gift.name, gift.whereToBuy);
+                {savedGifts.map((gift, i) => {
+                  const shopLinks = getShopLinks(gift, locationHint);
+                  const primaryUrl = shopLinks[0].url;
+                  const bought = (gift as SavedGift).purchased;
                   return (
-                    <div key={`fav-main-${i}`} className="flex items-center justify-between gap-2 p-2 rounded-md bg-background border">
+                    <div key={`fav-main-${i}`} className={`flex items-center justify-between gap-2 p-2 rounded-md bg-background border ${bought ? "opacity-75" : ""}`}>
                       <div className="flex items-center gap-2 min-w-0">
                         <span>{gift.emoji}</span>
                         <span className="text-sm truncate">{gift.name}</span>
-                        <Badge variant="outline" className="text-xs shrink-0">{gift.priceRange}</Badge>
+                        {bought && (
+                          <Badge variant="secondary" className="text-xs shrink-0 gap-0.5">
+                            <CheckCircle className="w-3 h-3" />
+                            Bought
+                          </Badge>
+                        )}
+                        {!bought && <Badge variant="outline" className="text-xs shrink-0">{gift.priceRange}</Badge>}
                       </div>
                       <div className="flex items-center gap-1 shrink-0">
+                        {bought ? (
+                          <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => { unmarkAsPurchased(gift); toast({ title: "Marked as not bought" }); }}>
+                            Undo
+                          </Button>
+                        ) : (
+                          <Button variant="ghost" size="sm" className="h-7 text-xs gap-1" onClick={() => { markAsPurchased(gift); toast({ title: "Marked as bought", description: "Won't be recommended again." }); }}>
+                            <ShoppingBag className="w-3.5 h-3.5" />
+                            Bought
+                          </Button>
+                        )}
                         <Button
                           variant="ghost"
                           size="icon"
                           className="h-7 w-7"
-                          onClick={() => toggleFavorite(gift)}
+                          onClick={() => toggleSavedGiftWithToast(gift)}
                         >
                           <Heart className="w-3.5 h-3.5 text-primary fill-primary" />
                         </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7"
-                          asChild
-                        >
-                          <a href={purchaseUrl} target="_blank" rel="noopener noreferrer">
+                        <Button variant="ghost" size="icon" className="h-7 w-7" asChild>
+                          <a href={primaryUrl} target="_blank" rel="noopener noreferrer">
                             <ExternalLink className="w-3.5 h-3.5" />
                           </a>
                         </Button>
@@ -819,8 +902,9 @@ const GiftSuggestionsList = ({ plans }: GiftSuggestionsListProps) => {
             {filteredGifts.map((item, i) => {
               const cardKey = item.gift.name.toLowerCase().trim();
               const isExpanded = expandedCards.has(cardKey);
-              const purchaseUrl = item.gift.purchaseUrl || generateSearchUrl(item.gift.name, item.gift.whereToBuy);
-              const favorited = isFavorited(item.gift);
+              const shopLinks = getShopLinks(item.gift, locationHint);
+              const primaryUrl = shopLinks[0].url;
+              const favorited = isSaved(item.gift);
               
               return (
                 <Card key={i} className="border-border hover:shadow-md transition-shadow flex flex-col">
@@ -836,7 +920,7 @@ const GiftSuggestionsList = ({ plans }: GiftSuggestionsListProps) => {
                           variant="ghost"
                           size="icon"
                           className="h-7 w-7"
-                          onClick={() => toggleFavorite(item.gift)}
+                          onClick={() => toggleSavedGiftWithToast(item.gift)}
                         >
                           <Heart className={`w-4 h-4 ${favorited ? 'text-primary fill-primary' : 'text-muted-foreground'}`} />
                         </Button>
@@ -874,36 +958,73 @@ const GiftSuggestionsList = ({ plans }: GiftSuggestionsListProps) => {
                     
                     {/* Actions */}
                     <div className="flex items-center justify-between gap-2 mt-auto pt-3 border-t border-border">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-xs h-8 px-2"
-                        onClick={() => toggleCardExpansion(cardKey)}
-                      >
-                        {isExpanded ? (
-                          <>
-                            <ChevronUp className="w-3 h-3 mr-1" />
-                            Less
-                          </>
+                      <div className="flex items-center gap-1.5">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-xs h-8 px-2"
+                          onClick={() => toggleCardExpansion(cardKey)}
+                        >
+                          {isExpanded ? (
+                            <>
+                              <ChevronUp className="w-3 h-3 mr-1" />
+                              Less
+                            </>
+                          ) : (
+                            <>
+                              <ChevronDown className="w-3 h-3 mr-1" />
+                              More
+                            </>
+                          )}
+                        </Button>
+                        {!isPurchased(item.gift) ? (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-xs h-8 gap-1"
+                            onClick={() => {
+                              markAsPurchased(item.gift);
+                              toast({ title: "Marked as bought", description: "Won't be recommended again." });
+                            }}
+                          >
+                            <ShoppingBag className="w-3 h-3" />
+                            Bought
+                          </Button>
                         ) : (
-                          <>
-                            <ChevronDown className="w-3 h-3 mr-1" />
-                            More
-                          </>
+                          <Badge variant="secondary" className="text-xs gap-0.5 h-8 px-2">
+                            <CheckCircle className="w-3 h-3" />
+                            Bought
+                          </Badge>
                         )}
-                      </Button>
-                      
-                      <Button
-                        variant="default"
-                        size="sm"
-                        className="text-xs h-8 gap-1.5 gradient-gold text-primary-foreground hover:opacity-90"
-                        asChild
-                      >
-                        <a href={purchaseUrl} target="_blank" rel="noopener noreferrer">
-                          <ExternalLink className="w-3 h-3" />
-                          Shop Now
-                        </a>
-                      </Button>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <Button
+                          variant="default"
+                          size="sm"
+                          className="text-xs h-8 gap-1.5 gradient-gold text-primary-foreground hover:opacity-90"
+                          asChild
+                        >
+                          <a href={primaryUrl} target="_blank" rel="noopener noreferrer">
+                            <ExternalLink className="w-3 h-3" />
+                            {shopLinks[0].label}
+                          </a>
+                        </Button>
+                        {shopLinks.slice(1, 3).map((link, j) => (
+                          <Button
+                            key={j}
+                            variant="outline"
+                            size="sm"
+                            className="text-xs h-8 gap-1"
+                            asChild
+                          >
+                            <a href={link.url} target="_blank" rel="noopener noreferrer">
+                              <ExternalLink className="w-3 h-3" />
+                              {link.label}
+                            </a>
+                          </Button>
+                        ))}
+                      </div>
                     </div>
                   </CardContent>
                 </Card>

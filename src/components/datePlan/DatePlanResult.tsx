@@ -11,7 +11,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { RefreshCw, Save, Camera, SaveAll, Music, MapPin, Users, ExternalLink, Navigation } from "lucide-react";
+import { RefreshCw, Save, Camera, SaveAll, Music, MapPin, Users, ExternalLink, Navigation, Gift } from "lucide-react";
 import DatePlanCard from "./DatePlanCard";
 import PlanSelector from "./PlanSelector";
 import ExportMenu from "./ExportMenu";
@@ -22,6 +22,7 @@ import PlaylistWidget from "@/components/playlist/PlaylistWidget";
 import RouteMap from "@/components/map/RouteMap";
 import PartnerShareDialog from "@/components/sharing/PartnerShareDialog";
 import { supabase } from "@/integrations/supabase/client";
+import { useSavedGifts } from "@/hooks/useSavedGifts";
 
 interface DatePlanResultProps {
   open: boolean;
@@ -40,6 +41,9 @@ interface DatePlanResultProps {
   scheduledDate?: string;
   startTime?: string;
   onUpdatePlanGifts?: (planIndex: number, newGifts: GiftSuggestion[]) => void;
+  onNavigateToGifts?: () => void;
+  /** Transportation mode from questionnaire (drive, transit, walk, etc.) for route map and "Open Full Route" */
+  transportationMode?: string;
 }
 
 const DatePlanResult = ({ 
@@ -59,9 +63,12 @@ const DatePlanResult = ({
   scheduledDate,
   startTime,
   onUpdatePlanGifts,
+  onNavigateToGifts,
+  transportationMode,
 }: DatePlanResultProps) => {
   
   const { toast } = useToast();
+  const { purchasedGiftNames } = useSavedGifts();
   const [reservationOpen, setReservationOpen] = useState(false);
   const [playlistOpen, setPlaylistOpen] = useState(false);
   const [partnerShareOpen, setPartnerShareOpen] = useState(false);
@@ -128,6 +135,7 @@ const DatePlanResult = ({
           planTitle: plan.title,
           occasion: plan.tagline,
           existingGifts: plan.giftSuggestions || [],
+          purchasedGiftNames: purchasedGiftNames.length > 0 ? purchasedGiftNames : undefined,
         },
       });
 
@@ -257,30 +265,42 @@ const DatePlanResult = ({
                       </div>
                     </div>
 
-                    {/* Google Maps Button with all stops */}
+                    {/* Google Maps Button with all stops - use coordinates when available so route starts at your location */}
                     <Button
                       variant="default"
                       className="w-full gap-2 gradient-gold text-primary-foreground hover:opacity-90 mb-4"
                       onClick={() => {
                         const stops = plan.stops || [];
                         if (stops.length === 0) return;
-                        
-                        // Use address for Google Maps directions (most reliable)
-                        const getAddress = (stop: typeof stops[0]) => {
-                          return encodeURIComponent(stop.address || `${stop.name}, ${stop.venueType}`);
+                        const originStop = stops[0];
+                        const destStop = stops[stops.length - 1];
+                        const wayStops = stops.length > 2 ? stops.slice(1, -1) : [];
+                        // Prefer lat/lng so route always starts at the right place (e.g. "Your location"); avoid address parsing that can show wrong city
+                        const hasCoord = (s: typeof originStop) =>
+                          typeof s.latitude === "number" && typeof s.longitude === "number" && Number.isFinite(s.latitude) && Number.isFinite(s.longitude);
+                        const toParam = (s: typeof originStop) =>
+                          s.placeId ? `place_id:${s.placeId}` : hasCoord(s) ? `${s.latitude},${s.longitude}` : encodeURIComponent(s.address || s.name || "");
+                        const origin = toParam(originStop);
+                        const destination = toParam(destStop);
+                        const waypoints = wayStops.map(toParam).join("|");
+                        const getTravelMode = (mode?: string) => {
+                          switch (mode?.toLowerCase()) {
+                            case "walking": return "walking";
+                            case "driving":
+                            case "rideshare": return "driving";
+                            case "public-transit":
+                            case "transit": return "transit";
+                            case "biking": return "bicycling";
+                            default: return "walking";
+                          }
                         };
-                        
-                        const origin = getAddress(stops[0]);
-                        const destination = getAddress(stops[stops.length - 1]);
-                        
-                        let url = `https://www.google.com/maps/dir/${decodeURIComponent(origin)}`;
-                        
-                        // Add all stops in order
-                        for (let i = 1; i < stops.length; i++) {
-                          url += `/${decodeURIComponent(getAddress(stops[i]))}`;
-                        }
-                        
-                        window.open(url, '_blank');
+                        const q = new URLSearchParams();
+                        q.set("api", "1");
+                        q.set("origin", origin);
+                        q.set("destination", destination);
+                        q.set("travelmode", getTravelMode(transportationMode));
+                        if (waypoints) q.set("waypoints", waypoints);
+                        window.open(`https://www.google.com/maps/dir/?${q.toString()}`, "_blank");
                       }}
                     >
                       <Navigation className="w-4 h-4" />
@@ -288,8 +308,8 @@ const DatePlanResult = ({
                       <ExternalLink className="w-4 h-4" />
                     </Button>
 
-                    {/* Interactive Map - Always show */}
-                    <RouteMap stops={plan.stops} className="mt-2" />
+                    {/* Interactive Map - use questionnaire transport mode */}
+                    <RouteMap stops={plan.stops} transportationMode={transportationMode} className="mt-2" />
                   </div>
                 )}
               </>
@@ -345,6 +365,17 @@ const DatePlanResult = ({
                 
                 {/* Save/Done buttons row */}
                 <div className="flex gap-2 justify-center sm:justify-end">
+                  {onNavigateToGifts && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={onNavigateToGifts}
+                      className="gap-1.5 h-9 text-muted-foreground"
+                    >
+                      <Gift className="w-4 h-4" />
+                      View saved gifts
+                    </Button>
+                  )}
                   {onSaveAllPlans && !areAllSaved && plans.length > 1 && (
                     <Button
                       variant="outline"

@@ -2,7 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { corsHeaders } from "./cors.ts";
 import { buildPrompt } from "./prompt.ts";
 import { generateMultipleDatePlans } from "./multiPlanAi.ts";
-import { validateAllStops } from "./places.ts";
+import { validateAllStops, geocodeAddress } from "./places.ts";
 
 function jsonResponse(status: number, body: unknown) {
   return new Response(JSON.stringify(body), {
@@ -191,6 +191,42 @@ serve(async (req) => {
       giftSuggestions: Array.isArray(plan.giftSuggestions) ? plan.giftSuggestions : [],
       conversationStarters: Array.isArray(plan.conversationStarters) ? plan.conversationStarters : [],
     }));
+
+    // Prepend Google-verified starting point when user provided startingAddress
+    const startingAddress = preferences.startingAddress?.trim();
+    if (startingAddress && GOOGLE_PLACES_API_KEY) {
+      try {
+        const startResult = await geocodeAddress(startingAddress, GOOGLE_PLACES_API_KEY);
+        if (startResult) {
+          const startStop = {
+            order: 1,
+            name: "Your location",
+            venueType: "Starting point",
+            timeSlot: "",
+            duration: "",
+            description: "Departure address",
+            whyItFits: "",
+            romanticTip: "",
+            emoji: "📍",
+            address: startResult.formatted_address,
+            latitude: startResult.latitude,
+            longitude: startResult.longitude,
+            validated: true,
+            estimatedCostPerPerson: "",
+          };
+          for (const plan of sanitizedPlans) {
+            const existingStops = Array.isArray(plan.stops) ? plan.stops : [];
+            plan.stops = [
+              startStop,
+              ...existingStops.map((s: any, i: number) => ({ ...s, order: i + 2 })),
+            ];
+          }
+          console.log(`[Starting point] Prepended geocoded start for "${startingAddress}" to ${sanitizedPlans.length} plans`);
+        }
+      } catch (err) {
+        console.warn("[Starting point] Geocode failed, leaving plans unchanged:", err);
+      }
+    }
     
     return jsonResponse(200, { datePlans: sanitizedPlans });
   } catch (error) {

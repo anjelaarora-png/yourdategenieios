@@ -1,15 +1,41 @@
 import { useState } from "react";
-import { Plus, MapPin, Clock, ChevronRight, Sparkles, Star, Calendar } from "lucide-react";
+import { Plus, MapPin, Clock, ChevronRight, Sparkles, Star, Calendar, RotateCcw, FileText, Zap } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { SavedDatePlan } from "@/hooks/useDatePlans";
+import { QuestionnaireData } from "@/components/questionnaire/types";
 import logo from "@/assets/logo.png";
+
+const QUESTIONNAIRE_PROGRESS_KEY = "dateGenie_questionnaireProgress";
+
+export type PlanIntent = "fresh" | "useLast" | "resume";
 
 interface MobileHomeProps {
   savedPlans: SavedDatePlan[];
-  onCreatePlan: () => void;
+  onCreatePlan: (intent?: PlanIntent) => void;
+  hasPendingPlans?: boolean;
+  onReviewUnsavedPlans?: () => void;
+  hasSavedPreferences?: boolean;
+  savedPreferences?: QuestionnaireData | null;
 }
 
-const MobileHome = ({ savedPlans, onCreatePlan }: MobileHomeProps) => {
+const MobileHome = ({ 
+  savedPlans, 
+  onCreatePlan, 
+  hasPendingPlans = false, 
+  onReviewUnsavedPlans,
+  hasSavedPreferences = false,
+  savedPreferences,
+}: MobileHomeProps) => {
+  const hasUnsavedProgress = (() => {
+    try {
+      const stored = localStorage.getItem(QUESTIONNAIRE_PROGRESS_KEY);
+      if (!stored) return false;
+      const parsed = JSON.parse(stored);
+      return Date.now() - parsed.timestamp < 24 * 60 * 60 * 1000 && parsed.step > 1;
+    } catch {
+      return false;
+    }
+  })();
   const { user } = useAuth();
   const [filter, setFilter] = useState<"all" | "upcoming" | "completed">("all");
 
@@ -45,30 +71,92 @@ const MobileHome = ({ savedPlans, onCreatePlan }: MobileHomeProps) => {
         </p>
       </div>
 
-      {/* Quick create card */}
+      {/* Unsaved plans banner */}
+      {hasPendingPlans && onReviewUnsavedPlans && (
+        <div className="px-5 mb-4">
+          <div className="p-4 rounded-2xl bg-primary/10 border border-primary/30">
+            <p className="font-medium text-primary text-sm mb-1">You have unsaved date plans!</p>
+            <p className="text-xs text-muted-foreground mb-3">
+              Pick up where you left off and save your plans.
+            </p>
+            <button
+              onClick={onReviewUnsavedPlans}
+              className="ios-button ios-button-primary w-full flex items-center justify-center gap-2 text-sm"
+            >
+              <FileText className="w-4 h-4" />
+              Review Plans
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Plan your next date - with options for returning users */}
       <div className="px-5 mb-6">
-        <button
-          onClick={onCreatePlan}
-          className="w-full p-5 rounded-2xl bg-gradient-to-br from-primary/10 via-primary/5 to-transparent border border-primary/20 text-left haptic-button active:scale-[0.98] transition-transform"
-        >
-          <div className="flex items-start justify-between">
-            <div className="flex-1">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-10 h-10 rounded-xl gradient-gold flex items-center justify-center">
-                  <Sparkles className="w-5 h-5 text-primary-foreground" />
+        <div className="w-full p-5 rounded-2xl bg-gradient-to-br from-primary/10 via-primary/5 to-transparent border border-primary/20">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-10 h-10 rounded-xl gradient-gold flex items-center justify-center">
+              <Sparkles className="w-5 h-5 text-primary-foreground" />
+            </div>
+            <span className="text-xs font-medium text-primary uppercase tracking-wide">
+              AI Powered
+            </span>
+          </div>
+          <h3 className="text-xl font-bold mb-2">Plan Your Next Date</h3>
+          
+          {(hasSavedPreferences || hasUnsavedProgress) ? (
+            <div className="space-y-2 mt-3">
+              <button
+                onClick={() => onCreatePlan("fresh")}
+                className="w-full flex items-center gap-3 p-3 rounded-xl border border-border bg-card/50 text-left haptic-button active:scale-[0.99]"
+              >
+                <RotateCcw className="w-5 h-5 text-primary shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-foreground">Start Fresh</p>
+                  <p className="text-xs text-muted-foreground">New preferences for this date</p>
                 </div>
-                <span className="text-xs font-medium text-primary uppercase tracking-wide">
-                  AI Powered
-                </span>
-              </div>
-              <h3 className="text-xl font-bold mb-1">Plan a New Date</h3>
-              <p className="text-muted-foreground text-sm">
+                <ChevronRight className="w-5 h-5 text-muted-foreground shrink-0" />
+              </button>
+              {hasSavedPreferences && savedPreferences && (
+                <button
+                  onClick={() => onCreatePlan("useLast")}
+                  className="w-full flex items-center gap-3 p-3 rounded-xl border border-border bg-card/50 text-left haptic-button active:scale-[0.99]"
+                >
+                  <Zap className="w-5 h-5 text-primary shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-foreground">Use & Generate from Last Plan</p>
+                    <p className="text-xs text-muted-foreground">
+                      {savedPreferences.city}{savedPreferences.neighborhood ? `, ${savedPreferences.neighborhood}` : ""}
+                    </p>
+                  </div>
+                  <ChevronRight className="w-5 h-5 text-muted-foreground shrink-0" />
+                </button>
+              )}
+              {hasUnsavedProgress && (
+                <button
+                  onClick={() => onCreatePlan("resume")}
+                  className="w-full flex items-center gap-3 p-3 rounded-xl border border-primary/40 bg-primary/5 text-left haptic-button active:scale-[0.99]"
+                >
+                  <FileText className="w-5 h-5 text-primary shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-foreground">Pick Up Where You Left Off</p>
+                    <p className="text-xs text-muted-foreground">Resume your unfinished questionnaire</p>
+                  </div>
+                  <ChevronRight className="w-5 h-5 text-primary shrink-0" />
+                </button>
+              )}
+            </div>
+          ) : (
+            <button
+              onClick={() => onCreatePlan()}
+              className="w-full flex items-start justify-between mt-2 text-left haptic-button active:scale-[0.98] transition-transform"
+            >
+              <p className="text-muted-foreground text-sm flex-1">
                 Tell us your preferences and get a personalized itinerary in seconds
               </p>
-            </div>
-            <ChevronRight className="w-5 h-5 text-muted-foreground mt-1" />
-          </div>
-        </button>
+              <ChevronRight className="w-5 h-5 text-muted-foreground mt-1 shrink-0" />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Stats row */}
@@ -134,7 +222,7 @@ const MobileHome = ({ savedPlans, onCreatePlan }: MobileHomeProps) => {
             </p>
             {filter === "all" && (
               <button
-                onClick={onCreatePlan}
+                onClick={() => onCreatePlan()}
                 className="text-primary font-medium flex items-center gap-1 mx-auto"
               >
                 <Plus className="w-4 h-4" />

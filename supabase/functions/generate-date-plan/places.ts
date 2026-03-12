@@ -98,6 +98,38 @@ function getStateName(abbr: string): string {
   return states[abbr.toUpperCase()] || abbr;
 }
 
+/** Geocode an address string using Google Geocoding API. Returns formatted address and coordinates or null. */
+export async function geocodeAddress(
+  address: string,
+  apiKey: string
+): Promise<{ formatted_address: string; latitude: number; longitude: number } | null> {
+  const trimmed = address?.trim();
+  if (!trimmed || !apiKey) return null;
+
+  try {
+    const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(trimmed)}&key=${apiKey}`;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+    let response: Response;
+    try {
+      response = await fetch(url, { signal: controller.signal });
+    } finally {
+      clearTimeout(timeoutId);
+    }
+    if (!response.ok) return null;
+    const data = await response.json();
+    if (data.status !== "OK" || !data.results?.length) return null;
+    const first = data.results[0];
+    const formatted_address = first.formatted_address;
+    const lat = first.geometry?.location?.lat;
+    const lng = first.geometry?.location?.lng;
+    if (typeof lat !== "number" || typeof lng !== "number") return null;
+    return { formatted_address, latitude: lat, longitude: lng };
+  } catch {
+    return null;
+  }
+}
+
 export async function validateVenue(
   venueName: string,
   city: string,

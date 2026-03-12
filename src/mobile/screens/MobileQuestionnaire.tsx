@@ -1,12 +1,52 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { ArrowLeft, ArrowRight, Sparkles, MapPin, Car, Zap, UtensilsCrossed, ShieldAlert, Gift, Check } from "lucide-react";
 import { QuestionnaireData, initialQuestionnaireData, DATE_TYPES, OCCASIONS, ENERGY_LEVELS, ACTIVITIES, TIME_OF_DAY, DURATIONS, CUISINES, DIETARY_RESTRICTIONS, BUDGET_RANGES, TRANSPORTATION_MODES, TRAVEL_RADIUS, COMMON_ALLERGIES, HARD_NOS } from "@/components/questionnaire/types";
+import { PlacesAutocompleteInput } from "@/components/ui/PlacesAutocompleteInput";
+import type { PlanIntent } from "./MobileHome";
+
+const STORAGE_KEY = "dateGenie_questionnaireProgress";
+
+interface StoredProgress {
+  data: QuestionnaireData;
+  step: number;
+  timestamp: number;
+}
 
 interface MobileQuestionnaireProps {
   onSubmit: (data: QuestionnaireData) => void;
   onBack: () => void;
   isGenerating: boolean;
+  existingData?: QuestionnaireData | null;
+  intent?: PlanIntent;
 }
+
+const TIME_SLOTS: Record<string, { value: string; label: string }[]> = {
+  morning: [
+    { value: "08:00", label: "8 AM" },
+    { value: "09:00", label: "9 AM" },
+    { value: "10:00", label: "10 AM" },
+    { value: "11:00", label: "11 AM" },
+  ],
+  afternoon: [
+    { value: "12:00", label: "12 PM" },
+    { value: "13:00", label: "1 PM" },
+    { value: "14:00", label: "2 PM" },
+    { value: "15:00", label: "3 PM" },
+    { value: "16:00", label: "4 PM" },
+  ],
+  evening: [
+    { value: "17:00", label: "5 PM" },
+    { value: "18:00", label: "6 PM" },
+    { value: "19:00", label: "7 PM" },
+    { value: "20:00", label: "8 PM" },
+    { value: "21:00", label: "9 PM" },
+  ],
+  night: [
+    { value: "21:00", label: "9 PM" },
+    { value: "22:00", label: "10 PM" },
+    { value: "23:00", label: "11 PM" },
+  ],
+};
 
 const STEPS = [
   { id: "location", icon: MapPin, title: "Where & When", color: "text-blue-500" },
@@ -17,10 +57,44 @@ const STEPS = [
   { id: "extras", icon: Gift, title: "Finishing Touch", color: "text-pink-500" },
 ];
 
-const MobileQuestionnaire = ({ onSubmit, onBack, isGenerating }: MobileQuestionnaireProps) => {
-  const [step, setStep] = useState(0);
-  const [data, setData] = useState<QuestionnaireData>(initialQuestionnaireData);
+const MobileQuestionnaire = ({ onSubmit, onBack, isGenerating, existingData, intent }: MobileQuestionnaireProps) => {
+  const loadStoredProgress = useCallback((): StoredProgress | null => {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (!stored) return null;
+      const parsed = JSON.parse(stored) as StoredProgress;
+      if (Date.now() - parsed.timestamp < 24 * 60 * 60 * 1000) return parsed;
+      localStorage.removeItem(STORAGE_KEY);
+    } catch {
+      localStorage.removeItem(STORAGE_KEY);
+    }
+    return null;
+  }, []);
+
+  const getInitialState = (): { step: number; data: QuestionnaireData } => {
+    if (intent === "resume") {
+      const stored = loadStoredProgress();
+      if (stored) return { step: stored.step, data: stored.data };
+    }
+    if (intent === "useLast" && existingData) {
+      return { step: 0, data: existingData };
+    }
+    if (existingData && intent !== "fresh") {
+      return { step: 0, data: existingData };
+    }
+    return { step: 0, data: initialQuestionnaireData };
+  };
+
+  const initialState = getInitialState();
+  const [step, setStep] = useState(initialState.step);
+  const [data, setData] = useState<QuestionnaireData>(initialState.data);
   const contentRef = useRef<HTMLDivElement>(null);
+
+  // Save progress to localStorage whenever data or step changes
+  useEffect(() => {
+    const progress: StoredProgress = { data, step, timestamp: Date.now() };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(progress));
+  }, [data, step]);
 
   useEffect(() => {
     contentRef.current?.scrollTo({ top: 0, behavior: "smooth" });
@@ -45,7 +119,7 @@ const MobileQuestionnaire = ({ onSubmit, onBack, isGenerating }: MobileQuestionn
       case 1:
         return data.transportationMode !== "" && data.travelRadius !== "";
       case 2:
-        return data.energyLevel !== "" && data.timeOfDay !== "";
+        return data.energyLevel !== "";
       case 3:
         return data.budgetRange !== "";
       default:
@@ -57,6 +131,7 @@ const MobileQuestionnaire = ({ onSubmit, onBack, isGenerating }: MobileQuestionn
     if (step < STEPS.length - 1) {
       setStep(step + 1);
     } else {
+      localStorage.removeItem(STORAGE_KEY);
       onSubmit(data);
     }
   };
@@ -144,27 +219,79 @@ const MobileQuestionnaire = ({ onSubmit, onBack, isGenerating }: MobileQuestionn
   );
 };
 
+// When — part of day + time (unified, asked once)
+const WhenTimeSelector = ({ data, onChange }: { data: QuestionnaireData; onChange: (u: Partial<QuestionnaireData>) => void }) => {
+  useEffect(() => {
+    if (!data.timeOfDay || !data.startTime) {
+      onChange({ timeOfDay: "evening", startTime: "19:00" });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  return (
+    <div className="space-y-3">
+      <label className="text-sm font-medium text-muted-foreground mb-2 block">What time works best?</label>
+      <div className="grid grid-cols-2 gap-2">
+        {TIME_OF_DAY.map((period) => (
+          <button
+            key={period.value}
+            type="button"
+            onClick={() => onChange({
+              timeOfDay: period.value,
+              startTime: TIME_SLOTS[period.value]?.[0]?.value ?? "19:00",
+            })}
+            className={`flex flex-col items-center gap-1 p-3 rounded-xl border transition-all ${
+              data.timeOfDay === period.value
+                ? "border-primary bg-primary/10"
+                : "border-border bg-muted/30"
+            }`}
+          >
+            <span className="text-lg">{period.emoji}</span>
+            <span className="text-xs font-medium">{period.label}</span>
+            {period.time && <span className="text-[10px] text-muted-foreground">{period.time}</span>}
+          </button>
+        ))}
+      </div>
+      {data.timeOfDay && TIME_SLOTS[data.timeOfDay] && (
+        <div className="flex flex-wrap gap-2">
+          {TIME_SLOTS[data.timeOfDay].map((slot) => (
+            <button
+              key={slot.value}
+              type="button"
+              onClick={() => onChange({ startTime: slot.value })}
+              className={`px-3 py-1.5 rounded-full text-sm ${
+                data.startTime === slot.value ? "bg-primary text-primary-foreground" : "bg-muted/60"
+              }`}
+            >
+              {slot.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 // Step 1: Location
 const StepLocation = ({ data, onChange }: { data: QuestionnaireData; onChange: (u: Partial<QuestionnaireData>) => void }) => (
   <div className="space-y-6">
     <div>
       <label className="text-sm font-medium text-muted-foreground mb-2 block">City *</label>
-      <input
-        type="text"
+      <PlacesAutocompleteInput
         value={data.city}
-        onChange={(e) => onChange({ city: e.target.value })}
+        onChange={(v) => onChange({ city: v })}
         placeholder="e.g., Austin, TX"
+        mode="city"
         className="ios-input"
       />
     </div>
 
     <div>
       <label className="text-sm font-medium text-muted-foreground mb-2 block">Neighborhood (optional)</label>
-      <input
-        type="text"
+      <PlacesAutocompleteInput
         value={data.neighborhood}
-        onChange={(e) => onChange({ neighborhood: e.target.value })}
+        onChange={(v) => onChange({ neighborhood: v })}
         placeholder="e.g., Downtown, East Side"
+        mode="city"
         className="ios-input"
       />
     </div>
@@ -198,6 +325,9 @@ const StepLocation = ({ data, onChange }: { data: QuestionnaireData; onChange: (
         ))}
       </div>
     </div>
+
+    {/* When — part of day + time, asked once */}
+    <WhenTimeSelector data={data} onChange={onChange} />
   </div>
 );
 
@@ -252,21 +382,6 @@ const StepVibe = ({ data, onChange, onToggle }: { data: QuestionnaireData; onCha
             description={level.desc}
             selected={data.energyLevel === level.value}
             onClick={() => onChange({ energyLevel: level.value })}
-          />
-        ))}
-      </div>
-    </div>
-
-    <div>
-      <label className="text-sm font-medium text-muted-foreground mb-3 block">Time of day *</label>
-      <div className="grid grid-cols-2 gap-2">
-        {TIME_OF_DAY.map((time) => (
-          <OptionChip
-            key={time.value}
-            emoji={time.emoji}
-            label={`${time.label} (${time.time})`}
-            selected={data.timeOfDay === time.value}
-            onClick={() => onChange({ timeOfDay: time.value })}
           />
         ))}
       </div>
@@ -461,7 +576,7 @@ const OptionChip = ({ emoji, label, selected, onClick }: { emoji?: string; label
     className={`flex items-center gap-2 p-3 rounded-xl border text-left haptic-button transition-all ${
       selected
         ? "bg-primary/10 border-primary text-foreground"
-        : "bg-card border-border text-muted-foreground hover:border-primary/50"
+        : "bg-card border-border text-foreground hover:border-primary/50"
     }`}
   >
     {emoji && <span className="text-lg">{emoji}</span>}
@@ -475,8 +590,8 @@ const OptionRow = ({ emoji, label, description, selected, onClick }: { emoji: st
     onClick={onClick}
     className={`flex items-center gap-3 p-4 rounded-xl border text-left haptic-button transition-all w-full ${
       selected
-        ? "bg-primary/10 border-primary"
-        : "bg-card border-border hover:border-primary/50"
+        ? "bg-primary/10 border-primary text-foreground"
+        : "bg-card border-border text-foreground hover:border-primary/50"
     }`}
   >
     <span className="text-2xl">{emoji}</span>

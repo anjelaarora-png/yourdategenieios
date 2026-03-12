@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { PlacesAutocompleteInput } from "@/components/ui/PlacesAutocompleteInput";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowLeft, Save, MapPin, Car, Zap, Utensils, AlertTriangle, Accessibility, Wind, Lock, Loader2, CheckCircle } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
@@ -289,18 +290,20 @@ const Preferences = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>City</Label>
-                <Input
+                <PlacesAutocompleteInput
                   value={edited.default_city}
-                  onChange={(e) => setEdited(prev => ({ ...prev, default_city: e.target.value }))}
+                  onChange={(v) => setEdited(prev => ({ ...prev, default_city: v }))}
                   placeholder="e.g., New York"
+                  mode="city"
                 />
               </div>
               <div className="space-y-2">
                 <Label>Neighborhood (optional)</Label>
-                <Input
+                <PlacesAutocompleteInput
                   value={edited.default_neighborhood}
-                  onChange={(e) => setEdited(prev => ({ ...prev, default_neighborhood: e.target.value }))}
+                  onChange={(v) => setEdited(prev => ({ ...prev, default_neighborhood: v }))}
                   placeholder="e.g., Brooklyn"
+                  mode="city"
                 />
               </div>
             </div>

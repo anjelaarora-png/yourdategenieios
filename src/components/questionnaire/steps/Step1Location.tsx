@@ -1,37 +1,49 @@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PlacesAutocompleteInput } from "@/components/ui/PlacesAutocompleteInput";
 import OptionCard from "../OptionCard";
-import { QuestionnaireData, DATE_TYPES, OCCASIONS, IDENTITY_OPTIONS, isSoloDate } from "../types";
+import { QuestionnaireData, DATE_TYPES, OCCASIONS, IDENTITY_OPTIONS, TIME_OF_DAY, isSoloDate } from "../types";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { CalendarIcon, Clock, User, Heart } from "lucide-react";
 import { format, parse } from "date-fns";
 import { cn } from "@/lib/utils";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useEffect } from "react";
 
 interface Step1Props {
   data: QuestionnaireData;
   onChange: (updates: Partial<QuestionnaireData>) => void;
 }
 
-const TIME_OPTIONS = [
-  { value: "08:00", label: "8:00 AM" },
-  { value: "09:00", label: "9:00 AM" },
-  { value: "10:00", label: "10:00 AM" },
-  { value: "11:00", label: "11:00 AM" },
-  { value: "12:00", label: "12:00 PM" },
-  { value: "13:00", label: "1:00 PM" },
-  { value: "14:00", label: "2:00 PM" },
-  { value: "15:00", label: "3:00 PM" },
-  { value: "16:00", label: "4:00 PM" },
-  { value: "17:00", label: "5:00 PM" },
-  { value: "18:00", label: "6:00 PM" },
-  { value: "19:00", label: "7:00 PM" },
-  { value: "20:00", label: "8:00 PM" },
-  { value: "21:00", label: "9:00 PM" },
-  { value: "22:00", label: "10:00 PM" },
-];
+// Time slots per period — one selection captures both part of day and specific time
+const TIME_SLOTS: Record<string, { value: string; label: string }[]> = {
+  morning: [
+    { value: "08:00", label: "8:00 AM" },
+    { value: "09:00", label: "9:00 AM" },
+    { value: "10:00", label: "10:00 AM" },
+    { value: "11:00", label: "11:00 AM" },
+  ],
+  afternoon: [
+    { value: "12:00", label: "12:00 PM" },
+    { value: "13:00", label: "1:00 PM" },
+    { value: "14:00", label: "2:00 PM" },
+    { value: "15:00", label: "3:00 PM" },
+    { value: "16:00", label: "4:00 PM" },
+  ],
+  evening: [
+    { value: "17:00", label: "5:00 PM" },
+    { value: "18:00", label: "6:00 PM" },
+    { value: "19:00", label: "7:00 PM" },
+    { value: "20:00", label: "8:00 PM" },
+    { value: "21:00", label: "9:00 PM" },
+  ],
+  night: [
+    { value: "21:00", label: "9:00 PM" },
+    { value: "22:00", label: "10:00 PM" },
+    { value: "23:00", label: "11:00 PM" },
+  ],
+};
 
 const Step1Location = ({ data, onChange }: Step1Props) => {
   const selectedDate = data.dateScheduled 
@@ -39,6 +51,14 @@ const Step1Location = ({ data, onChange }: Step1Props) => {
     : undefined;
 
   const isSolo = isSoloDate(data.dateType);
+
+  // Default to evening + 7pm when empty (seamless first load)
+  useEffect(() => {
+    if (!data.timeOfDay || !data.startTime) {
+      onChange({ timeOfDay: "evening", startTime: "19:00" });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="space-y-5 sm:space-y-6">
@@ -52,53 +72,43 @@ const Step1Location = ({ data, onChange }: Step1Props) => {
         <Label className="text-sm sm:text-base font-medium">📍 Where's this happening?</Label>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
           <div>
-            <Input
+            <PlacesAutocompleteInput
               placeholder="City (e.g., Austin, TX)"
               value={data.city}
-              onChange={(e) => onChange({ city: e.target.value })}
-              onBlur={() => {
-                const normalized = data.city
-                  .trim()
-                  .replace(/\s+/g, " ")
-                  // Ensure comma before 2-letter state when users type "city  nj"
-                  .replace(/\b([A-Za-z .'-]+?)\s+([A-Za-z]{2})$/i, (_m, city, st) =>
-                    `${String(city).trim()}, ${String(st).toUpperCase()}`
-                  );
-                if (normalized !== data.city) onChange({ city: normalized });
-              }}
+              onChange={(v) => onChange({ city: v })}
+              mode="city"
               className="bg-card border-border"
             />
           </div>
           <div>
-            <Input
+            <PlacesAutocompleteInput
               placeholder="Neighborhood (optional)"
               value={data.neighborhood}
-              onChange={(e) => onChange({ neighborhood: e.target.value })}
-              onBlur={() => {
-                const normalized = data.neighborhood.trim().replace(/\s+/g, " ");
-                if (normalized !== data.neighborhood) onChange({ neighborhood: normalized });
-              }}
+              onChange={(v) => onChange({ neighborhood: v })}
+              mode="city"
               className="bg-card border-border"
             />
           </div>
         </div>
         <div>
-          <Input
+          <PlacesAutocompleteInput
             placeholder="Starting address or intersection (e.g., 123 Main St or Main St & 5th Ave)"
             value={data.startingAddress}
-            onChange={(e) => onChange({ startingAddress: e.target.value })}
+            onChange={(v) => onChange({ startingAddress: v })}
+            mode="address"
+            addressOnly
             className="bg-card border-border"
           />
           <p className="text-xs text-muted-foreground mt-1">
-            Where will you be departing from? This helps us plan your route.
+            Where will you be departing from? This helps us plan your route. Start typing to see address suggestions.
           </p>
         </div>
       </div>
 
-      {/* Date & Time */}
+      {/* Date & Time — unified, asked once */}
       <div className="space-y-3 sm:space-y-4">
         <Label className="text-sm sm:text-base font-medium">📅 When is your date?</Label>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
+        <div className="space-y-3">
           <Popover>
             <PopoverTrigger asChild>
               <Button
@@ -126,28 +136,60 @@ const Step1Location = ({ data, onChange }: Step1Props) => {
               />
             </PopoverContent>
           </Popover>
-          
-          <Select
-            value={data.startTime}
-            onValueChange={(value) => onChange({ startTime: value })}
-          >
-            <SelectTrigger className="bg-card border-border">
-              <div className="flex items-center gap-2">
-                <Clock className="h-4 w-4 text-muted-foreground" />
-                <SelectValue placeholder="Start time" />
-              </div>
-            </SelectTrigger>
-            <SelectContent>
-              {TIME_OPTIONS.map((time) => (
-                <SelectItem key={time.value} value={time.value}>
-                  {time.label}
-                </SelectItem>
+
+          {/* Part of day + time — one seamless selection */}
+          <div className="rounded-lg border border-border bg-card/50 p-4 space-y-3">
+            <Label className="text-xs sm:text-sm font-medium text-muted-foreground flex items-center gap-1.5">
+              <Clock className="h-3.5 w-3.5" />
+              What time works best?
+            </Label>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {TIME_OF_DAY.map((period) => (
+                <button
+                  key={period.value}
+                  type="button"
+                  onClick={() => onChange({
+                    timeOfDay: period.value,
+                    startTime: TIME_SLOTS[period.value]?.[0]?.value ?? "19:00",
+                  })}
+                  className={cn(
+                    "flex flex-col items-center gap-1 p-3 rounded-xl border transition-all",
+                    data.timeOfDay === period.value
+                      ? "border-primary bg-primary/10 text-foreground shadow-sm"
+                      : "border-border bg-card text-foreground hover:border-primary/40"
+                  )}
+                >
+                  <span className="text-lg">{period.emoji}</span>
+                  <span className="text-xs font-medium truncate w-full text-center">{period.label}</span>
+                  {period.time && (
+                    <span className="text-[10px] text-muted-foreground">{period.time}</span>
+                  )}
+                </button>
               ))}
-            </SelectContent>
-          </Select>
+            </div>
+            {data.timeOfDay && TIME_SLOTS[data.timeOfDay] && (
+              <div className="flex flex-wrap gap-2 pt-1">
+                {TIME_SLOTS[data.timeOfDay].map((slot) => (
+                  <button
+                    key={slot.value}
+                    type="button"
+                    onClick={() => onChange({ startTime: slot.value })}
+                    className={cn(
+                      "px-3 py-1.5 rounded-full text-sm font-medium transition-all",
+                      data.startTime === slot.value
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-card border border-border text-foreground hover:border-primary/50"
+                    )}
+                  >
+                    {slot.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
         <p className="text-xs text-muted-foreground">
-          This helps us find venues that are open and make time-appropriate suggestions.
+          Pick your preferred time — we'll find venues that are open and plan accordingly.
         </p>
       </div>
 
@@ -203,7 +245,7 @@ const Step1Location = ({ data, onChange }: Step1Props) => {
                   className={`flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-2 rounded-lg border text-xs sm:text-sm transition-all min-h-[40px] ${
                     data.userIdentity === option.value
                       ? "border-primary bg-primary/10 text-foreground"
-                      : "border-border bg-background text-muted-foreground hover:border-primary/50"
+                      : "border-border bg-card text-foreground hover:border-primary/50"
                   }`}
                 >
                   <span className="text-sm sm:text-base">{option.emoji}</span>
@@ -228,7 +270,7 @@ const Step1Location = ({ data, onChange }: Step1Props) => {
                     className={`flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-2 rounded-lg border text-xs sm:text-sm transition-all min-h-[40px] ${
                       data.partnerIdentity === option.value
                         ? "border-primary bg-primary/10 text-foreground"
-                        : "border-border bg-background text-muted-foreground hover:border-primary/50"
+                        : "border-border bg-card text-foreground hover:border-primary/50"
                     }`}
                   >
                     <span className="text-sm sm:text-base">{option.emoji}</span>

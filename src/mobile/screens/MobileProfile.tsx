@@ -33,7 +33,7 @@ const MobileProfile = ({ onNavigate }: MobileProfileProps) => {
             </span>
           </div>
 
-          <h1 className="text-xl font-bold mb-1">
+          <h1 className="text-[2.5rem] font-bold font-tangerine mb-1 text-primary">
             {firstName.charAt(0).toUpperCase() + firstName.slice(1)}
           </h1>
           <p className="text-muted-foreground text-sm">{user?.email}</p>
@@ -76,13 +76,13 @@ const MobileProfile = ({ onNavigate }: MobileProfileProps) => {
               icon={<Bell className="w-5 h-5 text-blue-500" />}
               label="Notifications"
               description="Reminders & alerts"
-              onClick={() => {}}
+              onClick={() => onNavigate("notifications")}
             />
             <MenuItem
               icon={<Moon className="w-5 h-5 text-purple-500" />}
               label="Appearance"
               description="Dark mode, themes"
-              onClick={() => {}}
+              onClick={() => onNavigate("settings")}
             />
           </div>
         </div>
@@ -96,17 +96,17 @@ const MobileProfile = ({ onNavigate }: MobileProfileProps) => {
               label="Subscription"
               description="Free plan"
               badge="Upgrade"
-              onClick={() => {}}
+              onClick={() => onNavigate("settings")}
             />
             <MenuItem
               icon={<Shield className="w-5 h-5 text-amber-500" />}
               label="Privacy & Security"
-              onClick={() => {}}
+              onClick={() => onNavigate("settings")}
             />
             <MenuItem
               icon={<User className="w-5 h-5 text-gray-500" />}
               label="Account Settings"
-              onClick={() => {}}
+              onClick={() => onNavigate("settings")}
             />
           </div>
         </div>
@@ -118,17 +118,27 @@ const MobileProfile = ({ onNavigate }: MobileProfileProps) => {
             <MenuItem
               icon={<Star className="w-5 h-5 text-amber-500" />}
               label="Rate the App"
-              onClick={() => {}}
+              onClick={() => onNavigate("help")}
             />
             <MenuItem
               icon={<Share2 className="w-5 h-5 text-blue-500" />}
               label="Share with Friends"
-              onClick={() => {}}
+              onClick={() => {
+                if (typeof navigator !== "undefined" && navigator.share) {
+                  navigator.share({
+                    title: "Your Date Genie",
+                    text: "Plan magical dates in seconds with Your Date Genie!",
+                    url: window.location.origin,
+                  }).catch(() => {});
+                } else {
+                  navigator.clipboard?.writeText(window.location.origin);
+                }
+              }}
             />
             <MenuItem
               icon={<HelpCircle className="w-5 h-5 text-green-500" />}
               label="Help & FAQ"
-              onClick={() => {}}
+              onClick={() => onNavigate("help")}
             />
           </div>
         </div>
