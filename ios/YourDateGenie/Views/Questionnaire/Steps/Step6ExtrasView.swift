@@ -2,10 +2,52 @@ import SwiftUI
 
 struct Step6ExtrasView: View {
     @Binding var data: QuestionnaireData
+    var isPreferencesOnly: Bool = false
     
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 24) {
+                // You & partner (gender) – saved in settings
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("You & your partner")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(Color.luxuryCream)
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Your gender")
+                            .font(Font.inter(14, weight: .medium))
+                            .foregroundColor(Color.luxuryMuted)
+                        FlowLayout(spacing: 8) {
+                            ForEach(PreferenceOptions.genderOptions, id: \.value) { option in
+                                ChipOptionView(
+                                    item: option,
+                                    isSelected: data.userGender == option.value,
+                                    onTap: { data.userGender = option.value }
+                                )
+                            }
+                        }
+                    }
+                    .padding(16)
+                    .background(Color.luxuryMaroonLight.opacity(0.6))
+                    .cornerRadius(12)
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Partner's gender")
+                            .font(Font.inter(14, weight: .medium))
+                            .foregroundColor(Color.luxuryMuted)
+                        FlowLayout(spacing: 8) {
+                            ForEach(PreferenceOptions.genderOptions, id: \.value) { option in
+                                ChipOptionView(
+                                    item: option,
+                                    isSelected: data.partnerGender == option.value,
+                                    onTap: { data.partnerGender = option.value }
+                                )
+                            }
+                        }
+                    }
+                    .padding(16)
+                    .background(Color.luxuryMaroonLight.opacity(0.6))
+                    .cornerRadius(12)
+                }
+                
                 // Info banner
                 HStack(spacing: 12) {
                     Image(systemName: "sparkles")
@@ -40,11 +82,17 @@ struct Step6ExtrasView: View {
                     .cornerRadius(12)
                     
                     if data.wantGiftSuggestions {
+                        // Luxe gift-with-bow unwrap animation
+                        GiftUnwrapView()
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 8)
+                        
                         // Partner Interests
                         VStack(alignment: .leading, spacing: 8) {
                             Text("What are they into?")
-                                .font(Font.inter(14, weight: .medium))
-                                .foregroundColor(Color.luxuryCream)
+                                .font(Font.tangerine(22, weight: .bold))
+                                .italic()
+                                .foregroundColor(Color.luxuryGold)
                             
                             FlowLayout(spacing: 8) {
                                 ForEach(QuestionnaireOptions.partnerInterests) { interest in
@@ -89,8 +137,9 @@ struct Step6ExtrasView: View {
                         // Relationship Stage
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Relationship stage")
-                                .font(Font.inter(14, weight: .medium))
-                                .foregroundColor(Color.luxuryCream)
+                                .font(Font.tangerine(22, weight: .bold))
+                                .italic()
+                                .foregroundColor(Color.luxuryGold)
                             
                             FlowLayout(spacing: 8) {
                                 ForEach(QuestionnaireOptions.relationshipStages) { stage in
@@ -109,8 +158,9 @@ struct Step6ExtrasView: View {
                         // Conversation Topics
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Topics you'd like to explore")
-                                .font(Font.inter(14, weight: .medium))
-                                .foregroundColor(Color.luxuryCream)
+                                .font(Font.tangerine(22, weight: .bold))
+                                .italic()
+                                .foregroundColor(Color.luxuryGold)
                             
                             FlowLayout(spacing: 8) {
                                 ForEach(QuestionnaireOptions.conversationTopics) { topic in
@@ -132,13 +182,21 @@ struct Step6ExtrasView: View {
                 
                 // Summary card
                 VStack(alignment: .leading, spacing: 12) {
-                    Text("✨ Ready to create your plan!")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(Color.luxuryGold)
-                    
-                    Text("Tap 'Create Plan' below and we'll generate a personalized date itinerary based on everything you've told us.")
-                        .font(.system(size: 14))
-                        .foregroundColor(Color.luxuryMuted)
+                    if isPreferencesOnly {
+                        Text("Save your preferences")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(Color.luxuryGold)
+                        Text("Tap 'Save preferences' below. No date plan will be generated.")
+                            .font(.system(size: 14))
+                            .foregroundColor(Color.luxuryMuted)
+                    } else {
+                        Text("✨ Ready to create your plan!")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(Color.luxuryGold)
+                        Text("Tap 'Create Plan' below and we'll generate a personalized date itinerary based on everything you've told us.")
+                            .font(.system(size: 14))
+                            .foregroundColor(Color.luxuryMuted)
+                    }
                 }
                 .padding(16)
                 .frame(maxWidth: .infinity, alignment: .leading)

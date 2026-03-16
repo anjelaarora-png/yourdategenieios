@@ -23,6 +23,7 @@ import RouteMap from "@/components/map/RouteMap";
 import PartnerShareDialog from "@/components/sharing/PartnerShareDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useSavedGifts } from "@/hooks/useSavedGifts";
+import type { QuestionnaireData } from "@/components/questionnaire/types";
 
 interface DatePlanResultProps {
   open: boolean;
@@ -44,6 +45,8 @@ interface DatePlanResultProps {
   onNavigateToGifts?: () => void;
   /** Transportation mode from questionnaire (drive, transit, walk, etc.) for route map and "Open Full Route" */
   transportationMode?: string;
+  /** Questionnaire data used to generate plans; passed so "Get More Gifts" can use full preferences */
+  questionnaireDataForGifts?: QuestionnaireData | null;
 }
 
 const DatePlanResult = ({ 
@@ -65,6 +68,7 @@ const DatePlanResult = ({
   onUpdatePlanGifts,
   onNavigateToGifts,
   transportationMode,
+  questionnaireDataForGifts,
 }: DatePlanResultProps) => {
   
   const { toast } = useToast();
@@ -82,10 +86,15 @@ const DatePlanResult = ({
     placeId?: string;
     address?: string;
     phoneNumber?: string;
+    bookingUrl?: string;
+    reservationPlatform?: 'opentable' | 'resy' | string;
+    websiteUrl?: string;
+    openingHours?: string[];
   } | null>(null);
 
   const plan = plans?.[selectedIndex];
-  const hasAnyStops = plan?.stops && plan.stops.length > 0;
+  const itineraryStops = (plan?.stops || []).filter((s) => s.venueType !== "Starting point" && s.name !== "Your location");
+  const hasAnyStops = itineraryStops.length > 0;
   const hasUnsavedPlans = !areAllSaved && !isSaved && !isViewingMode;
 
   // #region agent log
@@ -113,6 +122,10 @@ const DatePlanResult = ({
     placeId?: string;
     address?: string;
     phoneNumber?: string;
+    bookingUrl?: string;
+    reservationPlatform?: 'opentable' | 'resy' | string;
+    websiteUrl?: string;
+    openingHours?: string[];
   }) => {
     setSelectedVenue({
       name: stop.name,
@@ -121,6 +134,10 @@ const DatePlanResult = ({
       placeId: stop.placeId,
       address: stop.address,
       phoneNumber: stop.phoneNumber,
+      bookingUrl: stop.bookingUrl,
+      reservationPlatform: stop.reservationPlatform,
+      websiteUrl: stop.websiteUrl,
+      openingHours: stop.openingHours,
     });
     setReservationOpen(true);
   };
@@ -130,12 +147,29 @@ const DatePlanResult = ({
     
     setIsLoadingGifts(true);
     try {
+      const q = questionnaireDataForGifts;
+      const locationStr = q?.city ? `${q.city}${q.neighborhood ? `, ${q.neighborhood}` : ""}` : undefined;
+      const loveLangs = q?.partnerLoveLanguages?.length ? q.partnerLoveLanguages : q?.userLoveLanguages?.length ? q.userLoveLanguages : undefined;
       const { data, error } = await supabase.functions.invoke("generate-more-gifts", {
         body: {
           planTitle: plan.title,
-          occasion: plan.tagline,
+          occasion: q?.occasion || plan.tagline,
           existingGifts: plan.giftSuggestions || [],
           purchasedGiftNames: purchasedGiftNames.length > 0 ? purchasedGiftNames : undefined,
+          partnerInterests: q?.partnerInterests?.length ? q.partnerInterests : undefined,
+          giftBudget: q?.giftBudget || undefined,
+          giftRecipient: q?.giftRecipient || undefined,
+          location: locationStr || undefined,
+          city: q?.city || undefined,
+          country: undefined,
+          loveLanguages: loveLangs?.length ? loveLangs : undefined,
+          relationshipStage: q?.relationshipStage || undefined,
+          recipientIdentity: q?.partnerIdentity || undefined,
+          giftStyle: q?.giftStyle?.length ? q.giftStyle : undefined,
+          favoriteBrandsOrStores: q?.favoriteBrandsOrStores || undefined,
+          recipientSizes: q?.recipientSizes || undefined,
+          interests: q?.partnerInterests?.length ? q.partnerInterests.join(", ") : undefined,
+          partnerDescription: q?.giftRecipientNotes || undefined,
         },
       });
 
@@ -229,6 +263,7 @@ const DatePlanResult = ({
                   plan={plan} 
                   onMakeReservation={handleMakeReservation} 
                   onGetMoreGifts={onUpdatePlanGifts ? handleGetMoreGifts : undefined}
+                  transportationMode={transportationMode}
                 />
 
                 {/* Route Map Section - Only visible when toggled on */}
@@ -239,10 +274,10 @@ const DatePlanResult = ({
                       Your Route
                     </h3>
                     
-                    {/* Stops Summary List - Numbered 1, 2, 3... */}
+                    {/* Stops Summary List - Itinerary only (1, 2, 3...), no starting point */}
                     <div className="bg-muted/50 rounded-lg p-4 mb-4">
                       <div className="flex flex-col gap-3">
-                        {plan.stops.map((stop, index) => (
+                        {(plan.stops || []).filter((s) => s.venueType !== "Starting point" && s.name !== "Your location").map((stop, index) => (
                           <div key={index} className="flex items-start gap-3">
                             <div className="w-7 h-7 rounded-full bg-primary flex items-center justify-center text-sm text-primary-foreground font-bold shrink-0 mt-0.5">
                               {index + 1}
@@ -265,22 +300,21 @@ const DatePlanResult = ({
                       </div>
                     </div>
 
-                    {/* Google Maps Button with all stops - use coordinates when available so route starts at your location */}
+                    {/* Google Maps Button - origin = starting point when set, else first stop */}
                     <Button
                       variant="default"
                       className="w-full gap-2 gradient-gold text-primary-foreground hover:opacity-90 mb-4"
                       onClick={() => {
-                        const stops = plan.stops || [];
+                        const stops = (plan.stops || []).filter((s) => s.venueType !== "Starting point" && s.name !== "Your location");
                         if (stops.length === 0) return;
-                        const originStop = stops[0];
-                        const destStop = stops[stops.length - 1];
-                        const wayStops = stops.length > 2 ? stops.slice(1, -1) : [];
-                        // Prefer lat/lng so route always starts at the right place (e.g. "Your location"); avoid address parsing that can show wrong city
-                        const hasCoord = (s: typeof originStop) =>
+                        const start = plan.startingPoint;
+                        const hasCoord = (s: { latitude?: number; longitude?: number; placeId?: string; address?: string; name?: string }) =>
                           typeof s.latitude === "number" && typeof s.longitude === "number" && Number.isFinite(s.latitude) && Number.isFinite(s.longitude);
-                        const toParam = (s: typeof originStop) =>
-                          s.placeId ? `place_id:${s.placeId}` : hasCoord(s) ? `${s.latitude},${s.longitude}` : encodeURIComponent(s.address || s.name || "");
-                        const origin = toParam(originStop);
+                        const toParam = (s: { latitude?: number; longitude?: number; placeId?: string; address?: string; name?: string }) =>
+                          (s as { placeId?: string }).placeId ? `place_id:${(s as { placeId: string }).placeId}` : hasCoord(s) ? `${s.latitude},${s.longitude}` : encodeURIComponent((s.address || s.name) || "");
+                        const origin = start && hasCoord(start) ? `${start.latitude},${start.longitude}` : toParam(stops[0]);
+                        const destStop = stops[stops.length - 1];
+                        const wayStops = start ? stops.slice(0, -1) : (stops.length > 2 ? stops.slice(1, -1) : []);
                         const destination = toParam(destStop);
                         const waypoints = wayStops.map(toParam).join("|");
                         const getTravelMode = (mode?: string) => {
@@ -308,8 +342,13 @@ const DatePlanResult = ({
                       <ExternalLink className="w-4 h-4" />
                     </Button>
 
-                    {/* Interactive Map - use questionnaire transport mode */}
-                    <RouteMap stops={plan.stops} transportationMode={transportationMode} className="mt-2" />
+                    {/* Interactive Map - origin = starting point when set; itinerary stops only */}
+                    <RouteMap
+                      stops={(plan.stops || []).filter((s) => s.venueType !== "Starting point" && s.name !== "Your location")}
+                      startingPoint={plan.startingPoint}
+                      transportationMode={transportationMode}
+                      className="mt-2"
+                    />
                   </div>
                 )}
               </>
@@ -440,6 +479,10 @@ const DatePlanResult = ({
           placeId={selectedVenue.placeId}
           address={selectedVenue.address}
           phoneNumber={selectedVenue.phoneNumber}
+          bookingUrl={selectedVenue.bookingUrl}
+          reservationPlatform={selectedVenue.reservationPlatform}
+          websiteUrl={selectedVenue.websiteUrl}
+          openingHours={selectedVenue.openingHours}
           open={reservationOpen}
           onOpenChange={setReservationOpen}
         />

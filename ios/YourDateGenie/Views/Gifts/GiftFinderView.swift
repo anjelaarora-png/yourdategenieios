@@ -10,10 +10,23 @@ struct GiftFinderView: View {
     @State private var selectedOccasion: String = ""
     @State private var interests: String = ""
     @State private var additionalNotes: String = ""
+    @State private var selectedRecipient: String = "partner"
+    @State private var selectedGiftStyles: Set<String> = []
+    @State private var resultBudgetFilter: String = ""
+    @State private var hasPrefilledOnce = false
     @State private var isLoading = false
     @State private var gifts: [GiftSuggestion] = []
     @State private var showResults = false
     @State private var nearbyStores: [NearbyStore] = []
+    /// When true, show full-screen big gift unwrap animation; then reveal form.
+    @State private var showUnwrapAnimation = true
+    /// When true, show box-open celebration overlay (after save or bought).
+    @State private var showBoxOpenCelebration = false
+    @State private var celebrationMessage = "Gift saved!"
+    /// When non-nil, the AI gift API failed; user sees message and can retry.
+    @State private var giftLoadError: String?
+    
+    @ObservedObject private var giftStore = GiftStorageManager.shared
     
     private var effectiveLocation: String {
         if let location = dateLocation, !location.isEmpty {
@@ -23,6 +36,11 @@ struct GiftFinderView: View {
             return address
         }
         return ""
+    }
+
+    /// Location for display only: no zip/postal code (any country).
+    private var effectiveLocationDisplay: String {
+        MapURLHelper.cityStateOrRegionFromAddress(effectiveLocation.isEmpty ? nil : effectiveLocation)
     }
     
     private let occasionOptions = [
@@ -42,28 +60,70 @@ struct GiftFinderView: View {
         ("200-plus", "$200+"),
     ]
     
+    private let recipientOptions = [
+        ("partner", "Partner"),
+        ("friend", "Friend"),
+        ("family", "Family"),
+        ("other", "Other"),
+    ]
+    
+    private let styleOptions = [
+        ("luxe", "Luxe"),
+        ("casual", "Casual"),
+        ("experiences", "Experiences"),
+        ("understated", "Understated"),
+    ]
+    
+    /// Gifts filtered by result budget filter (if set).
+    private var filteredGifts: [GiftSuggestion] {
+        guard !resultBudgetFilter.isEmpty else { return gifts }
+        return gifts.filter { gift in
+            let p = gift.priceRange.lowercased()
+            switch resultBudgetFilter {
+            case "under-25": return p.contains("under")
+            case "25-50": return (p.contains("25") && p.contains("50")) || (p.contains("25") && p.contains("-"))
+            case "50-100": return (p.contains("50") && p.contains("100")) || (p.contains("50") && p.contains("-"))
+            case "100-200": return (p.contains("100") && p.contains("200")) || (p.contains("100") && p.contains("-"))
+            case "200-plus": return p.contains("200") || p.contains("+") || p.contains("300") || p.contains("over") || p.contains("luxury")
+            default: return true
+            }
+        }
+    }
+    
     var body: some View {
         NavigationStack {
             ZStack {
                 Color.luxuryMaroon
                     .ignoresSafeArea()
                 
-                ScrollView(showsIndicators: false) {
-                    VStack(spacing: 24) {
-                        headerSection
-                        
-                        if !showResults {
-                            inputFormSection
-                        } else {
-                            resultsSection
+                if showUnwrapAnimation {
+                    BigGiftUnwrapView {
+                        withAnimation(.easeInOut(duration: 0.4)) {
+                            showUnwrapAnimation = false
                         }
                     }
-                    .padding(.bottom, 40)
+                } else {
+                    ScrollView(showsIndicators: false) {
+                        VStack(spacing: 24) {
+                            headerSection
+                            
+                            if !showResults {
+                                inputFormSection
+                            } else {
+                                resultsSection
+                            }
+                        }
+                        .padding(.bottom, 40)
+                    }
                 }
             }
-            .navigationTitle("Gift Finder")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Text("Gift Finder")
+                        .font(Font.tangerine(24, weight: .bold))
+                        .foregroundColor(Color.luxuryGold)
+                }
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Close") {
                         dismiss()
@@ -74,7 +134,38 @@ struct GiftFinderView: View {
             }
             .toolbarBackground(Color.luxuryMaroon, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
+            .onAppear {
+                prefillFromProfile()
+            }
         }
+    }
+    
+    /// Pre-fill budget and interests from UserProfileManager when opening finder (only once, when form is empty).
+    private func prefillFromProfile() {
+        guard !hasPrefilledOnce else { return }
+        let prefs = UserProfileManager.shared.currentUser?.preferences
+        guard let prefs = prefs else { return }
+        if selectedBudget.isEmpty, !prefs.defaultBudget.isEmpty {
+            switch prefs.defaultBudget {
+            case "budget": selectedBudget = "25-50"
+            case "moderate": selectedBudget = "50-100"
+            case "upscale": selectedBudget = "100-200"
+            case "luxury": selectedBudget = "200-plus"
+            default: break
+            }
+        }
+        if interests.isEmpty, !prefs.favoriteActivities.isEmpty {
+            let labels = prefs.favoriteActivities.compactMap { value in
+                QuestionnaireOptions.activities.first(where: { $0.value == value })?.label
+            }
+            if !labels.isEmpty {
+                interests = labels.joined(separator: ", ")
+            }
+        }
+        if selectedOccasion.isEmpty, let title = datePlan?.title, title.lowercased().contains("date night") {
+            selectedOccasion = "date-night"
+        }
+        hasPrefilledOnce = true
     }
     
     // MARK: - Header Section
@@ -91,14 +182,20 @@ struct GiftFinderView: View {
             }
             
             Text("Find the Perfect Gift")
-                .font(Font.displayTitle())
+                .font(Font.tangerine(42, weight: .bold))
                 .foregroundColor(Color.luxuryGold)
             
             Text("Discover gifts from stores near your date")
-                .font(Font.playfair(15, weight: .regular))
+                .font(Font.bodySans(15, weight: .regular))
                 .foregroundColor(Color.luxuryCreamMuted)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 20)
+            
+            if !showResults {
+                Text("Personalized to your person and occasion")
+                    .font(Font.bodySans(15, weight: .regular))
+                    .foregroundColor(Color.luxuryCreamMuted)
+            }
             
             if let plan = datePlan {
                 dateContextBadge(plan: plan)
@@ -112,29 +209,32 @@ struct GiftFinderView: View {
             HStack(spacing: 8) {
                 Image(systemName: "sparkles")
                     .font(.system(size: 12))
+                    .foregroundColor(Color.luxuryGold)
                 Text("Your date: \(plan.title)")
-                    .font(Font.inter(12, weight: .medium))
+                    .font(Font.tangerine(18, weight: .bold))
+                    .foregroundColor(Color.luxuryGold)
             }
-            .foregroundColor(Color.luxuryGold)
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
             .background(Color.luxuryGold.opacity(0.15))
             .cornerRadius(20)
             
-            if !effectiveLocation.isEmpty {
+            if !effectiveLocationDisplay.isEmpty {
                 Button {
-                    openInAppleMaps(query: "gift shop", near: effectiveLocation)
+                    openInAppleMaps(query: "gift shop", near: effectiveLocationDisplay)
                 } label: {
                     HStack(spacing: 6) {
                         Image(systemName: "mappin.circle.fill")
                             .font(.system(size: 11))
-                        Text(effectiveLocation)
+                            .foregroundColor(Color.luxuryGold)
+                        Text(effectiveLocationDisplay)
                             .font(Font.inter(11, weight: .regular))
+                            .foregroundColor(Color.luxuryGold)
                             .lineLimit(1)
                         Image(systemName: "arrow.up.right")
                             .font(.system(size: 9))
+                            .foregroundColor(Color.luxuryGold)
                     }
-                    .foregroundColor(Color.luxuryMuted)
                 }
             }
         }
@@ -143,15 +243,39 @@ struct GiftFinderView: View {
     // MARK: - Input Form Section
     private var inputFormSection: some View {
         VStack(spacing: 24) {
+            // Who is this for?
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(spacing: 6) {
+                    Image(systemName: "person.fill")
+                        .foregroundColor(Color.luxuryGold)
+                    Text("Who is this for?")
+                        .font(Font.tangerine(28, weight: .bold))
+                        .italic()
+                        .foregroundColor(Color.luxuryGold)
+                }
+                
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 10) {
+                        ForEach(recipientOptions, id: \.0) { option in
+                            GiftBudgetChip(
+                                text: option.1,
+                                isSelected: selectedRecipient == option.0,
+                                action: { selectedRecipient = option.0 }
+                            )
+                        }
+                    }
+                }
+            }
+            .padding(.horizontal, 20)
+            
             // Occasion Selection
             VStack(alignment: .leading, spacing: 14) {
-                HStack {
+                HStack(spacing: 6) {
                     Image(systemName: "heart.fill")
                         .foregroundColor(Color.luxuryGold)
-                    Text("What's the occasion?")
-                        .font(Font.playfair(16, weight: .semibold))
-                        .foregroundColor(Color.luxuryCream)
-                    Text("*")
+                    Text("What's the occasion? *")
+                        .font(Font.tangerine(28, weight: .bold))
+                        .italic()
                         .foregroundColor(Color.luxuryGold)
                 }
                 
@@ -170,12 +294,13 @@ struct GiftFinderView: View {
             
             // Budget Selection
             VStack(alignment: .leading, spacing: 14) {
-                HStack {
+                HStack(spacing: 6) {
                     Image(systemName: "dollarsign.circle")
                         .foregroundColor(Color.luxuryGold)
-                    Text("Budget")
-                        .font(Font.playfair(16, weight: .semibold))
-                        .foregroundColor(Color.luxuryCream)
+                    Text("Your budget")
+                        .font(Font.tangerine(28, weight: .bold))
+                        .italic()
+                        .foregroundColor(Color.luxuryGold)
                 }
                 
                 ScrollView(.horizontal, showsIndicators: false) {
@@ -192,17 +317,55 @@ struct GiftFinderView: View {
             }
             .padding(.horizontal, 20)
             
+            // Style or vibe (optional)
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(spacing: 6) {
+                    Image(systemName: "sparkle")
+                        .foregroundColor(Color.luxuryGold)
+                    Text("Style or vibe (optional)")
+                        .font(Font.tangerine(28, weight: .bold))
+                        .italic()
+                        .foregroundColor(Color.luxuryGold)
+                }
+                
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 10) {
+                        ForEach(styleOptions, id: \.0) { option in
+                            Button {
+                                if selectedGiftStyles.contains(option.0) {
+                                    selectedGiftStyles.remove(option.0)
+                                } else {
+                                    selectedGiftStyles.insert(option.0)
+                                }
+                            } label: {
+                                Text(option.1)
+                                    .font(Font.inter(14, weight: .medium))
+                                    .foregroundColor(selectedGiftStyles.contains(option.0) ? Color.luxuryMaroon : Color.luxuryCream)
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 10)
+                                    .background(selectedGiftStyles.contains(option.0) ? Color.luxuryGold : Color.luxuryMaroonLight)
+                                    .cornerRadius(20)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 20)
+                                            .stroke(Color.luxuryGold.opacity(0.5), lineWidth: 1)
+                                    )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+            }
+            .padding(.horizontal, 20)
+            
             // Interests
             VStack(alignment: .leading, spacing: 10) {
-                HStack {
+                HStack(spacing: 6) {
                     Image(systemName: "sparkles")
                         .foregroundColor(Color.luxuryGold)
-                    Text("Their interests")
-                        .font(Font.playfair(16, weight: .semibold))
-                        .foregroundColor(Color.luxuryCream)
-                    Text("(optional)")
-                        .font(Font.inter(12, weight: .regular))
-                        .foregroundColor(Color.luxuryMuted)
+                    Text("Their interests (optional)")
+                        .font(Font.tangerine(28, weight: .bold))
+                        .italic()
+                        .foregroundColor(Color.luxuryGold)
                 }
                 
                 TextField("e.g., cooking, travel, photography, books...", text: $interests)
@@ -220,12 +383,13 @@ struct GiftFinderView: View {
             
             // Additional Notes
             VStack(alignment: .leading, spacing: 10) {
-                HStack {
+                HStack(spacing: 6) {
                     Image(systemName: "text.bubble")
                         .foregroundColor(Color.luxuryGold)
                     Text("Anything else we should know?")
-                        .font(Font.playfair(16, weight: .semibold))
-                        .foregroundColor(Color.luxuryCream)
+                        .font(Font.tangerine(28, weight: .bold))
+                        .italic()
+                        .foregroundColor(Color.luxuryGold)
                 }
                 
                 TextEditor(text: $additionalNotes)
@@ -266,7 +430,9 @@ struct GiftFinderView: View {
                             .tint(Color.luxuryMaroon)
                     } else {
                         Image(systemName: "sparkles")
+                            .foregroundColor(Color.luxuryGold)
                         Text("Find Gift Ideas")
+                            .font(Font.tangerine(28, weight: .bold))
                     }
                 }
                 .frame(maxWidth: .infinity)
@@ -281,15 +447,58 @@ struct GiftFinderView: View {
     // MARK: - Results Section
     private var resultsSection: some View {
         VStack(spacing: 20) {
-            // Results header
+            // API error — couldn't reach AI gift service; show message and retry
+            if let error = giftLoadError {
+                VStack(spacing: 12) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "wifi.exclamationmark")
+                            .font(.system(size: 18))
+                            .foregroundColor(Color.luxuryGold)
+                        Text("Couldn't load gift ideas from the server")
+                            .font(Font.tangerine(20, weight: .bold))
+                            .foregroundColor(Color.luxuryGold)
+                    }
+                    Text("Check your connection and tap Try again to get AI-powered suggestions.")
+                        .font(Font.inter(12, weight: .regular))
+                        .foregroundColor(Color.luxuryCreamMuted)
+                        .multilineTextAlignment(.center)
+                    Button {
+                        generateGifts()
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "arrow.clockwise")
+                            Text("Try again")
+                                .font(Font.inter(14, weight: .semibold))
+                        }
+                        .foregroundColor(Color.luxuryMaroon)
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 12)
+                        .background(Color.luxuryGold)
+                        .cornerRadius(12)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(20)
+                .frame(maxWidth: .infinity)
+                .background(Color.luxuryMaroonLight)
+                .cornerRadius(16)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(Color.luxuryGold.opacity(0.4), lineWidth: 1)
+                )
+                .padding(.horizontal, 20)
+            }
+            
+            // Results header with Refine + New Search
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("\(gifts.count) gift ideas")
-                        .font(Font.sectionTitle())
+                    Text(filteredGifts.isEmpty && giftLoadError != nil ? "Gift ideas" : "\(filteredGifts.count) gift ideas")
+                        .font(Font.tangerine(28, weight: .bold))
+                        .italic()
                         .foregroundColor(Color.luxuryGold)
                     
-                    if !effectiveLocation.isEmpty {
-                        Text("With stores near \(effectiveLocation)")
+                    if !effectiveLocationDisplay.isEmpty {
+                        Text("With stores near \(effectiveLocationDisplay)")
                             .font(Font.inter(12, weight: .regular))
                             .foregroundColor(Color.luxuryMuted)
                             .lineLimit(1)
@@ -298,39 +507,98 @@ struct GiftFinderView: View {
                 
                 Spacer()
                 
-                Button {
-                    resetSearch()
-                } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "magnifyingglass")
-                            .font(.system(size: 12))
-                        Text("New Search")
-                            .font(Font.inter(13, weight: .medium))
+                HStack(spacing: 10) {
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            showResults = false
+                        }
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "slider.horizontal.3")
+                                .font(.system(size: 12))
+                                .foregroundColor(Color.luxuryGold)
+                            Text("Refine")
+                                .font(Font.inter(13, weight: .medium))
+                        }
+                        .foregroundColor(Color.luxuryGold)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .background(Color.luxuryMaroonLight)
+                        .cornerRadius(20)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 20)
+                                .stroke(Color.luxuryGold.opacity(0.3), lineWidth: 1)
+                        )
                     }
+                    
+                    Button {
+                        resetSearch()
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "magnifyingglass")
+                                .font(.system(size: 12))
+                                .foregroundColor(Color.luxuryGold)
+                            Text("New Search")
+                                .font(Font.inter(13, weight: .medium))
+                        }
+                        .foregroundColor(Color.luxuryGold)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .background(Color.luxuryMaroonLight)
+                        .cornerRadius(20)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 20)
+                                .stroke(Color.luxuryGold.opacity(0.3), lineWidth: 1)
+                        )
+                    }
+                }
+            }
+            .padding(.horizontal, 20)
+            
+            // Result filters (budget)
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Filter by budget")
+                    .font(Font.tangerine(28, weight: .bold))
+                    .italic()
                     .foregroundColor(Color.luxuryGold)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 8)
-                    .background(Color.luxuryMaroonLight)
-                    .cornerRadius(20)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 20)
-                            .stroke(Color.luxuryGold.opacity(0.3), lineWidth: 1)
-                    )
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        FilterChip(title: "All", isSelected: resultBudgetFilter.isEmpty) {
+                            resultBudgetFilter = ""
+                        }
+                        ForEach(budgetOptions, id: \.0) { option in
+                            FilterChip(title: option.1, isSelected: resultBudgetFilter == option.0) {
+                                resultBudgetFilter = resultBudgetFilter == option.0 ? "" : option.0
+                            }
+                        }
+                    }
                 }
             }
             .padding(.horizontal, 20)
             
             // Nearby Stores Section - Opens Google Maps
-            if !nearbyStores.isEmpty && !effectiveLocation.isEmpty {
+            if !nearbyStores.isEmpty && !effectiveLocationDisplay.isEmpty {
                 nearbyStoresSection
             }
             
             // Gift cards with shop nearby buttons
             VStack(spacing: 14) {
-                ForEach(gifts) { gift in
+                ForEach(filteredGifts) { gift in
                     GiftResultCardWithMap(
                         gift: gift,
-                        location: effectiveLocation
+                        location: effectiveLocationDisplay,
+                        isSaved: giftStore.isSaved(gift),
+                        isBought: giftStore.isBought(gift),
+                        onSave: {
+                            giftStore.addSaved(gift)
+                            celebrationMessage = "Gift saved!"
+                            showBoxOpenCelebration = true
+                        },
+                        onBought: {
+                            giftStore.markAsBought(gift)
+                            celebrationMessage = "Marked as bought!"
+                            showBoxOpenCelebration = true
+                        }
                     )
                 }
             }
@@ -346,7 +614,9 @@ struct GiftFinderView: View {
                             .tint(Color.luxuryGold)
                     } else {
                         Image(systemName: "sparkles")
+                            .foregroundColor(Color.luxuryGold)
                         Text("Get More Ideas")
+                            .font(Font.tangerine(20, weight: .bold))
                     }
                 }
                 .frame(maxWidth: .infinity)
@@ -360,20 +630,21 @@ struct GiftFinderView: View {
     // MARK: - Nearby Stores Section
     private var nearbyStoresSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 8) {
+            HStack(spacing: 6) {
                 Image(systemName: "mappin.and.ellipse")
                     .font(.system(size: 14))
                     .foregroundColor(Color.luxuryGold)
                 Text("Find Stores Near Your Date")
-                    .font(Font.playfair(16, weight: .semibold))
-                    .foregroundColor(Color.luxuryCream)
+                    .font(Font.tangerine(28, weight: .bold))
+                    .italic()
+                    .foregroundColor(Color.luxuryGold)
             }
             .padding(.horizontal, 20)
             
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 12) {
                     ForEach(nearbyStores) { store in
-                        NearbyStoreCard(store: store, location: effectiveLocation)
+                        NearbyStoreCard(store: store, location: effectiveLocationDisplay)
                     }
                 }
                 .padding(.horizontal, 20)
@@ -381,17 +652,19 @@ struct GiftFinderView: View {
             
             // View all on map button
             Button {
-                openInAppleMaps(query: "gift shop", near: effectiveLocation)
+                openInAppleMaps(query: "gift shop", near: effectiveLocationDisplay)
             } label: {
                 HStack(spacing: 8) {
                     Image(systemName: "map.fill")
                         .font(.system(size: 14))
+                        .foregroundColor(Color.luxuryGold)
                     Text("View All Gift Shops on Map")
-                        .font(Font.inter(14, weight: .semibold))
+                        .font(Font.tangerine(22, weight: .bold))
+                        .foregroundColor(Color.luxuryGold)
                     Image(systemName: "arrow.up.right")
                         .font(.system(size: 12))
+                        .foregroundColor(Color.luxuryGold)
                 }
-                .foregroundColor(Color.luxuryGold)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 14)
                 .background(Color.luxuryMaroonLight)
@@ -407,20 +680,68 @@ struct GiftFinderView: View {
     
     // MARK: - Functions
     private func generateGifts() {
+        giftLoadError = nil
         isLoading = true
+        let occasion = selectedOccasion
+        let budget = selectedBudget
+        let interestsText = interests
+        let notesText = additionalNotes
+        let loc = effectiveLocation
+        let planTitle: String? = {
+            if let title = datePlan?.title, !title.isEmpty { return title }
+            if occasion.isEmpty { return nil }
+            let label = occasionOptions.first(where: { $0.0 == occasion })?.1 ?? occasion
+            return "Gift Ideas for \(label)"
+        }()
+        let recipient = selectedRecipient
+        let style = selectedGiftStyles.isEmpty ? nil : Array(selectedGiftStyles)
         
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5, execute: {
-            if let plan = self.datePlan {
-                self.gifts = self.generateContextualGifts(for: plan)
-            } else {
-                self.gifts = self.generateSampleGifts()
+        var existingNames = gifts.map(\.name)
+        let boughtNames = giftStore.purchasedGiftNames
+        existingNames = Array(Set(existingNames + boughtNames))
+        let planForFallback = datePlan
+        Task {
+            do {
+                let result: [GiftSuggestion]
+                if Config.isOpenAIConfigured {
+                    result = try await GiftAIService.generateGifts(
+                        occasion: occasion.isEmpty ? "just because" : occasion,
+                        budget: budget.isEmpty ? "any" : budget,
+                        interests: interestsText,
+                        notes: notesText,
+                        location: loc,
+                        planTitle: planTitle,
+                        existingGiftNames: existingNames,
+                        recipient: recipient.isEmpty ? nil : recipient,
+                        giftStyle: style,
+                        count: 6
+                    )
+                } else {
+                    let fallback: [GiftSuggestion] = planForFallback.map { generateContextualGifts(for: $0) } ?? generateSampleGifts()
+                    await MainActor.run {
+                        self.gifts = fallback.shuffled()
+                        self.nearbyStores = self.generateNearbyStores()
+                        self.giftLoadError = "Add OPENAI_API_KEY in Secrets for AI-powered gift ideas."
+                        self.isLoading = false
+                        withAnimation(.spring(response: 0.5)) { self.showResults = true }
+                    }
+                    return
+                }
+                await MainActor.run {
+                    self.gifts = result
+                    self.nearbyStores = self.generateNearbyStores()
+                    self.giftLoadError = nil
+                    self.isLoading = false
+                    withAnimation(.spring(response: 0.5)) { self.showResults = true }
+                }
+            } catch {
+                await MainActor.run {
+                    self.giftLoadError = error.localizedDescription
+                    self.isLoading = false
+                    withAnimation(.spring(response: 0.5)) { self.showResults = true }
+                }
             }
-            self.nearbyStores = self.generateNearbyStores()
-            self.isLoading = false
-            withAnimation(.spring(response: 0.5)) {
-                self.showResults = true
-            }
-        })
+        }
     }
     
     private func resetSearch() {
@@ -428,6 +749,7 @@ struct GiftFinderView: View {
             showResults = false
             gifts = []
             nearbyStores = []
+            giftLoadError = nil
         }
     }
     
@@ -778,6 +1100,30 @@ struct GiftBudgetChip: View {
     }
 }
 
+// MARK: - Filter Chip (results budget filter)
+private struct FilterChip: View {
+    let title: String
+    let isSelected: Bool
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            Text(title)
+                .font(Font.inter(12, weight: isSelected ? .semibold : .regular))
+                .foregroundColor(isSelected ? Color.luxuryMaroon : Color.luxuryCreamMuted)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+                .background(isSelected ? Color.luxuryGold : Color.luxuryMaroonLight)
+                .cornerRadius(16)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(Color.luxuryGold.opacity(isSelected ? 0 : 0.4), lineWidth: 1)
+                )
+        }
+        .buttonStyle(.plain)
+    }
+}
+
 // MARK: - Nearby Store Card
 struct NearbyStoreCard: View {
     let store: NearbyStore
@@ -823,10 +1169,12 @@ struct NearbyStoreCard: View {
                 HStack(spacing: 4) {
                     Image(systemName: "map.fill")
                         .font(.system(size: 10))
+                        .foregroundColor(Color.luxuryGold)
                     Text("Find on Google Maps")
                         .font(Font.inter(11, weight: .semibold))
                     Image(systemName: "arrow.up.right")
                         .font(.system(size: 9))
+                        .foregroundColor(Color.luxuryGold)
                 }
                 .foregroundColor(Color.luxuryGold)
             }
@@ -854,6 +1202,16 @@ struct NearbyStoreCard: View {
 struct GiftResultCardWithMap: View {
     let gift: GiftSuggestion
     let location: String
+    var isSaved: Bool = false
+    var isBought: Bool = false
+    var onSave: (() -> Void)?
+    var onBought: (() -> Void)?
+    
+    private var hasValidPurchaseURL: Bool {
+        guard let s = gift.purchaseUrl, !s.isEmpty,
+              let url = URL(string: s) else { return false }
+        return url.scheme == "http" || url.scheme == "https"
+    }
     
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -871,18 +1229,28 @@ struct GiftResultCardWithMap: View {
                 VStack(alignment: .leading, spacing: 6) {
                     HStack {
                         Text(gift.name)
-                            .font(Font.playfair(17, weight: .semibold))
+                            .font(Font.bodySans(17, weight: .semibold))
                             .foregroundColor(Color.luxuryCream)
                         
                         Spacer()
                         
-                        Text(gift.priceRange)
-                            .font(Font.inter(11, weight: .semibold))
-                            .foregroundColor(Color.luxuryGold)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 5)
-                            .background(Color.luxuryGold.opacity(0.15))
-                            .cornerRadius(8)
+                        if isBought {
+                            Text("Bought")
+                                .font(Font.inter(10, weight: .semibold))
+                                .foregroundColor(Color.luxuryMaroon)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(Color.luxuryGold)
+                                .cornerRadius(6)
+                        } else {
+                            Text(gift.priceRange)
+                                .font(Font.inter(11, weight: .semibold))
+                                .foregroundColor(Color.luxuryGold)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 5)
+                                .background(Color.luxuryGold.opacity(0.15))
+                                .cornerRadius(8)
+                        }
                     }
                     
                     Text(gift.description)
@@ -895,7 +1263,7 @@ struct GiftResultCardWithMap: View {
             HStack(spacing: 8) {
                 Image(systemName: "heart.fill")
                     .font(.system(size: 10))
-                    .foregroundColor(Color.luxuryGoldLight)
+                    .foregroundColor(Color.luxuryGold)
                 Text(gift.whyItFits)
                     .font(Font.playfairItalic(13))
                     .foregroundColor(Color.luxuryGoldLight)
@@ -905,15 +1273,35 @@ struct GiftResultCardWithMap: View {
             .background(Color.luxuryGold.opacity(0.1))
             .cornerRadius(10)
             
-            // Action buttons
+            // Row 1: Save, Find Nearby
             HStack(spacing: 10) {
-                // Find Nearby button - Opens Google Maps
+                if let onSave = onSave {
+                    Button {
+                        onSave()
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: isSaved ? "heart.fill" : "heart.fill")
+                                .font(.system(size: 12))
+                                .foregroundColor(Color.luxuryGold)
+                            Text(isSaved ? "Saved" : "Save")
+                                .font(Font.inter(13, weight: .semibold))
+                        }
+                        .foregroundColor(isSaved ? Color.luxuryCreamMuted : Color.luxuryMaroon)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(isSaved ? Color.luxuryMaroonLight.opacity(0.6) : Color.luxuryCream.opacity(0.9))
+                        .cornerRadius(10)
+                    }
+                    .disabled(isSaved)
+                }
+                
                 Button {
                     openStoreNearby()
                 } label: {
                     HStack(spacing: 6) {
                         Image(systemName: "mappin.circle.fill")
                             .font(.system(size: 13))
+                            .foregroundColor(Color.luxuryGold)
                         Text("Find Nearby")
                             .font(Font.inter(13, weight: .semibold))
                     }
@@ -927,43 +1315,76 @@ struct GiftResultCardWithMap: View {
                             .stroke(Color.luxuryGold.opacity(0.4), lineWidth: 1)
                     )
                 }
+            }
+            
+            // Row 2: Shop Online, Get new link, Bought
+            HStack(spacing: 10) {
+                Button {
+                    if hasValidPurchaseURL, let url = URL(string: gift.purchaseUrl!) {
+                        UIApplication.shared.open(url)
+                    } else {
+                        openSearchLink()
+                    }
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "cart.fill")
+                            .font(.system(size: 12))
+                        Text("Shop Online")
+                            .font(Font.inter(13, weight: .semibold))
+                    }
+                    .foregroundColor(Color.luxuryMaroon)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(LinearGradient.goldShimmer)
+                    .cornerRadius(10)
+                }
                 
-                // Shop Online button (if available)
-                if let purchaseUrl = gift.purchaseUrl, !purchaseUrl.isEmpty {
+                Button {
+                    openSearchLink()
+                } label: {
+                    HStack(spacing: 5) {
+                        Image(systemName: "link")
+                            .font(.system(size: 11))
+                            .foregroundColor(Color.luxuryGold)
+                        Text("New link")
+                            .font(Font.inter(12, weight: .semibold))
+                    }
+                    .foregroundColor(Color.luxuryGold)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(Color.clear)
+                    .cornerRadius(10)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                            .stroke(Color.luxuryGold.opacity(0.5), lineWidth: 1)
+                    )
+                }
+                
+                if let onBought = onBought {
                     Button {
-                        if let url = URL(string: purchaseUrl) {
-                            UIApplication.shared.open(url)
-                        }
+                        onBought()
                     } label: {
                         HStack(spacing: 6) {
-                            Image(systemName: "cart.fill")
+                            Image(systemName: "checkmark.circle.fill")
                                 .font(.system(size: 12))
-                            Text("Shop Online")
+                            Text(isBought ? "Bought" : "Bought")
                                 .font(Font.inter(13, weight: .semibold))
                         }
                         .foregroundColor(Color.luxuryMaroon)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 12)
-                        .background(LinearGradient.goldShimmer)
+                        .background(
+                            Group {
+                                if isBought {
+                                    Color.luxuryCreamMuted.opacity(0.5)
+                                } else {
+                                    LinearGradient.goldShimmer
+                                }
+                            }
+                        )
                         .cornerRadius(10)
                     }
-                } else {
-                    // Google Shopping fallback
-                    Button {
-                        openGoogleShopping()
-                    } label: {
-                        HStack(spacing: 6) {
-                            Image(systemName: "cart.fill")
-                                .font(.system(size: 12))
-                            Text("Shop Online")
-                                .font(Font.inter(13, weight: .semibold))
-                        }
-                        .foregroundColor(Color.luxuryMaroon)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 12)
-                        .background(LinearGradient.goldShimmer)
-                        .cornerRadius(10)
-                    }
+                    .disabled(isBought)
                 }
             }
         }
@@ -979,9 +1400,10 @@ struct GiftResultCardWithMap: View {
         }
     }
     
-    private func openGoogleShopping() {
-        let searchQuery = gift.name.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? gift.name
-        if let url = URL(string: "https://www.google.com/search?tbm=shop&q=\(searchQuery)") {
+    /// Opens a search (Google Shopping) for the gift name — "Get new link" / alternative purchase option.
+    private func openSearchLink() {
+        let query = gift.name.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? gift.name
+        if let url = URL(string: "https://www.google.com/search?tbm=shop&q=\(query)") {
             UIApplication.shared.open(url)
         }
     }

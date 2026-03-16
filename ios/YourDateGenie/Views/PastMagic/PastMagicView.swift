@@ -1,6 +1,6 @@
 import SwiftUI
 
-// MARK: - Past Magic (dates that have already taken place)
+// MARK: - Past Dates (dates that have already taken place)
 struct PastMagicView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var coordinator: NavigationCoordinator
@@ -33,7 +33,7 @@ struct PastMagicView: View {
                     }
                 }
             }
-            .navigationTitle("Past Magic")
+            .navigationTitle("Past Dates")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(Color.luxuryMaroon, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
@@ -77,7 +77,7 @@ struct PastMagicView: View {
     }
 }
 
-// MARK: - Past Magic Card
+// MARK: - Past Dates Card
 private struct PastMagicCard: View {
     let plan: DatePlan
     let onTap: () -> Void
@@ -103,7 +103,7 @@ private struct PastMagicCard: View {
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(plan.title)
-                        .font(Font.header(15, weight: .bold))
+                        .font(Font.bodySans(14, weight: .semibold))
                         .foregroundColor(Color.luxuryCream)
                         .lineLimit(2)
                     Text("\(plan.stops.count) stops · \(plan.totalDuration)")

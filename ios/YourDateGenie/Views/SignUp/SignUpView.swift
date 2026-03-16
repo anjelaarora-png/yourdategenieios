@@ -58,17 +58,23 @@ struct SignUpView: View {
                 .aspectRatio(contentMode: .fit)
                 .frame(width: 100, height: 100)
             
-            HStack(spacing: 4) {
-                Text("Create your account to start planning")
-                    .font(Font.bodySans(14, weight: .regular))
-                    .foregroundColor(Color.luxuryCreamMuted)
-                Text("magical")
-                    .font(Font.tangerine(26, weight: .bold))
+            VStack(spacing: 8) {
+                Text("Create Your Account")
+                    .font(Font.tangerine(34, weight: .bold))
                     .italic()
                     .foregroundColor(Color.luxuryGold)
-                Text("dates")
-                    .font(Font.bodySans(14, weight: .regular))
-                    .foregroundColor(Color.luxuryCreamMuted)
+                HStack(spacing: 4) {
+                    Text("to start planning ")
+                        .font(Font.bodySans(14, weight: .regular))
+                        .foregroundColor(Color.luxuryCreamMuted)
+                    Text("magical")
+                        .font(Font.tangerine(26, weight: .bold))
+                        .italic()
+                        .foregroundColor(Color.luxuryGold)
+                    Text(" dates")
+                        .font(Font.bodySans(14, weight: .regular))
+                        .foregroundColor(Color.luxuryCreamMuted)
+                }
             }
             .multilineTextAlignment(.center)
         }

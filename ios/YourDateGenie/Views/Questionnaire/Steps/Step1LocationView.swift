@@ -16,11 +16,21 @@ struct Step1LocationView: View {
                         mode: .city
                     )
                     
-                    PlacesAutocompleteField(
-                        placeholder: "Starting point (optional)",
-                        text: $data.startingAddress,
-                        mode: .address
-                    )
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Where are you leaving from?")
+                            .font(Font.bodySans(13, weight: .medium))
+                            .foregroundColor(Color.luxuryMuted)
+                        PlacesAutocompleteField(
+                            placeholder: "Your starting address (required)",
+                            text: $data.startingAddress,
+                            mode: .address
+                        )
+                        if data.startingAddress.isEmpty {
+                            Text("Required for your route and map")
+                                .font(Font.inter(11, weight: .regular))
+                                .foregroundColor(Color.luxuryGold.opacity(0.9))
+                        }
+                    }
                 }
                 
                 // Date Type
@@ -91,7 +101,8 @@ struct Step1LocationView: View {
                     // Part of day + time — one seamless selection
                     VStack(alignment: .leading, spacing: 14) {
                         Text("What time works best?")
-                            .font(Font.inter(14, weight: .medium))
+                            .font(Font.tangerine(22, weight: .bold))
+                            .italic()
                             .foregroundColor(Color.luxuryGold)
                         
                         // Period cards (Morning / Afternoon / Evening / Late Night)
@@ -136,6 +147,7 @@ struct Step1LocationView: View {
             }
             .padding(20)
         }
+        .scrollDismissesKeyboard(.interactively)
         .onAppear {
             if data.timeOfDay.isEmpty {
                 data.timeOfDay = "evening"

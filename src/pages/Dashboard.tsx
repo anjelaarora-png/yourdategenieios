@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, LogOut, Map, History, Camera, Gift, MessageCircle, Shield, Settings, Music } from "lucide-react";
+import { Plus, LogOut, Map, History, Camera, Gift, MessageCircle, Shield, Settings, Music, BookOpen } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
@@ -24,7 +24,9 @@ import GiftSuggestionsList from "@/components/datePlan/GiftSuggestionsList";
 import ConversationStartersList from "@/components/datePlan/ConversationStartersList";
 import PlaylistCollection from "@/components/playlist/PlaylistCollection";
 import SaveTheDateDialog from "@/components/datePlan/SaveTheDateDialog";
+import PlaybookView from "@/components/playbook/PlaybookView";
 import { ErrorBoundary, SectionFallback } from "@/components/ui/error-boundary";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 
 const Dashboard = () => {
   const { user, loading: authLoading, signOut } = useAuth();
@@ -66,6 +68,7 @@ const Dashboard = () => {
   const [saveTheDateOpen, setSaveTheDateOpen] = useState(false);
   const [lastSavedPlan, setLastSavedPlan] = useState<typeof datePlans[0] | null>(null);
   const [activeTab, setActiveTab] = useState("history");
+  const [playbookOpen, setPlaybookOpen] = useState(false);
 
   // Redirect if not authenticated
   if (!authLoading && !user) {
@@ -74,13 +77,15 @@ const Dashboard = () => {
   }
 
   const handleQuestionnaireSubmit = async (data: QuestionnaireData) => {
-    
     setSavedPreferences(data);
     setQuestionnaireOpen(false);
-    savePreferences(data);
     setSavedPlanIds(new Set());
     setAllPlansSaved(false);
-    
+
+    // Save preferences from the questionnaire first (no date plan generation here)
+    await savePreferences(data);
+
+    // Then generate date plans
     const generatedPlans = await generatePlans(data);
     if (generatedPlans && generatedPlans.length > 0) {
       setResultOpen(true);
@@ -204,6 +209,26 @@ const Dashboard = () => {
             </div>
           )}
 
+          {/* Magical Tools */}
+          <section className="mb-6">
+            <h2 className="font-display text-lg sm:text-xl text-foreground mb-3">Magical Tools</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              <button
+                type="button"
+                onClick={() => setPlaybookOpen(true)}
+                className="flex items-center gap-3 p-4 rounded-lg border border-border bg-card text-card-foreground shadow-sm hover:bg-accent/50 hover:border-primary/30 transition-colors text-left"
+              >
+                <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center shrink-0">
+                  <BookOpen className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <p className="font-semibold text-foreground">The Playbook</p>
+                  <p className="text-xs text-muted-foreground">Opinionated date advice for your situation</p>
+                </div>
+              </button>
+            </div>
+          </section>
+
           <div className="flex items-center justify-between mb-4 sm:mb-6 gap-2">
             <h1 className="font-display text-2xl sm:text-3xl">Your Date Plans</h1>
             <Button className="gradient-gold text-primary-foreground text-sm sm:text-base" onClick={() => setQuestionnaireOpen(true)} size="sm">
@@ -305,6 +330,10 @@ const Dashboard = () => {
         onOpenChange={setQuestionnaireOpen}
         existingData={savedPreferences || getQuestionnaireDefaults()}
         onSubmit={handleQuestionnaireSubmit}
+        onCloseWithDraft={(draft) => {
+        savePreferences(draft, { silent: true });
+        setSavedPreferences(draft);
+      }}
       />
 
       <DatePlanResult
@@ -326,6 +355,7 @@ const Dashboard = () => {
         onUpdatePlanGifts={isViewingMode ? undefined : updatePlanGifts}
         onNavigateToGifts={() => { setActiveTab("gifts"); setResultOpen(false); }}
         transportationMode={savedPreferences?.transportationMode}
+        questionnaireDataForGifts={savedPreferences}
       />
 
       <PhotoPrompt
@@ -344,6 +374,18 @@ const Dashboard = () => {
           startTime={savedPreferences?.startTime}
         />
       )}
+
+      {/* The Playbook - Magical Tools */}
+      <Sheet open={playbookOpen} onOpenChange={setPlaybookOpen}>
+        <SheetContent side="right" className="w-full sm:max-w-md flex flex-col p-0">
+          <SheetHeader className="p-4 pb-0 shrink-0">
+            <SheetTitle className="sr-only">The Playbook</SheetTitle>
+          </SheetHeader>
+          <div className="flex-1 min-h-0 px-4 pb-4">
+            <PlaybookView onClose={() => setPlaybookOpen(false)} showClose />
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 };

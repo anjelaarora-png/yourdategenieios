@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Music, Plus, Play, Pause, ExternalLink, Heart, MoreHorizontal, Clock, Trash2 } from "lucide-react";
 import { usePlaylistStorage } from "@/hooks/usePlaylistStorage";
+import MusicRecordAnimation from "@/components/playlist/MusicRecordAnimation";
 
 interface Playlist {
   id: string;
@@ -55,8 +56,8 @@ const MobilePlaylists = () => {
       <div className="px-5">
         {playlists.length === 0 ? (
           <div className="ios-card text-center py-12">
-            <div className="w-16 h-16 rounded-full bg-muted mx-auto mb-4 flex items-center justify-center">
-              <Music className="w-8 h-8 text-muted-foreground" />
+            <div className="flex justify-center mb-4">
+              <MusicRecordAnimation size={80} showNotes />
             </div>
             <p className="text-muted-foreground mb-2">No playlists yet</p>
             <p className="text-sm text-muted-foreground">

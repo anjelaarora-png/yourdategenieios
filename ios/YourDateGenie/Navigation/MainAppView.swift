@@ -3,30 +3,37 @@ import SwiftUI
 // MARK: - Luxury Main App View (Tab-based)
 struct LuxuryMainAppView: View {
     @EnvironmentObject var coordinator: NavigationCoordinator
+    @ObservedObject private var planGenerator = DatePlanGeneratorService.shared
     
     var body: some View {
         TabView(selection: $coordinator.currentTab) {
             LuxuryHomeTabView()
                 .tabItem {
-                    Label(NavigationCoordinator.Tab.home.rawValue, systemImage: NavigationCoordinator.Tab.home.icon)
+                    Label(NavigationCoordinator.Tab.home.tabBarTitle, systemImage: NavigationCoordinator.Tab.home.icon)
                 }
                 .tag(NavigationCoordinator.Tab.home)
             
-            LuxuryExploreTabView()
+            LoveNoteGeneratorView()
                 .tabItem {
-                    Label(NavigationCoordinator.Tab.explore.rawValue, systemImage: NavigationCoordinator.Tab.explore.icon)
+                    Label(NavigationCoordinator.Tab.loveNote.tabBarTitle, systemImage: NavigationCoordinator.Tab.loveNote.icon)
                 }
-                .tag(NavigationCoordinator.Tab.explore)
+                .tag(NavigationCoordinator.Tab.loveNote)
+            
+            GiftsTabView()
+                .tabItem {
+                    Label(NavigationCoordinator.Tab.gifts.tabBarTitle, systemImage: NavigationCoordinator.Tab.gifts.icon)
+                }
+                .tag(NavigationCoordinator.Tab.gifts)
             
             MemoriesTabView()
                 .tabItem {
-                    Label(NavigationCoordinator.Tab.memories.rawValue, systemImage: NavigationCoordinator.Tab.memories.icon)
+                    Label(NavigationCoordinator.Tab.memories.tabBarTitle, systemImage: NavigationCoordinator.Tab.memories.icon)
                 }
                 .tag(NavigationCoordinator.Tab.memories)
             
             LuxuryProfileTabView()
                 .tabItem {
-                    Label(NavigationCoordinator.Tab.profile.rawValue, systemImage: NavigationCoordinator.Tab.profile.icon)
+                    Label(NavigationCoordinator.Tab.profile.tabBarTitle, systemImage: NavigationCoordinator.Tab.profile.icon)
                 }
                 .tag(NavigationCoordinator.Tab.profile)
         }
@@ -36,10 +43,28 @@ struct LuxuryMainAppView: View {
             appearance.configureWithOpaqueBackground()
             appearance.backgroundColor = UIColor(Color.luxuryMaroon)
             
+            let paragraphStyle = NSMutableParagraphStyle()
+            paragraphStyle.lineBreakMode = .byTruncatingTail
+            paragraphStyle.alignment = .center
+            let font = UIFont.systemFont(ofSize: 9, weight: .medium)
+            let normalAttrs: [NSAttributedString.Key: Any] = [
+                .foregroundColor: UIColor(Color.luxuryMuted),
+                .paragraphStyle: paragraphStyle,
+                .font: font
+            ]
+            let selectedAttrs: [NSAttributedString.Key: Any] = [
+                .foregroundColor: UIColor(Color.luxuryGold),
+                .paragraphStyle: paragraphStyle,
+                .font: font
+            ]
             appearance.stackedLayoutAppearance.normal.iconColor = UIColor(Color.luxuryMuted)
-            appearance.stackedLayoutAppearance.normal.titleTextAttributes = [.foregroundColor: UIColor(Color.luxuryMuted)]
+            appearance.stackedLayoutAppearance.normal.titleTextAttributes = normalAttrs
             appearance.stackedLayoutAppearance.selected.iconColor = UIColor(Color.luxuryGold)
-            appearance.stackedLayoutAppearance.selected.titleTextAttributes = [.foregroundColor: UIColor(Color.luxuryGold)]
+            appearance.stackedLayoutAppearance.selected.titleTextAttributes = selectedAttrs
+            appearance.inlineLayoutAppearance.normal.titleTextAttributes = normalAttrs
+            appearance.inlineLayoutAppearance.selected.titleTextAttributes = selectedAttrs
+            appearance.compactInlineLayoutAppearance.normal.titleTextAttributes = normalAttrs
+            appearance.compactInlineLayoutAppearance.selected.titleTextAttributes = selectedAttrs
             
             UITabBar.appearance().standardAppearance = appearance
             UITabBar.appearance().scrollEdgeAppearance = appearance
@@ -52,6 +77,12 @@ struct LuxuryMainAppView: View {
         }
         .sheet(isPresented: $coordinator.isShowingMemoryCapture) {
             AddMemorySheet()
+        }
+        .overlay {
+            if coordinator.isRegeneratingFromOptions && planGenerator.isGenerating {
+                MagicalLoadingView(generator: planGenerator)
+                    .ignoresSafeArea()
+            }
         }
     }
     
@@ -66,9 +97,10 @@ struct LuxuryMainAppView: View {
         case .datePlanOptions:
             DatePlanOptionsView(
                 plans: coordinator.generatedPlans,
+                loadingPlanIndices: planGenerator.loadingPlanIndices,
                 initialSelectedIndex: coordinator.generatedPlansSelectedIndex,
                 onSave: { plan in coordinator.savePlan(plan) },
-                onRegenerate: { }
+                onRegenerate: { coordinator.requestRegenerateFromOptions() }
             )
             .environmentObject(coordinator)
         case .datePlanResult:
@@ -76,7 +108,11 @@ struct LuxuryMainAppView: View {
                 DatePlanResultView(
                     plan: plan,
                     onSave: { coordinator.savePlan(plan) },
-                    onRegenerate: { }
+                    onRegenerate: { },
+                    onDelete: {
+                        coordinator.deletePlan(plan)
+                        coordinator.dismissSheet()
+                    }
                 )
                 .environmentObject(coordinator)
             }
@@ -84,19 +120,22 @@ struct LuxuryMainAppView: View {
             GiftFinderView(datePlan: datePlan, dateLocation: dateLocation)
         case .playlist(let title):
             PlaylistWidgetView(planTitle: title)
-        case .reservation(let name, let type, let address, let phone):
+        case .reservation(let name, let type, let address, let phone, let bookingUrl, let websiteUrl, let openingHours):
             ReservationWidgetView(
                 venueName: name,
                 venueType: type,
                 address: address,
-                phoneNumber: phone
+                phoneNumber: phone,
+                bookingUrl: bookingUrl,
+                websiteUrl: websiteUrl,
+                openingHours: openingHours
             )
         case .partnerShare(let plan):
             PartnerShareView(plan: plan)
-        case .routeMap(let stops):
+        case .routeMap(let stops, let startingPoint, let showRouteLine):
             NavigationStack {
-                RouteMapView(stops: stops)
-                    .navigationTitle("Your Route")
+                RouteMapView(stops: stops, startingPoint: startingPoint, showRouteLine: showRouteLine)
+                    .navigationTitle(showRouteLine ? "Your Route" : "Journey Map")
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar {
                         ToolbarItem(placement: .navigationBarTrailing) {
@@ -136,6 +175,31 @@ struct LuxuryMainAppView: View {
                 .environmentObject(coordinator)
         case .settings:
             SettingsSheetView()
+                .environmentObject(coordinator)
+        case .playbook:
+            PlaybookView()
+                .environmentObject(coordinator)
+        case .explore:
+            NavigationStack {
+                LuxuryExploreTabView()
+                    .navigationTitle("Explore")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .navigationBarTrailing) {
+                            Button("Done") {
+                                coordinator.dismissSheet()
+                            }
+                            .foregroundColor(Color.luxuryGold)
+                        }
+                    }
+            }
+        case .partnerPlanning:
+            NavigationStack {
+                PartnerPlanningSheetView()
+                    .environmentObject(coordinator)
+            }
+        case .authRequired:
+            AuthenticationView(onDismiss: { coordinator.dismissAuthRequiredSheet() })
                 .environmentObject(coordinator)
         }
     }

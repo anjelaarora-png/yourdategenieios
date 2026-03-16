@@ -3,6 +3,7 @@ import { corsHeaders } from "./cors.ts";
 import { buildPrompt } from "./prompt.ts";
 import { generateMultipleDatePlans } from "./multiPlanAi.ts";
 import { validateAllStops, geocodeAddress } from "./places.ts";
+import { getDirections, toGoogleTravelMode, toAppTravelMode } from "./directions.ts";
 
 function jsonResponse(status: number, body: unknown) {
   return new Response(JSON.stringify(body), {
@@ -173,7 +174,7 @@ serve(async (req) => {
       }
     }
 
-    // Ensure all plans have required fields with safe defaults
+    // Ensure all plans have required fields. Stops = itinerary venues only (step 1 = first venue, not starting point).
     const sanitizedPlans = plans.map((plan: any) => ({
       ...plan,
       title: plan.title || "Your Date Plan",
@@ -181,6 +182,7 @@ serve(async (req) => {
       totalDuration: plan.totalDuration || "3-4 hours",
       estimatedCost: plan.estimatedCost || "$50-100",
       stops: Array.isArray(plan.stops) ? plan.stops : [],
+      startingPoint: plan.startingPoint ?? undefined,
       genieSecretTouch: plan.genieSecretTouch || {
         title: "Special Touch",
         description: "Make this date memorable with your unique presence.",
@@ -192,42 +194,74 @@ serve(async (req) => {
       conversationStarters: Array.isArray(plan.conversationStarters) ? plan.conversationStarters : [],
     }));
 
-    // Prepend Google-verified starting point when user provided startingAddress
+    // Set starting point separately for route map; do NOT add it as step 1 of the itinerary.
     const startingAddress = preferences.startingAddress?.trim();
+    const transportationMode = preferences.transportationMode || "walking";
+    const googleMode = toGoogleTravelMode(transportationMode);
+    const appTravelMode = toAppTravelMode(googleMode);
+
     if (startingAddress && GOOGLE_PLACES_API_KEY) {
       try {
         const startResult = await geocodeAddress(startingAddress, GOOGLE_PLACES_API_KEY);
         if (startResult) {
-          const startStop = {
-            order: 1,
+          const startingPoint = {
             name: "Your location",
-            venueType: "Starting point",
-            timeSlot: "",
-            duration: "",
-            description: "Departure address",
-            whyItFits: "",
-            romanticTip: "",
-            emoji: "📍",
             address: startResult.formatted_address,
             latitude: startResult.latitude,
             longitude: startResult.longitude,
-            validated: true,
-            estimatedCostPerPerson: "",
           };
           for (const plan of sanitizedPlans) {
-            const existingStops = Array.isArray(plan.stops) ? plan.stops : [];
-            plan.stops = [
-              startStop,
-              ...existingStops.map((s: any, i: number) => ({ ...s, order: i + 2 })),
-            ];
+            plan.startingPoint = startingPoint;
           }
-          console.log(`[Starting point] Prepended geocoded start for "${startingAddress}" to ${sanitizedPlans.length} plans`);
+          console.log(`[Starting point] Set starting point (not as itinerary step)`);
         }
       } catch (err) {
-        console.warn("[Starting point] Geocode failed, leaving plans unchanged:", err);
+        console.warn("[Starting point] Geocode failed:", err);
       }
     }
-    
+
+    // Enrich stops with accurate travel time/distance from Directions API; use selected transportation mode.
+    if (GOOGLE_PLACES_API_KEY && sanitizedPlans.length > 0) {
+      for (const plan of sanitizedPlans) {
+        const stops = Array.isArray(plan.stops) ? plan.stops : [];
+        const start = plan.startingPoint;
+        const withCoords = stops.filter(
+          (s: any) =>
+            typeof s.latitude === "number" &&
+            typeof s.longitude === "number" &&
+            Number.isFinite(s.latitude) &&
+            Number.isFinite(s.longitude)
+        );
+        if (withCoords.length === 0) continue;
+
+        let legs: { durationText: string; distanceText: string }[] = [];
+        if (start) {
+          const origin = { latitude: start.latitude, longitude: start.longitude };
+          const waypoints = withCoords.slice(0, -1).map((s: any) => ({ latitude: s.latitude, longitude: s.longitude }));
+          const dest = withCoords[withCoords.length - 1];
+          const destination = { latitude: dest.latitude, longitude: dest.longitude };
+          legs = await getDirections(origin, destination, waypoints, googleMode, GOOGLE_PLACES_API_KEY);
+        } else {
+          const origin = { latitude: withCoords[0].latitude, longitude: withCoords[0].longitude };
+          const waypoints = withCoords.slice(1, -1).map((s: any) => ({ latitude: s.latitude, longitude: s.longitude }));
+          const dest = withCoords[withCoords.length - 1];
+          const destination = { latitude: dest.latitude, longitude: dest.longitude };
+          legs = await getDirections(origin, destination, waypoints, googleMode, GOOGLE_PLACES_API_KEY);
+        }
+
+        for (let i = 0; i < legs.length && i < stops.length; i++) {
+          const stop = start ? stops[i] : stops[i + 1];
+          if (!stop) continue;
+          const leg = legs[i];
+          if (!leg.durationText) continue;
+          stop.travelTimeFromPrevious = leg.durationText + " by " + transportationMode;
+          stop.travelDistanceFromPrevious = leg.distanceText || stop.travelDistanceFromPrevious;
+          stop.travelMode = appTravelMode;
+        }
+      }
+      console.log(`[Directions] Enriched travel legs using ${transportationMode}`);
+    }
+
     return jsonResponse(200, { datePlans: sanitizedPlans });
   } catch (error) {
     console.error("Error generating date plans:", error);

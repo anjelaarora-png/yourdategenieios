@@ -20,8 +20,8 @@ export const multiDatePlanTool = {
                 type: "string",
                 description: "Short label like 'Classic Romance', 'Adventure', 'Cozy & Intimate'",
               },
-              title: { type: "string", description: "Creative name for the date" },
-              tagline: { type: "string", description: "Romantic one-liner" },
+              title: { type: "string", description: "Short creative name (2-6 words), e.g. 'Sunset & Vinyl' or 'Secret Garden Evening'. Do not use only cuisine or neighborhood names." },
+              tagline: { type: "string", description: "Romantic one-liner; can mention cuisine or area" },
               totalDuration: {
                 type: "string",
                 description: "Total time like '3-4 hours'",
@@ -57,7 +57,7 @@ export const multiDatePlanTool = {
                     },
                     travelMode: {
                       type: "string",
-                      description: "Mode of transport used, e.g. 'walking', 'driving', 'rideshare', 'transit'. Empty for first stop."
+                      description: "Mode for this leg: 'walking', 'driving', 'public-transit', 'biking', or 'rideshare' to match user's selection. Set for every stop that has travel (including first stop when user has a starting point)."
                     },
                     // Phase 3: Enhanced venue info
                     websiteUrl: {
@@ -66,7 +66,16 @@ export const multiDatePlanTool = {
                     },
                     bookingUrl: {
                       type: "string",
-                      description: "Direct booking/reservation URL if available (e.g., OpenTable, Resy, or venue's own booking page)"
+                      description: "Direct reservation URL. For dinner/restaurants: REQUIRED when venue is on OpenTable or Resy—use the exact restaurant page URL (e.g. https://www.opentable.com/restref/... or https://resy.com/cities/ny/venues/...). For other venues, use venue's booking page if available."
+                    },
+                    address: {
+                      type: "string",
+                      description: "Full street address with city and state (e.g. 123 Main St, Austin, TX 78701)"
+                    },
+                    openingHours: {
+                      type: "array",
+                      items: { type: "string" },
+                      description: "Opening hours per day when known (e.g. ['Monday: 5:00 PM – 10:00 PM'])"
                     },
                     phoneNumber: {
                       type: "string",

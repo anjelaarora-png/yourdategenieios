@@ -17,7 +17,7 @@ export interface UserPreferences {
   transportation_mode: string | null;
   travel_radius: string | null;
   activity_preferences: string[] | null;
-  drink_preferences: string | null;
+  drink_preferences: string[] | null;
   dietary_restrictions: string[] | null;
   allergies: string[] | null;
   accessibility_needs: string[] | null;
@@ -29,6 +29,12 @@ export interface UserPreferences {
   gift_budget: string | null;
   gift_occasion: string | null;
   gift_notes: string | null;
+  gift_recipient_identity: string | null;
+  gift_style: string[] | null;
+  gift_favorite_brands: string | null;
+  gift_sizes: string | null;
+  gender: string | null;
+  partner_gender: string | null;
 }
 
 export interface GiftPreferences {
@@ -37,6 +43,10 @@ export interface GiftPreferences {
   gift_budget: string;
   gift_occasion: string;
   gift_notes: string;
+  gift_recipient_identity?: string;
+  gift_style?: string[];
+  gift_favorite_brands?: string;
+  gift_sizes?: string;
 }
 
 export function useUserPreferences() {
@@ -72,8 +82,9 @@ export function useUserPreferences() {
     fetchPreferences();
   }, [user]);
 
-  const savePreferences = async (questionnaireData: QuestionnaireData) => {
+  const savePreferences = async (questionnaireData: QuestionnaireData, options?: { silent?: boolean }) => {
     if (!user) return;
+    const silent = options?.silent === true;
 
     const prefsToSave = {
       user_id: user.id,
@@ -90,7 +101,7 @@ export function useUserPreferences() {
       // Food & Drinks
       food_preferences: questionnaireData.cuisinePreferences || [],
       dietary_restrictions: questionnaireData.dietaryRestrictions?.filter(d => d !== "none") || [],
-      drink_preferences: questionnaireData.drinkPreferences || null,
+      drink_preferences: questionnaireData.drinkPreferences?.length ? questionnaireData.drinkPreferences : null,
       budget_range: questionnaireData.budgetRange || null,
       // Deal Breakers
       allergies: questionnaireData.allergies?.filter(a => a !== "none") || [],
@@ -104,6 +115,10 @@ export function useUserPreferences() {
       gift_budget: questionnaireData.giftBudget || null,
       gift_occasion: questionnaireData.occasion || null,
       gift_notes: questionnaireData.giftRecipientNotes || null,
+      gift_recipient_identity: questionnaireData.partnerIdentity || null,
+      gift_style: questionnaireData.giftStyle?.length ? questionnaireData.giftStyle : null,
+      gift_favorite_brands: questionnaireData.favoriteBrandsOrStores || null,
+      gift_sizes: questionnaireData.recipientSizes || null,
     };
 
     try {
@@ -125,11 +140,12 @@ export function useUserPreferences() {
         setPreferences(data);
       }
 
-      toast({
-        title: "Preferences saved!",
-        description: "Your preferences will pre-fill future questionnaires.",
-      });
-      
+      if (!silent) {
+        toast({
+          title: "Preferences saved!",
+          description: "Your preferences will pre-fill future questionnaires.",
+        });
+      }
       // Refetch to get updated data
       fetchPreferences();
     } catch (error) {
@@ -162,7 +178,7 @@ export function useUserPreferences() {
       dietaryRestrictions: preferences.dietary_restrictions?.length 
         ? preferences.dietary_restrictions 
         : [],
-      drinkPreferences: preferences.drink_preferences || "",
+      drinkPreferences: preferences.drink_preferences || [],
       budgetRange: preferences.budget_range || "",
       // Deal Breakers
       allergies: preferences.allergies?.length 
@@ -179,6 +195,10 @@ export function useUserPreferences() {
       partnerInterests: preferences.gift_interests || [],
       giftBudget: preferences.gift_budget || "",
       giftRecipientNotes: preferences.gift_notes || "",
+      partnerIdentity: preferences.gift_recipient_identity || "",
+      giftStyle: preferences.gift_style || [],
+      favoriteBrandsOrStores: preferences.gift_favorite_brands || "",
+      recipientSizes: preferences.gift_sizes || "",
     };
   }, [preferences]);
 
@@ -190,6 +210,10 @@ export function useUserPreferences() {
       gift_budget: preferences?.gift_budget || "",
       gift_occasion: preferences?.gift_occasion || "",
       gift_notes: preferences?.gift_notes || "",
+      gift_recipient_identity: preferences?.gift_recipient_identity || undefined,
+      gift_style: preferences?.gift_style || undefined,
+      gift_favorite_brands: preferences?.gift_favorite_brands || undefined,
+      gift_sizes: preferences?.gift_sizes || undefined,
     };
   };
 
@@ -197,7 +221,7 @@ export function useUserPreferences() {
   const saveGiftPreferences = async (giftPrefs: GiftPreferences) => {
     if (!user) return;
 
-    const prefsToSave = {
+    const prefsToSave: Record<string, unknown> = {
       user_id: user.id,
       gift_recipient: giftPrefs.gift_recipient || null,
       gift_interests: giftPrefs.gift_interests || [],
@@ -205,6 +229,10 @@ export function useUserPreferences() {
       gift_occasion: giftPrefs.gift_occasion || null,
       gift_notes: giftPrefs.gift_notes || null,
     };
+    if (giftPrefs.gift_recipient_identity !== undefined) prefsToSave.gift_recipient_identity = giftPrefs.gift_recipient_identity || null;
+    if (giftPrefs.gift_style !== undefined) prefsToSave.gift_style = giftPrefs.gift_style?.length ? giftPrefs.gift_style : null;
+    if (giftPrefs.gift_favorite_brands !== undefined) prefsToSave.gift_favorite_brands = giftPrefs.gift_favorite_brands || null;
+    if (giftPrefs.gift_sizes !== undefined) prefsToSave.gift_sizes = giftPrefs.gift_sizes || null;
 
     try {
       if (preferences) {

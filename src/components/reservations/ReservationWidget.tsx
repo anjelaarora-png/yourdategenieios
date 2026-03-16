@@ -18,6 +18,21 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  detectRegionFromAddress,
+  getTopTwoPlatformsForRegion,
+  PLATFORM_ICONS,
+  type ReservationPlatformConfig,
+} from "@/lib/reservationPlatforms";
+import { cn } from "@/lib/utils";
+
+/** Hex (without #) to rgba string with given alpha, for chip background. */
+function hexToRgba(hex: string, alpha: number): string {
+  const r = parseInt(hex.slice(0, 2), 16);
+  const g = parseInt(hex.slice(2, 4), 16);
+  const b = parseInt(hex.slice(4, 6), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
 
 interface ReservationWidgetProps {
   venueName: string;
@@ -26,153 +41,16 @@ interface ReservationWidgetProps {
   placeId?: string;
   address?: string;
   phoneNumber?: string;
+  /** Direct OpenTable/Resy or venue booking URL — shown as primary CTA when set */
+  bookingUrl?: string;
+  /** Preferred platform for label (e.g. "Reserve on OpenTable") */
+  reservationPlatform?: 'opentable' | 'resy' | string;
+  websiteUrl?: string;
+  openingHours?: string[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onReservationMade?: () => void;
 }
-
-// Region detection and platform configuration
-type Region = 'us' | 'uk' | 'eu' | 'au' | 'asia' | 'india' | 'other';
-
-interface ReservationPlatform {
-  name: string;
-  getUrl: (params: { venueName: string; date: string; time: string; partySize: string; address?: string }) => string;
-  regions: Region[];
-}
-
-// Detect region from address
-const detectRegion = (address?: string): Region => {
-  if (!address) return 'us';
-  
-  const lowerAddr = address.toLowerCase();
-  
-  // Country patterns
-  const patterns: Array<{ pattern: RegExp; region: Region }> = [
-    // US patterns
-    { pattern: /\b(usa|united states|u\.s\.a?\.|, [a-z]{2} \d{5})/i, region: 'us' },
-    { pattern: /\b(ny|nyc|ca|tx|fl|wa|il|pa|oh|ga|nc|mi|nj|va|az|ma|tn|in|mo|md|wi|mn|co|al|sc|la|ky|or|ok|ct|ut|ia|nv|ar|ms|ks|nm|ne|wv|id|hi|nh|me|mt|ri|de|sd|nd|ak|vt|dc|wy)\b/i, region: 'us' },
-    // UK patterns  
-    { pattern: /\b(uk|united kingdom|england|scotland|wales|london|manchester|birmingham|liverpool|leeds|glasgow|edinburgh)\b/i, region: 'uk' },
-    { pattern: /\b[a-z]{1,2}\d{1,2}[a-z]?\s?\d[a-z]{2}\b/i, region: 'uk' }, // UK postcode
-    // EU patterns
-    { pattern: /\b(france|germany|spain|italy|netherlands|belgium|austria|switzerland|portugal|ireland|denmark|sweden|norway|finland|greece|poland|czech|hungary)\b/i, region: 'eu' },
-    { pattern: /\b(paris|berlin|munich|madrid|barcelona|rome|milan|amsterdam|brussels|vienna|zurich|lisbon|dublin|copenhagen|stockholm)\b/i, region: 'eu' },
-    // Australia patterns
-    { pattern: /\b(australia|sydney|melbourne|brisbane|perth|adelaide|canberra|nsw|vic|qld|wa|sa|tas|nt|act)\b/i, region: 'au' },
-    // Asia patterns (excluding India)
-    { pattern: /\b(japan|tokyo|osaka|singapore|hong kong|south korea|seoul|taiwan|taipei|thailand|bangkok|vietnam|malaysia|indonesia|philippines)\b/i, region: 'asia' },
-    // India patterns
-    { pattern: /\b(india|mumbai|delhi|bangalore|bengaluru|chennai|hyderabad|kolkata|pune|ahmedabad|jaipur|lucknow|surat)\b/i, region: 'india' },
-  ];
-  
-  for (const { pattern, region } of patterns) {
-    if (pattern.test(lowerAddr)) {
-      return region;
-    }
-  }
-  
-  return 'us'; // Default to US
-};
-
-// Reservation platforms configuration
-const RESERVATION_PLATFORMS: ReservationPlatform[] = [
-  // OpenTable - primarily US, UK, some EU
-  {
-    name: 'OpenTable',
-    getUrl: ({ venueName, date, time, partySize, address }) => {
-      const searchQuery = encodeURIComponent(venueName);
-      const locationQuery = address ? encodeURIComponent(address.split(",")[0] || '') : "";
-      return `https://www.opentable.com/s?covers=${partySize}&dateTime=${date}T${time}&term=${searchQuery}${locationQuery ? `&metroId=&regionId=&neighborhood=${locationQuery}` : ""}`;
-    },
-    regions: ['us', 'uk', 'au', 'other'],
-  },
-  // Resy - US cities
-  {
-    name: 'Resy',
-    getUrl: ({ venueName, date, partySize, address }) => {
-      const searchQuery = encodeURIComponent(venueName);
-      const city = getCitySlugFromAddress(address);
-      return `https://resy.com/cities/${city}?query=${searchQuery}&date=${date}&seats=${partySize}`;
-    },
-    regions: ['us'],
-  },
-  // TheFork (formerly LaFourchette) - EU & UK
-  {
-    name: 'TheFork',
-    getUrl: ({ venueName, date, time, partySize }) => {
-      const searchQuery = encodeURIComponent(venueName);
-      return `https://www.thefork.com/search?cityId=&queryText=${searchQuery}&date=${date}&time=${time}&partySize=${partySize}`;
-    },
-    regions: ['eu', 'uk'],
-  },
-  // Quandoo - EU, UK, Australia
-  {
-    name: 'Quandoo',
-    getUrl: ({ venueName, date, time, partySize }) => {
-      const searchQuery = encodeURIComponent(venueName);
-      return `https://www.quandoo.com/en/search?query=${searchQuery}&date=${date}&time=${time}&pax=${partySize}`;
-    },
-    regions: ['eu', 'uk', 'au'],
-  },
-  // Zomato - India primarily
-  {
-    name: 'Zomato',
-    getUrl: ({ venueName, address }) => {
-      const searchQuery = encodeURIComponent(venueName);
-      const city = address?.split(",").slice(-2, -1)[0]?.trim().toLowerCase() || 'mumbai';
-      return `https://www.zomato.com/${city}/restaurants?q=${searchQuery}`;
-    },
-    regions: ['india'],
-  },
-  // EatApp - Middle East, Asia
-  {
-    name: 'Eatapp',
-    getUrl: ({ venueName }) => {
-      const searchQuery = encodeURIComponent(venueName);
-      return `https://eat.app/search?q=${searchQuery}`;
-    },
-    regions: ['asia', 'india'],
-  },
-  // TableCheck - Japan primarily
-  {
-    name: 'TableCheck',
-    getUrl: ({ venueName, date, time, partySize }) => {
-      const searchQuery = encodeURIComponent(venueName);
-      return `https://www.tablecheck.com/en/search?query=${searchQuery}&date=${date}&time=${time}&pax=${partySize}`;
-    },
-    regions: ['asia'],
-  },
-];
-
-// Get Resy city slug from address
-const getCitySlugFromAddress = (addr?: string): string => {
-  if (!addr) return "ny";
-  const parts = addr.split(",");
-  if (parts.length >= 2) {
-    const city = parts[parts.length - 2]?.trim().toLowerCase();
-    const cityMap: Record<string, string> = {
-      "new york": "ny", "nyc": "ny", "manhattan": "ny", "brooklyn": "ny",
-      "los angeles": "la", "la": "la",
-      "san francisco": "sf", "sf": "sf",
-      "chicago": "chi",
-      "miami": "mia",
-      "austin": "atx",
-      "denver": "den",
-      "seattle": "sea",
-      "boston": "bos",
-      "washington": "dc", "dc": "dc",
-      "atlanta": "atl",
-      "nashville": "nash",
-      "houston": "hou",
-      "dallas": "dal",
-      "philadelphia": "phl",
-    };
-    for (const [key, value] of Object.entries(cityMap)) {
-      if (city?.includes(key)) return value;
-    }
-  }
-  return "ny";
-};
 
 const ReservationWidget = ({
   venueName,
@@ -181,6 +59,10 @@ const ReservationWidget = ({
   placeId,
   address,
   phoneNumber,
+  bookingUrl,
+  reservationPlatform,
+  websiteUrl,
+  openingHours,
   open,
   onOpenChange,
   onReservationMade,
@@ -189,20 +71,14 @@ const ReservationWidget = ({
   const [time, setTime] = useState("");
   const [partySize, setPartySize] = useState("2");
 
-  // Detect region and get appropriate platforms
+  // Detect region and get top two dining reservation platforms for that country
   const { region, platforms } = useMemo(() => {
-    const detectedRegion = detectRegion(address);
-    const availablePlatforms = RESERVATION_PLATFORMS.filter(p => 
-      p.regions.includes(detectedRegion)
-    );
-    // Always include at least OpenTable as fallback
-    if (availablePlatforms.length === 0) {
-      availablePlatforms.push(RESERVATION_PLATFORMS[0]); // OpenTable
-    }
-    return { region: detectedRegion, platforms: availablePlatforms.slice(0, 3) }; // Max 3 platforms
+    const detectedRegion = detectRegionFromAddress(address);
+    const list = getTopTwoPlatformsForRegion(detectedRegion);
+    return { region: detectedRegion, platforms: list };
   }, [address]);
 
-  const handlePlatformClick = (platform: ReservationPlatform) => {
+  const handlePlatformClick = (platform: ReservationPlatformConfig) => {
     const url = platform.getUrl({ venueName, date, time, partySize, address });
     window.open(url, "_blank", "noopener,noreferrer");
     onReservationMade?.();
@@ -248,8 +124,51 @@ const ReservationWidget = ({
           <DialogTitle className="font-display text-2xl">Make a Reservation</DialogTitle>
           <DialogDescription>
             Book a table at <span className="font-semibold">{venueName}</span>
+            {address && (
+              <span className="block mt-2 text-muted-foreground font-normal">
+                <MapPin className="inline w-3.5 h-3.5 mr-1" />
+                {address}
+              </span>
+            )}
           </DialogDescription>
         </DialogHeader>
+
+        {(websiteUrl || (openingHours && openingHours.length > 0)) && (
+          <div className="rounded-lg border border-border bg-muted/30 p-3 text-sm space-y-2">
+            {websiteUrl && (
+              <a href={websiteUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-1.5">
+                <ExternalLink className="w-3.5 h-3.5" />
+                Website
+              </a>
+            )}
+            {openingHours && openingHours.length > 0 && (
+              <div>
+                <p className="font-medium text-muted-foreground mb-1">Hours</p>
+                <ul className="text-muted-foreground space-y-0.5">
+                  {openingHours.slice(0, 7).map((line, i) => (
+                    <li key={i}>{line}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
+
+        {bookingUrl && (reservationPlatform === "opentable" || reservationPlatform === "resy") && (
+          <div className="space-y-2">
+            <p className="text-sm font-medium">Reserve directly</p>
+            <Button
+              className="w-full gap-2"
+              onClick={() => {
+                window.open(bookingUrl, "_blank", "noopener,noreferrer");
+                onReservationMade?.();
+              }}
+            >
+              <ExternalLink className="w-4 h-4" />
+              Reserve on {reservationPlatform === "opentable" ? "OpenTable" : "Resy"}
+            </Button>
+          </div>
+        )}
 
         <div className="space-y-4 mt-4">
           <div className="space-y-2">
@@ -304,35 +223,85 @@ const ReservationWidget = ({
           </div>
 
           <div className="border-t border-border pt-4 mt-4">
-            <p className="text-sm text-muted-foreground mb-3">
-              Choose a reservation platform:
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {platforms.map((platform) => (
-                <Button
-                  key={platform.name}
-                  variant="outline"
-                  className="flex-1 min-w-[100px]"
-                  onClick={() => handlePlatformClick(platform)}
-                  disabled={!date || !time}
-                >
-                  <ExternalLink className="w-4 h-4 mr-2" />
-                  {platform.name}
-                </Button>
-              ))}
+            <p className="text-sm font-medium text-foreground mb-1">Reserve a table</p>
+            <p className="text-xs text-muted-foreground mb-3">Select date & time above, then tap a platform to open it.</p>
+            <div className="grid grid-cols-2 gap-3">
+              {platforms.map((platform) => {
+                const iconConfig = PLATFORM_ICONS[platform.id];
+                const brandColor = iconConfig?.color ?? "6b7280";
+                const hasLogo = iconConfig?.slug != null;
+                const isDisabled = !date || !time;
+                const bgStyle =
+                  isDisabled ? undefined : {
+                    backgroundColor: hexToRgba(brandColor, 0.14),
+                    borderColor: `#${brandColor}`,
+                  };
+                return (
+                  <button
+                    key={platform.id}
+                    type="button"
+                    onClick={() => handlePlatformClick(platform)}
+                    disabled={isDisabled}
+                    className={cn(
+                      "flex items-center gap-3 rounded-xl border-2 p-3 text-left transition-all duration-200",
+                      !isDisabled &&
+                        "hover:shadow-lg hover:brightness-[1.02] active:scale-[0.98] active:brightness-[0.98]",
+                      "disabled:pointer-events-none disabled:opacity-50 disabled:cursor-not-allowed",
+                      "cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
+                      isDisabled && "border-border bg-muted/40"
+                    )}
+                    style={!isDisabled ? bgStyle : undefined}
+                    aria-label={`Reserve on ${platform.name}`}
+                  >
+                    <span
+                      className={cn(
+                        "flex shrink-0 items-center justify-center rounded-lg w-10 h-10",
+                        hasLogo ? "bg-white/80" : "text-white"
+                      )}
+                      style={!hasLogo ? { backgroundColor: `#${brandColor}` } : undefined}
+                    >
+                      {hasLogo ? (
+                        <img
+                          src={`https://cdn.simpleicons.org/${iconConfig.slug}/${brandColor}`}
+                          alt=""
+                          className="w-6 h-6 object-contain"
+                          width={24}
+                          height={24}
+                        />
+                      ) : (
+                        <span className="text-sm font-bold leading-none">
+                          {platform.name.charAt(0)}
+                        </span>
+                      )}
+                    </span>
+                    <span
+                      className={cn(
+                        "font-semibold text-sm truncate",
+                        isDisabled ? "text-muted-foreground" : "text-foreground"
+                      )}
+                    >
+                      {platform.name}
+                    </span>
+                    <ExternalLink
+                      className={cn(
+                        "w-4 h-4 shrink-0 ml-auto",
+                        isDisabled ? "text-muted-foreground" : "text-foreground/70"
+                      )}
+                      aria-hidden
+                    />
+                  </button>
+                );
+              })}
             </div>
-            {region !== 'us' && (
-              <p className="text-xs text-muted-foreground mt-2">
-                Showing platforms for your region. Results may vary by location.
-              </p>
-            )}
           </div>
 
           {/* Fallback Option */}
           <Alert className="bg-muted/50 border-amber-500/30">
             <AlertCircle className="h-4 w-4 text-amber-500" />
             <AlertDescription className="text-sm">
-              <span className="font-medium">Not on OpenTable or Resy?</span>
+              <span className="font-medium">
+                Prefer to call or find the website?
+              </span>
               <p className="mt-1 text-muted-foreground">
                 Some restaurants take reservations by phone or their own website.
               </p>

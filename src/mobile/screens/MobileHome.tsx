@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, MapPin, Clock, ChevronRight, Sparkles, Star, Calendar, RotateCcw, FileText, Zap } from "lucide-react";
+import { Plus, MapPin, Clock, ChevronRight, Sparkles, Star, Calendar, RotateCcw, FileText, Zap, BookOpen } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { SavedDatePlan } from "@/hooks/useDatePlans";
 import { QuestionnaireData } from "@/components/questionnaire/types";
@@ -16,6 +16,7 @@ interface MobileHomeProps {
   onReviewUnsavedPlans?: () => void;
   hasSavedPreferences?: boolean;
   savedPreferences?: QuestionnaireData | null;
+  onNavigate?: (screen: string) => void;
 }
 
 const MobileHome = ({ 
@@ -25,6 +26,7 @@ const MobileHome = ({
   onReviewUnsavedPlans,
   hasSavedPreferences = false,
   savedPreferences,
+  onNavigate,
 }: MobileHomeProps) => {
   const hasUnsavedProgress = (() => {
     try {
@@ -158,6 +160,27 @@ const MobileHome = ({
           )}
         </div>
       </div>
+
+      {/* Magical Tools */}
+      {onNavigate && (
+        <div className="px-5 mb-6">
+          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">Magical Tools</h2>
+          <button
+            type="button"
+            onClick={() => onNavigate("playbook")}
+            className="ios-card w-full flex items-center gap-3 text-left haptic-button active:scale-[0.99]"
+          >
+            <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center shrink-0">
+              <BookOpen className="w-6 h-6 text-primary" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-foreground">The Playbook</p>
+              <p className="text-xs text-muted-foreground">Opinionated date advice for your situation</p>
+            </div>
+            <ChevronRight className="w-5 h-5 text-muted-foreground shrink-0" />
+          </button>
+        </div>
+      )}
 
       {/* Stats row */}
       <div className="px-5 mb-6">

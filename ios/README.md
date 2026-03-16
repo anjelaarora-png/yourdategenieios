@@ -88,7 +88,7 @@ Set the following environment variables in your scheme or Info.plist:
 | `SUPABASE_URL` | Your Supabase project URL |
 | `SUPABASE_ANON_KEY` | Your Supabase anon/public key |
 | `OPENAI_API_KEY` | OpenAI API key for date plan generation |
-| `GOOGLE_PLACES_API_KEY` | Google Places API key for venue verification |
+| `GOOGLE_PLACES_API_KEY` | Google API key for address autocomplete, place details, and geocoding. Enable **Places API** (autocomplete + details) and **Geocoding API** in Google Cloud Console. |
 
 See `ENV_TEMPLATE.txt` for a template.
 

@@ -24,7 +24,7 @@ struct QuestionnaireData: Codable {
     // Step 4: Food & Drinks
     var cuisinePreferences: [String]
     var dietaryRestrictions: [String]
-    var drinkPreferences: String
+    var drinkPreferences: [String]
     var budgetRange: String
     
     // Step 5: Deal Breakers
@@ -34,7 +34,9 @@ struct QuestionnaireData: Codable {
     var smokingPreference: String
     var additionalNotes: String
     
-    // Step 6: Relationship Enhancers
+    // Step 6: Relationship Enhancers (and settings: gender)
+    var userGender: String
+    var partnerGender: String
     var wantGiftSuggestions: Bool
     var giftRecipient: String
     var partnerInterests: [String]
@@ -59,13 +61,15 @@ struct QuestionnaireData: Codable {
         duration: String = "",
         cuisinePreferences: [String] = [],
         dietaryRestrictions: [String] = [],
-        drinkPreferences: String = "",
+        drinkPreferences: [String] = [],
         budgetRange: String = "",
         allergies: [String] = [],
         hardNos: [String] = [],
         accessibilityNeeds: [String] = [],
         smokingPreference: String = "",
         additionalNotes: String = "",
+        userGender: String = "",
+        partnerGender: String = "",
         wantGiftSuggestions: Bool = false,
         giftRecipient: String = "",
         partnerInterests: [String] = [],
@@ -96,6 +100,8 @@ struct QuestionnaireData: Codable {
         self.accessibilityNeeds = accessibilityNeeds
         self.smokingPreference = smokingPreference
         self.additionalNotes = additionalNotes
+        self.userGender = userGender
+        self.partnerGender = partnerGender
         self.wantGiftSuggestions = wantGiftSuggestions
         self.giftRecipient = giftRecipient
         self.partnerInterests = partnerInterests

@@ -87,7 +87,7 @@ struct MobileOnboardingView: View {
                 .padding(.bottom, 44)
             }
         }
-        .onChange(of: currentSlide) {
+        .onChange(of: currentSlide) { _, _ in
             showContent = false
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 withAnimation(.easeOut(duration: 0.5)) {
@@ -186,7 +186,7 @@ struct LuxurySlideWelcome: View {
                 .animation(.easeOut(duration: 0.5).delay(0.4), value: showContent)
                 
                 // Description
-                Text("Tell us what you love. We'll create a complete evening � venues, timing, and all the details.")
+                Text("Tell us what you love. We'll create a complete evening — venues, timing, and all the details.")
                     .font(Font.bodySans(15, weight: .regular))
                     .foregroundColor(Color.luxuryCreamMuted)
                     .multilineTextAlignment(.center)
@@ -421,7 +421,7 @@ struct LuxurySlideItinerary: View {
                                 .foregroundColor(Color.luxuryGold)
                         }
                         
-                        Text("Saturday � 3 stops � ~$150")
+                        Text("Saturday · 3 stops · ~$150")
                             .font(Font.bodySans(12, weight: .regular))
                             .foregroundColor(Color.luxuryMuted)
                     }
@@ -730,7 +730,7 @@ struct LuxurySlideGetStarted: View {
                     .padding(.leading, 14)
                 }
                 
-                Text("Free to start � No credit card")
+                Text("Free to start · No credit card")
                     .font(Font.bodySans(11, weight: .regular))
                     .foregroundColor(Color.luxuryMuted.opacity(0.7))
             }

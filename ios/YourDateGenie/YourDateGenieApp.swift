@@ -47,13 +47,11 @@ struct YourDateGenieApp: App {
     }
     
     private func handleAuthCallback(_ url: URL) {
-        guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
-              let queryItems = components.queryItems else {
-            return
-        }
+        // Supabase may send tokens in query (?key=val) or in fragment (#key=val). Parse both.
+        let params = parseAuthCallbackParams(from: url)
+        guard !params.isEmpty else { return }
         
-        if let accessToken = queryItems.first(where: { $0.name == "access_token" })?.value,
-           let refreshToken = queryItems.first(where: { $0.name == "refresh_token" })?.value {
+        if let accessToken = params["access_token"], let refreshToken = params["refresh_token"] {
             Task {
                 do {
                     try await supabase.handleAuthCallback(accessToken: accessToken, refreshToken: refreshToken)
@@ -64,16 +62,40 @@ struct YourDateGenieApp: App {
                     print("Auth callback error: \(error)")
                 }
             }
+            return
         }
         
-        if let type = queryItems.first(where: { $0.name == "type" })?.value,
-           type == "email_confirmation" {
+        // type=email_confirmation without tokens: user confirmed in browser; still need to sign in in app
+        if params["type"] == "email_confirmation" {
             Task {
                 await MainActor.run {
                     coordinator.completeSignIn()
                 }
             }
         }
+    }
+    
+    /// Parses access_token, refresh_token, type etc. from URL query and/or fragment (Supabase uses fragment for redirects).
+    private func parseAuthCallbackParams(from url: URL) -> [String: String] {
+        var result: [String: String] = [:]
+        if let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+           let queryItems = components.queryItems {
+            for item in queryItems {
+                if let value = item.value { result[item.name] = value }
+            }
+        }
+        if let fragment = url.fragment, !fragment.isEmpty {
+            let pairs = fragment.split(separator: "&")
+            for pair in pairs {
+                let parts = pair.split(separator: "=", maxSplits: 1)
+                if parts.count == 2 {
+                    let key = String(parts[0]).removingPercentEncoding ?? String(parts[0])
+                    let value = String(parts[1]).removingPercentEncoding ?? String(parts[1])
+                    result[key] = value
+                }
+            }
+        }
+        return result
     }
     
     private func validateConfiguration() {

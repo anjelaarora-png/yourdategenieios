@@ -1,3 +1,65 @@
+/** Map country code or timezone to currency for display (VPN/location-aware). */
+function getCurrencyForLocation(countryCode?: string, timeZone?: string): { code: string; symbol: string } {
+  const country = (countryCode || "").toUpperCase().trim();
+  const tz = (timeZone || "").trim();
+  const byCountry: Record<string, { code: string; symbol: string }> = {
+    US: { code: "USD", symbol: "$" },
+    IN: { code: "INR", symbol: "₹" },
+    GB: { code: "GBP", symbol: "£" },
+    UK: { code: "GBP", symbol: "£" },
+    AU: { code: "AUD", symbol: "A$" },
+    CA: { code: "CAD", symbol: "C$" },
+    DE: { code: "EUR", symbol: "€" },
+    FR: { code: "EUR", symbol: "€" },
+    IT: { code: "EUR", symbol: "€" },
+    ES: { code: "EUR", symbol: "€" },
+    NL: { code: "EUR", symbol: "€" },
+    BE: { code: "EUR", symbol: "€" },
+    AT: { code: "EUR", symbol: "€" },
+    PT: { code: "EUR", symbol: "€" },
+    IE: { code: "EUR", symbol: "€" },
+    JP: { code: "JPY", symbol: "¥" },
+    CN: { code: "CNY", symbol: "¥" },
+    SG: { code: "SGD", symbol: "S$" },
+    HK: { code: "HKD", symbol: "HK$" },
+    AE: { code: "AED", symbol: "AED" },
+    SA: { code: "SAR", symbol: "SAR" },
+    MX: { code: "MXN", symbol: "MX$" },
+    BR: { code: "BRL", symbol: "R$" },
+    ZA: { code: "ZAR", symbol: "R" },
+    KR: { code: "KRW", symbol: "₩" },
+    TH: { code: "THB", symbol: "฿" },
+    MY: { code: "MYR", symbol: "RM" },
+    ID: { code: "IDR", symbol: "Rp" },
+    PH: { code: "PHP", symbol: "₱" },
+    NZ: { code: "NZD", symbol: "NZ$" },
+    CH: { code: "CHF", symbol: "CHF" },
+    SE: { code: "SEK", symbol: "kr" },
+    NO: { code: "NOK", symbol: "kr" },
+    DK: { code: "DKK", symbol: "kr" },
+    PL: { code: "PLN", symbol: "zł" },
+    TR: { code: "TRY", symbol: "₺" },
+    RU: { code: "RUB", symbol: "₽" },
+  };
+  if (country && byCountry[country]) return byCountry[country];
+  if (tz) {
+    if (/^Asia\/Kolkata|^Asia\/Calcutta|^India/i.test(tz)) return { code: "INR", symbol: "₹" };
+    if (/^America\//i.test(tz)) return { code: "USD", symbol: "$" };
+    if (/^Europe\//i.test(tz)) return { code: "EUR", symbol: "€" };
+    if (/^Australia\//i.test(tz)) return { code: "AUD", symbol: "A$" };
+    if (/^Pacific\/Auckland/i.test(tz)) return { code: "NZD", symbol: "NZ$" };
+    if (/^Asia\//i.test(tz)) return { code: "USD", symbol: "$" }; // fallback Asia
+  }
+  return { code: "USD", symbol: "$" };
+}
+
+const CURRENCY_SYMBOLS: Record<string, string> = {
+  USD: "$", INR: "₹", GBP: "£", EUR: "€", AUD: "A$", CAD: "C$", JPY: "¥", CNY: "¥",
+  SGD: "S$", HKD: "HK$", AED: "AED", SAR: "SAR", MXN: "MX$", BRL: "R$", ZAR: "R",
+  KRW: "₩", THB: "฿", MYR: "RM", IDR: "Rp", PHP: "₱", NZD: "NZ$", CHF: "CHF",
+  SEK: "kr", NOK: "kr", DKK: "kr", PLN: "zł", TRY: "₺", RUB: "₽",
+};
+
 export interface QuestionnaireData {
   city: string;
   neighborhood: string;
@@ -6,6 +68,12 @@ export interface QuestionnaireData {
   occasion: string;
   dateScheduled?: string;
   startTime?: string;
+  /** User's country (e.g. from device/VPN) for local currency. */
+  countryCode?: string;
+  /** User's timezone (e.g. Asia/Kolkata) for local currency when country not set. */
+  timeZone?: string;
+  /** Explicit currency code (e.g. INR, USD); overrides country/timeZone if set. */
+  currencyCode?: string;
   transportationMode: string;
   travelRadius: string;
   energyLevel: string;
@@ -14,7 +82,7 @@ export interface QuestionnaireData {
   duration: string;
   cuisinePreferences: string[];
   dietaryRestrictions: string[];
-  drinkPreferences: string;
+  drinkPreferences: string | string[];
   budgetRange: string;
   allergies: string[];
   hardNos: string[];
@@ -348,6 +416,11 @@ Please include 10-15 thoughtful conversation starters tailored to deepen their c
     ? "Create a self-care solo date plan" 
     : "Create a romantic date plan";
 
+  const currency = data.currencyCode
+    ? { code: data.currencyCode, symbol: CURRENCY_SYMBOLS[data.currencyCode.toUpperCase()] || data.currencyCode }
+    : getCurrencyForLocation(data.countryCode, data.timeZone);
+  const currencyInstruction = `CURRENCY (IMPORTANT): The user's location/VPN indicates they should see prices in ${currency.code}. Format ALL of the following using the symbol "${currency.symbol}" and local amounts: "estimatedCost", "estimatedCostPerPerson" on each stop, and "priceRange" on gifts. Examples: ${currency.symbol}50-100, ${currency.symbol}1,500-2,000. Do NOT use $ or USD unless the user is in the US.`;
+
   return `${planDescription} with these preferences:
 
 LOCATION: ${data.city}${data.neighborhood ? `, ${data.neighborhood}` : ""}
@@ -364,8 +437,10 @@ ACTIVITIES: ${activities}
 TIME: ${data.timeOfDay}
 DURATION: ${data.duration}
 CUISINE: ${cuisines}
-DRINKS: ${data.drinkPreferences || "any"}
+DRINKS: ${Array.isArray(data.drinkPreferences) ? (data.drinkPreferences.length ? data.drinkPreferences.join(", ") : "any") : (data.drinkPreferences || "any")}
 BUDGET: ${data.budgetRange}
+${currencyInstruction}
+
 ${dietary}
 ${allergies}
 ${hardNos}
@@ -379,13 +454,14 @@ ${conversationSection}
 
 CRITICAL REQUIREMENTS:
 
+GLOBAL ADDRESSES: Suggest real venues anywhere in the world. The plan is for the user's specified city/region (${data.city}); use that city to choose venues and to validate addresses. Every venue must be a REAL, VERIFIED location that exists in or near the specified area.
+
 ⚠️ LOCATION RESTRICTION - ABSOLUTELY CRITICAL ⚠️
 ALL venues MUST be located in or very near: ${data.city}${data.neighborhood ? `, specifically in/near ${data.neighborhood}` : ""}
-- DO NOT suggest venues in other cities or states
+- DO NOT suggest venues in other cities or regions
 - DO NOT suggest venues outside the specified travel radius of ${travelRadius}
 - Every single venue must be a REAL, VERIFIED location that exists in ${data.city}
-- If the user is in New Jersey, suggest ONLY New Jersey venues (not Texas, not New York unless within radius)
-- If the user is in a specific neighborhood, prioritize venues in that exact area first
+- If the user specified a neighborhood, prioritize venues in that exact area first
 
 ${isSoloDate ? `1. Generate 3 COMPLETELY DIFFERENT solo date plan options:
    - Option A - Relaxation & Rejuvenation focus
@@ -398,23 +474,25 @@ IMPORTANT: This is a SOLO DATE for ONE PERSON. All activities should be enjoyabl
    - Option C - Cozy/Intimate setting`}
 
 2. TRAVEL TIME REQUIREMENTS (VERY IMPORTANT):
-   - For each stop after the first, include realistic travel time from the previous stop
-   - Use the specified transportation mode (${transportMode}) for travel estimates
-   - Keep ALL stops within the specified travel radius (${travelRadius}) from ${data.city}
-   - Factor travel time into the overall schedule
-   - Format: "travelTimeFromPrevious": "X mins by ${transportMode.toLowerCase()}"
+   - Itinerary steps are VENUES ONLY: step 1 = first venue, step 2 = second venue, etc. The user's starting point is NOT a step—it is only used for getting to the first venue.
+   - When the user provides a starting point, the FIRST stop must include travel from that starting point to the first venue. For every stop after that, include travel from the previous venue.
+   - Use ONLY the selected transportation mode (${transportMode}) for every leg. Set "travelMode" on every stop that has travel (use exact value: ${data.transportationMode || "walking"}).
+   - Keep ALL stops within the specified travel radius (${travelRadius}) from ${data.city}. Factor travel time into the overall schedule.
+   - Format: "travelTimeFromPrevious": "X mins by ${(data.transportationMode || "walking").toLowerCase()}"
    - Format: "travelDistanceFromPrevious": "X.X miles" or "X blocks"
 
 3. VENUE INFORMATION (VERY IMPORTANT):
-   - For each stop, include the estimated cost PER PERSON (e.g., "$25-40" or "Free")
-   - Include website URL if the venue has one (real, valid URLs only)
-   - Include phone number in format (XXX) XXX-XXXX
-   - For restaurants, include booking URL if available on OpenTable or Resy
-   - Include FULL ADDRESS with city and state for each venue
+   - For each stop, include the estimated cost PER PERSON in the user's local currency (see CURRENCY above; e.g. "${currency.symbol}25-40" or "Free")
+   - Include FULL ADDRESS with city and state for every venue (required).
+   - Include official website URL when the venue has one (real, valid URLs only).
+   - Include phone number in format (XXX) XXX-XXXX when known.
+   - For RESTAURANTS and DINNER stops (venueType containing "restaurant", "dining", "dinner", "bistro", "eatery"): you MUST include a direct booking/reservation URL when the venue is on OpenTable or Resy. Use the actual restaurant page URL from opentable.com or resy.com (e.g. https://www.opentable.com/restref/... or https://resy.com/cities/.../venues/...). This ensures users can make reservations accurately. If the venue uses another booking system, use that URL in bookingUrl.
+   - Opening hours: when you know them, include as openingHours array of strings (e.g. ["Monday: 5:00 PM – 10:00 PM", "Tuesday: 5:00 PM – 10:00 PM"]). If not known, omit and our system may enrich from Google.
 
 4. Each option should have 3-4 stops with ${isSoloDate ? "self-care tips" : "romantic tips"} and travel logistics.
 5. Use ONLY real, well-known venues that actually exist in ${data.city} or within the travel radius.
 6. Be specific with venue names - use actual restaurant names, park names, etc.
 7. Double-check that every venue's address is in ${data.city} or within ${travelRadius} of it.
-${scheduledDate ? `8. The date is scheduled for ${scheduledDate}${scheduledTime ? ` starting at ${scheduledTime}` : ""}. Make sure all venues will be OPEN at the specified times and plan the time slots accordingly starting from the scheduled start time.` : ""}`;
+9. PLAN TITLES: Give each plan a short, creative title (2–6 words) that fits on a card. Do NOT use only cuisine names (e.g. "Italian Night") or neighborhood names alone. Use evocative, memorable names like "Sunset & Vinyl", "Secret Garden Evening", "Rooftop & Bubbles", "Books, Bites & Starlight", "Jazz and Velvet". Taglines can mention cuisine or neighborhood; keep titles punchy and wrap-friendly.
+${scheduledDate ? `10. The date is scheduled for ${scheduledDate}${scheduledTime ? ` starting at ${scheduledTime}` : ""}. Make sure all venues will be OPEN at the specified times and plan the time slots accordingly starting from the scheduled start time.` : ""}`;
 };

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -27,16 +27,25 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
-  Music,
   Plus,
   Trash2,
   X,
   Calendar,
   ListMusic,
+  RefreshCw,
+  Replace,
+  ChevronDown,
+  Loader2,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { SavedPlaylist, PlaylistSong, usePlaylistStorage } from "@/hooks/usePlaylistStorage";
 import SongSearchInput from "./SongSearchInput";
+import MusicRecordAnimation from "./MusicRecordAnimation";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 
 // Platform URL generators (works with or without artist - YouTube style)
 const platformUrls = {
@@ -76,19 +85,88 @@ const vibeEmojis: Record<string, string> = {
   indie: "🎸",
   classic: "🎻",
   rnb: "🎤",
+  latin: "🌴",
+  afrobeats: "🔥",
+  kpop: "💜",
+  reggae: "🎵",
+  country: "🤠",
+  metal: "🤘",
+  classical: "🎼",
+  folk: "🌾",
+  hiphop: "🎤",
+  electronic: "⚡",
 };
+
+// Display order for main 8 genres; any other vibe goes in "Other"
+const GENRE_ORDER = ["romantic", "upbeat", "chill", "adventurous", "jazzy", "indie", "classic", "rnb"] as const;
+const GENRE_LABELS: Record<string, string> = {
+  romantic: "Romantic",
+  upbeat: "Upbeat",
+  chill: "Chill",
+  adventurous: "Eclectic",
+  jazzy: "Jazzy",
+  indie: "Indie",
+  classic: "Classic",
+  rnb: "R&B",
+};
+
+// Expandable "Explore more genres" (global genres)
+const MORE_GENRES: { value: string; label: string; emoji: string }[] = [
+  { value: "latin", label: "Latin", emoji: "🌴" },
+  { value: "afrobeats", label: "Afrobeats", emoji: "🔥" },
+  { value: "kpop", label: "K-Pop", emoji: "💜" },
+  { value: "reggae", label: "Reggae", emoji: "🎵" },
+  { value: "country", label: "Country", emoji: "🤠" },
+  { value: "metal", label: "Metal", emoji: "🤘" },
+  { value: "classical", label: "Classical", emoji: "🎼" },
+  { value: "folk", label: "Folk", emoji: "🌾" },
+  { value: "hiphop", label: "Hip-Hop", emoji: "🎤" },
+  { value: "electronic", label: "Electronic", emoji: "⚡" },
+];
+
+const GENERATE_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-playlist`;
 
 interface PlaylistCollectionProps {
   onCreateNew?: () => void;
 }
 
 const PlaylistCollection = ({ onCreateNew }: PlaylistCollectionProps) => {
-  const { playlists, deletePlaylist, addSongToPlaylist, removeSongFromPlaylist } = usePlaylistStorage();
+  const {
+    playlists,
+    deletePlaylist,
+    addSongToPlaylist,
+    removeSongFromPlaylist,
+    replaceSongInPlaylist,
+    updatePlaylist,
+    savePlaylist,
+  } = usePlaylistStorage();
   const { toast } = useToast();
-  
+
   const [selectedPlaylist, setSelectedPlaylist] = useState<SavedPlaylist | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [showAddSong, setShowAddSong] = useState(false);
+  const [replaceSongId, setReplaceSongId] = useState<string | null>(null);
+  const [isRegenerating, setIsRegenerating] = useState(false);
+  const [generatingGenre, setGeneratingGenre] = useState<string | null>(null);
+  const [exploreGenresOpen, setExploreGenresOpen] = useState(false);
+
+  // Group playlists by vibe for sectioned display
+  const playlistsByGenre = useMemo(() => {
+    const map = new Map<string, SavedPlaylist[]>();
+    for (const p of playlists) {
+      const vibe = (p.vibe || "").toLowerCase() || "other";
+      if (!map.has(vibe)) map.set(vibe, []);
+      map.get(vibe)!.push(p);
+    }
+    const ordered: { genre: string; list: SavedPlaylist[] }[] = [];
+    for (const genre of GENRE_ORDER) {
+      const list = map.get(genre);
+      if (list?.length) ordered.push({ genre, list });
+    }
+    const other = Array.from(map.entries()).filter(([g]) => !GENRE_ORDER.includes(g as any));
+    for (const [genre, list] of other) ordered.push({ genre, list });
+    return ordered;
+  }, [playlists]);
 
   const handleDeletePlaylist = (id: string) => {
     deletePlaylist(id);
@@ -132,16 +210,105 @@ const PlaylistCollection = ({ onCreateNew }: PlaylistCollectionProps) => {
 
   const handleRemoveSong = (songId: string) => {
     if (!selectedPlaylist) return;
-    
     removeSongFromPlaylist(selectedPlaylist.id, songId);
+    setReplaceSongId(null);
+    setSelectedPlaylist(prev => {
+      if (!prev) return prev;
+      return { ...prev, songs: prev.songs.filter(s => s.id !== songId) };
+    });
+    toast({ title: "Song removed" });
+  };
+
+  const handleReplaceSong = (songId: string, newSong: { title: string; artist: string }) => {
+    if (!selectedPlaylist) return;
+    replaceSongInPlaylist(selectedPlaylist.id, songId, {
+      title: newSong.title,
+      artist: newSong.artist || "",
+      isCustom: true,
+    });
     setSelectedPlaylist(prev => {
       if (!prev) return prev;
       return {
         ...prev,
-        songs: prev.songs.filter(s => s.id !== songId),
+        songs: prev.songs.map(s =>
+          s.id === songId
+            ? { ...s, title: newSong.title, artist: newSong.artist || "", isCustom: true }
+            : s
+        ),
       };
     });
-    toast({ title: "Song removed" });
+    setReplaceSongId(null);
+    toast({ title: "Song replaced! 🎵" });
+  };
+
+  const handleRegenerate = async () => {
+    if (!selectedPlaylist?.stops?.length) return;
+    setIsRegenerating(true);
+    try {
+      const res = await fetch(GENERATE_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: JSON.stringify({
+          vibe: selectedPlaylist.vibe,
+          datePlanTitle: selectedPlaylist.datePlanTitle,
+          stops: selectedPlaylist.stops,
+        }),
+      });
+      if (!res.ok) throw new Error("Regenerate failed");
+      const data = await res.json();
+      const songs = (data.songs || []).map((s: { title: string; artist: string; year?: number }, i: number) => ({
+        id: `regen-${Date.now()}-${i}`,
+        title: s.title,
+        artist: s.artist || "",
+        year: s.year,
+        isCustom: false,
+        addedAt: new Date().toISOString(),
+      }));
+      updatePlaylist(selectedPlaylist.id, { songs });
+      setSelectedPlaylist(prev => (prev ? { ...prev, songs } : null));
+      toast({ title: "Playlist regenerated! 🎵" });
+    } catch {
+      toast({ title: "Could not regenerate", variant: "destructive" });
+    } finally {
+      setIsRegenerating(false);
+    }
+  };
+
+  const handleGenerateByGenre = async (vibe: string) => {
+    const label = MORE_GENRES.find(g => g.value === vibe)?.label ?? vibe;
+    setGeneratingGenre(vibe);
+    try {
+      const res = await fetch(GENERATE_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: JSON.stringify({
+          vibe,
+          datePlanTitle: `My ${label} Mix`,
+          stops: [],
+        }),
+      });
+      if (!res.ok) throw new Error("Generate failed");
+      const data = await res.json();
+      const songs = (data.songs || []).map((s: { title: string; artist: string; year?: number }) => ({
+        title: s.title,
+        artist: s.artist || "",
+        year: s.year,
+        isCustom: false,
+      }));
+      const newPlaylist = savePlaylist(`${label} Playlist`, `My ${label} Mix`, vibe, songs);
+      setSelectedPlaylist(newPlaylist);
+      toast({ title: `${label} playlist created! 🎵` });
+    } catch {
+      toast({ title: "Could not generate playlist", variant: "destructive" });
+    } finally {
+      setGeneratingGenre(null);
+    }
   };
 
   const openSong = (song: PlaylistSong, platform: "spotify" | "apple" | "youtube") => {
@@ -156,13 +323,11 @@ const PlaylistCollection = ({ onCreateNew }: PlaylistCollectionProps) => {
     });
   };
 
-  // Empty state
+  // Empty state (with spinning record + notes animation)
   if (playlists.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center bg-muted/50 rounded-lg p-8 sm:p-12 gap-4 min-h-[300px]">
-        <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
-          <Music className="w-8 h-8 text-primary" />
-        </div>
+        <MusicRecordAnimation size={88} showNotes />
         <div className="text-center">
           <h3 className="font-display text-xl mb-2">No Playlists Yet</h3>
           <p className="text-muted-foreground text-sm max-w-sm">
@@ -191,56 +356,95 @@ const PlaylistCollection = ({ onCreateNew }: PlaylistCollectionProps) => {
         </div>
       </div>
 
-      {/* Playlist grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {playlists.map((playlist) => (
-          <Card
-            key={playlist.id}
-            className="cursor-pointer hover:border-primary/50 transition-colors group"
-            onClick={() => setSelectedPlaylist(playlist)}
-          >
-            <CardHeader className="pb-2">
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex-1 min-w-0">
-                  <CardTitle className="text-base truncate flex items-center gap-2">
-                    <span>{vibeEmojis[playlist.vibe] || "🎵"}</span>
-                    {playlist.name}
-                  </CardTitle>
-                  <CardDescription className="text-xs truncate mt-1">
-                    From: {playlist.datePlanTitle}
-                  </CardDescription>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setDeleteConfirmId(playlist.id);
-                  }}
+      {/* Saved playlists by genre */}
+      <div className="space-y-6">
+        {playlistsByGenre.map(({ genre, list }) => (
+          <section key={genre}>
+            <h3 className="font-display text-sm font-medium text-muted-foreground uppercase tracking-wide mb-3 flex items-center gap-2">
+              <span>{vibeEmojis[genre] || "🎵"}</span>
+              {genre === "other" ? "Other" : (GENRE_LABELS[genre] ?? MORE_GENRES.find(g => g.value === genre)?.label ?? genre.charAt(0).toUpperCase() + genre.slice(1))}
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {list.map((playlist) => (
+                <Card
+                  key={playlist.id}
+                  className="cursor-pointer hover:border-primary/50 transition-colors group"
+                  onClick={() => { setReplaceSongId(null); setSelectedPlaylist(playlist); }}
                 >
-                  <Trash2 className="w-4 h-4 text-destructive" />
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent className="pt-0">
-              <div className="flex items-center justify-between text-xs text-muted-foreground">
-                <span className="flex items-center gap-1">
-                  <ListMusic className="w-3 h-3" />
-                  {playlist.songs.length} songs
-                </span>
-                <span className="flex items-center gap-1">
-                  <Calendar className="w-3 h-3" />
-                  {formatDate(playlist.createdAt)}
-                </span>
-              </div>
-              <Badge variant="secondary" className="mt-2 text-xs capitalize">
-                {playlist.vibe}
-              </Badge>
-            </CardContent>
-          </Card>
+                  <CardHeader className="pb-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <CardTitle className="text-base truncate flex items-center gap-2">
+                          <span>{vibeEmojis[playlist.vibe] || "🎵"}</span>
+                          {playlist.name}
+                        </CardTitle>
+                        <CardDescription className="text-xs truncate mt-1">
+                          From: {playlist.datePlanTitle}
+                        </CardDescription>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDeleteConfirmId(playlist.id);
+                        }}
+                      >
+                        <Trash2 className="w-4 h-4 text-destructive" />
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                      <span className="flex items-center gap-1">
+                        <ListMusic className="w-3 h-3" />
+                        {playlist.songs.length} songs
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Calendar className="w-3 h-3" />
+                        {formatDate(playlist.createdAt)}
+                      </span>
+                    </div>
+                    <Badge variant="secondary" className="mt-2 text-xs capitalize">
+                      {playlist.vibe}
+                    </Badge>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </section>
         ))}
       </div>
+
+      {/* Explore more genres (expandable) */}
+      <Collapsible open={exploreGenresOpen} onOpenChange={setExploreGenresOpen} className="rounded-lg border border-border bg-muted/30">
+        <CollapsibleTrigger className="flex w-full items-center justify-between px-4 py-3 text-left font-medium hover:bg-muted/50 transition-colors rounded-lg">
+          <span>Explore more genres</span>
+          <ChevronDown className={`h-4 w-4 shrink-0 transition-transform duration-200 ${exploreGenresOpen ? "rotate-180" : ""}`} />
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <div className="px-4 pb-4 pt-0 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+            {MORE_GENRES.map((g) => (
+              <Button
+                key={g.value}
+                variant="outline"
+                size="sm"
+                className="h-auto py-2.5 justify-start gap-2"
+                onClick={() => handleGenerateByGenre(g.value)}
+                disabled={!!generatingGenre}
+              >
+                {generatingGenre === g.value ? (
+                  <Loader2 className="w-4 h-4 shrink-0 animate-spin" />
+                ) : (
+                  <span className="text-lg">{g.emoji}</span>
+                )}
+                <span className="truncate">{g.label}</span>
+              </Button>
+            ))}
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
 
       {/* Playlist detail dialog */}
       <Dialog open={!!selectedPlaylist} onOpenChange={(open) => !open && setSelectedPlaylist(null)}>
@@ -256,18 +460,34 @@ const PlaylistCollection = ({ onCreateNew }: PlaylistCollectionProps) => {
           </DialogHeader>
 
           <div className="flex-1 overflow-y-auto px-4 sm:px-6 pb-4">
+            {/* Regenerate (only when playlist has stored stops) */}
+            {selectedPlaylist?.stops != null && selectedPlaylist.stops.length > 0 && (
+              <div className="mb-4">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleRegenerate}
+                  disabled={isRegenerating}
+                  className="gap-2"
+                >
+                  <RefreshCw className={`w-4 h-4 ${isRegenerating ? "animate-spin" : ""}`} />
+                  {isRegenerating ? "Regenerating…" : "Regenerate playlist"}
+                </Button>
+              </div>
+            )}
+
             {/* Add song section */}
             <div className="mb-4">
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setShowAddSong(!showAddSong)}
+                onClick={() => { setShowAddSong(!showAddSong); setReplaceSongId(null); }}
                 className="gap-2"
               >
                 {showAddSong ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
                 {showAddSong ? "Cancel" : "Add Song"}
               </Button>
-              
+
               {showAddSong && (
                 <div className="mt-3 bg-muted/50 rounded-lg p-3 border border-border">
                   <SongSearchInput
@@ -282,77 +502,104 @@ const PlaylistCollection = ({ onCreateNew }: PlaylistCollectionProps) => {
               )}
             </div>
 
-            {/* Song list */}
+            {/* Song list (with Replace) */}
             <div className="space-y-2">
               {selectedPlaylist?.songs.map((song, index) => (
-                <div
-                  key={song.id}
-                  className="flex items-center justify-between p-2.5 rounded-lg bg-muted/50 hover:bg-muted transition-colors group"
-                >
-                  <div className="flex items-center gap-3 flex-1 min-w-0">
-                    <span className="text-xs text-muted-foreground w-5 text-right shrink-0">
-                      {index + 1}
-                    </span>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-sm truncate flex items-center gap-2">
-                        {song.title}
-                        {song.isCustom && (
-                          <Badge variant="outline" className="text-[10px] px-1 py-0">
-                            Custom
-                          </Badge>
-                        )}
-                      </p>
-                      <p className="text-xs text-muted-foreground truncate">
-                        {song.artist || <span className="italic">Search by title</span>}
-                        {song.year && <span className="ml-1">({song.year})</span>}
-                      </p>
+                <div key={song.id} className="space-y-1.5">
+                  {replaceSongId === song.id ? (
+                    <div className="bg-muted/50 rounded-lg p-3 border border-border">
+                      <p className="text-xs text-muted-foreground mb-2">Replace &quot;{song.title}&quot;</p>
+                      <SongSearchInput
+                        onSelectSong={(selected) => handleReplaceSong(song.id, selected)}
+                        placeholder="Search for a song..."
+                        autoFocus
+                      />
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="mt-2 h-7 text-xs"
+                        onClick={() => setReplaceSongId(null)}
+                      >
+                        Cancel
+                      </Button>
                     </div>
-                  </div>
-                  <div className="flex gap-0.5 shrink-0 items-center">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 hover:bg-[#1DB954]/10 hover:text-[#1DB954]"
-                      onClick={() => openSong(song, "spotify")}
-                      title="Open in Spotify"
-                    >
-                      <SpotifyIcon />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 hover:bg-[#FC3C44]/10 hover:text-[#FC3C44]"
-                      onClick={() => openSong(song, "apple")}
-                      title="Open in Apple Music"
-                    >
-                      <AppleMusicIcon />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 hover:bg-[#FF0000]/10 hover:text-[#FF0000]"
-                      onClick={() => openSong(song, "youtube")}
-                      title="Open in YouTube Music"
-                    >
-                      <YouTubeMusicIcon />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
-                      onClick={() => handleRemoveSong(song.id)}
-                      title="Remove song"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </Button>
-                  </div>
+                  ) : (
+                    <div className="flex items-center justify-between p-2.5 rounded-lg bg-muted/50 hover:bg-muted transition-colors group">
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        <span className="text-xs text-muted-foreground w-5 text-right shrink-0">
+                          {index + 1}
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm truncate flex items-center gap-2">
+                            {song.title}
+                            {song.isCustom && (
+                              <Badge variant="outline" className="text-[10px] px-1 py-0">
+                                Custom
+                              </Badge>
+                            )}
+                          </p>
+                          <p className="text-xs text-muted-foreground truncate">
+                            {song.artist || <span className="italic">Search by title</span>}
+                            {song.year && <span className="ml-1">({song.year})</span>}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex gap-0.5 shrink-0 items-center">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 hover:bg-[#1DB954]/10 hover:text-[#1DB954]"
+                          onClick={() => openSong(song, "spotify")}
+                          title="Open in Spotify"
+                        >
+                          <SpotifyIcon />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 hover:bg-[#FC3C44]/10 hover:text-[#FC3C44]"
+                          onClick={() => openSong(song, "apple")}
+                          title="Open in Apple Music"
+                        >
+                          <AppleMusicIcon />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 hover:bg-[#FF0000]/10 hover:text-[#FF0000]"
+                          onClick={() => openSong(song, "youtube")}
+                          title="Open in YouTube Music"
+                        >
+                          <YouTubeMusicIcon />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-primary"
+                          onClick={() => setReplaceSongId(song.id)}
+                          title="Replace song"
+                        >
+                          <Replace className="w-3.5 h-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
+                          onClick={() => handleRemoveSong(song.id)}
+                          title="Remove song"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
           </div>
 
           <DialogFooter className="px-4 sm:px-6 pb-4 sm:pb-6 pt-2 border-t">
-            <Button variant="outline" onClick={() => setSelectedPlaylist(null)}>
+            <Button variant="outline" onClick={() => { setSelectedPlaylist(null); setReplaceSongId(null); }}>
               Close
             </Button>
           </DialogFooter>

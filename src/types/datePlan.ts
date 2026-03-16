@@ -23,6 +23,10 @@ export interface DatePlanStop {
   phoneNumber?: string;
   openingHours?: string[];
   estimatedCostPerPerson?: string;
+  /** Direct reservation URL (OpenTable, Resy, or venue booking page). Especially for dinner/restaurants. */
+  bookingUrl?: string;
+  /** When bookingUrl is set, preferred platform for the CTA label (e.g. "Reserve on OpenTable") */
+  reservationPlatform?: 'opentable' | 'resy' | string;
 }
 
 export interface GenieSecretTouch {
@@ -39,12 +43,22 @@ export interface GiftSuggestion {
   purchaseUrl?: string;
   whyItFits: string;
   emoji: string;
+  /** Direct URL to a product image when available; otherwise use emoji/placeholder */
+  imageUrl?: string;
 }
 
 export interface ConversationStarter {
   question: string;
   category: string;
   emoji: string;
+}
+
+/** Starting point for the route (departure); not a step in the itinerary. */
+export interface StartingPoint {
+  name: string;
+  address: string;
+  latitude: number;
+  longitude: number;
 }
 
 export interface DatePlan {
@@ -54,6 +68,8 @@ export interface DatePlan {
   totalDuration: string;
   estimatedCost: string;
   stops: DatePlanStop[];
+  /** Departure location for the route; itinerary steps start at 1 (first venue). */
+  startingPoint?: StartingPoint;
   genieSecretTouch: GenieSecretTouch;
   packingList: string[];
   weatherNote: string;

@@ -303,13 +303,7 @@ struct PolaroidTimelineItem: View {
             Rectangle()
                 .fill(Color.polaroidCream)
             
-            if let uiImage = memory.uiImage {
-                Image(uiImage: uiImage)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-            } else {
-                placeholderPhoto
-            }
+            MemoryPhotoView(memory: memory)
         }
         .frame(width: 180, height: 180)
         .clipped()
@@ -733,24 +727,7 @@ struct MemoryDetailView: View {
                 Rectangle()
                     .fill(Color.polaroidCream)
                 
-                if let uiImage = memory.uiImage {
-                    Image(uiImage: uiImage)
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                } else {
-                    ZStack {
-                        LinearGradient(
-                            colors: [Color.luxuryMaroonLight.opacity(0.3), Color.luxuryMaroonMedium.opacity(0.2)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                        
-                        Image(systemName: "sparkle")
-                            .font(.system(size: 60))
-                            .foregroundStyle(LinearGradient.goldShimmer)
-                            .opacity(0.6)
-                    }
-                }
+                MemoryPhotoView(memory: memory)
             }
             .frame(height: 280)
             .clipped()
@@ -837,6 +814,52 @@ struct MemoryDetailView: View {
             )
         }
         .padding(.bottom, 20)
+    }
+}
+
+// MARK: - Memory photo (local or cloud URL)
+private struct MemoryPhotoView: View {
+    let memory: DateMemory
+    
+    var body: some View {
+        Group {
+            if let uiImage = memory.uiImage {
+                Image(uiImage: uiImage)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+            } else if let url = memory.imageURL {
+                AsyncImage(url: url) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                    case .failure:
+                        placeholder
+                    case .empty:
+                        placeholder
+                    @unknown default:
+                        placeholder
+                    }
+                }
+            } else {
+                placeholder
+            }
+        }
+    }
+    
+    private var placeholder: some View {
+        ZStack {
+            LinearGradient(
+                colors: [Color.luxuryMaroonLight.opacity(0.3), Color.luxuryMaroonMedium.opacity(0.2)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            Image(systemName: "sparkle")
+                .font(.system(size: 40))
+                .foregroundStyle(LinearGradient.goldShimmer)
+                .opacity(0.6)
+        }
     }
 }
 

@@ -98,6 +98,8 @@ struct DBPreferences: Codable, Identifiable, Equatable {
     var foodAllergies: [String]?
     var hardNos: [String]?
     var accessibilityNeeds: [String]?
+    var gender: String?
+    var partnerGender: String?
     var updatedAt: Date
     
     var id: UUID { preferenceId }
@@ -114,6 +116,8 @@ struct DBPreferences: Codable, Identifiable, Equatable {
         case foodAllergies = "food_allergies"
         case hardNos = "hard_nos"
         case accessibilityNeeds = "accessibility_needs"
+        case gender
+        case partnerGender = "partner_gender"
         case updatedAt = "updated_at"
     }
     
@@ -129,6 +133,8 @@ struct DBPreferences: Codable, Identifiable, Equatable {
         foodAllergies: [String]? = nil,
         hardNos: [String]? = nil,
         accessibilityNeeds: [String]? = nil,
+        gender: String? = nil,
+        partnerGender: String? = nil,
         updatedAt: Date = Date()
     ) {
         self.preferenceId = preferenceId
@@ -142,6 +148,8 @@ struct DBPreferences: Codable, Identifiable, Equatable {
         self.foodAllergies = foodAllergies
         self.hardNos = hardNos
         self.accessibilityNeeds = accessibilityNeeds
+        self.gender = gender
+        self.partnerGender = partnerGender
         self.updatedAt = updatedAt
     }
 }
@@ -164,6 +172,7 @@ struct DBDatePlan: Codable, Identifiable, Equatable {
     var weatherNote: String?
     var geniesSecretTouch: String?
     var conversationStarters: [String]?
+    var giftSuggestions: [GiftSuggestion]?
     var itinerary: [ItineraryStop]?
     var totalTravelTime: String?
     var venueCount: Int?
@@ -190,6 +199,7 @@ struct DBDatePlan: Codable, Identifiable, Equatable {
         case weatherNote = "weather_note"
         case geniesSecretTouch = "genies_secret_touch"
         case conversationStarters = "conversation_starters"
+        case giftSuggestions = "gift_suggestions"
         case itinerary
         case totalTravelTime = "total_travel_time"
         case venueCount = "venue_count"
@@ -215,6 +225,7 @@ struct DBDatePlan: Codable, Identifiable, Equatable {
         weatherNote: String? = nil,
         geniesSecretTouch: String? = nil,
         conversationStarters: [String]? = nil,
+        giftSuggestions: [GiftSuggestion]? = nil,
         itinerary: [ItineraryStop]? = nil,
         totalTravelTime: String? = nil,
         venueCount: Int? = nil,
@@ -238,6 +249,7 @@ struct DBDatePlan: Codable, Identifiable, Equatable {
         self.weatherNote = weatherNote
         self.geniesSecretTouch = geniesSecretTouch
         self.conversationStarters = conversationStarters
+        self.giftSuggestions = giftSuggestions
         self.itinerary = itinerary
         self.totalTravelTime = totalTravelTime
         self.venueCount = venueCount

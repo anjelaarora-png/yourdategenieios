@@ -2,6 +2,7 @@ import SwiftUI
 
 struct DatePlanOptionsView: View {
     let plans: [DatePlan]
+    var loadingPlanIndices: Set<Int> = []
     var initialSelectedIndex: Int = 0
     var onSave: ((DatePlan) -> Void)?
     var onRegenerate: (() -> Void)?
@@ -16,11 +17,17 @@ struct DatePlanOptionsView: View {
     @State private var calendarDate = Date()
     @State private var calendarMessage: String?
     @State private var showCalendarAlert = false
+    @State private var itineraryAppeared = false
+    @State private var loadingSpinnerRotation: Double = 0
+    @State private var showSavedBanner = false
+    @State private var showCloseConfirmation = false
     
     var selectedPlan: DatePlan {
         guard selectedPlanIndex < plans.count else { return plans.first ?? DatePlan.sample }
         return plans[selectedPlanIndex]
     }
+    
+    var isOnRegeneratePage: Bool { selectedPlanIndex >= plans.count }
     
     var body: some View {
         NavigationStack {
@@ -29,38 +36,44 @@ struct DatePlanOptionsView: View {
                     .ignoresSafeArea()
                 
                 VStack(spacing: 0) {
-                    optionSelector
-                    
-                    ScrollView(.vertical, showsIndicators: false) {
-                        VStack(spacing: 0) {
-                            selectedPlanHeader
-                            
-                            planItinerary
-                            
-                            genieSecretTouch
-                            
-                            giftSuggestions
-                            
-                            packingAndWeather
-                            
-                            routeSection
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.bottom, 120)
-                    }
-                    .scrollBounceBehavior(.basedOnSize)
+                    optionChipsSection
+                        .zIndex(2)
+                    mainContentArea
                 }
+                .overlay(alignment: .top) {
+                    if showSavedBanner {
+                        savedBannerView
+                            .padding(.top, 12)
+                            .transition(.move(edge: .top).combined(with: .opacity))
+                            .zIndex(10)
+                    }
+                }
+                .animation(.easeInOut(duration: 0.3), value: showSavedBanner)
             }
+            .interactiveDismissDisabled(true)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button {
-                        dismiss()
+                        showCloseConfirmation = true
                     } label: {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundColor(Color.luxuryGold)
+                        HStack(spacing: 6) {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 14, weight: .medium))
+                            Text("Close")
+                                .font(Font.inter(14, weight: .medium))
+                        }
+                        .foregroundColor(Color.luxuryGold)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(Color.luxuryMaroonLight.opacity(0.8))
+                        .cornerRadius(20)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 20)
+                                .stroke(Color.luxuryGold.opacity(0.4), lineWidth: 1)
+                        )
                     }
+                    .buttonStyle(.plain)
                 }
                 
                 ToolbarItem(placement: .principal) {
@@ -79,6 +92,8 @@ struct DatePlanOptionsView: View {
                                     .font(.system(size: 13))
                                 Text("Add to Calendar")
                                     .font(Font.bodySans(12, weight: .medium))
+                                    .lineLimit(2)
+                                    .multilineTextAlignment(.center)
                             }
                             .foregroundColor(Color.luxuryGold)
                             .padding(.horizontal, 12)
@@ -99,6 +114,8 @@ struct DatePlanOptionsView: View {
                                     .font(.system(size: 13))
                                 Text("Invite Partner")
                                     .font(Font.bodySans(12, weight: .medium))
+                                    .lineLimit(2)
+                                    .multilineTextAlignment(.center)
                             }
                             .foregroundColor(Color.luxuryGold)
                             .padding(.horizontal, 12)
@@ -136,10 +153,17 @@ struct DatePlanOptionsView: View {
             .toolbarBackground(Color.luxuryMaroon, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .safeAreaInset(edge: .bottom) {
-                savePlanBar
+                if !isOnRegeneratePage {
+                    savePlanBar
+                }
             }
             .onAppear {
                 selectedPlanIndex = min(initialSelectedIndex, max(0, plans.count - 1))
+                let savedIds = Set(coordinator.savedPlans.map(\.id))
+                savedPlanIds = Set(plans.filter { savedIds.contains($0.id) }.map(\.id))
+            }
+            .onDisappear {
+                coordinator.moveUnsavedPlansToExperiencesWaiting()
             }
         }
         .sheet(isPresented: $showPartnerShare) {
@@ -152,6 +176,17 @@ struct DatePlanOptionsView: View {
             Button("OK") { calendarMessage = nil }
         } message: {
             if let msg = calendarMessage { Text(msg) }
+        }
+        .alert("Close date plans?", isPresented: $showCloseConfirmation) {
+            Button("Cancel", role: .cancel) {
+                showCloseConfirmation = false
+            }
+            Button("Close") {
+                showCloseConfirmation = false
+                coordinator.dismissSheet()
+            }
+        } message: {
+            Text("Your options will be moved to Experiences Waiting. You can save a date from there when you're ready.")
         }
     }
     
@@ -223,33 +258,164 @@ struct DatePlanOptionsView: View {
         }
     }
     
-    // MARK: - Option Selector
-    private var optionSelector: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Choose your date style:")
-                .font(Font.bodySans(14, weight: .medium))
-                .foregroundColor(Color.luxuryMuted)
-                .padding(.horizontal, 20)
+    // MARK: - Main content (swipeable TabView: one page per plan + Regenerate page)
+    private var mainContentArea: some View {
+        TabView(selection: $selectedPlanIndex) {
+            ForEach(0..<plans.count, id: \.self) { index in
+                planPageContent(index: index)
+                    .tag(index)
+            }
+            regeneratePageContent
+                .tag(plans.count)
+        }
+        .tabViewStyle(.page(indexDisplayMode: .never))
+        .animation(.spring(response: 0.45, dampingFraction: 0.8), value: selectedPlanIndex)
+        .onChange(of: selectedPlanIndex) { _, _ in
+            if selectedPlanIndex < plans.count {
+                itineraryAppeared = false
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) { itineraryAppeared = true }
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private func planPageContent(index: Int) -> some View {
+        ScrollView(.vertical, showsIndicators: false) {
+            VStack(spacing: 0) {
+                if loadingPlanIndices.contains(index) {
+                    loadingOptionView
+                        .transition(.opacity.combined(with: .scale(scale: 0.96)))
+                } else {
+                    let plan = plans[index]
+                    LoveLetterItineraryBackground(cornerRadius: 20) {
+                        VStack(spacing: 0) {
+                            planHeaderView(plan: plan)
+                            planItineraryView(plan: plan)
+                            genieSecretTouchView(plan: plan)
+                            giftSuggestionsView(plan: plan)
+                            packingAndWeatherView(plan: plan)
+                            routeSectionView(plan: plan)
+                        }
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 16)
+                    }
+                    .padding(.horizontal, 16)
+                    .id(index)
+                    .transition(.bookFlip)
+                    .opacity(itineraryAppeared ? 1 : 0)
+                    .offset(y: itineraryAppeared ? 0 : 10)
+                    .scaleEffect(itineraryAppeared ? 1 : 0.98)
+                    .animation(.easeOut(duration: 0.45), value: itineraryAppeared)
+                }
+            }
+            .padding(.bottom, 120)
+            .animation(.spring(response: 0.45, dampingFraction: 0.8), value: loadingPlanIndices.contains(index))
+        }
+        .scrollBounceBehavior(.basedOnSize)
+        .onAppear {
+            if index == selectedPlanIndex { itineraryAppeared = true }
+        }
+    }
+    
+    private var regeneratePageContent: some View {
+        VStack(spacing: 24) {
+            Spacer()
+            VStack(spacing: 16) {
+                Image(systemName: "arrow.triangle.2.circlepath")
+                    .font(.system(size: 48))
+                    .foregroundStyle(LinearGradient(
+                        colors: [Color.luxuryGold, Color.luxuryGoldLight],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ))
+                Text("Want different options?")
+                    .font(Font.tangerine(28, weight: .bold))
+                    .italic()
+                    .foregroundColor(Color.luxuryGold)
+                    .multilineTextAlignment(.center)
+                Text("Get three new date plans with the same preferences.")
+                    .font(Font.bodySans(16, weight: .regular))
+                    .foregroundColor(Color.luxuryCreamMuted)
+                    .multilineTextAlignment(.center)
+            }
+            .padding(32)
+            .frame(maxWidth: .infinity)
+            .background(Color.luxuryMaroonLight)
+            .cornerRadius(20)
+            .overlay(
+                RoundedRectangle(cornerRadius: 20)
+                    .stroke(Color.luxuryGold.opacity(0.3), lineWidth: 1)
+            )
+            .padding(.horizontal, 24)
             
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 12) {
-                    ForEach(Array(plans.enumerated()), id: \.element.id) { index, plan in
-                        PlanOptionCard(
-                            plan: plan,
-                            optionLabel: plan.optionLabel ?? "Option \(["A", "B", "C"][min(index, 2)])",
-                            isSelected: selectedPlanIndex == index
-                        ) {
-                            withAnimation(.spring(response: 0.3)) {
-                                selectedPlanIndex = index
-                            }
+            if let onRegenerate = onRegenerate {
+                Button(action: onRegenerate) {
+                    HStack(spacing: 10) {
+                        Image(systemName: "sparkles")
+                            .font(.system(size: 16))
+                        Text("Regenerate plans")
+                            .font(Font.bodySans(16, weight: .semibold))
+                    }
+                    .foregroundColor(Color.luxuryMaroon)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 16)
+                    .background(LinearGradient.goldShimmer)
+                    .cornerRadius(16)
+                }
+                .padding(.horizontal, 24)
+            }
+            Spacer()
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+    
+    // MARK: - Save confirmation banner
+    private var savedBannerView: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: 18))
+                .foregroundColor(Color(hex: "4CAF50"))
+            Text("Date plan saved")
+                .font(Font.bodySans(15, weight: .semibold))
+                .foregroundColor(Color.luxuryCream)
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 14)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color.luxuryMaroonLight)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(Color.luxuryGold.opacity(0.5), lineWidth: 1)
+                )
+        )
+        .shadow(color: Color.black.opacity(0.2), radius: 8, y: 4)
+    }
+    
+    // MARK: - Option chips (ExperienceCard-style: image, emoji, title — like navigation pane)
+    private var optionChipsSection: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 12) {
+                ForEach(Array(plans.enumerated()), id: \.element.id) { index, plan in
+                    OptionChipCard(
+                        plan: plan,
+                        optionLabel: plan.optionLabel ?? "Option \(["A", "B", "C"][min(index, 2)])",
+                        isSelected: selectedPlanIndex == index,
+                        isSaved: savedPlanIds.contains(plan.id),
+                        isVerifying: loadingPlanIndices.contains(index)
+                    ) {
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                            selectedPlanIndex = index
                         }
                     }
                 }
-                .padding(.horizontal, 20)
             }
+            .padding(.horizontal, 16)
         }
-        .padding(.vertical, 16)
+        .padding(.vertical, 12)
+        .frame(minHeight: 120)
         .background(Color.luxuryMaroon)
+        .contentShape(Rectangle())
     }
     
     // MARK: - Save Plan Bar
@@ -259,8 +425,14 @@ struct DatePlanOptionsView: View {
                 let isCurrentSaved = savedPlanIds.contains(selectedPlan.id)
                 Button {
                     onSave(selectedPlan)
-                    _ = withAnimation(.spring(response: 0.3)) {
+                    withAnimation(.spring(response: 0.3)) {
                         savedPlanIds.insert(selectedPlan.id)
+                    }
+                    showSavedBanner = true
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+                        withAnimation(.easeOut(duration: 0.25)) {
+                            showSavedBanner = false
+                        }
                     }
                 } label: {
                     HStack(spacing: 10) {
@@ -289,70 +461,127 @@ struct DatePlanOptionsView: View {
         )
     }
     
-    // MARK: - Selected Plan Header
-    private var selectedPlanHeader: some View {
+    // MARK: - Loading Option (preparing in background — luxe animation)
+    private var loadingOptionView: some View {
+        VStack(spacing: 28) {
+            ZStack {
+                Circle()
+                    .stroke(Color.luxuryGold.opacity(0.2), lineWidth: 3)
+                    .frame(width: 56, height: 56)
+                Circle()
+                    .trim(from: 0, to: 0.7)
+                    .stroke(
+                        LinearGradient(
+                            colors: [Color.luxuryGold, Color.luxuryGoldLight],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        ),
+                        style: StrokeStyle(lineWidth: 3, lineCap: .round)
+                    )
+                    .frame(width: 56, height: 56)
+                    .rotationEffect(.degrees(loadingSpinnerRotation))
+                    .animation(.linear(duration: 1).repeatForever(autoreverses: false), value: loadingSpinnerRotation)
+                Image(systemName: "mappin.circle.fill")
+                    .font(.system(size: 24))
+                    .foregroundStyle(LinearGradient(
+                        colors: [Color.luxuryGold, Color.luxuryGoldDark],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ))
+            }
+            VStack(spacing: 8) {
+                Text("Adding the finishing touches")
+                    .font(Font.tangerine(24, weight: .bold))
+                    .italic()
+                    .foregroundColor(Color.luxuryGold)
+                Text("Your date is almost ready")
+                    .font(Font.bodySans(13, weight: .regular))
+                    .foregroundColor(Color.luxuryMuted)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 80)
+        .onAppear {
+            withAnimation(.linear(duration: 1).repeatForever(autoreverses: false)) {
+                loadingSpinnerRotation = 360
+            }
+        }
+    }
+    
+    // MARK: - Plan Header (parameterized for TabView pages)
+    private func planHeaderView(plan: DatePlan) -> some View {
         VStack(spacing: 16) {
             VStack(spacing: 8) {
-                Text(selectedPlan.title)
+                Text(plan.title)
                     .font(Font.tangerine(42, weight: .bold))
                     .italic()
-                    .foregroundColor(Color.luxuryCream)
+                    .foregroundColor(Color(hex: "3D2C2C"))
                     .multilineTextAlignment(.center)
                 
-                Text(selectedPlan.tagline)
-                    .font(Font.playfairItalic(16))
-                    .foregroundColor(Color.luxuryMuted)
+                Text(plan.tagline)
+                    .font(Font.playfairItalic(17))
+                    .foregroundColor(Color(hex: "4A3D2C"))
                     .multilineTextAlignment(.center)
             }
             
             HStack(spacing: 20) {
                 HStack(spacing: 6) {
                     Image(systemName: "clock")
-                        .font(.system(size: 13))
-                    Text(selectedPlan.totalDuration)
-                        .font(Font.bodySans(13, weight: .medium))
+                        .font(.system(size: 14))
+                    Text(plan.totalDuration)
+                        .font(Font.bodySans(14, weight: .medium))
                 }
-                .foregroundColor(Color.luxuryCream)
+                .foregroundColor(Color(hex: "3D2C2C"))
                 .padding(.horizontal, 16)
                 .padding(.vertical, 10)
-                .background(Color.luxuryMaroonLight)
+                .background(Color.luxuryGold.opacity(0.15))
                 .cornerRadius(20)
                 
                 HStack(spacing: 6) {
                     Image(systemName: "dollarsign.circle")
-                        .font(.system(size: 13))
-                    Text(selectedPlan.estimatedCost)
-                        .font(Font.bodySans(13, weight: .medium))
+                        .font(.system(size: 14))
+                    Text(plan.estimatedCost)
+                        .font(Font.bodySans(14, weight: .medium))
                 }
-                .foregroundColor(Color.luxuryGold)
+                .foregroundColor(Color(hex: "4A0E0E"))
                 .padding(.horizontal, 16)
                 .padding(.vertical, 10)
-                .background(Color.luxuryGold.opacity(0.15))
+                .background(Color.luxuryGold.opacity(0.2))
                 .cornerRadius(20)
             }
         }
         .padding(.vertical, 24)
     }
     
-    // MARK: - Plan Itinerary
-    private var planItinerary: some View {
+    // MARK: - Selected Plan Header (on paper: dark text) — used by sheets
+    private var selectedPlanHeader: some View {
+        planHeaderView(plan: selectedPlan)
+    }
+    
+    // MARK: - Plan Itinerary (parameterized for TabView pages)
+    private func planItineraryView(plan: DatePlan) -> some View {
         VStack(spacing: 0) {
-            if let startingPoint = coordinator.generatedPlans.first?.stops.first {
-                StartingPointCard(address: startingPoint.address ?? "Your Location")
+            if let start = plan.startingPoint {
+                StartingPointCard(address: start.address)
             }
             
-            ForEach(Array(selectedPlan.stops.enumerated()), id: \.element.id) { index, stop in
+            ForEach(Array(plan.stops.enumerated()), id: \.element.id) { index, stop in
                 ItineraryStopCard(
                     stop: stop,
                     stopNumber: index + 1,
-                    isLast: index == selectedPlan.stops.count - 1
+                    isLast: index == plan.stops.count - 1
                 )
             }
         }
     }
     
-    // MARK: - Genie Secret Touch
-    private var genieSecretTouch: some View {
+    // MARK: - Plan Itinerary (selectedPlan)
+    private var planItinerary: some View {
+        planItineraryView(plan: selectedPlan)
+    }
+    
+    // MARK: - Genie Secret Touch (parameterized)
+    private func genieSecretTouchView(plan: DatePlan) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 10) {
                 ZStack {
@@ -367,22 +596,22 @@ struct DatePlanOptionsView: View {
                 
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 6) {
-                        Text(selectedPlan.genieSecretTouch.emoji)
+                        Text(plan.genieSecretTouch.emoji)
                         Text("Genie's Secret Touch")
-                            .font(Font.header(16, weight: .bold))
+                            .font(Font.header(17, weight: .bold))
                             .foregroundColor(Color.luxuryGold)
                     }
                     
-                    Text(selectedPlan.genieSecretTouch.title)
-                        .font(Font.bodySans(14, weight: .semibold))
-                        .foregroundColor(Color.luxuryGold.opacity(0.9))
+                    Text(plan.genieSecretTouch.title)
+                        .font(Font.bodySans(15, weight: .semibold))
+                        .foregroundColor(Color.luxuryGold.opacity(0.95))
                 }
             }
             
-            Text(selectedPlan.genieSecretTouch.description)
-                .font(Font.bodySans(14, weight: .regular))
-                .foregroundColor(Color.luxuryCreamMuted)
-                .lineSpacing(4)
+            Text(plan.genieSecretTouch.description)
+                .font(Font.bodySans(15, weight: .regular))
+                .foregroundColor(Color.luxuryCream)
+                .lineSpacing(5)
         }
         .padding(20)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -395,10 +624,15 @@ struct DatePlanOptionsView: View {
         .padding(.top, 24)
     }
     
-    // MARK: - Gift Suggestions
+    // MARK: - Genie Secret Touch (selectedPlan)
+    private var genieSecretTouch: some View {
+        genieSecretTouchView(plan: selectedPlan)
+    }
+    
+    // MARK: - Gift Suggestions (parameterized)
     @ViewBuilder
-    private var giftSuggestions: some View {
-        if let gifts = selectedPlan.giftSuggestions, !gifts.isEmpty {
+    private func giftSuggestionsView(plan: DatePlan) -> some View {
+        if let gifts = plan.giftSuggestions, !gifts.isEmpty {
             VStack(alignment: .leading, spacing: 16) {
                 HStack {
                     HStack(spacing: 8) {
@@ -411,7 +645,7 @@ struct DatePlanOptionsView: View {
                     Spacer()
                     
                     Button {
-                        coordinator.showGiftFinder(datePlan: selectedPlan, dateLocation: selectedPlan.stops.first?.address)
+                        coordinator.showGiftFinder(datePlan: plan, dateLocation: plan.stops.first?.address)
                     } label: {
                         HStack(spacing: 6) {
                             Image(systemName: "sparkles")
@@ -427,9 +661,9 @@ struct DatePlanOptionsView: View {
                     }
                 }
                 
-                Text("Found \(gifts.count) suggestions for your \(selectedPlan.title) date")
-                    .font(Font.bodySans(13, weight: .regular))
-                    .foregroundColor(Color.luxuryMuted)
+                Text("Found \(gifts.count) suggestions for your \(plan.title) date")
+                    .font(Font.bodySans(14, weight: .regular))
+                    .foregroundColor(Color.luxuryCreamMuted)
                 
                 ForEach(gifts) { gift in
                     GiftSuggestionCard(gift: gift)
@@ -446,27 +680,33 @@ struct DatePlanOptionsView: View {
         }
     }
     
-    // MARK: - Packing and Weather
-    private var packingAndWeather: some View {
+    // MARK: - Gift Suggestions (selectedPlan)
+    @ViewBuilder
+    private var giftSuggestions: some View {
+        giftSuggestionsView(plan: selectedPlan)
+    }
+    
+    // MARK: - Packing and Weather (parameterized)
+    private func packingAndWeatherView(plan: DatePlan) -> some View {
         HStack(alignment: .top, spacing: 16) {
             VStack(alignment: .leading, spacing: 12) {
                 HStack(spacing: 8) {
                     Image(systemName: "bag.fill")
                         .foregroundColor(Color.luxuryGold)
                     Text("What to Bring")
-                        .font(Font.header(14, weight: .semibold))
+                        .font(Font.header(15, weight: .semibold))
                         .foregroundColor(Color.luxuryCream)
                 }
                 
                 VStack(alignment: .leading, spacing: 8) {
-                    ForEach(selectedPlan.packingList, id: \.self) { item in
+                    ForEach(plan.packingList, id: \.self) { item in
                         HStack(spacing: 8) {
                             Circle()
                                 .fill(Color.luxuryGold)
                                 .frame(width: 6, height: 6)
                             Text(item)
-                                .font(Font.bodySans(13, weight: .regular))
-                                .foregroundColor(Color.luxuryCreamMuted)
+                                .font(Font.bodySans(14, weight: .regular))
+                                .foregroundColor(Color.luxuryCream)
                         }
                     }
                 }
@@ -481,13 +721,13 @@ struct DatePlanOptionsView: View {
                     Image(systemName: "cloud.sun.fill")
                         .foregroundColor(Color.luxuryGold)
                     Text("Weather Note")
-                        .font(Font.header(14, weight: .semibold))
+                        .font(Font.header(15, weight: .semibold))
                         .foregroundColor(Color.luxuryCream)
                 }
                 
-                Text(selectedPlan.weatherNote)
-                    .font(Font.bodySans(13, weight: .regular))
-                    .foregroundColor(Color.luxuryCreamMuted)
+                Text(plan.weatherNote)
+                    .font(Font.bodySans(14, weight: .regular))
+                    .foregroundColor(Color.luxuryCream)
                     .lineSpacing(4)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -498,9 +738,24 @@ struct DatePlanOptionsView: View {
         .padding(.top, 24)
     }
     
-    // MARK: - Route Section
-    private var routeSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
+    // MARK: - Packing and Weather (selectedPlan)
+    private var packingAndWeather: some View {
+        packingAndWeatherView(plan: selectedPlan)
+    }
+    
+    /// Itinerary = venues only (same as DatePlanResultView). Starting point is not a step.
+    private func itineraryStops(for plan: DatePlan) -> [DatePlanStop] {
+        plan.stops.filter { $0.venueType != "Starting point" && $0.name != "Your location" }
+    }
+    
+    private var selectedPlanItineraryStops: [DatePlanStop] {
+        itineraryStops(for: selectedPlan)
+    }
+    
+    // MARK: - Route Section (parameterized)
+    private func routeSectionView(plan: DatePlan) -> some View {
+        let stops = itineraryStops(for: plan)
+        return VStack(alignment: .leading, spacing: 16) {
             HStack(spacing: 8) {
                 Image(systemName: "location.fill")
                     .foregroundColor(Color.luxuryGold)
@@ -510,7 +765,7 @@ struct DatePlanOptionsView: View {
             }
             
             Button {
-                coordinator.showRouteMap(stops: selectedPlan.stops)
+                coordinator.showRouteMap(stops: stops, startingPoint: plan.startingPoint)
             } label: {
                 HStack {
                     HStack(spacing: 8) {
@@ -523,7 +778,7 @@ struct DatePlanOptionsView: View {
                     
                     Spacer()
                     
-                    Text("\(selectedPlan.stops.count) stops")
+                    Text("\(stops.count) stops")
                         .font(Font.bodySans(12, weight: .regular))
                         .foregroundColor(Color.luxuryMuted)
                     
@@ -548,9 +803,90 @@ struct DatePlanOptionsView: View {
                 )
             }
             
-            RouteSummaryBar(stops: selectedPlan.stops)
+            RouteSummaryBar(stops: stops)
         }
         .padding(.top, 24)
+    }
+    
+    // MARK: - Route Section (selectedPlan)
+    private var routeSection: some View {
+        routeSectionView(plan: selectedPlan)
+    }
+}
+
+// MARK: - Option Chip Card (mini ExperienceCard-style for options strip)
+private struct OptionChipCard: View {
+    let plan: DatePlan
+    let optionLabel: String
+    let isSelected: Bool
+    let isSaved: Bool
+    let isVerifying: Bool
+    let onTap: () -> Void
+    
+    private let cardWidth: CGFloat = 110
+    private let imageHeight: CGFloat = 52
+    
+    var body: some View {
+        Button(action: onTap) {
+            VStack(alignment: .leading, spacing: 0) {
+                ZStack(alignment: .bottomLeading) {
+                    if isVerifying {
+                        Color.luxuryMaroonLight
+                            .frame(width: cardWidth, height: imageHeight)
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: Color.luxuryGold))
+                            .scaleEffect(0.9)
+                    } else {
+                        AsyncImage(url: URL(string: plan.displayImageUrl)) { phase in
+                            switch phase {
+                            case .success(let image):
+                                image
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                            case .empty, .failure:
+                                Color.luxuryMaroonLight
+                            @unknown default:
+                                EmptyView()
+                            }
+                        }
+                        .frame(width: cardWidth, height: imageHeight)
+                        .clipped()
+                        LinearGradient(
+                            colors: [.clear, Color.luxuryMaroon.opacity(0.75)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                        Text(plan.stops.first?.emoji ?? "✨")
+                            .font(.system(size: 18))
+                            .padding(6)
+                    }
+                    if isSaved {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 14))
+                            .foregroundColor(Color(hex: "4CAF50"))
+                            .padding(6)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                    }
+                }
+                .frame(width: cardWidth, height: imageHeight)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(plan.title)
+                        .font(Font.bodySans(11, weight: .semibold))
+                        .foregroundColor(Color.luxuryCream)
+                        .lineLimit(2)
+                }
+                .padding(8)
+            }
+            .frame(width: cardWidth)
+            .background(Color.luxuryMaroonLight)
+            .cornerRadius(12)
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(isSelected ? Color.luxuryGold : Color.luxuryGold.opacity(0.25), lineWidth: isSelected ? 2 : 1)
+            )
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 }
 
@@ -559,11 +895,28 @@ struct PlanOptionCard: View {
     let plan: DatePlan
     let optionLabel: String
     let isSelected: Bool
+    var isVerifying: Bool = false
     let onTap: () -> Void
     
     var body: some View {
         Button(action: onTap) {
             VStack(alignment: .leading, spacing: 12) {
+                AsyncImage(url: URL(string: plan.displayImageUrl)) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                    case .empty, .failure:
+                        Color.luxuryMaroonLight
+                    @unknown default:
+                        EmptyView()
+                    }
+                }
+                .frame(height: 72)
+                .frame(maxWidth: .infinity)
+                .clipped()
+                .cornerRadius(10)
                 HStack {
                     Text(optionLabel)
                         .font(Font.bodySans(12, weight: .semibold))
@@ -582,7 +935,7 @@ struct PlanOptionCard: View {
                 }
                 
                 Text(plan.title)
-                    .font(Font.header(16, weight: .bold))
+                    .font(Font.bodySans(14, weight: .semibold))
                     .foregroundColor(Color.luxuryCream)
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
@@ -614,13 +967,24 @@ struct PlanOptionCard: View {
                     .foregroundColor(Color.luxuryMuted)
                 }
                 
-                HStack(spacing: 4) {
-                    Image(systemName: "checkmark.seal.fill")
-                        .font(.system(size: 11))
-                        .foregroundColor(Color(hex: "4CAF50"))
-                    Text("\(plan.stops.filter { $0.validated == true }.count)/\(plan.stops.count) venues verified")
-                        .font(Font.bodySans(11, weight: .medium))
-                        .foregroundColor(Color(hex: "4CAF50"))
+                if isVerifying {
+                    HStack(spacing: 6) {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: Color.luxuryGold))
+                            .scaleEffect(0.7)
+                        Text("Just a moment…")
+                            .font(Font.bodySans(11, weight: .medium))
+                            .foregroundColor(Color.luxuryGold)
+                    }
+                } else {
+                    HStack(spacing: 4) {
+                        Image(systemName: "checkmark.seal.fill")
+                            .font(.system(size: 11))
+                            .foregroundColor(Color(hex: "4CAF50"))
+                        Text("\(plan.stops.filter { $0.validated == true }.count)/\(plan.stops.count) venues verified")
+                            .font(Font.bodySans(11, weight: .medium))
+                            .foregroundColor(Color(hex: "4CAF50"))
+                    }
                 }
             }
             .padding(16)
@@ -631,7 +995,11 @@ struct PlanOptionCard: View {
                 RoundedRectangle(cornerRadius: 16)
                     .stroke(isSelected ? Color.luxuryGold : Color.luxuryGold.opacity(0.2), lineWidth: isSelected ? 2 : 1)
             )
+            .scaleEffect(isSelected ? 1.02 : 1.0)
+            .shadow(color: isSelected ? Color.luxuryGold.opacity(0.25) : .clear, radius: 12, y: 4)
         }
+        .buttonStyle(.plain)
+        .animation(.spring(response: 0.35, dampingFraction: 0.75), value: isSelected)
     }
 }
 
@@ -650,18 +1018,18 @@ struct StartingPointCard: View {
                     .foregroundColor(Color.luxuryGold)
             }
             
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
                     Text("🏠")
                     Text("Starting Point")
-                        .font(Font.bodySans(14, weight: .semibold))
+                        .font(Font.bodySans(15, weight: .semibold))
                         .foregroundColor(Color.luxuryCream)
                 }
                 
                 Text(address)
-                    .font(Font.bodySans(12, weight: .regular))
-                    .foregroundColor(Color.luxuryMuted)
-                    .lineLimit(1)
+                    .font(Font.bodySans(14, weight: .regular))
+                    .foregroundColor(Color.luxuryCreamMuted)
+                    .lineLimit(2)
             }
             
             Spacer()
@@ -685,7 +1053,8 @@ struct ItineraryStopCard: View {
             if let travelTime = stop.travelTimeFromPrevious {
                 TravelIndicator(
                     time: travelTime,
-                    distance: stop.travelDistanceFromPrevious
+                    distance: stop.travelDistanceFromPrevious,
+                    travelMode: stop.travelMode
                 )
             }
             
@@ -697,16 +1066,16 @@ struct ItineraryStopCard: View {
                             .frame(width: 28, height: 28)
                         
                         Text("\(stopNumber)")
-                            .font(Font.bodySans(13, weight: .bold))
+                            .font(Font.bodySans(14, weight: .bold))
                             .foregroundColor(Color.luxuryMaroon)
                     }
                     
-                    VStack(alignment: .leading, spacing: 8) {
+                    VStack(alignment: .leading, spacing: 6) {
                         HStack {
-                            HStack(spacing: 8) {
+                            HStack(spacing: 6) {
                                 Text(stop.emoji)
                                 Text(stop.name)
-                                    .font(Font.header(16, weight: .bold))
+                                    .font(Font.header(17, weight: .bold))
                                     .foregroundColor(Color.luxuryCream)
                                 
                                 if stop.validated == true {
@@ -719,7 +1088,7 @@ struct ItineraryStopCard: View {
                             Spacer()
                             
                             Text(stop.timeSlot)
-                                .font(Font.bodySans(13, weight: .semibold))
+                                .font(Font.bodySans(14, weight: .semibold))
                                 .foregroundColor(Color.luxuryGold)
                                 .padding(.horizontal, 12)
                                 .padding(.vertical, 6)
@@ -728,18 +1097,18 @@ struct ItineraryStopCard: View {
                         }
                         
                         Text(stop.venueType)
-                            .font(Font.bodySans(13, weight: .medium))
-                            .foregroundColor(Color.luxuryMuted)
+                            .font(Font.bodySans(14, weight: .medium))
+                            .foregroundColor(Color.luxuryCreamMuted)
                         
                         if let address = stop.address {
                             HStack(spacing: 6) {
                                 Image(systemName: "mappin.circle.fill")
-                                    .font(.system(size: 12))
+                                    .font(.system(size: 13))
                                 Text(address)
-                                    .font(Font.bodySans(12, weight: .regular))
-                                    .lineLimit(1)
+                                    .font(Font.bodySans(13, weight: .regular))
+                                    .lineLimit(2)
                             }
-                            .foregroundColor(Color.luxuryMuted)
+                            .foregroundColor(Color.luxuryCreamMuted)
                         }
                         
                         HStack(spacing: 16) {
@@ -756,12 +1125,7 @@ struct ItineraryStopCard: View {
                             }
                             
                             Button {
-                                if let placeId = stop.placeId,
-                                   let url = URL(string: "https://www.google.com/maps/place/?q=place_id:\(placeId)") {
-                                    UIApplication.shared.open(url)
-                                } else if let address = stop.address,
-                                          let encoded = address.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
-                                          let url = URL(string: "maps://?q=\(encoded)") {
+                                if let url = MapURLHelper.urlForStop(stop) {
                                     UIApplication.shared.open(url)
                                 }
                             } label: {
@@ -787,7 +1151,15 @@ struct ItineraryStopCard: View {
                             }
                             
                             if let hours = stop.openingHours, !hours.isEmpty {
-                                VStack(alignment: .leading, spacing: 4) {
+                                DisclosureGroup {
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        ForEach(hours.indices, id: \.self) { i in
+                                            Text(hours[i])
+                                                .font(Font.bodySans(11, weight: .regular))
+                                                .foregroundColor(Color.luxuryCreamMuted)
+                                        }
+                                    }
+                                } label: {
                                     HStack(spacing: 4) {
                                         Image(systemName: "clock")
                                             .font(.system(size: 11))
@@ -795,12 +1167,8 @@ struct ItineraryStopCard: View {
                                             .font(Font.bodySans(11, weight: .medium))
                                     }
                                     .foregroundColor(Color.luxuryGold)
-                                    ForEach(hours.indices, id: \.self) { i in
-                                        Text(hours[i])
-                                            .font(Font.bodySans(11, weight: .regular))
-                                            .foregroundColor(Color.luxuryCreamMuted)
-                                    }
                                 }
+                                .disclosureGroupStyle(.automatic)
                             }
                         }
                         
@@ -808,10 +1176,10 @@ struct ItineraryStopCard: View {
                             .font(Font.bodySans(14, weight: .regular))
                             .foregroundColor(Color.luxuryCreamMuted)
                             .lineSpacing(4)
-                            .padding(.top, 8)
+                            .padding(.top, 6)
                         
-                        VStack(alignment: .leading, spacing: 8) {
-                            HStack(alignment: .top, spacing: 8) {
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack(alignment: .top, spacing: 6) {
                                 Text("Why this fits:")
                                     .font(Font.bodySans(12, weight: .semibold))
                                     .foregroundColor(Color.luxuryGold.opacity(0.9))
@@ -820,7 +1188,7 @@ struct ItineraryStopCard: View {
                                     .foregroundColor(Color.luxuryMuted)
                             }
                             
-                            HStack(alignment: .top, spacing: 8) {
+                            HStack(alignment: .top, spacing: 6) {
                                 Text("😍")
                                 Text("Romantic tip:")
                                     .font(Font.bodySans(12, weight: .semibold))
@@ -830,12 +1198,12 @@ struct ItineraryStopCard: View {
                                     .foregroundColor(Color.luxuryMuted)
                             }
                         }
-                        .padding(12)
+                        .padding(10)
                         .background(Color.luxuryMaroon.opacity(0.5))
                         .cornerRadius(10)
-                        .padding(.top, 8)
+                        .padding(.top, 6)
                         
-                        HStack(spacing: 24) {
+                        HStack(spacing: 20) {
                             HStack(spacing: 6) {
                                 Text("Duration:")
                                     .font(Font.bodySans(12, weight: .regular))
@@ -856,12 +1224,12 @@ struct ItineraryStopCard: View {
                                 }
                             }
                         }
-                        .padding(.top, 8)
+                        .padding(.top, 6)
                     }
-                    .padding(.leading, 12)
+                    .padding(.leading, 10)
                 }
             }
-            .padding(20)
+            .padding(16)
             .background(Color.luxuryMaroonLight)
             .cornerRadius(16)
             .overlay(
@@ -876,6 +1244,8 @@ struct ItineraryStopCard: View {
 struct TravelIndicator: View {
     let time: String
     let distance: String?
+    /// Transportation mode for this leg (e.g. "driving", "walking"). When nil, inferred from time text (e.g. "Drive 15 mins").
+    var travelMode: String? = nil
     
     var body: some View {
         HStack(spacing: 12) {
@@ -884,7 +1254,7 @@ struct TravelIndicator: View {
                 .frame(width: 2, height: 30)
             
             HStack(spacing: 8) {
-                Image(systemName: "figure.walk")
+                Image(systemName: TravelModeIcon.sfSymbol(for: travelMode, inferFromTimeText: time))
                     .font(.system(size: 12))
                     .foregroundColor(Color.luxuryGold)
                 

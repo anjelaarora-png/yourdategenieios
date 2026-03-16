@@ -1,10 +1,108 @@
 import SwiftUI
 
+// MARK: - Reservation region & top-two platforms (matches web config)
+private enum ReservationRegion: String {
+    case us, uk, ca, au, fr, de, it, es, jp, india, ae, sa, sg, th, my, br, mx, za, nz, eu, latam, other
+}
+
+private func detectReservationRegion(from address: String?) -> ReservationRegion {
+    guard let address = address, !address.isEmpty else { return .us }
+    let lower = address.lowercased()
+    if lower.contains("usa") || lower.contains("united states") || lower.range(of: #", [a-z]{2} \d{5}"#, options: .regularExpression) != nil { return .us }
+    if lower.contains("canada") || lower.contains("ontario") || lower.contains("quebec") || lower.contains("british columbia") || lower.contains("toronto") || lower.contains("vancouver") || lower.contains("montreal") || lower.contains("calgary") || lower.contains("ottawa") || lower.contains(", bc") || lower.contains(", ab") || lower.contains(", qc") || lower.contains(", on") { return .ca }
+    if lower.contains("mexico") || lower.contains("méxico") || lower.contains("cdmx") || lower.contains("guadalajara") || lower.contains("monterrey") || lower.contains("cancun") || lower.contains("oaxaca") { return .mx }
+    if lower.contains("new zealand") || lower.contains("auckland") || lower.contains("wellington") || lower.contains("christchurch") || lower.contains("queenstown") || lower.contains("dunedin") { return .nz }
+    if lower.contains("uae") || lower.contains("dubai") || lower.contains("abu dhabi") || lower.contains("emirates") { return .ae }
+    if lower.contains("saudi arabia") || lower.contains("saudi") || lower.contains("riyadh") || lower.contains("jeddah") || lower.contains("mecca") || lower.contains("dammam") { return .sa }
+    if lower.contains("south africa") || lower.contains("johannesburg") || lower.contains("cape town") || lower.contains("durban") || lower.contains("pretoria") { return .za }
+    if lower.contains("brazil") || lower.contains("brasil") || lower.contains("são paulo") || lower.contains("sao paulo") || lower.contains("rio de janeiro") || lower.contains("brasília") || lower.contains("brasilia") { return .br }
+    if lower.contains("uk") || lower.contains("united kingdom") || lower.contains("england") || lower.contains("london") || lower.contains("scotland") || lower.contains("wales") { return .uk }
+    if lower.contains("france") || lower.contains("paris") || lower.contains("lyon") || lower.contains("marseille") { return .fr }
+    if lower.contains("germany") || lower.contains("deutschland") || lower.contains("berlin") || lower.contains("munich") || lower.contains("hamburg") || lower.contains("frankfurt") || lower.contains("cologne") { return .de }
+    if lower.contains("italy") || lower.contains("italia") || lower.contains("rome") || lower.contains("roma") || lower.contains("milan") || lower.contains("milano") || lower.contains("naples") || lower.contains("florence") || lower.contains("venice") { return .it }
+    if lower.contains("spain") || lower.contains("españa") || lower.contains("espana") || lower.contains("madrid") || lower.contains("barcelona") || lower.contains("valencia") || lower.contains("seville") { return .es }
+    if lower.contains("japan") || lower.contains("tokyo") || lower.contains("osaka") || lower.contains("kyoto") || lower.contains("yokohama") || lower.contains("nagoya") || lower.contains("fukuoka") || lower.contains("sapporo") || lower.contains("hiroshima") { return .jp }
+    if lower.contains("india") || lower.contains("mumbai") || lower.contains("delhi") || lower.contains("bangalore") || lower.contains("chennai") || lower.contains("hyderabad") || lower.contains("kolkata") || lower.contains("pune") || lower.contains("ahmedabad") || lower.contains("jaipur") { return .india }
+    if lower.contains("singapore") || lower.contains(" sg ") { return .sg }
+    if lower.contains("thailand") || lower.contains("bangkok") || lower.contains("phuket") || lower.contains("chiang mai") { return .th }
+    if lower.contains("malaysia") || lower.contains("kuala lumpur") || lower.contains("penang") || lower.contains("george town") || lower.contains("johor") { return .my }
+    if lower.contains("argentina") || lower.contains("chile") || lower.contains("colombia") || lower.contains("peru") || lower.contains("lima") || lower.contains("buenos aires") || lower.contains("bogotá") || lower.contains("bogota") || lower.contains("santiago") { return .latam }
+    let usStates = ["ny", "nyc", "ca", "tx", "fl", "wa", "il", "pa", "oh", "ga", "nc", "mi", "nj", "va", "az", "ma", "tn", "in", "mo", "md", "wi", "mn", "co", "al", "sc", "la", "ky", "or", "ok", "ct", "ut", "ia", "nv", "ar", "ms", "ks", "nm", "ne", "wv", "id", "hi", "nh", "me", "mt", "ri", "de", "sd", "nd", "ak", "vt", "dc", "wy"]
+    if usStates.contains(where: { lower.contains($0) }) { return .us }
+    if lower.contains("australia") || lower.contains("sydney") || lower.contains("melbourne") || lower.contains("brisbane") || lower.contains("perth") || lower.contains("adelaide") || lower.contains("canberra") { return .au }
+    let euTerms = ["netherlands", "belgium", "austria", "switzerland", "portugal", "ireland", "denmark", "sweden", "norway", "finland", "greece", "poland", "amsterdam", "brussels", "vienna", "zurich", "lisbon", "dublin", "copenhagen", "stockholm"]
+    if euTerms.contains(where: { lower.contains($0) }) { return .eu }
+    return .us
+}
+
+private struct ReservationPlatformItem: Identifiable {
+    let id: String
+    let name: String
+}
+
+private func topTwoPlatforms(for region: ReservationRegion) -> [ReservationPlatformItem] {
+    switch region {
+    case .us: return [ReservationPlatformItem(id: "opentable", name: "OpenTable"), ReservationPlatformItem(id: "resy", name: "Resy")]
+    case .uk: return [ReservationPlatformItem(id: "opentable", name: "OpenTable"), ReservationPlatformItem(id: "thefork", name: "TheFork")]
+    case .ca: return [ReservationPlatformItem(id: "opentable", name: "OpenTable"), ReservationPlatformItem(id: "resy", name: "Resy")]
+    case .au: return [ReservationPlatformItem(id: "opentable", name: "OpenTable"), ReservationPlatformItem(id: "quandoo", name: "Quandoo")]
+    case .fr: return [ReservationPlatformItem(id: "thefork", name: "TheFork"), ReservationPlatformItem(id: "opentable", name: "OpenTable")]
+    case .de: return [ReservationPlatformItem(id: "thefork", name: "TheFork"), ReservationPlatformItem(id: "quandoo", name: "Quandoo")]
+    case .it: return [ReservationPlatformItem(id: "thefork", name: "TheFork"), ReservationPlatformItem(id: "opentable", name: "OpenTable")]
+    case .es: return [ReservationPlatformItem(id: "thefork", name: "TheFork"), ReservationPlatformItem(id: "opentable", name: "OpenTable")]
+    case .jp: return [ReservationPlatformItem(id: "tabelog", name: "Tabelog"), ReservationPlatformItem(id: "opentable", name: "OpenTable")]
+    case .india: return [ReservationPlatformItem(id: "swiggy", name: "Swiggy"), ReservationPlatformItem(id: "district", name: "District")]
+    case .ae: return [ReservationPlatformItem(id: "eatapp", name: "Eat App"), ReservationPlatformItem(id: "zomato", name: "Zomato")]
+    case .sa: return [ReservationPlatformItem(id: "eatapp", name: "Eat App"), ReservationPlatformItem(id: "thechefz", name: "The Chefz")]
+    case .sg: return [ReservationPlatformItem(id: "chope", name: "Chope"), ReservationPlatformItem(id: "eatigo", name: "Eatigo")]
+    case .th: return [ReservationPlatformItem(id: "eatigo", name: "Eatigo"), ReservationPlatformItem(id: "opentable", name: "OpenTable")]
+    case .my: return [ReservationPlatformItem(id: "eatigo", name: "Eatigo"), ReservationPlatformItem(id: "opentable", name: "OpenTable")]
+    case .br: return [ReservationPlatformItem(id: "opentable", name: "OpenTable"), ReservationPlatformItem(id: "tripadvisor", name: "TripAdvisor")]
+    case .mx: return [ReservationPlatformItem(id: "opentable", name: "OpenTable"), ReservationPlatformItem(id: "tripadvisor", name: "TripAdvisor")]
+    case .za: return [ReservationPlatformItem(id: "zomato", name: "Zomato"), ReservationPlatformItem(id: "opentable", name: "OpenTable")]
+    case .nz: return [ReservationPlatformItem(id: "opentable", name: "OpenTable"), ReservationPlatformItem(id: "firsttable", name: "First Table")]
+    case .eu: return [ReservationPlatformItem(id: "thefork", name: "TheFork"), ReservationPlatformItem(id: "quandoo", name: "Quandoo")]
+    case .latam: return [ReservationPlatformItem(id: "opentable", name: "OpenTable"), ReservationPlatformItem(id: "thefork", name: "TheFork")]
+    case .other: return [ReservationPlatformItem(id: "opentable", name: "OpenTable"), ReservationPlatformItem(id: "quandoo", name: "Quandoo")]
+    }
+}
+
+private func regionDisplayName(_ region: ReservationRegion) -> String {
+    switch region {
+    case .us: return "USA"
+    case .uk: return "UK"
+    case .ca: return "Canada"
+    case .au: return "Australia"
+    case .fr: return "France"
+    case .de: return "Germany"
+    case .it: return "Italy"
+    case .es: return "Spain"
+    case .jp: return "Japan"
+    case .india: return "India"
+    case .ae: return "UAE / Dubai"
+    case .sa: return "Saudi Arabia"
+    case .sg: return "Singapore"
+    case .th: return "Thailand"
+    case .my: return "Malaysia"
+    case .br: return "Brazil"
+    case .mx: return "Mexico"
+    case .za: return "South Africa"
+    case .nz: return "New Zealand"
+    case .eu: return "Europe"
+    case .latam: return "Latin America"
+    case .other: return "International"
+    }
+}
+
 struct ReservationWidgetView: View {
     let venueName: String
     let venueType: String
     var address: String?
     var phoneNumber: String?
+    /// Direct OpenTable/Resy or venue booking URL — shown as primary CTA when set.
+    var bookingUrl: String?
+    var websiteUrl: String?
+    var openingHours: [String]?
     
     @Environment(\.dismiss) private var dismiss
     @State private var selectedDate = Date()
@@ -13,6 +111,7 @@ struct ReservationWidgetView: View {
     @State private var specialRequests = ""
     @State private var isSubmitting = false
     @State private var showConfirmation = false
+    @State private var hoursExpanded = false
     
     private let timeSlots = ["6:00 PM", "6:30 PM", "7:00 PM", "7:30 PM", "8:00 PM", "8:30 PM", "9:00 PM", "9:30 PM"]
     
@@ -65,7 +164,7 @@ struct ReservationWidgetView: View {
                     }
                     
                     if let address = address {
-                        HStack(spacing: 8) {
+                        HStack(alignment: .top, spacing: 8) {
                             Image(systemName: "mappin.circle")
                                 .foregroundColor(Color.luxuryGold.opacity(0.7))
                             Text(address)
@@ -73,12 +172,104 @@ struct ReservationWidgetView: View {
                                 .foregroundColor(Color.luxuryMuted)
                         }
                     }
+                    if let hours = openingHours, !hours.isEmpty {
+                        DisclosureGroup(isExpanded: $hoursExpanded) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                ForEach(hours, id: \.self) { line in
+                                    Text(line)
+                                        .font(Font.inter(11, weight: .regular))
+                                        .foregroundColor(Color.luxuryMuted)
+                                }
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.top, 4)
+                        } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: "clock")
+                                    .foregroundColor(Color.luxuryGold.opacity(0.7))
+                                Text("Hours")
+                                    .font(Font.inter(12, weight: .semibold))
+                                    .foregroundColor(Color.luxuryMuted)
+                            }
+                        }
+                        .tint(Color.luxuryGold)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.top, 6)
+                    }
+                    if let url = websiteUrl, !url.isEmpty {
+                        Link(destination: URL(string: url)!) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "globe")
+                                    .foregroundColor(Color.luxuryGold)
+                                Text("Website")
+                                    .font(Font.inter(13, weight: .medium))
+                                    .foregroundColor(Color.luxuryGold)
+                            }
+                        }
+                        .padding(.top, 4)
+                    }
                 }
                 .padding(24)
                 .frame(maxWidth: .infinity)
                 .luxuryCard()
                 .padding(.horizontal, 20)
                 .padding(.top, 12)
+                
+                // Direct reservation link – use bookingUrl or websiteUrl when it's a booking platform (OpenTable/Resy)
+                if let urlString = effectiveReservationUrl, let url = URL(string: urlString) {
+                    Button {
+                        UIApplication.shared.open(url)
+                    } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: "link.circle.fill")
+                                .font(.system(size: 20))
+                            Text(reservationPlatformLabel(urlString))
+                                .font(Font.inter(16, weight: .semibold))
+                        }
+                        .foregroundColor(Color.luxuryMaroon)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 16)
+                        .background(LinearGradient.goldShimmer)
+                        .cornerRadius(16)
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.top, 8)
+                } else {
+                    // No direct link — show location-based reservation platforms
+                    let region = detectReservationRegion(from: address)
+                    let platforms = topTwoPlatforms(for: region)
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Reserve a table")
+                            .font(Font.playfair(16, weight: .semibold))
+                            .foregroundColor(Color.luxuryCream)
+                        HStack(spacing: 12) {
+                            ForEach(platforms) { platform in
+                                if let url = searchUrl(forPlatformId: platform.id) {
+                                    Button {
+                                        UIApplication.shared.open(url)
+                                    } label: {
+                                        HStack(spacing: 8) {
+                                            Image(systemName: "link.circle.fill")
+                                                .font(.system(size: 18))
+                                            Text(platform.name)
+                                                .font(Font.inter(15, weight: .semibold))
+                                        }
+                                        .foregroundColor(Color.luxuryMaroon)
+                                        .frame(maxWidth: .infinity)
+                                        .padding(.vertical, 14)
+                                        .background(Color.luxuryGold.opacity(0.2))
+                                        .cornerRadius(12)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    .padding(20)
+                    .frame(maxWidth: .infinity)
+                    .luxuryCard()
+                    .padding(.horizontal, 20)
+                    .padding(.top, 8)
+                }
                 
                 // Date picker
                 VStack(alignment: .leading, spacing: 12) {
@@ -308,6 +499,207 @@ struct ReservationWidgetView: View {
         let formatter = DateFormatter()
         formatter.dateStyle = .medium
         return formatter.string(from: selectedDate)
+    }
+    
+    /// Reservation URL for the primary CTA: bookingUrl, or websiteUrl when it's OpenTable/Resy.
+    private var effectiveReservationUrl: String? {
+        if let b = bookingUrl, !b.isEmpty { return b }
+        if let w = websiteUrl, !w.isEmpty, isOpenTableOrResy(w) { return w }
+        return nil
+    }
+    
+    private var isoDateString: String {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        return f.string(from: selectedDate)
+    }
+    
+    /// selectedTime is like "7:00 PM" -> "19:00" for URL
+    private var isoTimeString: String {
+        let f = DateFormatter()
+        f.dateFormat = "h:mm a"
+        guard let date = f.date(from: selectedTime) else { return "19:00" }
+        let out = DateFormatter()
+        out.dateFormat = "HH:mm"
+        return out.string(from: date)
+    }
+    
+    /// OpenTable search URL (USA top platform) using venue name, date, time, party size.
+    private var openTableSearchUrl: URL? {
+        let term = venueName.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? venueName
+        let neighborhood = address?.split(separator: ",").first.map(String.init)?.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
+        var comp = URLComponents(string: "https://www.opentable.com/s")!
+        comp.queryItems = [
+            URLQueryItem(name: "covers", value: "\(partySize)"),
+            URLQueryItem(name: "dateTime", value: "\(isoDateString)T\(isoTimeString)"),
+            URLQueryItem(name: "term", value: term),
+        ]
+        if !neighborhood.isEmpty {
+            comp.queryItems?.append(URLQueryItem(name: "neighborhood", value: neighborhood))
+        }
+        return comp.url
+    }
+    
+    /// Resy search URL (USA top platform) using venue name, date, party size, city from address.
+    private var resySearchUrl: URL? {
+        let query = venueName.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? venueName
+        let citySlug = resyCitySlugFromAddress(address)
+        var comp = URLComponents(string: "https://resy.com/cities/\(citySlug)")!
+        comp.queryItems = [
+            URLQueryItem(name: "query", value: query),
+            URLQueryItem(name: "date", value: isoDateString),
+            URLQueryItem(name: "seats", value: "\(partySize)"),
+        ]
+        return comp.url
+    }
+    
+    private func resyCitySlugFromAddress(_ addr: String?) -> String {
+        guard let addr = addr, !addr.isEmpty else { return "ny" }
+        let parts = addr.split(separator: ",")
+        guard parts.count >= 2 else { return "ny" }
+        let city = parts[parts.count - 2].trimmingCharacters(in: .whitespaces).lowercased()
+        let map: [String: String] = [
+            "new york": "ny", "nyc": "ny", "manhattan": "ny", "brooklyn": "ny",
+            "los angeles": "la", "la": "la",
+            "san francisco": "sf", "sf": "sf",
+            "chicago": "chi", "miami": "mia", "austin": "atx", "denver": "den",
+            "seattle": "sea", "boston": "bos", "washington": "dc", "dc": "dc",
+            "atlanta": "atl", "nashville": "nash", "houston": "hou", "dallas": "dal",
+            "philadelphia": "phl",
+        ]
+        for (key, value) in map {
+            if city.contains(key) { return value }
+        }
+        return "ny"
+    }
+    
+    private func chopeCitySlugFromAddress(_ addr: String?) -> String {
+        guard let addr = addr, !addr.isEmpty else { return "singapore" }
+        let city = addr.split(separator: ",").dropLast().last.map(String.init)?.trimmingCharacters(in: .whitespaces).lowercased() ?? ""
+        let map: [String: String] = [
+            "singapore": "singapore", "hong kong": "hong-kong", "bangkok": "bangkok",
+            "phuket": "phuket", "bali": "bali", "jakarta": "jakarta", "shanghai": "shanghai",
+        ]
+        for (key, value) in map {
+            if city.contains(key) { return value }
+        }
+        return "singapore"
+    }
+    
+    private func tabelogAreaSlugFromAddress(_ addr: String?) -> String {
+        guard let addr = addr, !addr.isEmpty else { return "tokyo" }
+        let city = addr.split(separator: ",").dropLast().last.map(String.init)?.trimmingCharacters(in: .whitespaces).lowercased() ?? ""
+        let map: [String: String] = [
+            "tokyo": "tokyo", "osaka": "osaka", "kyoto": "kyoto", "yokohama": "kanagawa",
+            "fukuoka": "fukuoka", "sapporo": "hokkaido", "nagoya": "aichi", "hiroshima": "hiroshima",
+        ]
+        for (key, value) in map {
+            if city.contains(key) { return value }
+        }
+        return "tokyo"
+    }
+    
+    private func eatigoPathFromAddress(_ addr: String?) -> String {
+        guard let addr = addr, !addr.isEmpty else { return "sg/singapore" }
+        let lower = addr.lowercased()
+        if lower.contains("thailand") || lower.contains("bangkok") || lower.contains("phuket") { return "th/bangkok" }
+        if lower.contains("malaysia") || lower.contains("kuala lumpur") || lower.contains("penang") { return "my/kuala-lumpur" }
+        return "sg/singapore"
+    }
+    
+    /// Build search URL for a platform id (top-two per region).
+    private func searchUrl(forPlatformId id: String) -> URL? {
+        let term = venueName.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? venueName
+        switch id {
+        case "opentable": return openTableSearchUrl
+        case "resy": return resySearchUrl
+        case "thefork":
+            var c = URLComponents(string: "https://www.thefork.com/search")!
+            c.queryItems = [
+                URLQueryItem(name: "queryText", value: term),
+                URLQueryItem(name: "date", value: isoDateString),
+                URLQueryItem(name: "time", value: isoTimeString),
+                URLQueryItem(name: "partySize", value: "\(partySize)"),
+            ]
+            return c.url
+        case "quandoo":
+            var c = URLComponents(string: "https://www.quandoo.com/en/search")!
+            c.queryItems = [
+                URLQueryItem(name: "query", value: term),
+                URLQueryItem(name: "date", value: isoDateString),
+                URLQueryItem(name: "time", value: isoTimeString),
+                URLQueryItem(name: "pax", value: "\(partySize)"),
+            ]
+            return c.url
+        case "tablecheck":
+            var c = URLComponents(string: "https://www.tablecheck.com/en/search")!
+            c.queryItems = [
+                URLQueryItem(name: "query", value: term),
+                URLQueryItem(name: "date", value: isoDateString),
+                URLQueryItem(name: "time", value: isoTimeString),
+                URLQueryItem(name: "pax", value: "\(partySize)"),
+            ]
+            return c.url
+        case "eatapp":
+            var c = URLComponents(string: "https://eat.app/search")!
+            c.queryItems = [URLQueryItem(name: "q", value: term)]
+            return c.url
+        case "chope":
+            let slug = chopeCitySlugFromAddress(address)
+            var c = URLComponents(string: "https://www.chope.co/\(slug)-restaurants")!
+            c.queryItems = [URLQueryItem(name: "query", value: term)]
+            return c.url
+        case "tabelog":
+            let area = tabelogAreaSlugFromAddress(address)
+            return URL(string: "https://tabelog.com/en/\(area)/rstLst/?vs=1&sk=\(term)")
+        case "swiggy":
+            let loc = address?.split(separator: ",").dropLast().last.map(String.init)?.trimmingCharacters(in: .whitespaces) ?? ""
+            let q = (loc.isEmpty ? venueName : "\(venueName) \(loc)").addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? term
+            var c = URLComponents(string: "https://www.swiggy.com/dineout")!
+            c.queryItems = [URLQueryItem(name: "query", value: q)]
+            return c.url
+        case "district":
+            var c = URLComponents(string: "https://www.district.in/dine")!
+            c.queryItems = [URLQueryItem(name: "q", value: term)]
+            return c.url
+        case "thechefz":
+            var c = URLComponents(string: "https://thechefz.co/en/search")!
+            c.queryItems = [URLQueryItem(name: "q", value: term)]
+            return c.url
+        case "eatigo":
+            let path = eatigoPathFromAddress(address)
+            return URL(string: "https://eatigo.com/\(path)/en?search=\(term)")
+        case "tripadvisor":
+            let loc = address?.split(separator: ",").dropLast().last.map(String.init)?.trimmingCharacters(in: .whitespaces) ?? ""
+            let q = loc.isEmpty ? "\(venueName) restaurant" : "\(venueName) restaurant \(loc)"
+            var c = URLComponents(string: "https://www.tripadvisor.com/Search")!
+            c.queryItems = [URLQueryItem(name: "q", value: q)]
+            return c.url
+        case "firsttable":
+            let isNz = address.map { let l = $0.lowercased(); return l.contains("zealand") || l.contains("auckland") || l.contains("wellington") } ?? true
+            let base = isNz ? "https://www.firsttable.co.nz" : "https://www.firsttable.com.au"
+            var c = URLComponents(string: "\(base)/search")!
+            c.queryItems = [URLQueryItem(name: "q", value: term)]
+            return c.url
+        case "zomato":
+            let city = address?.split(separator: ",").dropLast().last.map(String.init)?.trimmingCharacters(in: .whitespaces).lowercased().replacingOccurrences(of: " ", with: "-") ?? "mumbai"
+            var c = URLComponents(string: "https://www.zomato.com/\(city)/restaurants")!
+            c.queryItems = [URLQueryItem(name: "q", value: venueName)]
+            return c.url
+        default: return nil
+        }
+    }
+    
+    private func isOpenTableOrResy(_ urlString: String) -> Bool {
+        let lower = urlString.lowercased()
+        return lower.contains("opentable.com") || lower.contains("resy.com")
+    }
+    
+    private func reservationPlatformLabel(_ urlString: String) -> String {
+        let lower = urlString.lowercased()
+        if lower.contains("opentable.com") { return "Reserve on OpenTable" }
+        if lower.contains("resy.com") { return "Reserve on Resy" }
+        return "Make reservation"
     }
     
     private func submitReservation() {

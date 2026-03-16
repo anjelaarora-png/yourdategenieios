@@ -1,9 +1,10 @@
-import { QuestionnaireData, RELATIONSHIP_STAGES, PARTNER_INTERESTS, GIFT_BUDGETS, CONVERSATION_TOPICS, GIFT_RECIPIENTS, LOVE_LANGUAGES, isSoloDate } from "../types";
+import { QuestionnaireData, RELATIONSHIP_STAGES, PARTNER_INTERESTS, GIFT_BUDGETS, GIFT_STYLES, CONVERSATION_TOPICS, GIFT_RECIPIENTS, IDENTITY_OPTIONS, LOVE_LANGUAGES, isSoloDate } from "../types";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import OptionCard from "../OptionCard";
 import { Gift, MessageCircle, Heart, Sparkles } from "lucide-react";
+import { Input } from "@/components/ui/input";
 
 interface Step6EnhancersProps {
   data: QuestionnaireData;
@@ -44,6 +45,16 @@ const Step6Enhancers = ({ data, onChange }: Step6EnhancersProps) => {
       : [...current, value];
     onChange({ partnerLoveLanguages: updated });
   };
+
+  const toggleGiftStyle = (value: string) => {
+    const current = data.giftStyle || [];
+    const updated = current.includes(value)
+      ? current.filter((v) => v !== value)
+      : [...current, value];
+    onChange({ giftStyle: updated });
+  };
+
+  const isGiftForPartnerOrDate = data.giftRecipient === "partner" || data.giftRecipient === "date";
 
   // Filter gift recipients for solo dates (only "myself" option)
   const filteredGiftRecipients = isSolo 
@@ -166,7 +177,35 @@ const Step6Enhancers = ({ data, onChange }: Step6EnhancersProps) => {
         </div>
 
         {data.wantGiftSuggestions && (
-          <div className="space-y-4 pt-4 border-t border-border">
+          <div className="space-y-4 pt-4 border-t border-border animate-gift-reveal">
+            {/* Luxe gift-with-bow unwrap animation */}
+            <div className="flex justify-center mb-2 sm:mb-4 overflow-visible">
+              <div className="relative w-20 h-20 sm:w-24 sm:h-24 flex items-center justify-center overflow-visible" aria-hidden>
+                {/* Gift box base */}
+                <div className="absolute inset-0 flex items-end justify-center pb-1 pointer-events-none">
+                  <div className="w-14 h-12 sm:w-16 sm:h-14 rounded-b-md bg-primary/25 border-2 border-primary/50 rounded-t-sm shadow-inner" />
+                </div>
+                {/* Ribbon vertical */}
+                <div className="absolute w-1.5 sm:w-2 h-12 sm:h-14 bottom-1 left-1/2 -translate-x-1/2 rounded-full bg-primary/60 pointer-events-none" />
+                {/* Ribbon horizontal with shine sweep */}
+                <div
+                  className="absolute w-14 sm:w-16 h-1.5 sm:h-2 bottom-1 left-1/2 -translate-x-1/2 rounded-full animate-gift-ribbon-shine overflow-hidden pointer-events-none"
+                  style={{
+                    background: "linear-gradient(90deg, transparent 0%, hsl(var(--primary)) 20%, hsl(var(--primary)) 80%, transparent 100%)",
+                    backgroundSize: "200% 100%",
+                  }}
+                />
+                {/* Lid (lifts up when section opens) */}
+                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-14 h-5 sm:w-16 sm:h-6 rounded-t-md bg-primary/35 border-2 border-primary/50 border-b-0 shadow-lg animate-gift-lid-lift origin-bottom pointer-events-none" />
+                {/* Bow center */}
+                <div className="absolute top-3.5 left-1/2 -translate-x-1/2 w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-primary/70 border-2 border-primary/80 flex items-center justify-center animate-gift-bow-shine shadow-md pointer-events-none">
+                  <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-primary" />
+                </div>
+                {/* Bow loops (left & right) */}
+                <div className="absolute top-3 left-1/2 -translate-x-[calc(50%+18px)] w-4 h-4 sm:w-5 sm:h-5 rounded-full border-2 border-primary/70 border-t-transparent border-l-transparent animate-gift-bow-shine origin-right rotate-45 pointer-events-none" />
+                <div className="absolute top-3 left-1/2 translate-x-[calc(18px-50%)] w-4 h-4 sm:w-5 sm:h-5 rounded-full border-2 border-primary/70 border-t-transparent border-r-transparent animate-gift-bow-shine origin-left -rotate-45 pointer-events-none" />
+              </div>
+            </div>
             {!isSolo && (
               <div>
                 <Label className="text-xs sm:text-sm font-medium mb-2 sm:mb-3 block">Who are you shopping for?</Label>
@@ -180,6 +219,29 @@ const Step6Enhancers = ({ data, onChange }: Step6EnhancersProps) => {
                       selected={data.giftRecipient === recipient.value}
                       onClick={() => onChange({ giftRecipient: recipient.value })}
                     />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {!isSolo && isGiftForPartnerOrDate && (
+              <div>
+                <Label className="text-xs sm:text-sm font-medium mb-2 sm:mb-3 block">Recipient&apos;s identity (optional)</Label>
+                <div className="flex flex-wrap gap-2">
+                  {IDENTITY_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => onChange({ partnerIdentity: opt.value })}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs sm:text-sm transition-all ${
+                        data.partnerIdentity === opt.value
+                          ? "border-primary bg-primary/10 text-foreground"
+                          : "border-border bg-card text-foreground hover:border-primary/50"
+                      }`}
+                    >
+                      <span>{opt.emoji}</span>
+                      <span>{opt.label}</span>
+                    </button>
                   ))}
                 </div>
               </div>
@@ -221,6 +283,53 @@ const Step6Enhancers = ({ data, onChange }: Step6EnhancersProps) => {
                   />
                 ))}
               </div>
+            </div>
+
+            <div>
+              <Label className="text-xs sm:text-sm font-medium mb-2 sm:mb-3 block">Gift style (optional)</Label>
+              <div className="flex flex-wrap gap-2">
+                {GIFT_STYLES.map((style) => (
+                  <button
+                    key={style.value}
+                    type="button"
+                    onClick={() => toggleGiftStyle(style.value)}
+                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs transition-all ${
+                      data.giftStyle?.includes(style.value)
+                        ? "border-primary bg-primary/10 text-foreground"
+                        : "border-border bg-card text-foreground hover:border-primary/50"
+                    }`}
+                  >
+                    <span>{style.emoji}</span>
+                    <span>{style.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="gift-brands" className="text-xs sm:text-sm font-medium mb-2 block">
+                Favorite brands or stores (optional)
+              </Label>
+              <Input
+                id="gift-brands"
+                placeholder="E.g. Nordstrom, Etsy, local boutiques"
+                value={data.favoriteBrandsOrStores || ""}
+                onChange={(e) => onChange({ favoriteBrandsOrStores: e.target.value })}
+                className="text-sm"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="gift-sizes" className="text-xs sm:text-sm font-medium mb-2 block">
+                Sizes if relevant (optional)
+              </Label>
+              <Input
+                id="gift-sizes"
+                placeholder="E.g. clothing size, shoe size"
+                value={data.recipientSizes || ""}
+                onChange={(e) => onChange({ recipientSizes: e.target.value })}
+                className="text-sm"
+              />
             </div>
 
             <div>

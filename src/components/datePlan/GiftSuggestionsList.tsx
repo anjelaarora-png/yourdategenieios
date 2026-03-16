@@ -17,7 +17,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import OptionCard from "@/components/questionnaire/OptionCard";
-import { PARTNER_INTERESTS, GIFT_BUDGETS, GIFT_RECIPIENTS } from "@/components/questionnaire/types";
+import { PARTNER_INTERESTS, GIFT_BUDGETS, GIFT_RECIPIENTS, GIFT_STYLES, IDENTITY_OPTIONS } from "@/components/questionnaire/types";
 import { useUserPreferences } from "@/hooks/useUserPreferences";
 import { useSavedGifts } from "@/hooks/useSavedGifts";
 import type { SavedGift } from "@/hooks/useSavedGifts";
@@ -126,6 +126,8 @@ const GiftSuggestionsList = ({ plans }: GiftSuggestionsListProps) => {
   const { toast } = useToast();
   const { getGiftPreferences, saveGiftPreferences, loading: prefsLoading, preferences } = useUserPreferences();
   const { savedGifts, toggleSavedGift, isSaved, markAsPurchased, unmarkAsPurchased, isPurchased, purchasedGiftNames } = useSavedGifts();
+  const savedOnly = useMemo(() => savedGifts.filter((g) => !(g as SavedGift).purchased), [savedGifts]);
+  const boughtOnly = useMemo(() => savedGifts.filter((g) => (g as SavedGift).purchased), [savedGifts]);
   const locationHint = preferences?.preferred_location || preferences?.default_city || "";
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedPriceRanges, setSelectedPriceRanges] = useState<string[]>([]);
@@ -141,13 +143,21 @@ const GiftSuggestionsList = ({ plans }: GiftSuggestionsListProps) => {
   const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
   const [giftBudget, setGiftBudget] = useState("");
   const [giftNotes, setGiftNotes] = useState("");
+  const [recipientIdentity, setRecipientIdentity] = useState("");
+  const [giftStyle, setGiftStyle] = useState<string[]>([]);
+  const [favoriteBrandsOrStores, setFavoriteBrandsOrStores] = useState("");
+  const [recipientSizes, setRecipientSizes] = useState("");
   const foundGiftsRef = useRef<GiftSuggestion[]>([]);
   const refillingRef = useRef(false);
   const swipeStartRef = useRef<{ x: number; y: number } | null>(null);
+  const debounceSaveRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** All gift names we've suggested this session (including skipped) so we never show the same twice */
+  const allSuggestedGiftNamesRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     foundGiftsRef.current = foundGifts;
-  }, [foundGifts]); (questionnaire prefs carried over)
+  }, [foundGifts]);
+
   useEffect(() => {
     if (showGiftFinder && !prefsLoading && !prefsLoaded) {
       const savedPrefs = getGiftPreferences();
@@ -156,6 +166,10 @@ const GiftSuggestionsList = ({ plans }: GiftSuggestionsListProps) => {
       if (savedPrefs.gift_interests?.length) setSelectedInterests(savedPrefs.gift_interests);
       if (savedPrefs.gift_budget) setGiftBudget(savedPrefs.gift_budget);
       if (savedPrefs.gift_notes) setGiftNotes(savedPrefs.gift_notes);
+      if (savedPrefs.gift_recipient_identity) setRecipientIdentity(savedPrefs.gift_recipient_identity);
+      if (savedPrefs.gift_style?.length) setGiftStyle(savedPrefs.gift_style);
+      if (savedPrefs.gift_favorite_brands) setFavoriteBrandsOrStores(savedPrefs.gift_favorite_brands);
+      if (savedPrefs.gift_sizes) setRecipientSizes(savedPrefs.gift_sizes);
       setPrefsLoaded(true);
     }
   }, [showGiftFinder, prefsLoading, prefsLoaded, getGiftPreferences]);
@@ -264,11 +278,14 @@ const GiftSuggestionsList = ({ plans }: GiftSuggestionsListProps) => {
       gift_interests: selectedInterests,
       gift_budget: giftBudget,
       gift_notes: giftNotes,
+      gift_recipient_identity: recipientIdentity || undefined,
+      gift_style: giftStyle.length ? giftStyle : undefined,
+      gift_favorite_brands: favoriteBrandsOrStores.trim() || undefined,
+      gift_sizes: recipientSizes.trim() || undefined,
     });
 
     try {
       const occasionLabel = OCCASIONS.find((o) => o.value === occasion)?.label || occasion;
-      const budgetLabel = GIFT_BUDGETS.find((b) => b.value === giftBudget)?.desc || "any budget";
       const interestLabels = selectedInterests.map(
         (i) => PARTNER_INTERESTS.find((p) => p.value === i)?.label || i
       );
@@ -277,8 +294,11 @@ const GiftSuggestionsList = ({ plans }: GiftSuggestionsListProps) => {
       const recipientLabel = GIFT_RECIPIENTS.find((r) => r.value === giftRecipient)?.label || "";
       const recipientContext = recipientLabel ? `Shopping for: ${recipientLabel}. ` : "";
 
-      // Pass existing gifts to avoid duplicates (unless refreshing completely)
-      const existingToExclude = refreshCompletely ? [] : foundGifts;
+      // Pass all names we've ever suggested this session so we never repeat (including skipped)
+      if (refreshCompletely) allSuggestedGiftNamesRef.current.clear();
+      const existingToExclude = refreshCompletely
+        ? []
+        : Array.from(allSuggestedGiftNamesRef.current).map((name) => ({ name }));
 
       const { data, error } = await supabase.functions.invoke("generate-more-gifts", {
         body: {
@@ -293,12 +313,17 @@ const GiftSuggestionsList = ({ plans }: GiftSuggestionsListProps) => {
           city: preferences?.default_city || undefined,
           giftRecipient: giftRecipient || undefined,
           purchasedGiftNames: purchasedGiftNames.length > 0 ? purchasedGiftNames : undefined,
+          recipientIdentity: recipientIdentity || undefined,
+          giftStyle: giftStyle.length ? giftStyle : undefined,
+          favoriteBrandsOrStores: favoriteBrandsOrStores.trim() || undefined,
+          recipientSizes: recipientSizes.trim() || undefined,
         },
       });
 
       if (error) throw error;
 
       if (data?.gifts && Array.isArray(data.gifts)) {
+        data.gifts.forEach((g: GiftSuggestion) => allSuggestedGiftNamesRef.current.add(g.name.trim()));
         if (refreshCompletely) {
           // Complete refresh - replace all results
           setFoundGifts(data.gifts);
@@ -321,8 +346,8 @@ const GiftSuggestionsList = ({ plans }: GiftSuggestionsListProps) => {
 
   const resetGiftFinder = () => {
     setFoundGifts([]);
+    allSuggestedGiftNamesRef.current.clear();
     // Don't reset the form values - keep saved preferences
-    // User can manually change if needed
   };
 
   /** Keep exactly 3 suggestions: fetch more when deck has fewer than 3 after skip/save. */
@@ -338,6 +363,7 @@ const GiftSuggestionsList = ({ plans }: GiftSuggestionsListProps) => {
       const interestLabels = selectedInterests.map((i) => PARTNER_INTERESTS.find((p) => p.value === i)?.label || i);
       const recipientLabel = GIFT_RECIPIENTS.find((r) => r.value === giftRecipient)?.label || "";
       const recipientContext = recipientLabel ? `Shopping for: ${recipientLabel}. ` : "";
+      const existingToExclude = Array.from(allSuggestedGiftNamesRef.current).map((name) => ({ name }));
       const { data, error } = await supabase.functions.invoke("generate-more-gifts", {
         body: {
           planTitle: `Gift Ideas for ${occasionLabel}`,
@@ -345,16 +371,21 @@ const GiftSuggestionsList = ({ plans }: GiftSuggestionsListProps) => {
           priceRange: giftBudget || "any",
           interests: interestLabels.join(", "),
           partnerDescription: `${recipientContext}${giftNotes}`.trim(),
-          existingGifts: foundGiftsRef.current,
+          existingGifts: existingToExclude,
           count: need,
           location: locationHint || undefined,
           city: preferences?.default_city || undefined,
           giftRecipient: giftRecipient || undefined,
           purchasedGiftNames: purchasedGiftNames.length > 0 ? purchasedGiftNames : undefined,
+          recipientIdentity: recipientIdentity || undefined,
+          giftStyle: giftStyle.length ? giftStyle : undefined,
+          favoriteBrandsOrStores: favoriteBrandsOrStores.trim() || undefined,
+          recipientSizes: recipientSizes.trim() || undefined,
         },
       });
       if (error) throw error;
       if (data?.gifts && Array.isArray(data.gifts)) {
+        data.gifts.forEach((g: GiftSuggestion) => allSuggestedGiftNamesRef.current.add(g.name.trim()));
         setFoundGifts((prev) => [...prev, ...data.gifts]);
       }
     } catch (e) {
@@ -364,7 +395,7 @@ const GiftSuggestionsList = ({ plans }: GiftSuggestionsListProps) => {
       setIsSearching(false);
       refillingRef.current = false;
     }
-  }, [occasion, selectedInterests, giftRecipient, giftBudget, giftNotes, locationHint, preferences?.default_city, purchasedGiftNames, isSearching]);
+  }, [occasion, selectedInterests, giftRecipient, giftBudget, giftNotes, recipientIdentity, giftStyle, favoriteBrandsOrStores, recipientSizes, locationHint, preferences?.default_city, purchasedGiftNames, isSearching]);
 
   const handleSkipTop = useCallback(() => {
     setFoundGifts((prev) => prev.slice(1));
@@ -382,6 +413,41 @@ const GiftSuggestionsList = ({ plans }: GiftSuggestionsListProps) => {
       refillToThree();
     }
   }, [foundGifts.length, occasion, isSearching, refillToThree]);
+
+  // Persist gift finder form: save on close (Cancel) and debounced on change
+  const saveFinderDraft = useCallback(() => {
+    const hasMeaningful =
+      !!occasion ||
+      !!giftRecipient ||
+      selectedInterests.length > 0 ||
+      !!giftBudget ||
+      (giftNotes && giftNotes.trim() !== "") ||
+      !!recipientIdentity ||
+      giftStyle.length > 0 ||
+      (favoriteBrandsOrStores && favoriteBrandsOrStores.trim() !== "") ||
+      (recipientSizes && recipientSizes.trim() !== "");
+    if (!hasMeaningful) return;
+    saveGiftPreferences({
+      gift_occasion: occasion,
+      gift_recipient: giftRecipient,
+      gift_interests: selectedInterests,
+      gift_budget: giftBudget,
+      gift_notes: giftNotes,
+      gift_recipient_identity: recipientIdentity || undefined,
+      gift_style: giftStyle.length ? giftStyle : undefined,
+      gift_favorite_brands: favoriteBrandsOrStores.trim() || undefined,
+      gift_sizes: recipientSizes.trim() || undefined,
+    });
+  }, [occasion, giftRecipient, selectedInterests, giftBudget, giftNotes, recipientIdentity, giftStyle, favoriteBrandsOrStores, recipientSizes, saveGiftPreferences]);
+
+  useEffect(() => {
+    if (!showGiftFinder) return;
+    if (debounceSaveRef.current) clearTimeout(debounceSaveRef.current);
+    debounceSaveRef.current = setTimeout(saveFinderDraft, 600);
+    return () => {
+      if (debounceSaveRef.current) clearTimeout(debounceSaveRef.current);
+    };
+  }, [showGiftFinder, occasion, giftRecipient, selectedInterests, giftBudget, giftNotes, recipientIdentity, giftStyle, favoriteBrandsOrStores, recipientSizes, saveFinderDraft]);
 
   const handleSwipeStart = (e: React.TouchEvent) => {
     swipeStartRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
@@ -416,6 +482,7 @@ const GiftSuggestionsList = ({ plans }: GiftSuggestionsListProps) => {
           variant="ghost"
           size="sm"
           onClick={() => {
+            saveFinderDraft();
             setShowGiftFinder(false);
             resetGiftFinder();
           }}
@@ -482,6 +549,68 @@ const GiftSuggestionsList = ({ plans }: GiftSuggestionsListProps) => {
             </div>
           </div>
 
+          {(giftRecipient === "partner" || giftRecipient === "date") && (
+            <div>
+              <Label className="text-sm font-medium mb-3 block">Recipient&apos;s identity (optional)</Label>
+              <div className="flex flex-wrap gap-2">
+                {IDENTITY_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setRecipientIdentity(opt.value)}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm transition-all ${
+                      recipientIdentity === opt.value ? "border-primary bg-primary/10 text-foreground" : "border-border bg-background text-muted-foreground hover:border-primary/50"
+                    }`}
+                  >
+                    <span>{opt.emoji}</span>
+                    <span>{opt.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div>
+            <Label className="text-sm font-medium mb-3 block">Gift style (optional)</Label>
+            <div className="flex flex-wrap gap-2">
+              {GIFT_STYLES.map((style) => (
+                <button
+                  key={style.value}
+                  type="button"
+                  onClick={() => setGiftStyle((prev) => prev.includes(style.value) ? prev.filter((v) => v !== style.value) : [...prev, style.value])}
+                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-sm transition-all ${
+                    giftStyle.includes(style.value) ? "border-primary bg-primary/10 text-foreground" : "border-border bg-background text-muted-foreground hover:border-primary/50"
+                  }`}
+                >
+                  <span>{style.emoji}</span>
+                  <span>{style.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <Label htmlFor="finder-brands" className="text-sm font-medium mb-2 block">Favorite brands or stores (optional)</Label>
+            <Input
+              id="finder-brands"
+              placeholder="E.g. Nordstrom, Etsy, local boutiques"
+              value={favoriteBrandsOrStores}
+              onChange={(e) => setFavoriteBrandsOrStores(e.target.value)}
+              className="text-sm"
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="finder-sizes" className="text-sm font-medium mb-2 block">Sizes if relevant (optional)</Label>
+            <Input
+              id="finder-sizes"
+              placeholder="E.g. clothing size, shoe size"
+              value={recipientSizes}
+              onChange={(e) => setRecipientSizes(e.target.value)}
+              className="text-sm"
+            />
+          </div>
+
           {/* Gift budget */}
           <div>
             <Label className="text-sm font-medium mb-3 block">Gift Budget</Label>
@@ -536,58 +665,42 @@ const GiftSuggestionsList = ({ plans }: GiftSuggestionsListProps) => {
         </div>
       ) : (
         <div className="space-y-4">
-          {/* Saved Gifts section at top */}
-          {savedGifts.length > 0 && (
+          {/* Saved Gifts (not bought) */}
+          {savedOnly.length > 0 && (
             <div className="space-y-3 p-4 rounded-lg border-2 border-primary/20 bg-primary/5">
               <div className="flex items-center gap-2">
                 <Heart className="w-4 h-4 text-primary fill-primary" />
-                <h4 className="font-medium text-sm">Saved Gifts ({savedGifts.length})</h4>
+                <h4 className="font-medium text-sm">Saved Gifts ({savedOnly.length})</h4>
               </div>
               <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                {savedGifts.map((gift, i) => {
+                {savedOnly.map((gift, i) => {
                   const shopLinks = getShopLinks(gift, locationHint);
                   const primaryUrl = shopLinks[0].url;
-                  const bought = (gift as SavedGift).purchased;
                   return (
-                    <div key={`fav-${i}`} className={`flex items-center justify-between gap-2 p-2 rounded-md bg-background border ${bought ? "opacity-75" : ""}`}>
+                    <div key={`saved-${i}`} className="flex items-center justify-between gap-2 p-2 rounded-md bg-background border">
                       <div className="flex items-center gap-2 min-w-0">
-                        <span>{gift.emoji}</span>
+                        <div className="relative w-8 h-8 shrink-0 flex items-center justify-center rounded overflow-hidden bg-muted">
+                          <span className="text-lg">{gift.emoji}</span>
+                          {gift.imageUrl && (
+                            <img src={gift.imageUrl} alt={gift.name} className="absolute inset-0 w-full h-full object-cover" onError={(e) => { e.currentTarget.style.display = "none"; }} />
+                          )}
+                        </div>
                         <span className="text-sm truncate">{gift.name}</span>
-                        {bought && (
-                          <Badge variant="secondary" className="text-xs shrink-0 gap-0.5">
-                            <CheckCircle className="w-3 h-3" />
-                            Bought
-                          </Badge>
-                        )}
-                        {!bought && <Badge variant="outline" className="text-xs shrink-0">{gift.priceRange}</Badge>}
+                        <Badge variant="outline" className="text-xs shrink-0">{gift.priceRange}</Badge>
                       </div>
                       <div className="flex items-center gap-1 shrink-0">
-                        {bought ? (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 text-xs"
-                            onClick={() => {
-                              unmarkAsPurchased(gift);
-                              toast({ title: "Marked as not bought", description: "It may be recommended again." });
-                            }}
-                          >
-                            Undo
-                          </Button>
-                        ) : (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 text-xs gap-1"
-                            onClick={() => {
-                              markAsPurchased(gift);
-                              toast({ title: "Marked as bought", description: "Won't be recommended again." });
-                            }}
-                          >
-                            <ShoppingBag className="w-3.5 h-3.5" />
-                            Bought
-                          </Button>
-                        )}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 text-xs gap-1"
+                          onClick={() => {
+                            markAsPurchased(gift);
+                            toast({ title: "Marked as bought", description: "Won't be recommended again." });
+                          }}
+                        >
+                          <ShoppingBag className="w-3.5 h-3.5" />
+                          Bought
+                        </Button>
                         <Button
                           variant="ghost"
                           size="icon"
@@ -596,12 +709,57 @@ const GiftSuggestionsList = ({ plans }: GiftSuggestionsListProps) => {
                         >
                           <Heart className="w-3.5 h-3.5 text-primary fill-primary" />
                         </Button>
+                        <Button variant="ghost" size="icon" className="h-7 w-7" asChild>
+                          <a href={primaryUrl} target="_blank" rel="noopener noreferrer">
+                            <ExternalLink className="w-3.5 h-3.5" />
+                          </a>
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+          {/* Bought Gifts */}
+          {boughtOnly.length > 0 && (
+            <div className="space-y-3 p-4 rounded-lg border border-border bg-muted/30">
+              <div className="flex items-center gap-2">
+                <CheckCircle className="w-4 h-4 text-muted-foreground" />
+                <h4 className="font-medium text-sm text-muted-foreground">Bought Gifts ({boughtOnly.length})</h4>
+              </div>
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {boughtOnly.map((gift, i) => {
+                  const shopLinks = getShopLinks(gift, locationHint);
+                  const primaryUrl = shopLinks[0].url;
+                  return (
+                    <div key={`bought-${i}`} className="flex items-center justify-between gap-2 p-2 rounded-md bg-background border opacity-90">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="relative w-8 h-8 shrink-0 flex items-center justify-center rounded overflow-hidden bg-muted">
+                          <span className="text-lg">{gift.emoji}</span>
+                          {gift.imageUrl && (
+                            <img src={gift.imageUrl} alt={gift.name} className="absolute inset-0 w-full h-full object-cover" onError={(e) => { e.currentTarget.style.display = "none"; }} />
+                          )}
+                        </div>
+                        <span className="text-sm truncate">{gift.name}</span>
+                        <Badge variant="secondary" className="text-xs shrink-0 gap-0.5">
+                          <CheckCircle className="w-3 h-3" />
+                          Bought
+                        </Badge>
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
                         <Button
                           variant="ghost"
-                          size="icon"
-                          className="h-7 w-7"
-                          asChild
+                          size="sm"
+                          className="h-7 text-xs"
+                          onClick={() => {
+                            unmarkAsPurchased(gift);
+                            toast({ title: "Marked as not bought", description: "It may be recommended again." });
+                          }}
                         >
+                          Undo
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-7 w-7" asChild>
                           <a href={primaryUrl} target="_blank" rel="noopener noreferrer">
                             <ExternalLink className="w-3.5 h-3.5" />
                           </a>
@@ -631,7 +789,7 @@ const GiftSuggestionsList = ({ plans }: GiftSuggestionsListProps) => {
           </div>
 
           {/* Swipeable 3-card stack: always show 3 suggestions; swipe left = skip, right = save */}
-          <div className="relative min-h-[320px] flex items-center justify-center">
+          <div className="relative min-h-[320px] flex items-center justify-center animate-gift-reveal">
             {foundGifts.length === 0 && isSearching && (
               <div className="absolute inset-0 flex items-center justify-center">
                 <Loader2 className="w-10 h-10 animate-spin text-primary" />
@@ -655,11 +813,16 @@ const GiftSuggestionsList = ({ plans }: GiftSuggestionsListProps) => {
                     onTouchEnd: handleSwipeEnd,
                   })}
                 >
-                  <Card className="border-border shadow-lg overflow-hidden">
+                    <Card className="border-border shadow-lg overflow-hidden">
                     <CardContent className="pt-4 pb-4">
                       <div className="flex items-start justify-between gap-2 mb-2">
                         <h4 className="font-medium flex items-center gap-2">
-                          <span className="text-2xl">{gift.emoji}</span>
+                          <div className="relative w-10 h-10 shrink-0 flex items-center justify-center rounded overflow-hidden bg-muted">
+                            <span className="text-2xl">{gift.emoji}</span>
+                            {gift.imageUrl && (
+                              <img src={gift.imageUrl} alt={gift.name} className="absolute inset-0 w-full h-full object-cover" onError={(e) => { e.currentTarget.style.display = "none"; }} />
+                            )}
+                          </div>
                           {gift.name}
                         </h4>
                         <Badge variant="outline" className="text-xs shrink-0">{gift.priceRange}</Badge>
@@ -773,42 +936,39 @@ const GiftSuggestionsList = ({ plans }: GiftSuggestionsListProps) => {
         renderGiftFinder()
       ) : (
         <div className="space-y-4">
-          {/* Saved Gifts section at top */}
-          {savedGifts.length > 0 && (
+          {/* Saved Gifts (not bought) */}
+          {savedOnly.length > 0 && (
             <div className="space-y-3 p-4 rounded-lg border-2 border-primary/20 bg-primary/5">
               <div className="flex items-center gap-2">
                 <Heart className="w-4 h-4 text-primary fill-primary" />
-                <h4 className="font-medium text-sm">Saved Gifts ({savedGifts.length})</h4>
+                <h4 className="font-medium text-sm">Saved Gifts ({savedOnly.length})</h4>
               </div>
               <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                {savedGifts.map((gift, i) => {
+                {savedOnly.map((gift, i) => {
                   const shopLinks = getShopLinks(gift, locationHint);
                   const primaryUrl = shopLinks[0].url;
-                  const bought = (gift as SavedGift).purchased;
                   return (
-                    <div key={`fav-main-${i}`} className={`flex items-center justify-between gap-2 p-2 rounded-md bg-background border ${bought ? "opacity-75" : ""}`}>
+                    <div key={`saved-main-${i}`} className="flex items-center justify-between gap-2 p-2 rounded-md bg-background border">
                       <div className="flex items-center gap-2 min-w-0">
-                        <span>{gift.emoji}</span>
+                        <div className="relative w-8 h-8 shrink-0 flex items-center justify-center rounded overflow-hidden bg-muted">
+                          <span className="text-lg">{gift.emoji}</span>
+                          {gift.imageUrl && (
+                            <img src={gift.imageUrl} alt={gift.name} className="absolute inset-0 w-full h-full object-cover" onError={(e) => { e.currentTarget.style.display = "none"; }} />
+                          )}
+                        </div>
                         <span className="text-sm truncate">{gift.name}</span>
-                        {bought && (
-                          <Badge variant="secondary" className="text-xs shrink-0 gap-0.5">
-                            <CheckCircle className="w-3 h-3" />
-                            Bought
-                          </Badge>
-                        )}
-                        {!bought && <Badge variant="outline" className="text-xs shrink-0">{gift.priceRange}</Badge>}
+                        <Badge variant="outline" className="text-xs shrink-0">{gift.priceRange}</Badge>
                       </div>
                       <div className="flex items-center gap-1 shrink-0">
-                        {bought ? (
-                          <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => { unmarkAsPurchased(gift); toast({ title: "Marked as not bought" }); }}>
-                            Undo
-                          </Button>
-                        ) : (
-                          <Button variant="ghost" size="sm" className="h-7 text-xs gap-1" onClick={() => { markAsPurchased(gift); toast({ title: "Marked as bought", description: "Won't be recommended again." }); }}>
-                            <ShoppingBag className="w-3.5 h-3.5" />
-                            Bought
-                          </Button>
-                        )}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 text-xs gap-1"
+                          onClick={() => { markAsPurchased(gift); toast({ title: "Marked as bought", description: "Won't be recommended again." }); }}
+                        >
+                          <ShoppingBag className="w-3.5 h-3.5" />
+                          Bought
+                        </Button>
                         <Button
                           variant="ghost"
                           size="icon"
@@ -816,6 +976,53 @@ const GiftSuggestionsList = ({ plans }: GiftSuggestionsListProps) => {
                           onClick={() => toggleSavedGiftWithToast(gift)}
                         >
                           <Heart className="w-3.5 h-3.5 text-primary fill-primary" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-7 w-7" asChild>
+                          <a href={primaryUrl} target="_blank" rel="noopener noreferrer">
+                            <ExternalLink className="w-3.5 h-3.5" />
+                          </a>
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+          {/* Bought Gifts */}
+          {boughtOnly.length > 0 && (
+            <div className="space-y-3 p-4 rounded-lg border border-border bg-muted/30">
+              <div className="flex items-center gap-2">
+                <CheckCircle className="w-4 h-4 text-muted-foreground" />
+                <h4 className="font-medium text-sm text-muted-foreground">Bought Gifts ({boughtOnly.length})</h4>
+              </div>
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {boughtOnly.map((gift, i) => {
+                  const shopLinks = getShopLinks(gift, locationHint);
+                  const primaryUrl = shopLinks[0].url;
+                  return (
+                    <div key={`bought-main-${i}`} className="flex items-center justify-between gap-2 p-2 rounded-md bg-background border opacity-90">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="relative w-8 h-8 shrink-0 flex items-center justify-center rounded overflow-hidden bg-muted">
+                          <span className="text-lg">{gift.emoji}</span>
+                          {gift.imageUrl && (
+                            <img src={gift.imageUrl} alt={gift.name} className="absolute inset-0 w-full h-full object-cover" onError={(e) => { e.currentTarget.style.display = "none"; }} />
+                          )}
+                        </div>
+                        <span className="text-sm truncate">{gift.name}</span>
+                        <Badge variant="secondary" className="text-xs shrink-0 gap-0.5">
+                          <CheckCircle className="w-3 h-3" />
+                          Bought
+                        </Badge>
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 text-xs"
+                          onClick={() => { unmarkAsPurchased(gift); toast({ title: "Marked as not bought" }); }}
+                        >
+                          Undo
                         </Button>
                         <Button variant="ghost" size="icon" className="h-7 w-7" asChild>
                           <a href={primaryUrl} target="_blank" rel="noopener noreferrer">
@@ -912,7 +1119,12 @@ const GiftSuggestionsList = ({ plans }: GiftSuggestionsListProps) => {
                     {/* Header */}
                     <div className="flex items-start justify-between gap-2 mb-2">
                       <h4 className="font-medium flex items-center gap-2">
-                        <span className="text-xl">{item.gift.emoji}</span>
+                        <div className="relative w-10 h-10 shrink-0 flex items-center justify-center rounded overflow-hidden bg-muted">
+                          <span className="text-xl">{item.gift.emoji}</span>
+                          {item.gift.imageUrl && (
+                            <img src={item.gift.imageUrl} alt={item.gift.name} className="absolute inset-0 w-full h-full object-cover" onError={(e) => { e.currentTarget.style.display = "none"; }} />
+                          )}
+                        </div>
                         {item.gift.name}
                       </h4>
                       <div className="flex items-center gap-1.5 shrink-0">

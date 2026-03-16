@@ -1,8 +1,9 @@
+import { useState } from "react";
 import { DatePlan, GiftSuggestion } from "@/types/datePlan";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Clock, DollarSign, Sparkles, Package, Cloud, Calendar, CheckCircle, AlertCircle, MapPin, Car, Footprints, Train, Bike, Phone, Navigation, Globe, Heart, ExternalLink, ShoppingBag } from "lucide-react";
+import { Clock, DollarSign, Sparkles, Package, Cloud, Calendar, CheckCircle, AlertCircle, MapPin, Car, Footprints, Train, Bike, Phone, Navigation, Globe, Heart, ExternalLink, ShoppingBag, ChevronDown, ChevronUp } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { generateVenueSearchUrl } from "@/lib/linkUtils";
 import { useSavedGifts } from "@/hooks/useSavedGifts";
@@ -15,16 +16,36 @@ interface VenueReservationInfo {
   placeId?: string;
   address?: string;
   phoneNumber?: string;
+  /** Direct OpenTable/Resy or venue booking URL — use for dinner/restaurants */
+  bookingUrl?: string;
+  /** Preferred platform when bookingUrl is set (e.g. "opentable", "resy") */
+  reservationPlatform?: 'opentable' | 'resy' | string;
+  websiteUrl?: string;
+  openingHours?: string[];
 }
 
 interface DatePlanCardProps {
   plan: DatePlan;
   onMakeReservation?: (stop: VenueReservationInfo) => void;
   onGetMoreGifts?: () => void;
+  /** Selected transportation mode for travel icons between stops (walking, driving, etc.). */
+  transportationMode?: string;
 }
 
-const DatePlanCard = ({ plan, onMakeReservation, onGetMoreGifts }: DatePlanCardProps) => {
+function inferReservationPlatform(bookingUrl?: string): 'opentable' | 'resy' | string | undefined {
+  if (!bookingUrl) return undefined;
+  const lower = bookingUrl.toLowerCase();
+  if (lower.includes('opentable.com')) return 'opentable';
+  if (lower.includes('resy.com')) return 'resy';
+  return undefined;
+}
+
+const DatePlanCard = ({ plan, onMakeReservation, onGetMoreGifts, transportationMode }: DatePlanCardProps) => {
   const { toast } = useToast();
+  // Itinerary = venues only; exclude starting point if it was ever included as a stop
+  const itineraryStops = (Array.isArray(plan.stops) ? plan.stops : []).filter(
+    (s) => s && s.venueType !== "Starting point" && s.name !== "Your location"
+  );
   const { toggleSavedGift, isSaved, markAsPurchased, isPurchased } = useSavedGifts();
 
   const handleSaveGift = (gift: GiftSuggestion) => {
@@ -56,8 +77,8 @@ const DatePlanCard = ({ plan, onMakeReservation, onGetMoreGifts }: DatePlanCardP
     return types.some((t) => venueType.toLowerCase().includes(t));
   };
 
-  // Safe getters for optional plan properties
-  const safeStops = Array.isArray(plan.stops) ? plan.stops : [];
+  // Safe getters for optional plan properties; timeline shows only itinerary (venues), numbered 1, 2, 3...
+  const safeStops = itineraryStops;
   const safeGiftSuggestions = Array.isArray(plan.giftSuggestions) ? plan.giftSuggestions : [];
   const safeConversationStarters = Array.isArray(plan.conversationStarters) ? plan.conversationStarters : [];
   const safePackingList = Array.isArray(plan.packingList) ? plan.packingList : [];
@@ -65,30 +86,36 @@ const DatePlanCard = ({ plan, onMakeReservation, onGetMoreGifts }: DatePlanCardP
     ? plan.genieSecretTouch 
     : { title: '', description: '', emoji: '✨' };
 
-  const getTravelIcon = (mode?: string) => {
-    switch (mode?.toLowerCase()) {
-      case "walking":
-        return <Footprints className="w-3 h-3" />;
-      case "driving":
-      case "rideshare":
-        return <Car className="w-3 h-3" />;
-      case "transit":
-      case "public-transit":
-        return <Train className="w-3 h-3" />;
-      case "biking":
-        return <Bike className="w-3 h-3" />;
-      default:
-        return <Car className="w-3 h-3" />;
-    }
+  /** Resolve travel mode for icon: prefer stop.travelMode, else infer from travelTimeFromPrevious text (e.g. "Drive 15 mins"), else questionnaire transportationMode. */
+  const resolveTravelMode = (stop: { travelMode?: string; travelTimeFromPrevious?: string }) => {
+    if (stop.travelMode && stop.travelMode.trim()) return stop.travelMode.trim();
+    const text = (stop.travelTimeFromPrevious || "").toLowerCase();
+    if (/driv|car|drive/.test(text)) return "driving";
+    if (/uber|lyft|taxi|rideshare/.test(text)) return "rideshare";
+    if (/transit|bus|train|subway|metro/.test(text)) return "transit";
+    if (/bike|cycl/.test(text)) return "biking";
+    if (/walk|foot/.test(text)) return "walking";
+    return transportationMode || "";
   };
 
+  const getTravelIcon = (mode?: string) => {
+    const m = (mode || "").toLowerCase();
+    if (m.includes("driv") || m === "car" || m === "drive" || m === "driving" || m === "rideshare") return <Car className="w-3 h-3" />;
+    if (m === "walking" || m.includes("walk") || m.includes("foot")) return <Footprints className="w-3 h-3" />;
+    if (m === "transit" || m === "public-transit" || m.includes("transit") || m.includes("bus") || m.includes("train")) return <Train className="w-3 h-3" />;
+    if (m === "biking" || m.includes("bike") || m.includes("cycl")) return <Bike className="w-3 h-3" />;
+    return <Footprints className="w-3 h-3" />;
+  };
+
+  const [expandedHoursStopIndex, setExpandedHoursStopIndex] = useState<number | null>(null);
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Header */}
-      <div className="text-center space-y-2">
+      <div className="text-center space-y-1.5">
         <h2 className="font-display text-3xl sm:text-4xl text-foreground">{plan.title || 'Your Date Plan'}</h2>
         <p className="text-muted-foreground italic text-lg">{plan.tagline || 'A special experience awaits'}</p>
-        <div className="flex items-center justify-center gap-4 pt-2">
+        <div className="flex items-center justify-center gap-3 pt-1.5">
           <Badge variant="secondary" className="gap-1">
             <Clock className="w-3 h-3" />
             {plan.totalDuration || '3-4 hours'}
@@ -105,7 +132,7 @@ const DatePlanCard = ({ plan, onMakeReservation, onGetMoreGifts }: DatePlanCardP
       <div className="relative">
         <div className="absolute left-6 top-0 bottom-0 w-0.5 bg-gradient-to-b from-primary via-primary/50 to-primary/20" />
         
-        <div className="space-y-4">
+        <div className="space-y-3">
           {safeStops.map((stop, index) => {
             // Skip invalid stops
             if (!stop || typeof stop !== 'object') return null;
@@ -116,7 +143,7 @@ const DatePlanCard = ({ plan, onMakeReservation, onGetMoreGifts }: DatePlanCardP
               {stop.travelTimeFromPrevious && typeof stop.travelTimeFromPrevious === 'string' && (
                 <div className="absolute left-[14px] -top-3 transform -translate-y-full">
                   <div className="flex items-center gap-1.5 bg-muted/80 backdrop-blur-sm rounded-full px-2 py-1 text-xs text-muted-foreground border border-border/50 shadow-sm">
-                    {getTravelIcon(stop.travelMode)}
+                    {getTravelIcon(resolveTravelMode(stop))}
                     <span>{stop.travelTimeFromPrevious}</span>
                     {stop.travelDistanceFromPrevious && (
                       <>
@@ -127,15 +154,15 @@ const DatePlanCard = ({ plan, onMakeReservation, onGetMoreGifts }: DatePlanCardP
                   </div>
                 </div>
               )}
-              {/* Timeline dot */}
+              {/* Timeline dot: step number is position in itinerary (1, 2, 3...) */}
               <div className="absolute left-4 w-5 h-5 rounded-full bg-primary flex items-center justify-center text-xs text-primary-foreground font-bold shadow-lg">
-                {stop.order}
+                {index + 1}
               </div>
               
               <Card className="border-border bg-card hover:shadow-lg transition-shadow">
-                <CardHeader className="pb-2">
+                <CardHeader className="pb-1.5 pt-4 px-4">
                   <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1">
+                    <div className="flex-1 min-w-0">
                       <h3 className="font-display text-xl flex items-center gap-2">
                         <span>{stop.emoji}</span>
                         {stop.name}
@@ -157,26 +184,37 @@ const DatePlanCard = ({ plan, onMakeReservation, onGetMoreGifts }: DatePlanCardP
                       <p className="text-sm text-muted-foreground">{stop.venueType}</p>
                       {stop.address && (
                         <p className="text-xs text-muted-foreground/70 flex items-center gap-1 mt-0.5">
-                          <MapPin className="w-3 h-3" />
+                          <MapPin className="w-3 h-3 shrink-0" />
                           {stop.address}
                         </p>
                       )}
-                      {/* Hours - Verified from Google when available */}
+                      {/* Hours - collapsed by default, expand on tap */}
                       {stop.openingHours && stop.openingHours.length > 0 && (
-                        <div className="mt-2 text-xs text-muted-foreground">
-                          <div className="flex items-center gap-1 mb-1">
+                        <div className="mt-1.5 text-xs text-muted-foreground">
+                          <button
+                            type="button"
+                            onClick={() => setExpandedHoursStopIndex(expandedHoursStopIndex === index ? null : index)}
+                            className="flex items-center gap-1.5 font-medium hover:text-foreground/80 transition-colors"
+                          >
                             <Clock className="w-3 h-3" />
-                            <span className="font-medium">Hours{stop.validated ? " (from Google)" : ""}:</span>
-                          </div>
-                          <div className="ml-4 space-y-0.5">
-                            {stop.openingHours.map((line, i) => (
-                              <p key={i}>{line}</p>
-                            ))}
-                          </div>
+                            <span>Hours{stop.validated ? " (from Google)" : ""}</span>
+                            {expandedHoursStopIndex === index ? (
+                              <ChevronUp className="w-3 h-3" />
+                            ) : (
+                              <ChevronDown className="w-3 h-3" />
+                            )}
+                          </button>
+                          {expandedHoursStopIndex === index && (
+                            <div className="ml-4 mt-1 space-y-0.5">
+                              {stop.openingHours.map((line, i) => (
+                                <p key={i}>{line}</p>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       )}
-                      {/* Venue links - prefer business profile (place_id) so Maps opens the correct location */}
-                      <div className="flex flex-wrap items-center gap-2 mt-2">
+                      {/* Venue links */}
+                      <div className="flex flex-wrap items-center gap-2 mt-1.5">
                         {stop.websiteUrl && (
                           <a
                             href={stop.websiteUrl}
@@ -222,39 +260,80 @@ const DatePlanCard = ({ plan, onMakeReservation, onGetMoreGifts }: DatePlanCardP
                         )}
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       {onMakeReservation && isRestaurantOrBar(stop.venueType) && (
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <span>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() =>
-                                    onMakeReservation({
-                                      name: stop.name,
-                                      venueType: stop.venueType,
-                                      validated: stop.validated,
-                                      placeId: stop.placeId,
-                                      address: stop.address,
-                                      phoneNumber: stop.phoneNumber,
-                                    })
-                                  }
-                                  className="gap-1"
-                                >
-                                  <Calendar className="w-3 h-3" />
-                                  Reserve
-                                </Button>
-                              </span>
-                            </TooltipTrigger>
-                            {!stop.validated && (
-                              <TooltipContent>
-                                <p>Venue isn't verified yet — reservation links still work.</p>
-                              </TooltipContent>
-                            )}
-                          </Tooltip>
-                        </TooltipProvider>
+                        <>
+                          {stop.bookingUrl && (inferReservationPlatform(stop.bookingUrl) === 'opentable' || inferReservationPlatform(stop.bookingUrl) === 'resy') ? (
+                            <>
+                              <Button
+                                variant="default"
+                                size="sm"
+                                onClick={() => window.open(stop.bookingUrl!, "_blank", "noopener,noreferrer")}
+                                className="gap-1"
+                              >
+                                <Calendar className="w-3 h-3" />
+                                Reserve on {inferReservationPlatform(stop.bookingUrl) === 'opentable' ? 'OpenTable' : 'Resy'}
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() =>
+                                  onMakeReservation({
+                                    name: stop.name,
+                                    venueType: stop.venueType,
+                                    validated: stop.validated,
+                                    placeId: stop.placeId,
+                                    address: stop.address,
+                                    phoneNumber: stop.phoneNumber,
+                                    bookingUrl: stop.bookingUrl,
+                                    reservationPlatform: inferReservationPlatform(stop.bookingUrl),
+                                    websiteUrl: stop.websiteUrl,
+                                    openingHours: stop.openingHours,
+                                  })
+                                }
+                                className="gap-1"
+                              >
+                                More options
+                              </Button>
+                            </>
+                          ) : (
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() =>
+                                        onMakeReservation({
+                                          name: stop.name,
+                                          venueType: stop.venueType,
+                                          validated: stop.validated,
+                                          placeId: stop.placeId,
+                                          address: stop.address,
+                                          phoneNumber: stop.phoneNumber,
+                                          bookingUrl: stop.bookingUrl,
+                                          reservationPlatform: inferReservationPlatform(stop.bookingUrl),
+                                          websiteUrl: stop.websiteUrl,
+                                          openingHours: stop.openingHours,
+                                        })
+                                      }
+                                      className="gap-1"
+                                    >
+                                      <Calendar className="w-3 h-3" />
+                                      Reserve
+                                    </Button>
+                                  </span>
+                                </TooltipTrigger>
+                                {!stop.validated && (
+                                  <TooltipContent>
+                                    <p>Venue isn't verified yet — reservation links still work.</p>
+                                  </TooltipContent>
+                                )}
+                              </Tooltip>
+                            </TooltipProvider>
+                          )}
+                        </>
                       )}
                       <Badge variant="outline" className="shrink-0">
                         {stop.timeSlot}
@@ -262,10 +341,10 @@ const DatePlanCard = ({ plan, onMakeReservation, onGetMoreGifts }: DatePlanCardP
                     </div>
                   </div>
                 </CardHeader>
-                <CardContent className="space-y-3">
-                  <p className="text-foreground">{stop.description}</p>
+                <CardContent className="space-y-2.5 px-4 pb-4">
+                  <p className="text-foreground text-sm">{stop.description}</p>
                   
-                  <div className="bg-muted/50 rounded-lg p-3 space-y-2">
+                  <div className="bg-muted/50 rounded-lg p-2.5 space-y-1.5">
                     <p className="text-sm">
                       <span className="font-medium text-primary">Why this fits: </span>
                       <span className="text-muted-foreground">{stop.whyItFits}</span>
@@ -343,7 +422,12 @@ const DatePlanCard = ({ plan, onMakeReservation, onGetMoreGifts }: DatePlanCardP
                 <div key={i} className="bg-background/50 rounded-lg p-3 space-y-1">
                   <div className="flex items-center justify-between gap-2">
                     <span className="font-medium flex items-center gap-2 flex-wrap">
-                      <span>{gift.emoji}</span>
+                      <div className="relative w-8 h-8 shrink-0 flex items-center justify-center rounded overflow-hidden bg-muted">
+                        <span className="text-base">{gift.emoji}</span>
+                        {gift.imageUrl && (
+                          <img src={gift.imageUrl} alt={gift.name} className="absolute inset-0 w-full h-full object-cover" onError={(e) => { e.currentTarget.style.display = "none"; }} />
+                        )}
+                      </div>
                       {gift.purchaseUrl ? (
                         <a
                           href={gift.purchaseUrl}

@@ -81,13 +81,21 @@ const Step3Food = ({ data, onChange }: Step3Props) => {
 
       {/* Drink Preferences */}
       <div className="space-y-3">
-        <Label className="text-sm sm:text-base font-medium">🥂 Drink of choice?</Label>
-        <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+        <Label className="text-sm sm:text-base font-medium">
+          🥂 Preferred beverages? <span className="text-muted-foreground font-normal text-xs sm:text-sm">(pick any)</span>
+        </Label>
+        <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 sm:gap-3">
           {DRINK_PREFERENCES.map((drink) => (
             <OptionCard
               key={drink.value}
-              selected={data.drinkPreferences === drink.value}
-              onClick={() => onChange({ drinkPreferences: drink.value })}
+              selected={data.drinkPreferences.includes(drink.value)}
+              onClick={() => {
+                const current = data.drinkPreferences;
+                const updated = current.includes(drink.value)
+                  ? current.filter((v) => v !== drink.value)
+                  : [...current, drink.value];
+                onChange({ drinkPreferences: updated });
+              }}
               emoji={drink.emoji}
               label={drink.label}
               compact

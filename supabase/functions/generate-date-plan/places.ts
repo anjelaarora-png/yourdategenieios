@@ -12,6 +12,8 @@ interface PlaceValidationResult {
   phoneNumber?: string;
   openingHours?: string[];
   businessStatus?: string;
+  /** Photo URL from Google Business Profile (Place Details photos) for cards and lists. */
+  imageUrl?: string;
 }
 
 interface Stop {
@@ -32,6 +34,8 @@ interface Stop {
   websiteUrl?: string;
   phoneNumber?: string;
   openingHours?: string[];
+  bookingUrl?: string;
+  imageUrl?: string;
 }
 
 // Extract state abbreviation from city string (e.g., "Newark, NJ" -> "NJ")
@@ -68,13 +72,74 @@ const cityNameVariations: Record<string, string[]> = {
   'moskva': ['moskva', 'moscow'],
 };
 
-// Trust Google's search results - we already search with "[venue] [city]"
-// so Google is already filtering by location
-function isAddressInLocation(address: string, city: string): boolean {
-  // Always trust Google's result if we have an address
-  // The search query already includes the city, so results are location-relevant
+/** Distance in km between two points (Haversine). */
+function distanceKm(
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number
+): number {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+/** Normalize city for matching: lowercase, trim. Returns also known variations for that city. */
+function cityMatchTerms(city: string): string[] {
+  const c = city.trim().toLowerCase();
+  if (!c) return [];
+  const terms = [c];
+  for (const [key, vals] of Object.entries(cityNameVariations)) {
+    if (key === c || vals.some((v) => v === c)) {
+      vals.forEach((v) => terms.push(v));
+      break;
+    }
+  }
+  return [...new Set(terms)];
+}
+
+/** Verify the place is in the requested city: address contains city (or variation) and/or within maxDistanceKm of city center. */
+function isAddressInLocation(
+  address: string,
+  city: string,
+  venueLat?: number,
+  venueLon?: number,
+  cityCenterLat?: number,
+  cityCenterLon?: number,
+  maxDistanceKm: number = 150
+): boolean {
+  const terms = cityMatchTerms(city);
+  const addrLower = (address || "").trim().toLowerCase();
+  const addressContainsCity = terms.some((t) => addrLower.includes(t));
+  if (addressContainsCity) {
+    console.log(`[Places API] Address in location: "${address}" contains city "${city}"`);
+    return true;
+  }
+  if (
+    typeof venueLat === "number" &&
+    typeof venueLon === "number" &&
+    typeof cityCenterLat === "number" &&
+    typeof cityCenterLon === "number" &&
+    Number.isFinite(venueLat) &&
+    Number.isFinite(venueLon) &&
+    Number.isFinite(cityCenterLat) &&
+    Number.isFinite(cityCenterLon)
+  ) {
+    const km = distanceKm(cityCenterLat, cityCenterLon, venueLat, venueLon);
+    if (km <= maxDistanceKm) {
+      console.log(`[Places API] Venue within ${km.toFixed(0)} km of city center for "${city}"`);
+      return true;
+    }
+    console.log(`[Places API] WRONG LOCATION: Venue at (${venueLat},${venueLon}) is ${km.toFixed(0)} km from "${city}" center (max ${maxDistanceKm} km). Address: "${address}"`);
+    return false;
+  }
   if (address) {
-    console.log(`[Places API] Trusting Google result: "${address}" for city "${city}"`);
+    console.log(`[Places API] Cannot verify city (no center); trusting address: "${address}" for "${city}"`);
     return true;
   }
   return false;
@@ -130,10 +195,13 @@ export async function geocodeAddress(
   }
 }
 
+export type CityCenter = { latitude: number; longitude: number };
+
 export async function validateVenue(
   venueName: string,
   city: string,
-  apiKey: string
+  apiKey: string,
+  cityCenter?: CityCenter
 ): Promise<PlaceValidationResult> {
   // Input validation
   if (!venueName || typeof venueName !== 'string' || venueName.trim() === '') {
@@ -152,12 +220,16 @@ export async function validateVenue(
   }
 
   try {
-    // Step 1: Find the place (include name and business_status)
+    // Step 1: Find the place (include name and business_status). Bias results to city area.
     const sanitizedVenue = venueName.trim().slice(0, 200); // Limit length
     const sanitizedCity = city.trim().slice(0, 100);
     const query = encodeURIComponent(`${sanitizedVenue} ${sanitizedCity}`);
-    const findUrl = `https://maps.googleapis.com/maps/api/place/findplacefromtext/json?input=${query}&inputtype=textquery&fields=place_id,name,formatted_address,geometry,business_status&key=${apiKey}`;
-
+    let findUrl = `https://maps.googleapis.com/maps/api/place/findplacefromtext/json?input=${query}&inputtype=textquery&fields=place_id,name,formatted_address,geometry,business_status&key=${apiKey}`;
+    if (cityCenter && Number.isFinite(cityCenter.latitude) && Number.isFinite(cityCenter.longitude)) {
+      const radiusM = 50000; // 50 km - prefer results near the city
+      findUrl += `&locationbias=circle:${radiusM}@${cityCenter.latitude},${cityCenter.longitude}`;
+      console.log(`[Places API] Using location bias: circle ${radiusM}m around city center`);
+    }
     console.log(`[Places API] Finding venue: ${sanitizedVenue} in ${sanitizedCity}`);
     
     // Add timeout to prevent hanging requests
@@ -189,11 +261,22 @@ export async function validateVenue(
     const officialName = place.name; // Get the official name from Google
     const formattedAddress = place.formatted_address;
     const businessStatus = place.business_status;
+    const placeLat = place.geometry?.location?.lat;
+    const placeLon = place.geometry?.location?.lng;
     console.log(`[Places API] Found: "${officialName}" at "${formattedAddress}" (searched: "${venueName}"), placeId: ${placeId}, status: ${businessStatus}`);
 
-    // CRITICAL: Verify the venue is actually in the correct location
-    if (!isAddressInLocation(formattedAddress, city)) {
-      console.log(`[Places API] WRONG LOCATION! Venue "${officialName}" is at "${formattedAddress}" but user requested "${city}"`);
+    // CRITICAL: Verify the venue is actually in the requested city (reject e.g. Dubai when user asked Chennai)
+    const inLocation = isAddressInLocation(
+      formattedAddress,
+      city,
+      placeLat,
+      placeLon,
+      cityCenter?.latitude,
+      cityCenter?.longitude,
+      150
+    );
+    if (!inLocation) {
+      console.log(`[Places API] WRONG LOCATION! Venue "${officialName}" at "${formattedAddress}" is not in "${city}"`);
       return { isValid: false };
     }
 
@@ -203,13 +286,14 @@ export async function validateVenue(
       return { isValid: false, isPermanentlyClosed: true };
     }
 
-    // Step 2: Get place details (website, phone, hours, official name for confirmation)
-    const detailsUrl = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=name,website,formatted_phone_number,opening_hours,business_status&key=${apiKey}`;
+    // Step 2: Get place details (website, phone, hours, photos, official name for confirmation)
+    const detailsUrl = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=name,website,formatted_phone_number,opening_hours,business_status,photos&key=${apiKey}`;
     
     const detailsResponse = await fetch(detailsUrl);
     let websiteUrl: string | undefined;
     let phoneNumber: string | undefined;
     let openingHours: string[] | undefined;
+    let imageUrl: string | undefined;
     let confirmedName = officialName; // Use the name from find, but details can override
 
     if (detailsResponse.ok) {
@@ -230,7 +314,14 @@ export async function validateVenue(
         websiteUrl = detailsData.result.website;
         phoneNumber = detailsData.result.formatted_phone_number;
         openingHours = detailsData.result.opening_hours?.weekday_text;
-        console.log(`[Places API] Details for "${confirmedName}": website=${websiteUrl}, phone=${phoneNumber}, hours=${openingHours?.length || 0} entries`);
+        // Build photo URL from first Google Business Profile photo (Place Photos API)
+        const photos = detailsData.result.photos;
+        if (Array.isArray(photos) && photos.length > 0 && photos[0].photo_reference) {
+          const ref = encodeURIComponent(photos[0].photo_reference);
+          imageUrl = `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=${ref}&key=${apiKey}`;
+          console.log(`[Places API] Photo URL set for "${confirmedName}"`);
+        }
+        console.log(`[Places API] Details for "${confirmedName}": website=${websiteUrl}, phone=${phoneNumber}, hours=${openingHours?.length || 0} entries, photo=${!!imageUrl}`);
       }
     } else {
       console.error("[Places API] Details fetch failed:", detailsResponse.status);
@@ -247,6 +338,7 @@ export async function validateVenue(
       phoneNumber,
       openingHours,
       businessStatus,
+      imageUrl,
     };
   } catch (error) {
     console.error("[Places API] Error validating venue:", error);
@@ -258,13 +350,18 @@ export async function validateVenue(
 async function searchVenueByType(
   venueType: string,
   city: string,
-  apiKey: string
+  apiKey: string,
+  cityCenter?: CityCenter
 ): Promise<PlaceValidationResult> {
   try {
-    // Search for the venue type in the city
+    // Search for the venue type in the city; bias to city area
     const query = encodeURIComponent(`${venueType} in ${city}`);
-    const searchUrl = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${query}&key=${apiKey}`;
-    
+    let searchUrl = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${query}&key=${apiKey}`;
+    if (cityCenter && Number.isFinite(cityCenter.latitude) && Number.isFinite(cityCenter.longitude)) {
+      searchUrl += `&location=${cityCenter.latitude},${cityCenter.longitude}`;
+      // textsearch uses location + radius (in meters)
+      searchUrl += `&radius=50000`;
+    }
     console.log(`[Places API] Fallback search: ${venueType} in ${city}`);
     
     const controller = new AbortController();
@@ -302,13 +399,14 @@ async function searchVenueByType(
       return { isValid: false, isPermanentlyClosed: true };
     }
     
-    // Get details for the place
-    const detailsUrl = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=name,website,formatted_phone_number,opening_hours,business_status,formatted_address,geometry&key=${apiKey}`;
+    // Get details for the place (include photos for card images)
+    const detailsUrl = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=name,website,formatted_phone_number,opening_hours,business_status,formatted_address,geometry,photos&key=${apiKey}`;
     const detailsResponse = await fetch(detailsUrl);
     
     let websiteUrl: string | undefined;
     let phoneNumber: string | undefined;
     let openingHours: string[] | undefined;
+    let imageUrl: string | undefined;
     let officialName = place.name;
     let formattedAddress = place.formatted_address;
     let latitude = place.geometry?.location?.lat;
@@ -327,9 +425,28 @@ async function searchVenueByType(
         openingHours = detailsData.result.opening_hours?.weekday_text;
         latitude = detailsData.result.geometry?.location?.lat || latitude;
         longitude = detailsData.result.geometry?.location?.lng || longitude;
+        const photos = detailsData.result.photos;
+        if (Array.isArray(photos) && photos.length > 0 && photos[0].photo_reference) {
+          const ref = encodeURIComponent(photos[0].photo_reference);
+          imageUrl = `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=${ref}&key=${apiKey}`;
+        }
       }
     }
     
+    // Verify result is in the requested city (same as validateVenue)
+    const inLocation = isAddressInLocation(
+      formattedAddress || "",
+      city,
+      latitude,
+      longitude,
+      cityCenter?.latitude,
+      cityCenter?.longitude,
+      150
+    );
+    if (!inLocation) {
+      console.log(`[Places API] Fallback WRONG LOCATION: "${officialName}" at "${formattedAddress}" not in "${city}"`);
+      return { isValid: false };
+    }
     console.log(`[Places API] Fallback found: "${officialName}" for type "${venueType}"`);
     
     return {
@@ -342,6 +459,7 @@ async function searchVenueByType(
       websiteUrl,
       phoneNumber,
       openingHours,
+      imageUrl,
     };
   } catch (error) {
     console.error("[Places API] Fallback search error:", error);
@@ -358,6 +476,7 @@ async function validateVenueWithRetry(
   venueType: string,
   city: string,
   apiKey: string,
+  cityCenter?: CityCenter,
   maxRetries = 2
 ): Promise<PlaceValidationResult> {
   let lastError: Error | null = null;
@@ -370,7 +489,7 @@ async function validateVenueWithRetry(
         console.log(`[Places API] Retry attempt ${attempt} for: ${venueName}`);
       }
       
-      const result = await validateVenue(venueName, city, apiKey);
+      const result = await validateVenue(venueName, city, apiKey, cityCenter);
       if (result.isValid) {
         return result;
       }
@@ -383,7 +502,7 @@ async function validateVenueWithRetry(
   // Fallback: Search by venue type if specific venue not found
   if (venueType) {
     console.log(`[Places API] Trying fallback search for type: ${venueType} in ${city}`);
-    const fallbackResult = await searchVenueByType(venueType, city, apiKey);
+    const fallbackResult = await searchVenueByType(venueType, city, apiKey, cityCenter);
     if (fallbackResult.isValid) {
       console.log(`[Places API] Fallback successful: found "${fallbackResult.officialName}" for type "${venueType}"`);
       return fallbackResult;
@@ -410,6 +529,18 @@ export async function validateAllStops(
     return stops.map((stop, index) => ({ ...stop, validated: false, order: index + 1 }));
   }
 
+  // Geocode city once so we can bias and verify all venues are in the right place (avoid e.g. Dubai when user asked Chennai)
+  let cityCenter: CityCenter | undefined;
+  try {
+    const geo = await geocodeAddress(city.trim().slice(0, 200), apiKey);
+    if (geo) {
+      cityCenter = { latitude: geo.latitude, longitude: geo.longitude };
+      console.log(`[Validation] City center for "${city}": ${geo.latitude}, ${geo.longitude}`);
+    }
+  } catch (e) {
+    console.warn("[Validation] Could not geocode city for location bias:", e);
+  }
+
   const validatedStops: Stop[] = [];
   
   for (const stop of stops) {
@@ -420,7 +551,7 @@ export async function validateAllStops(
     }
     
     try {
-      const result = await validateVenueWithRetry(stop.name, stop.venueType || "", city, apiKey);
+      const result = await validateVenueWithRetry(stop.name, stop.venueType || "", city, apiKey, cityCenter);
 
       // Skip permanently closed venues, but keep unverified ones
       if (result.isPermanentlyClosed) {
@@ -454,9 +585,10 @@ export async function validateAllStops(
         address: result.formattedAddress,
         latitude: result.latitude,
         longitude: result.longitude,
-        websiteUrl: result.websiteUrl,
-        phoneNumber: result.phoneNumber,
-        openingHours: result.openingHours,
+        websiteUrl: result.websiteUrl ?? stop.websiteUrl,
+        phoneNumber: result.phoneNumber ?? stop.phoneNumber,
+        openingHours: result.openingHours ?? stop.openingHours,
+        imageUrl: result.imageUrl ?? stop.imageUrl,
       });
     } catch (err) {
       console.error(`[Validation] Unexpected error validating ${stop.name}:`, err);

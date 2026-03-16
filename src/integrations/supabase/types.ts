@@ -214,7 +214,7 @@ export type Database = {
           default_city: string | null
           default_neighborhood: string | null
           dietary_restrictions: string[] | null
-          drink_preferences: string | null
+          drink_preferences: string[] | null
           energy_level: string | null
           food_preferences: string[] | null
           gift_budget: string | null
@@ -241,7 +241,7 @@ export type Database = {
           default_city?: string | null
           default_neighborhood?: string | null
           dietary_restrictions?: string[] | null
-          drink_preferences?: string | null
+          drink_preferences?: string[] | null
           energy_level?: string | null
           food_preferences?: string[] | null
           gift_budget?: string | null
@@ -268,7 +268,7 @@ export type Database = {
           default_city?: string | null
           default_neighborhood?: string | null
           dietary_restrictions?: string[] | null
-          drink_preferences?: string | null
+          drink_preferences?: string[] | null
           energy_level?: string | null
           food_preferences?: string[] | null
           gift_budget?: string | null

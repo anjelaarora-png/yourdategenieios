@@ -1,6 +1,6 @@
 import SwiftUI
 
-// MARK: - Section Header (matches "Our Memories" header style: Times New Roman, 30pt regular)
+// MARK: - Section Header (questionnaire questions in Tangerine)
 struct SectionHeader: View {
     var emoji: String = ""
     let title: String
@@ -15,7 +15,8 @@ struct SectionHeader: View {
                 }
                 
                 Text(title)
-                    .font(Font.header(30, weight: .regular))
+                    .font(Font.tangerine(30, weight: .bold))
+                    .italic()
                     .foregroundColor(Color.luxuryGold)
             }
             

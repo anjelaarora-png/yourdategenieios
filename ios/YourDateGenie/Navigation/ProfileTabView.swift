@@ -70,8 +70,7 @@ struct LuxuryProfileTabView: View {
                         
                         if let prefs = userProfile?.preferences {
                             PreferencesSummaryCard(preferences: prefs, onEdit: {
-                                coordinator.planIntent = .useLast
-                                coordinator.startDatePlanning(mode: .useLast)
+                                coordinator.startEditPreferencesOnly()
                             })
                                 .padding(.horizontal, 20)
                         }
@@ -84,8 +83,7 @@ struct LuxuryProfileTabView: View {
                                 coordinator.activeSheet = .pastMagic
                             }
                             LuxuryProfileMenuItem(icon: "heart.fill", title: "Preferences") {
-                                coordinator.planIntent = .useLast
-                                coordinator.startDatePlanning(mode: .useLast)
+                                coordinator.startEditPreferencesOnly()
                             }
                             LuxuryProfileMenuItem(icon: "bell.fill", title: "Notifications") {
                                 notificationManager.showNotificationsSheet = true
@@ -206,6 +204,18 @@ struct PreferencesSummaryCard: View {
             }
             
             VStack(alignment: .leading, spacing: 14) {
+                // Your gender & partner's gender
+                PreferenceChipsSection(
+                    icon: "person.fill",
+                    title: "Your gender",
+                    chips: [(emoji: preferences.gender.emoji, label: preferences.gender.displayName)]
+                )
+                PreferenceChipsSection(
+                    icon: "person.2.fill",
+                    title: "Partner's gender",
+                    chips: [(emoji: preferences.partnerGender.emoji, label: preferences.partnerGender.displayName)]
+                )
+                
                 // Activities that interest me
                 PreferenceChipsSection(
                     icon: "sparkles",

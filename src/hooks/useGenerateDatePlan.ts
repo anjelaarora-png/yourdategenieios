@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { QuestionnaireData } from "@/components/questionnaire/types";
 import { DatePlan, GiftSuggestion } from "@/types/datePlan";
 import { useToast } from "@/hooks/use-toast";
+import { getClientTimeZone, getClientLocaleRegion } from "@/lib/currency";
 
 const GENERATE_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-date-plan`;
 const STORAGE_KEY = "pending_date_plans";
@@ -92,13 +93,18 @@ export function useGenerateDatePlan() {
         const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s timeout
 
 
+        const payload = {
+          ...preferences,
+          timeZone: preferences.timeZone ?? getClientTimeZone(),
+          countryCode: preferences.countryCode ?? getClientLocaleRegion(),
+        };
         const response = await fetch(GENERATE_URL, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
           },
-          body: JSON.stringify({ preferences }),
+          body: JSON.stringify({ preferences: payload }),
           signal: controller.signal,
         });
 

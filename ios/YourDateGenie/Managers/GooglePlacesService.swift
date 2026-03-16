@@ -47,20 +47,43 @@ class GooglePlacesService {
         let website: String?
         let openingHours: [String]?
         let priceLevel: Int?
+        /// URL for a place photo from Google Business Profile (built from photo_reference).
+        let photoUrl: String?
+    }
+    
+    // MARK: - Booking URL from website
+    
+    /// If the venue's website is a known booking platform (OpenTable, Resy), use it as the reservation link.
+    private static func bookingUrlFromWebsite(_ website: String?) -> String? {
+        guard let w = website?.lowercased(), !w.isEmpty else { return nil }
+        if w.contains("opentable.com") || w.contains("resy.com") { return website }
+        return nil
     }
     
     // MARK: - Verify Venue
     
-    /// Verify a venue exists and enrich with real data from Google Places
+    /// Verify a venue exists and enrich with real data from Google Places. Biases search to the user's city so we don't replace e.g. Chennai venues with same-named venues in Spain.
     func verifyVenue(_ stop: DatePlanStop, city: String) async throws -> DatePlanStop {
         let query = "\(stop.name) \(city)"
+        let cityTrimmed = city.trimmingCharacters(in: .whitespacesAndNewlines)
+        var cityCenter: (lat: Double, lon: Double)?
+        if !cityTrimmed.isEmpty, let geo = try? await geocodeAddress(cityTrimmed) {
+            cityCenter = (geo.latitude, geo.longitude)
+        }
         
-        guard let place = try await searchPlace(query: query) else {
+        guard let place = try await searchPlace(query: query, locationBias: cityCenter) else {
+            return stop
+        }
+        
+        // Reject result if it's clearly in another country/region (e.g. user asked Chennai but got Spain)
+        if !cityTrimmed.isEmpty && !isAddressInCity(place.address, city: cityTrimmed, placeLat: place.latitude, placeLon: place.longitude, cityCenter: cityCenter) {
             return stop
         }
         
         // Get detailed place information
         let details = try await getPlaceDetails(placeId: place.placeId)
+        let website = details?.website ?? stop.websiteUrl
+        let bookingUrl = stop.bookingUrl ?? Self.bookingUrlFromWebsite(website)
         
         return DatePlanStop(
             order: stop.order,
@@ -80,10 +103,12 @@ class GooglePlacesService {
             address: details?.address ?? place.address,
             latitude: place.latitude,
             longitude: place.longitude,
-            websiteUrl: details?.website,
-            phoneNumber: details?.phoneNumber,
-            openingHours: details?.openingHours,
-            estimatedCostPerPerson: stop.estimatedCostPerPerson
+            websiteUrl: website,
+            phoneNumber: details?.phoneNumber ?? stop.phoneNumber,
+            openingHours: details?.openingHours ?? stop.openingHours,
+            estimatedCostPerPerson: stop.estimatedCostPerPerson,
+            bookingUrl: bookingUrl,
+            imageUrl: details?.photoUrl ?? stop.imageUrl
         )
     }
     
@@ -179,6 +204,16 @@ class GooglePlacesService {
         )
     }
     
+    // MARK: - Place Details (full address from place_id)
+    
+    /// Fetch the canonical formatted address and coordinates for a place_id (e.g. from autocomplete).
+    /// Use this when the user selects an address suggestion so the stored value is the full accurate address.
+    func fetchFormattedAddress(placeId: String) async throws -> (formattedAddress: String, latitude: Double, longitude: Double)? {
+        guard Config.isGooglePlacesConfigured else { return nil }
+        guard let details = try await getPlaceDetails(placeId: placeId) else { return nil }
+        return (details.address, details.latitude, details.longitude)
+    }
+    
     // MARK: - Geocode Address
     
     /// Resolve an address string to coordinates using Google Geocoding API (Google-verified).
@@ -217,12 +252,18 @@ class GooglePlacesService {
     
     // MARK: - Search Place
     
-    private func searchPlace(query: String) async throws -> PlaceSearchResult? {
+    /// Search with optional location bias so results are in the user's city (e.g. Chennai), not same-named venues elsewhere (e.g. Spain).
+    private func searchPlace(query: String, locationBias: (lat: Double, lon: Double)? = nil) async throws -> PlaceSearchResult? {
         guard let encodedQuery = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) else {
             return nil
         }
         
-        let urlString = "\(Config.googlePlacesEndpoint)/textsearch/json?query=\(encodedQuery)&key=\(Config.googlePlacesAPIKey)"
+        var urlString = "\(Config.googlePlacesEndpoint)/textsearch/json?query=\(encodedQuery)"
+        if let bias = locationBias {
+            let radiusMeters = 50_000
+            urlString += "&location=\(bias.lat),\(bias.lon)&radius=\(radiusMeters)"
+        }
+        urlString += "&key=\(Config.googlePlacesAPIKey)"
         
         guard let url = URL(string: urlString) else {
             return nil
@@ -247,10 +288,99 @@ class GooglePlacesService {
         return parsePlaceResult(from: firstResult)
     }
     
+    /// Map ExploreCategory id to Google Places text search terms for trending in city.
+    private static func trendingQueryTerms(for categoryId: String?) -> String {
+        switch categoryId {
+        case "restaurants": return "restaurant"
+        case "cafes": return "cafe coffee"
+        case "bars": return "bar lounge"
+        case "romantic": return "romantic restaurant"
+        case "date_night", nil: return "restaurant bar romantic date night"
+        case "outdoor": return "parks outdoor activities"
+        case "arts": return "museum art gallery"
+        case "nightlife": return "nightclub nightlife"
+        default: return "restaurant bar romantic date night"
+        }
+    }
+    
+    /// Fetch trending / popular places in the given city (e.g. for "Trending in your Area" on home).
+    /// Optional `categoryId` from ExploreCategory (e.g. "restaurants", "bars") narrows results; nil = general date-night mix.
+    /// Uses Places Text Search; returns up to `limit` results.
+    func fetchTrendingPlacesInCity(city: String, categoryId: String? = nil, limit: Int = 6) async throws -> [PlaceSearchResult] {
+        let trimmed = city.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, Config.isGooglePlacesConfigured else { return [] }
+        
+        var locationBias: (lat: Double, lon: Double)?
+        if let geo = try? await geocodeAddress(trimmed) {
+            locationBias = (geo.latitude, geo.longitude)
+        }
+        
+        let queryTerms = Self.trendingQueryTerms(for: categoryId)
+        let query = "\(queryTerms) \(trimmed)"
+        guard let encodedQuery = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) else {
+            return []
+        }
+        
+        var urlString = "\(Config.googlePlacesEndpoint)/textsearch/json?query=\(encodedQuery)"
+        if let bias = locationBias {
+            let radiusMeters = 25_000
+            urlString += "&location=\(bias.lat),\(bias.lon)&radius=\(radiusMeters)"
+        }
+        urlString += "&key=\(Config.googlePlacesAPIKey)"
+        
+        guard let url = URL(string: urlString) else { return [] }
+        
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 12
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            return []
+        }
+        
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let results = json["results"] as? [[String: Any]] else {
+            return []
+        }
+        
+        var places: [PlaceSearchResult] = []
+        for result in results.prefix(limit) {
+            if let place = parsePlaceResult(from: result) {
+                places.append(place)
+            }
+        }
+        return places
+    }
+    
+    /// Heuristic: address contains city name (or known variation) or place is within maxDistanceKm of city center. Reject e.g. Spain when user asked Chennai.
+    private func isAddressInCity(_ address: String, city: String, placeLat: Double, placeLon: Double, cityCenter: (lat: Double, lon: Double)?, maxDistanceKm: Double = 80) -> Bool {
+        let addressLower = address.lowercased()
+        let cityLower = city.lowercased()
+        let cityWords = cityLower.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces) }
+        let firstCityName = cityWords.first ?? cityLower
+        if !firstCityName.isEmpty && addressLower.contains(firstCityName) { return true }
+        if cityLower.contains("chennai") && addressLower.contains("madras") { return true }
+        if cityLower.contains("madras") && addressLower.contains("chennai") { return true }
+        if let c = cityCenter {
+            let km = distanceKm(c.lat, c.lon, placeLat, placeLon)
+            return km <= maxDistanceKm
+        }
+        return true
+    }
+    
+    private func distanceKm(_ lat1: Double, _ lon1: Double, _ lat2: Double, _ lon2: Double) -> Double {
+        let R = 6371.0
+        let dLat = (lat2 - lat1) * .pi / 180
+        let dLon = (lon2 - lon1) * .pi / 180
+        let a = sin(dLat/2) * sin(dLat/2) + cos(lat1 * .pi / 180) * cos(lat2 * .pi / 180) * sin(dLon/2) * sin(dLon/2)
+        let c = 2 * atan2(sqrt(a), sqrt(1-a))
+        return R * c
+    }
+    
     // MARK: - Get Place Details
     
     private func getPlaceDetails(placeId: String) async throws -> PlaceSearchResult? {
-        let fields = "name,formatted_address,geometry,rating,user_ratings_total,opening_hours,formatted_phone_number,website,price_level"
+        let fields = "name,formatted_address,geometry,rating,user_ratings_total,opening_hours,formatted_phone_number,website,price_level,photos"
         let urlString = "\(Config.googlePlacesEndpoint)/details/json?place_id=\(placeId)&fields=\(fields)&key=\(Config.googlePlacesAPIKey)"
         
         guard let url = URL(string: urlString) else {
@@ -296,6 +426,10 @@ class GooglePlacesService {
             openNow = openingHours["open_now"] as? Bool
         }
         
+        var photoUrl: String?
+        if let photos = json["photos"] as? [[String: Any]], let first = photos.first, let ref = first["photo_reference"] as? String, !Config.googlePlacesAPIKey.isEmpty {
+            photoUrl = "https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=\(ref.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ref)&key=\(Config.googlePlacesAPIKey)"
+        }
         return PlaceSearchResult(
             placeId: placeId,
             name: name,
@@ -308,7 +442,8 @@ class GooglePlacesService {
             phoneNumber: nil,
             website: nil,
             openingHours: nil,
-            priceLevel: json["price_level"] as? Int
+            priceLevel: json["price_level"] as? Int,
+            photoUrl: photoUrl
         )
     }
     
@@ -335,7 +470,10 @@ class GooglePlacesService {
            let weekdayText = hours["weekday_text"] as? [String] {
             openingHours = weekdayText
         }
-        
+        var photoUrl: String?
+        if let photos = json["photos"] as? [[String: Any]], let first = photos.first, let ref = first["photo_reference"] as? String, !Config.googlePlacesAPIKey.isEmpty {
+            photoUrl = "https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=\(ref.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ref)&key=\(Config.googlePlacesAPIKey)"
+        }
         return PlaceSearchResult(
             placeId: placeId,
             name: name,
@@ -348,7 +486,8 @@ class GooglePlacesService {
             phoneNumber: phoneNumber,
             website: website,
             openingHours: openingHours,
-            priceLevel: priceLevel
+            priceLevel: priceLevel,
+            photoUrl: photoUrl
         )
     }
     

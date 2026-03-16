@@ -41,7 +41,7 @@ export function useSongSearch(debounceMs = 300) {
         term: searchQuery,
         media: "music",
         entity: "song",
-        limit: "8",
+        limit: "15",
       });
 
       const response = await fetch(`${ITUNES_SEARCH_URL}?${params}`, {

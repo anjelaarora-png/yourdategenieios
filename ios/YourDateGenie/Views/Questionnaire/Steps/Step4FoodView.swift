@@ -72,16 +72,16 @@ struct Step4FoodView: View {
                     }
                 }
                 
-                // Drink Preferences
+                // Drink Preferences (multi-select)
                 VStack(alignment: .leading, spacing: 12) {
-                    SectionHeader(emoji: "🍷", title: "Drink preferences?")
+                    SectionHeader(emoji: "🍷", title: "Preferred beverages? (pick any)")
                     
                     FlowLayout(spacing: 10) {
                         ForEach(QuestionnaireOptions.drinkPreferences) { drink in
                             ChipOptionView(
                                 item: drink,
-                                isSelected: data.drinkPreferences == drink.value,
-                                onTap: { data.drinkPreferences = drink.value }
+                                isSelected: data.drinkPreferences.contains(drink.value),
+                                onTap: { toggleSelection(drink.value, in: &data.drinkPreferences) }
                             )
                         }
                     }

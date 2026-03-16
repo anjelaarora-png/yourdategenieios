@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -20,6 +20,8 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Loader2, Gift, Sparkles, ExternalLink, Search } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useUserPreferences } from "@/hooks/useUserPreferences";
+import { useSavedGifts } from "@/hooks/useSavedGifts";
 import { supabase } from "@/integrations/supabase/client";
 import { GiftSuggestion } from "@/types/datePlan";
 
@@ -69,14 +71,30 @@ const generateSearchUrl = (giftName: string, whereToBuy: string): string => {
 
 const GiftFinderDialog = ({ open, onOpenChange }: GiftFinderDialogProps) => {
   const { toast } = useToast();
+  const { getGiftPreferences, preferences } = useUserPreferences();
+  const { purchasedGiftNames } = useSavedGifts();
   const [isLoading, setIsLoading] = useState(false);
   const [gifts, setGifts] = useState<GiftSuggestion[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
+  const [prefsLoaded, setPrefsLoaded] = useState(false);
 
   const [occasion, setOccasion] = useState("");
   const [priceRange, setPriceRange] = useState("");
   const [interests, setInterests] = useState("");
   const [partnerDescription, setPartnerDescription] = useState("");
+
+  const locationHint = preferences?.preferred_location || preferences?.default_city || "";
+
+  useEffect(() => {
+    if (open && !prefsLoaded) {
+      const prefs = getGiftPreferences();
+      if (prefs.gift_occasion) setOccasion(prefs.gift_occasion);
+      if (prefs.gift_budget) setPriceRange(prefs.gift_budget);
+      if (prefs.gift_interests?.length) setInterests(prefs.gift_interests.join(", "));
+      if (prefs.gift_notes) setPartnerDescription(prefs.gift_notes);
+      setPrefsLoaded(true);
+    }
+  }, [open, prefsLoaded, getGiftPreferences]);
 
   const handleSearch = async () => {
     if (!occasion) {
@@ -91,15 +109,24 @@ const GiftFinderDialog = ({ open, onOpenChange }: GiftFinderDialogProps) => {
     setHasSearched(true);
 
     try {
+      const prefs = getGiftPreferences();
       const { data, error } = await supabase.functions.invoke("generate-more-gifts", {
         body: {
           planTitle: `Gift Ideas for ${OCCASIONS.find((o) => o.value === occasion)?.label || occasion}`,
           occasion: occasion,
           priceRange: priceRange || "any",
-          interests: interests,
-          partnerDescription: partnerDescription,
+          interests: interests.trim() || prefs.gift_interests?.join(", ") || undefined,
+          partnerDescription: partnerDescription.trim() || prefs.gift_notes || undefined,
           existingGifts: [],
           count: 3,
+          location: locationHint || undefined,
+          city: preferences?.default_city || undefined,
+          giftRecipient: prefs.gift_recipient || undefined,
+          purchasedGiftNames: purchasedGiftNames.length > 0 ? purchasedGiftNames : undefined,
+          recipientIdentity: prefs.gift_recipient_identity || undefined,
+          giftStyle: prefs.gift_style?.length ? prefs.gift_style : undefined,
+          favoriteBrandsOrStores: prefs.gift_favorite_brands || undefined,
+          recipientSizes: prefs.gift_sizes || undefined,
         },
       });
 
@@ -247,7 +274,12 @@ const GiftFinderDialog = ({ open, onOpenChange }: GiftFinderDialogProps) => {
                     <CardContent className="pt-4">
                       <div className="flex items-start justify-between gap-2 mb-2">
                         <h4 className="font-medium flex items-center gap-2">
-                          <span className="text-xl">{gift.emoji}</span>
+                          <div className="relative w-10 h-10 shrink-0 flex items-center justify-center rounded overflow-hidden bg-muted">
+                            <span className="text-xl">{gift.emoji}</span>
+                            {gift.imageUrl && (
+                              <img src={gift.imageUrl} alt={gift.name} className="absolute inset-0 w-full h-full object-cover" onError={(e) => { e.currentTarget.style.display = "none"; }} />
+                            )}
+                          </div>
                           {gift.name}
                         </h4>
                         <Badge variant="outline" className="text-xs shrink-0">

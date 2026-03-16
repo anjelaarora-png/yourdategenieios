@@ -4,13 +4,15 @@ import Combine
 
 // MARK: - Date Memory Model
 
-/// Represents a single memory captured from a date
+/// Represents a single memory captured from a date (photo may be local photoData or cloud imageUrl).
 struct DateMemory: Identifiable, Codable, Equatable {
     let id: UUID
     var title: String
     var date: Date
     var location: String
     var photoData: Data?
+    /// URL of photo in cloud storage (used when restored from Supabase; photoData is nil).
+    var imageUrl: String?
     var caption: String?
     var datePlanId: UUID?
     var createdAt: Date
@@ -21,6 +23,7 @@ struct DateMemory: Identifiable, Codable, Equatable {
         date: Date = Date(),
         location: String = "",
         photoData: Data? = nil,
+        imageUrl: String? = nil,
         caption: String? = nil,
         datePlanId: UUID? = nil,
         createdAt: Date = Date()
@@ -30,6 +33,7 @@ struct DateMemory: Identifiable, Codable, Equatable {
         self.date = date
         self.location = location
         self.photoData = photoData
+        self.imageUrl = imageUrl
         self.caption = caption
         self.datePlanId = datePlanId
         self.createdAt = createdAt
@@ -48,12 +52,18 @@ struct DateMemory: Identifiable, Codable, Equatable {
     }
     
     var hasPhoto: Bool {
-        photoData != nil && !photoData!.isEmpty
+        (photoData != nil && !photoData!.isEmpty) || (imageUrl != nil && !imageUrl!.isEmpty)
     }
     
     var uiImage: UIImage? {
         guard let data = photoData else { return nil }
         return UIImage(data: data)
+    }
+    
+    /// URL for loading photo from cloud when photoData is nil.
+    var imageURL: URL? {
+        guard let s = imageUrl, !s.isEmpty, let url = URL(string: s) else { return nil }
+        return url
     }
 }
 
@@ -95,6 +105,7 @@ class MemoryManager: ObservableObject {
     func addMemory(_ memory: DateMemory) {
         memories.append(memory)
         saveMemories()
+        Task { await uploadMemoryToCloudIfNeeded(memory) }
     }
     
     func updateMemory(_ memory: DateMemory) {
@@ -116,6 +127,59 @@ class MemoryManager: ObservableObject {
     
     func getMemory(for datePlanId: UUID) -> DateMemory? {
         memories.first { $0.datePlanId == datePlanId }
+    }
+    
+    /// Restore memories from Supabase after login so history persists across reinstalls.
+    func syncMemoriesFromCloud(coupleId: UUID) {
+        Task {
+            do {
+                let dbMemories = try await SupabaseService.shared.getMemories(coupleId: coupleId)
+                let converted: [DateMemory] = dbMemories.map { db in
+                    DateMemory(
+                        id: db.memoryId,
+                        title: db.notes ?? "Memory",
+                        date: db.createdAt,
+                        location: "",
+                        photoData: nil,
+                        imageUrl: db.photoUrls?.first,
+                        caption: db.notes,
+                        datePlanId: db.planId,
+                        createdAt: db.createdAt
+                    )
+                }
+                await MainActor.run {
+                    if !converted.isEmpty {
+                        memories = converted
+                        saveMemories()
+                    }
+                }
+            } catch {
+                // User may be offline or table may not exist
+            }
+        }
+    }
+    
+    private func uploadMemoryToCloudIfNeeded(_ memory: DateMemory) async {
+        guard let coupleId = UserProfileManager.shared.coupleId,
+              let planId = memory.datePlanId,
+              let data = memory.photoData, !data.isEmpty else { return }
+        do {
+            let path = "\(UserProfileManager.shared.userId?.uuidString ?? "user")/\(memory.id.uuidString).jpg"
+            _ = try await SupabaseService.shared.uploadImage(data: data, bucket: "memories", path: path)
+            let publicURL = SupabaseService.shared.getPublicURL(bucket: "memories", path: path).absoluteString
+            let db = DBDateMemory(
+                memoryId: memory.id,
+                planId: planId,
+                coupleId: coupleId,
+                rating: nil,
+                notes: memory.caption ?? memory.title,
+                photoUrls: [publicURL],
+                createdAt: memory.createdAt
+            )
+            _ = try await SupabaseService.shared.createMemory(db)
+        } catch {
+            // User may be offline
+        }
     }
     
     // MARK: - Persistence

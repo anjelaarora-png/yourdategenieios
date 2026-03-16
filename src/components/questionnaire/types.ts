@@ -7,7 +7,13 @@ export interface QuestionnaireData {
   occasion: string;
   dateScheduled: string; // Date of the date (YYYY-MM-DD)
   startTime: string; // Start time (e.g., "19:00")
-  
+  /** User's timezone (e.g. Asia/Kolkata) for local currency; set from browser/VPN. */
+  timeZone?: string;
+  /** User's country code (e.g. IN, US) for local currency when available. */
+  countryCode?: string;
+  /** Explicit currency code (e.g. INR, USD); overrides timeZone/countryCode if set. */
+  currencyCode?: string;
+
   // Step 2: Transportation & Logistics
   transportationMode: string;
   travelRadius: string;
@@ -21,7 +27,7 @@ export interface QuestionnaireData {
   // Step 4: Food & Drinks
   cuisinePreferences: string[];
   dietaryRestrictions: string[];
-  drinkPreferences: string;
+  drinkPreferences: string[];
   budgetRange: string;
   
   // Step 5: Deal Breakers
@@ -42,6 +48,14 @@ export interface QuestionnaireData {
   giftRecipientNotes: string;
   partnerInterests: string[];
   giftBudget: string;
+  /** Recipient identity for gift personalization (when shopping for partner/date). Reuses partnerIdentity. */
+  recipientIdentity?: string;
+  /** Gift style preferences e.g. minimal, luxury, quirky */
+  giftStyle?: string[];
+  /** Favorite brands or stores (optional) */
+  favoriteBrandsOrStores?: string;
+  /** Sizes if relevant for apparel etc. (optional) */
+  recipientSizes?: string;
   wantConversationStarters: boolean;
   relationshipStage: string;
   conversationTopics: string[];
@@ -63,7 +77,7 @@ export const initialQuestionnaireData: QuestionnaireData = {
   duration: "",
   cuisinePreferences: [],
   dietaryRestrictions: [],
-  drinkPreferences: "",
+  drinkPreferences: [],
   budgetRange: "",
   allergies: [],
   hardNos: [],
@@ -84,6 +98,10 @@ export const initialQuestionnaireData: QuestionnaireData = {
   wantConversationStarters: false,
   relationshipStage: "",
   conversationTopics: [],
+  recipientIdentity: "",
+  giftStyle: [],
+  favoriteBrandsOrStores: "",
+  recipientSizes: "",
 };
 
 export const LOVE_LANGUAGES = [
@@ -300,6 +318,15 @@ export const GIFT_BUDGETS = [
   { value: "moderate", label: "$$", desc: "$50-150", range: "$50-150" },
   { value: "special", label: "$$$", desc: "$150-300", range: "$150-300" },
   { value: "luxury", label: "$$$$", desc: "$300+", range: "$300+" },
+];
+
+export const GIFT_STYLES = [
+  { value: "minimal", label: "Minimal", emoji: "⬜" },
+  { value: "luxury", label: "Luxury", emoji: "✨" },
+  { value: "quirky", label: "Quirky", emoji: "🎭" },
+  { value: "practical", label: "Practical", emoji: "🛠️" },
+  { value: "sentimental", label: "Sentimental", emoji: "💝" },
+  { value: "experiential", label: "Experiential", emoji: "🎟️" },
 ];
 
 export const CONVERSATION_TOPICS = [

@@ -13,6 +13,7 @@ import MobileSettingsScreen from "./screens/MobileSettingsScreen";
 import MobileNotificationsScreen from "./screens/MobileNotificationsScreen";
 import MobileHelpScreen from "./screens/MobileHelpScreen";
 import MobileTabBar from "./components/MobileTabBar";
+import PlaybookView from "@/components/playbook/PlaybookView";
 import { QuestionnaireData } from "@/components/questionnaire/types";
 import { useGenerateDatePlan } from "@/hooks/useGenerateDatePlan";
 import { useDatePlans, SavedDatePlan } from "@/hooks/useDatePlans";
@@ -37,7 +38,8 @@ export type MobileScreen =
   | "preferences"
   | "notifications"
   | "settings"
-  | "help";
+  | "help"
+  | "playbook";
 
 export type TabId = "home" | "history" | "create" | "music" | "profile";
 
@@ -117,7 +119,7 @@ const MobileApp = () => {
   };
 
   const handleQuestionnaireSubmit = async (data: QuestionnaireData) => {
-    savePreferences(data);
+    await savePreferences(data);
     const plans = await generatePlans(data);
     if (plans && plans.length > 0) {
       setCurrentScreen("result");
@@ -171,7 +173,7 @@ const MobileApp = () => {
     );
   }
 
-  const showTabBar = user && !["onboarding", "auth", "welcome", "questionnaire", "result", "preferences"].includes(currentScreen);
+  const showTabBar = user && !["onboarding", "auth", "welcome", "questionnaire", "result", "preferences", "playbook"].includes(currentScreen);
 
   return (
     <div className="mobile-container bg-background">
@@ -195,6 +197,7 @@ const MobileApp = () => {
           onReviewUnsavedPlans={handleReviewUnsavedPlans}
           hasSavedPreferences={!!getQuestionnaireDefaults()}
           savedPreferences={getQuestionnaireDefaults()}
+          onNavigate={handleNavigate}
         />
       )}
       
@@ -258,6 +261,27 @@ const MobileApp = () => {
 
       {currentScreen === "help" && (
         <MobileHelpScreen onBack={handleBackToProfile} />
+      )}
+
+      {currentScreen === "playbook" && (
+        <div className="min-h-screen bg-background pb-24">
+          <div className="sticky top-0 z-10 bg-background/95 backdrop-blur border-b border-border px-4 py-3 flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => { setCurrentScreen("home"); setActiveTab("home"); }}
+              className="p-2 -m-2 rounded-lg hover:bg-muted text-foreground"
+              aria-label="Back"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+            <h1 className="font-display text-lg font-semibold text-foreground">The Playbook</h1>
+          </div>
+          <div className="p-4">
+            <PlaybookView showClose={false} />
+          </div>
+        </div>
       )}
 
       {showTabBar && (

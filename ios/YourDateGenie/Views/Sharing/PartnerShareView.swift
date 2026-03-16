@@ -228,11 +228,31 @@ struct PartnerShareView: View {
     private func sharePlan() {
         let activityController = UIActivityViewController(activityItems: [shareText], applicationActivities: nil)
         
-        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-           let window = windowScene.windows.first,
-           let rootVC = window.rootViewController {
-            rootVC.present(activityController, animated: true)
+        guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+              let window = windowScene.windows.first(where: { $0.isKeyWindow }) ?? windowScene.windows.first,
+              let topVC = topViewController(from: window.rootViewController) else { return }
+        
+        if let popover = activityController.popoverPresentationController {
+            popover.sourceView = topVC.view
+            popover.sourceRect = CGRect(x: topVC.view.bounds.midX, y: topVC.view.bounds.midY, width: 0, height: 0)
+            popover.permittedArrowDirections = []
         }
+        
+        topVC.present(activityController, animated: true)
+    }
+    
+    private func topViewController(from base: UIViewController?) -> UIViewController? {
+        guard let base = base else { return nil }
+        if let presented = base.presentedViewController {
+            return topViewController(from: presented)
+        }
+        if let nav = base as? UINavigationController, let visible = nav.visibleViewController {
+            return topViewController(from: visible)
+        }
+        if let tab = base as? UITabBarController, let selected = tab.selectedViewController {
+            return topViewController(from: selected)
+        }
+        return base
     }
     
     private func copyToClipboard() {

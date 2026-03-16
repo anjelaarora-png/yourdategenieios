@@ -85,17 +85,28 @@ private struct SavedPlanRowCard: View {
     var body: some View {
         Button(action: onTap) {
             HStack(spacing: 14) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 14)
-                        .fill(Color.luxuryMaroonLight)
-                        .frame(width: 56, height: 56)
-                    HStack(spacing: 2) {
-                        ForEach(plan.stops.prefix(3)) { stop in
-                            Text(stop.emoji)
-                                .font(.system(size: 18))
+                AsyncImage(url: URL(string: plan.displayImageUrl)) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                    case .empty, .failure:
+                        ZStack {
+                            Color.luxuryMaroonLight
+                            HStack(spacing: 2) {
+                                ForEach(plan.stops.prefix(3)) { stop in
+                                    Text(stop.emoji)
+                                        .font(.system(size: 18))
+                                }
+                            }
                         }
+                    @unknown default:
+                        Color.luxuryMaroonLight
                     }
                 }
+                .frame(width: 56, height: 56)
+                .clipShape(RoundedRectangle(cornerRadius: 14))
                 .overlay(
                     RoundedRectangle(cornerRadius: 14)
                         .stroke(Color.luxuryGold.opacity(0.3), lineWidth: 1)
@@ -103,7 +114,7 @@ private struct SavedPlanRowCard: View {
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(plan.title)
-                        .font(Font.header(15, weight: .bold))
+                        .font(Font.bodySans(14, weight: .semibold))
                         .foregroundColor(Color.luxuryCream)
                         .lineLimit(2)
                     Text("\(plan.stops.count) stops · \(plan.totalDuration)")

@@ -10,12 +10,19 @@ export interface PlaylistSong {
   addedAt?: string;
 }
 
+export interface PlaylistStop {
+  name: string;
+  venueType: string;
+}
+
 export interface SavedPlaylist {
   id: string;
   name: string;
   datePlanTitle: string;
   vibe: string;
   songs: PlaylistSong[];
+  /** Optional: stored when saving from a date plan so playlist can be regenerated. */
+  stops?: PlaylistStop[];
   createdAt: string;
   updatedAt: string;
 }
@@ -71,12 +78,13 @@ export function usePlaylistStorage() {
     return () => window.removeEventListener("storage", handleStorageChange);
   }, []);
 
-  // Save a new playlist
+  // Save a new playlist (optionally with stops for regeneration from saved view)
   const savePlaylist = useCallback((
     name: string,
     datePlanTitle: string,
     vibe: string,
-    songs: Omit<PlaylistSong, "id">[]
+    songs: Omit<PlaylistSong, "id">[],
+    stops?: PlaylistStop[]
   ): SavedPlaylist => {
     const now = new Date().toISOString();
     const newPlaylist: SavedPlaylist = {
@@ -89,6 +97,7 @@ export function usePlaylistStorage() {
         id: generateId(),
         addedAt: now,
       })),
+      stops,
       createdAt: now,
       updatedAt: now,
     };
@@ -168,6 +177,33 @@ export function usePlaylistStorage() {
     saveToStorage(updated);
   }, [playlists]);
 
+  // Replace a song in a playlist (same slot, new track)
+  const replaceSongInPlaylist = useCallback((
+    playlistId: string,
+    songId: string,
+    newSong: Omit<PlaylistSong, "id" | "addedAt">
+  ) => {
+    const updated = playlists.map(p => {
+      if (p.id !== playlistId) return p;
+      const songIndex = p.songs.findIndex(s => s.id === songId);
+      if (songIndex === -1) return p;
+      const replacement: PlaylistSong = {
+        ...newSong,
+        id: generateId(),
+        addedAt: new Date().toISOString(),
+      };
+      const newSongs = [...p.songs];
+      newSongs[songIndex] = replacement;
+      return {
+        ...p,
+        songs: newSongs,
+        updatedAt: new Date().toISOString(),
+      };
+    });
+    setPlaylists(updated);
+    saveToStorage(updated);
+  }, [playlists]);
+
   // Get a single playlist by ID
   const getPlaylist = useCallback((playlistId: string) => {
     return playlists.find(p => p.id === playlistId) || null;
@@ -181,6 +217,7 @@ export function usePlaylistStorage() {
     deletePlaylist,
     addSongToPlaylist,
     removeSongFromPlaylist,
+    replaceSongInPlaylist,
     getPlaylist,
   };
 }

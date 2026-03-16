@@ -166,6 +166,9 @@ class UserProfileManager: ObservableObject {
     @Published var isLoading: Bool = false
     @Published var userId: UUID?
     @Published var coupleId: UUID?
+    /// True after sign up when email confirmation is required; cleared when user confirms (deep link) or signs in.
+    @Published var pendingEmailConfirmation: Bool = false
+    @Published var pendingConfirmationEmail: String?
     
     private let supabase = SupabaseService.shared
     private let keychain = KeychainManager.shared
@@ -189,6 +192,8 @@ class UserProfileManager: ObservableObject {
             .sink { [weak self] isAuthenticated in
                 self?.isLoggedIn = isAuthenticated
                 if isAuthenticated {
+                    self?.pendingEmailConfirmation = false
+                    self?.pendingConfirmationEmail = nil
                     self?.userId = self?.supabase.currentUser?.id
                     self?.loadProfileFromDatabase()
                 }
@@ -217,6 +222,7 @@ class UserProfileManager: ObservableObject {
             name: name
         )
         
+        let hasSession = supabase.isAuthenticated
         await MainActor.run {
             var profile = UserProfile()
             profile.firstName = firstName
@@ -227,11 +233,20 @@ class UserProfileManager: ObservableObject {
             profile.location = location
             self.currentUser = profile
             self.userId = supabaseUser.id
-            self.isLoggedIn = true
-            UserDefaults.standard.set(true, forKey: self.loggedInKey)
+            if hasSession {
+                self.isLoggedIn = true
+                UserDefaults.standard.set(true, forKey: self.loggedInKey)
+                self.pendingEmailConfirmation = false
+                self.pendingConfirmationEmail = nil
+            } else {
+                self.isLoggedIn = false
+                UserDefaults.standard.set(false, forKey: self.loggedInKey)
+                self.pendingEmailConfirmation = true
+                self.pendingConfirmationEmail = email.lowercased()
+            }
         }
         
-        if let uid = userId {
+        if hasSession, let uid = userId {
             let couple = try await supabase.getCoupleForUser(userId: uid)
             await MainActor.run {
                 self.coupleId = couple?.coupleId
@@ -249,13 +264,17 @@ class UserProfileManager: ObservableObject {
             let preferences = try await supabase.getPreferences(userId: supabaseUser.id)
             let couple = try await supabase.getCoupleForUser(userId: supabaseUser.id)
             
-            await MainActor.run {
+                await MainActor.run {
                 var profile = UserProfile()
                 profile.firstName = supabaseUser.firstName
                 profile.lastName = supabaseUser.lastName
                 profile.email = dbUser.email
                 profile.dateOfBirth = dbUser.birthday
                 profile.location = dbUser.homeAddress ?? ""
+                // Preserve phone from local profile if present (not in DB)
+                if let existing = self.currentUser, !existing.phoneNumber.isEmpty {
+                    profile.phoneNumber = existing.phoneNumber
+                }
                 
                 if let prefs = preferences {
                     profile.preferences = self.convertToDatePreferences(prefs)
@@ -280,7 +299,15 @@ class UserProfileManager: ObservableObject {
         isLoggedIn = false
         userId = nil
         coupleId = nil
+        pendingEmailConfirmation = false
+        pendingConfirmationEmail = nil
         UserDefaults.standard.set(false, forKey: loggedInKey)
+    }
+    
+    /// Call when user wants to go back from "Confirm your email" to the sign-up form.
+    func clearPendingEmailConfirmation() {
+        pendingEmailConfirmation = false
+        pendingConfirmationEmail = nil
     }
     
     func sendPasswordReset(to email: String) async throws {
@@ -317,6 +344,10 @@ class UserProfileManager: ObservableObject {
                         profile.email = dbUser.email
                         profile.dateOfBirth = dbUser.birthday
                         profile.location = dbUser.homeAddress ?? ""
+                        // Preserve phone from local profile (not stored in DB yet)
+                        if let existing = self.currentUser, !existing.phoneNumber.isEmpty {
+                            profile.phoneNumber = existing.phoneNumber
+                        }
                         
                         if let prefs = preferences {
                             profile.preferences = self.convertToDatePreferences(prefs)
@@ -325,6 +356,10 @@ class UserProfileManager: ObservableObject {
                         
                         self.currentUser = profile
                         self.coupleId = couple?.coupleId
+                        if let cid = couple?.coupleId {
+                            NavigationCoordinator.shared.syncDatePlansFromCloud(coupleId: cid)
+                            MemoryManager.shared.syncMemoriesFromCloud(coupleId: cid)
+                        }
                         self.isProfileComplete = !profile.firstName.isEmpty
                     }
                 }
@@ -348,6 +383,25 @@ class UserProfileManager: ObservableObject {
                 _ = try? await supabase.savePreferences(dbPrefs)
             }
         }
+    }
+    
+    /// Save preferences from questionnaire data only (no date plan). Used when user edits preferences from Profile.
+    func savePreferencesFromQuestionnaire(_ data: QuestionnaireData) {
+        guard var profile = currentUser else { return }
+        var prefs = profile.preferences
+        prefs.gender = Gender(rawValue: data.userGender) ?? .preferNotToSay
+        prefs.partnerGender = Gender(rawValue: data.partnerGender) ?? .preferNotToSay
+        prefs.defaultCity = data.city
+        prefs.defaultStartingPoint = data.startingAddress
+        prefs.favoriteActivities = data.activityPreferences
+        prefs.favoriteCuisines = data.cuisinePreferences
+        prefs.beveragePreferences = data.drinkPreferences
+        prefs.defaultBudget = data.budgetRange
+        prefs.allergies = data.allergies
+        prefs.hardNos = data.hardNos
+        prefs.accessibilityNeeds = data.accessibilityNeeds
+        prefs.dietaryRestrictions = data.dietaryRestrictions
+        updatePreferences(prefs)
     }
     
     func createProfile(
@@ -445,7 +499,9 @@ class UserProfileManager: ObservableObject {
             loveLanguages: prefs.loveLanguages.map { $0.rawValue },
             foodAllergies: prefs.allergies.isEmpty ? nil : prefs.allergies,
             hardNos: prefs.hardNos.isEmpty ? nil : prefs.hardNos,
-            accessibilityNeeds: prefs.accessibilityNeeds.isEmpty ? nil : prefs.accessibilityNeeds
+            accessibilityNeeds: prefs.accessibilityNeeds.isEmpty ? nil : prefs.accessibilityNeeds,
+            gender: prefs.gender.rawValue,
+            partnerGender: prefs.partnerGender.rawValue
         )
     }
     
@@ -460,6 +516,8 @@ class UserProfileManager: ObservableObject {
         prefs.allergies = dbPrefs.foodAllergies ?? []
         prefs.hardNos = dbPrefs.hardNos ?? []
         prefs.accessibilityNeeds = dbPrefs.accessibilityNeeds ?? []
+        prefs.gender = Gender(rawValue: dbPrefs.gender ?? "") ?? .preferNotToSay
+        prefs.partnerGender = Gender(rawValue: dbPrefs.partnerGender ?? "") ?? .preferNotToSay
         return prefs
     }
     
@@ -488,7 +546,7 @@ class UserProfileManager: ObservableObject {
             data.allergies = prefs.allergies
         }
         if !prefs.beveragePreferences.isEmpty {
-            data.drinkPreferences = prefs.beveragePreferences.first ?? ""
+            data.drinkPreferences = prefs.beveragePreferences
         }
         if !prefs.accessibilityNeeds.isEmpty {
             data.accessibilityNeeds = prefs.accessibilityNeeds
@@ -499,6 +557,8 @@ class UserProfileManager: ObservableObject {
         if !prefs.defaultBudget.isEmpty {
             data.budgetRange = prefs.defaultBudget
         }
+        data.userGender = prefs.gender.rawValue
+        data.partnerGender = prefs.partnerGender.rawValue
     }
 }
 

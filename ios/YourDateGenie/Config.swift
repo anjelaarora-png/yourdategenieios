@@ -12,14 +12,16 @@ struct Config {
     static let openAIAPIEndpoint = "https://api.openai.com/v1/chat/completions"
     static let openAIModel = "gpt-4o"
     
-    // MARK: - Google Places API
+    // MARK: - Google Places & Geocoding API
+    /// Same key is used for: Places API (autocomplete, place details) and Geocoding API.
+    /// In Google Cloud Console enable: Places API, Geocoding API.
     static let googlePlacesAPIKey: String = {
         Bundle.main.infoDictionary?["GOOGLE_PLACES_API_KEY"] as? String ?? ""
     }()
     static let googlePlacesEndpoint = "https://maps.googleapis.com/maps/api/place"
     
     // MARK: - API Timeouts
-    static let apiTimeout: TimeInterval = 30.0
+    static let apiTimeout: TimeInterval = 90.0
     static let venueVerificationTimeout: TimeInterval = 10.0
     
     // MARK: - Supabase

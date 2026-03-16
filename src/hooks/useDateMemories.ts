@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "./useAuth";
@@ -14,14 +14,23 @@ export interface DateMemory {
   created_at: string;
 }
 
+/** Path prefix for current user's files in storage (user_id/filename) */
+function pathBelongsToUser(filePath: string, userId: string): boolean {
+  const firstSegment = filePath.split("/")[0];
+  return firstSegment === userId;
+}
+
 export function useDateMemories() {
   const [memories, setMemories] = useState<DateMemory[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   const { user } = useAuth();
+  const userIdRef = useRef<string | null>(null);
+  userIdRef.current = user?.id ?? null;
 
   const fetchMemories = async () => {
-    if (!user) {
+    const currentUserId = userIdRef.current;
+    if (!currentUserId) {
       setMemories([]);
       setLoading(false);
       return;
@@ -31,22 +40,25 @@ export function useDateMemories() {
       const { data, error } = await supabase
         .from("date_memories")
         .select("*")
-        .eq("user_id", user.id)
+        .eq("user_id", currentUserId)
         .order("taken_at", { ascending: false });
 
       if (error) throw error;
-      
-      // Generate signed URLs for each memory since bucket is now private
+
+      // Only generate signed URLs for paths under the current user (prevents cross-account exposure)
       const memoriesWithSignedUrls = await Promise.all(
         (data || []).map(async (memory) => {
-          // Extract the file path from the full URL
-          const urlParts = memory.image_url.split("/date-memories/");
-          if (urlParts.length > 1) {
+          const urlParts = memory.image_url?.split("/date-memories/");
+          if (urlParts?.length > 1) {
             const filePath = urlParts[1];
+            if (!pathBelongsToUser(filePath, currentUserId)) {
+              // Row points to another user's file; exclude so we never show it
+              return null;
+            }
             const { data: signedUrlData } = await supabase.storage
               .from("date-memories")
-              .createSignedUrl(filePath, 3600); // 1 hour expiry
-            
+              .createSignedUrl(filePath, 3600);
+
             if (signedUrlData?.signedUrl) {
               return { ...memory, image_url: signedUrlData.signedUrl };
             }
@@ -54,25 +66,32 @@ export function useDateMemories() {
           return memory;
         })
       );
-      
-      setMemories(memoriesWithSignedUrls);
+
+      setMemories(memoriesWithSignedUrls.filter(Boolean) as DateMemory[]);
     } catch (error) {
       console.error("Error fetching memories:", error);
+      setMemories([]);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
+    if (!user) {
+      setMemories([]);
+      setLoading(false);
+      return;
+    }
     fetchMemories();
-  }, [user]);
+  }, [user?.id]);
 
   const uploadMemory = async (
     file: File,
     datePlanId?: string,
     caption?: string
   ): Promise<DateMemory | null> => {
-    if (!user) {
+    const currentUserId = userIdRef.current;
+    if (!currentUserId) {
       toast({
         title: "Not signed in",
         description: "Please sign in to upload photos.",
@@ -83,7 +102,7 @@ export function useDateMemories() {
 
     try {
       const fileExt = file.name.split(".").pop();
-      const fileName = `${user.id}/${Date.now()}.${fileExt}`;
+      const fileName = `${currentUserId}/${Date.now()}.${fileExt}`;
 
       const { error: uploadError } = await supabase.storage
         .from("date-memories")
@@ -91,16 +110,14 @@ export function useDateMemories() {
 
       if (uploadError) throw uploadError;
 
-      // Use signed URL since bucket is now private
       const { data: signedUrlData } = await supabase.storage
         .from("date-memories")
-        .createSignedUrl(fileName, 3600); // 1 hour expiry
+        .createSignedUrl(fileName, 3600);
 
       if (!signedUrlData?.signedUrl) {
         throw new Error("Failed to generate signed URL");
       }
 
-      // Store the original path reference for the database (without signature)
       const { data: publicUrlData } = supabase.storage
         .from("date-memories")
         .getPublicUrl(fileName);
@@ -108,9 +125,9 @@ export function useDateMemories() {
       const { data, error } = await supabase
         .from("date_memories")
         .insert({
-          user_id: user.id,
+          user_id: currentUserId,
           date_plan_id: datePlanId || null,
-          image_url: publicUrlData.publicUrl, // Store the base URL for reference
+          image_url: publicUrlData.publicUrl,
           caption,
           taken_at: new Date().toISOString(),
         })
@@ -119,7 +136,9 @@ export function useDateMemories() {
 
       if (error) throw error;
 
-      // Return the memory with signed URL for immediate display
+      // Only update state if the same user is still logged in
+      if (userIdRef.current !== currentUserId) return null;
+
       const memoryWithSignedUrl = { ...data, image_url: signedUrlData.signedUrl };
       setMemories((prev) => [memoryWithSignedUrl, ...prev]);
       toast({
@@ -139,11 +158,15 @@ export function useDateMemories() {
   };
 
   const deleteMemory = async (memoryId: string) => {
+    const currentUserId = userIdRef.current;
+    if (!currentUserId) return;
+
     try {
       const { error } = await supabase
         .from("date_memories")
         .delete()
-        .eq("id", memoryId);
+        .eq("id", memoryId)
+        .eq("user_id", currentUserId);
 
       if (error) throw error;
 

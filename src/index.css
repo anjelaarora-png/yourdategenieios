@@ -362,6 +362,111 @@
   animation: pulse-glow 2s ease-in-out infinite;
 }
 
+/* Music / playlist: spinning record + floating notes */
+@keyframes record-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes note-float {
+  0%, 100% {
+    transform: translateY(0) scale(1);
+    opacity: 0.85;
+  }
+  50% {
+    transform: translateY(-6px) scale(1.05);
+    opacity: 1;
+  }
+}
+
+.animate-record-spin {
+  animation: record-spin 4s linear infinite;
+}
+
+.animate-note-float {
+  animation: note-float 2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-record-spin {
+    animation-duration: 8s;
+  }
+  .animate-note-float {
+    animation: none;
+  }
+}
+
+/* Gift unwrap / luxe section animations (Step 6 + Gifts tab) */
+@keyframes gift-reveal {
+  0% {
+    opacity: 0;
+    transform: scale(0.94) translateY(12px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes gift-lid-lift {
+  0% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: translateY(-10px) scale(1.03);
+  }
+  100% {
+    opacity: 0.3;
+    transform: translateY(-18px) scale(1.06);
+  }
+}
+
+@keyframes gift-bow-shine {
+  0% {
+    opacity: 0.7;
+    filter: brightness(1);
+  }
+  40% {
+    opacity: 1;
+    filter: brightness(1.5);
+  }
+  100% {
+    opacity: 0.9;
+    filter: brightness(1.15);
+  }
+}
+
+@keyframes gift-ribbon-shine {
+  0% {
+    background-position: 120% 0;
+  }
+  100% {
+    background-position: -20% 0;
+  }
+}
+
+.animate-gift-reveal {
+  animation: gift-reveal 0.7s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.animate-gift-lid-lift {
+  animation: gift-lid-lift 0.85s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.animate-gift-bow-shine {
+  animation: gift-bow-shine 1.2s ease-out 0.35s forwards;
+}
+
+.animate-gift-ribbon-shine {
+  animation: gift-ribbon-shine 1s ease-out 0.25s forwards;
+}
+
 /* iOS-specific overrides via media query */
 @supports (-webkit-touch-callout: none) {
   /* iOS-only styles */

@@ -357,6 +357,134 @@ final class SupabaseService: ObservableObject {
         )
     }
     
+    // MARK: - Generate More Gifts (Edge Function)
+    /// Calls the generate-more-gifts edge function for personalized, unique gift suggestions.
+    func generateMoreGifts(
+        occasion: String? = nil,
+        budget: String? = nil,
+        interests: String? = nil,
+        notes: String? = nil,
+        location: String? = nil,
+        planTitle: String? = nil,
+        existingGiftNames: [String] = [],
+        count: Int = 6,
+        recipient: String? = nil,
+        giftStyle: [String]? = nil
+    ) async throws -> [GiftSuggestion] {
+        let urlString = baseURL.hasSuffix("/") ? "\(baseURL)functions/v1/generate-more-gifts" : "\(baseURL)/functions/v1/generate-more-gifts"
+        guard let url = URL(string: urlString) else {
+            throw SupabaseError.invalidResponse
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(anonKey)", forHTTPHeaderField: "Authorization")
+        if let token = accessToken {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        var body: [String: Any] = [
+            "occasion": occasion ?? "just-because",
+            "priceRange": budget ?? "any",
+            "interests": interests ?? "",
+            "partnerDescription": notes ?? "",
+            "location": location ?? "",
+            "planTitle": planTitle ?? "",
+            "existingGifts": existingGiftNames.map { ["name": $0] },
+            "count": count
+        ]
+        if let recipient = recipient, !recipient.isEmpty {
+            body["giftRecipient"] = recipient
+        }
+        if let style = giftStyle, !style.isEmpty {
+            body["giftStyle"] = style
+        }
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        let (data, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse else {
+            throw SupabaseError.invalidResponse
+        }
+        if http.statusCode != 200 {
+            let errorMessage = (try? JSONDecoder().decode(GenerateGiftsErrorResponse.self, from: data))?.error ?? "Request failed"
+            if http.statusCode == 429 { throw SupabaseError.authFailed("Rate limit. Try again in a moment.") }
+            if http.statusCode == 503 || http.statusCode == 502 { throw SupabaseError.authFailed("Gift service temporarily unavailable.") }
+            throw SupabaseError.authFailed(errorMessage)
+        }
+        let decoded = try decoder.decode(GenerateGiftsAPIResponse.self, from: data)
+        return decoded.gifts.map { api in
+            GiftSuggestion(
+                name: api.name,
+                description: api.description ?? "",
+                priceRange: api.priceRange ?? "",
+                whereToBuy: api.whereToBuy ?? "",
+                purchaseUrl: api.purchaseUrl,
+                whyItFits: api.whyItFits ?? "",
+                emoji: api.emoji ?? "🎁",
+                storeSearchQuery: nil,
+                imageUrl: api.imageUrl
+            )
+        }
+    }
+    
+    // MARK: - Generate Playlist (Edge Function – fresh AI-generated songs)
+    struct GeneratePlaylistSongItem {
+        let title: String
+        let artist: String
+        let year: Int?
+        let genre: String?
+    }
+    
+    struct GeneratePlaylistResult {
+        let playlistName: String
+        let vibeDescription: String
+        let songs: [GeneratePlaylistSongItem]
+    }
+    
+    /// Calls the generate-playlist edge function for fresh, AI-generated song suggestions.
+    func generatePlaylist(vibe: String, datePlanTitle: String, stops: [(name: String, venueType: String)]? = nil) async throws -> GeneratePlaylistResult {
+        let urlString = baseURL.hasSuffix("/") ? "\(baseURL)functions/v1/generate-playlist" : "\(baseURL)/functions/v1/generate-playlist"
+        guard let url = URL(string: urlString) else {
+            throw SupabaseError.invalidResponse
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(anonKey)", forHTTPHeaderField: "Authorization")
+        if let token = accessToken {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        var body: [String: Any] = [
+            "vibe": vibe,
+            "datePlanTitle": datePlanTitle
+        ]
+        if let stops = stops, !stops.isEmpty {
+            body["stops"] = stops.map { ["name": $0.name, "venueType": $0.venueType] }
+        }
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        let (data, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse else {
+            throw SupabaseError.invalidResponse
+        }
+        if http.statusCode != 200 {
+            let errorMessage = (try? JSONDecoder().decode(GenerateGiftsErrorResponse.self, from: data))?.error ?? "Playlist generation failed"
+            if http.statusCode == 429 { throw SupabaseError.authFailed("Rate limit. Try again in a moment.") }
+            if http.statusCode == 503 || http.statusCode == 502 { throw SupabaseError.authFailed("Playlist service temporarily unavailable.") }
+            throw SupabaseError.authFailed(errorMessage)
+        }
+        let decoded = try decoder.decode(GeneratePlaylistAPIResponse.self, from: data)
+        let songs = decoded.songs
+            .compactMap { s -> GeneratePlaylistSongItem? in
+                let t = s.title?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                let a = s.artist?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                guard !t.isEmpty, !a.isEmpty else { return nil }
+                return GeneratePlaylistSongItem(title: t, artist: a, year: s.year, genre: s.genre)
+            }
+        return GeneratePlaylistResult(
+            playlistName: decoded.playlistName ?? "\(vibe.capitalized) Playlist",
+            vibeDescription: decoded.vibeDescription ?? vibe,
+            songs: songs
+        )
+    }
+    
     // Playlists
     func createPlaylist(_ playlist: DBPlaylist) async throws -> DBPlaylist {
         return try await insert(table: "playlists", data: playlist)
@@ -694,20 +822,30 @@ final class SupabaseService: ObservableObject {
                     syncSessionFromSDK(session)
                 }
             } catch {
-                // No valid session - try our keychain as fallback
+                // No valid session - try our keychain as fallback and restore into SDK so API calls work
                 do {
-                    if let session = try keychain.getSession(), !session.isExpired {
-                        accessToken = session.idToken
-                        refreshToken = session.refreshToken
-                        isAuthenticated = true
-                        if let userId = UUID(uuidString: session.userId) {
-                            currentUser = SupabaseUser(
-                                id: userId,
-                                email: session.email,
-                                userMetadata: nil
-                            )
+                    guard let session = try keychain.getSession(), !session.isExpired,
+                          let access = session.idToken, let refresh = session.refreshToken else {
+                        return
+                    }
+                    try await supabaseClient.auth.setSession(accessToken: access, refreshToken: refresh)
+                    if let s = supabaseClient.auth.currentSession {
+                        await MainActor.run {
+                            syncSessionFromSDK(s)
                         }
-                        Task { try? await refreshSession() }
+                    } else {
+                        await MainActor.run {
+                            accessToken = access
+                            refreshToken = refresh
+                            isAuthenticated = true
+                            if let userId = UUID(uuidString: session.userId) {
+                                currentUser = SupabaseUser(
+                                    id: userId,
+                                    email: session.email,
+                                    userMetadata: nil
+                                )
+                            }
+                        }
                     }
                 } catch {
                     print("Failed to load cached session: \(error)")
@@ -780,6 +918,40 @@ struct AuthResponse: Codable {
         case expiresIn = "expires_in"
         case user
     }
+}
+
+// MARK: - Generate Gifts API
+
+private struct GenerateGiftsAPIResponse: Decodable {
+    let gifts: [GenerateGiftsAPIItem]
+}
+
+private struct GenerateGiftsAPIItem: Decodable {
+    let name: String
+    let description: String?
+    let priceRange: String?
+    let whereToBuy: String?
+    let purchaseUrl: String?
+    let whyItFits: String?
+    let emoji: String?
+    let imageUrl: String?
+}
+
+private struct GenerateGiftsErrorResponse: Decodable {
+    let error: String?
+}
+
+private struct GeneratePlaylistAPIResponse: Decodable {
+    let songs: [GeneratePlaylistAPISong]
+    let playlistName: String?
+    let vibeDescription: String?
+}
+
+private struct GeneratePlaylistAPISong: Decodable {
+    let title: String?
+    let artist: String?
+    let year: Int?
+    let genre: String?
 }
 
 // MARK: - Supabase Errors

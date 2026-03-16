@@ -10,6 +10,7 @@ struct PlacesAutocompleteField: View {
     
     @State private var predictions: [GooglePlacesService.AutocompletePrediction] = []
     @State private var isSearching = false
+    @State private var isFetchingPlaceDetails = false
     @State private var debounceTask: Task<Void, Never>?
     @State private var showPredictions = false
     @FocusState private var isFocused: Bool
@@ -58,15 +59,19 @@ struct PlacesAutocompleteField: View {
                     RoundedRectangle(cornerRadius: 12)
                         .stroke(text.isEmpty ? Color.luxuryGold.opacity(0.2) : Color.luxuryGold.opacity(0.5), lineWidth: 1)
                 )
+                .overlay(alignment: .trailing) {
+                    if isFetchingPlaceDetails {
+                        ProgressView()
+                            .tint(Color.luxuryGold)
+                            .padding(.trailing, 16)
+                    }
+                }
                 
                 if showPredictions && !predictions.isEmpty {
                     VStack(spacing: 0) {
                         ForEach(predictions) { prediction in
                             Button {
-                                text = prediction.description
-                                predictions = []
-                                showPredictions = false
-                                isFocused = false
+                                selectPrediction(prediction)
                             } label: {
                                 HStack(spacing: 12) {
                                     Image(systemName: "mappin.circle.fill")
@@ -147,6 +152,25 @@ struct PlacesAutocompleteField: View {
         }
         
         await MainActor.run { isSearching = false }
+    }
+    
+    /// On selection: in address mode fetch Place Details for full accurate address; otherwise use prediction description.
+    private func selectPrediction(_ prediction: GooglePlacesService.AutocompletePrediction) {
+        predictions = []
+        showPredictions = false
+        isFocused = false
+        text = prediction.description
+
+        if mode == .address && Config.isGooglePlacesConfigured {
+            Task { @MainActor in
+                isFetchingPlaceDetails = true
+                defer { isFetchingPlaceDetails = false }
+                if let result = try? await GooglePlacesService.shared.fetchFormattedAddress(placeId: prediction.placeId),
+                   !result.formattedAddress.isEmpty {
+                    text = result.formattedAddress
+                }
+            }
+        }
     }
 }
 

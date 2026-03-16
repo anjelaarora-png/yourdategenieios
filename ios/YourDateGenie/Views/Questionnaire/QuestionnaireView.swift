@@ -42,7 +42,7 @@ struct QuestionnaireView: View {
                                 .tag(4)
                             Step5DealBreakersView(data: $viewModel.data)
                                 .tag(5)
-                            Step6ExtrasView(data: $viewModel.data)
+                            Step6ExtrasView(data: $viewModel.data, isPreferencesOnly: coordinator.questionnairePreferencesOnly)
                                 .tag(6)
                         }
                         .tabViewStyle(.page(indexDisplayMode: .never))
@@ -66,7 +66,8 @@ struct QuestionnaireView: View {
                     
                     ToolbarItem(placement: .principal) {
                         Text(viewModel.stepTitle)
-                            .font(Font.subheader(17, weight: .semibold))
+                            .font(Font.tangerine(24, weight: .bold))
+                            .italic()
                             .foregroundColor(Color.luxuryGold)
                     }
                 }
@@ -125,6 +126,7 @@ struct QuestionnaireView: View {
                 if coordinator.planIntent != .fresh && !isGenerating {
                     QuestionnaireProgressStore.save(data: viewModel.data, step: viewModel.currentStep)
                 }
+                coordinator.questionnairePreferencesOnly = false
             }
         }
     }
@@ -151,7 +153,11 @@ struct QuestionnaireView: View {
             // Next/Submit button
             Button {
                 if viewModel.currentStep == 6 {
-                    generateDatePlan()
+                    if coordinator.questionnairePreferencesOnly {
+                        savePreferencesOnly()
+                    } else {
+                        generateDatePlan()
+                    }
                 } else {
                     withAnimation {
                         viewModel.nextStep()
@@ -160,8 +166,13 @@ struct QuestionnaireView: View {
             } label: {
                 HStack(spacing: 8) {
                     if viewModel.currentStep == 6 {
-                        Image(systemName: "sparkles")
-                        Text("Create Plan")
+                        if coordinator.questionnairePreferencesOnly {
+                            Image(systemName: "checkmark.circle.fill")
+                            Text("Save preferences")
+                        } else {
+                            Image(systemName: "sparkles")
+                            Text("Create Plan")
+                        }
                     } else {
                         Text("Next")
                         Image(systemName: "chevron.right")
@@ -179,6 +190,15 @@ struct QuestionnaireView: View {
             Color.luxuryMaroon
                 .shadow(color: Color.black.opacity(0.3), radius: 10, y: -5)
         )
+    }
+    
+    private func savePreferencesOnly() {
+        LastQuestionnaireStore.save(viewModel.data)
+        QuestionnaireProgressStore.clear()
+        UserProfileManager.shared.savePreferencesFromQuestionnaire(viewModel.data)
+        coordinator.questionnairePreferencesOnly = false
+        coordinator.activeSheet = nil
+        dismiss()
     }
     
     private func generateDatePlan() {
@@ -339,7 +359,7 @@ class QuestionnaireViewModel: ObservableObject {
     
     var isCurrentStepValid: Bool {
         switch currentStep {
-        case 1: return !data.city.isEmpty && !data.dateType.isEmpty
+        case 1: return !data.city.isEmpty && !data.startingAddress.isEmpty && !data.dateType.isEmpty
         case 2: return !data.transportationMode.isEmpty && !data.travelRadius.isEmpty
         case 3: return !data.energyLevel.isEmpty
         case 4: return !data.budgetRange.isEmpty

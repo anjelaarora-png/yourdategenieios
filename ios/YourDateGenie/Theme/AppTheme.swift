@@ -13,6 +13,7 @@ extension Color {
     static let luxuryGold = Color(hex: "C7A677")             // Primary gold
     static let luxuryGoldLight = Color(hex: "D4B896")        // Light gold for highlights
     static let luxuryGoldDark = Color(hex: "A68B5B")         // Dark gold for depth
+    static let tangerine = Color(hex: "E07C24")              // Warm tangerine for loading/headers
     
     // Text Colors
     static let luxuryCream = Color(hex: "FFF8F0")            // Primary text on dark
@@ -161,14 +162,16 @@ struct LuxuryOutlineButtonStyle: ButtonStyle {
     }
 }
 
-/// Solid gold button with dark text
+/// Solid gold button with dark or light label (e.g. onboarding: white text)
 struct LuxuryGoldButtonStyle: ButtonStyle {
     var isSmall: Bool = false
-    
+    /// Use .luxuryCream or .white for onboarding to match reference; default dark maroon elsewhere.
+    var labelColor: Color = Color.luxuryMaroon
+
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(Font.inter(isSmall ? 14 : 16, weight: .semibold))
-            .foregroundColor(Color.luxuryMaroon)
+            .foregroundColor(labelColor)
             .padding(.horizontal, isSmall ? 20 : 28)
             .padding(.vertical, isSmall ? 12 : 16)
             .background(
@@ -601,6 +604,24 @@ struct SectionLabel: View {
             .font(Font.bodySans(12, weight: .semibold))
             .tracking(2)
             .foregroundColor(color)
+    }
+}
+
+// MARK: - Book Flip Transition (page-turn effect for date plan options)
+struct BookFlipModifier: ViewModifier {
+    let angle: Double
+    func body(content: Content) -> some View {
+        content
+            .rotation3DEffect(.degrees(angle), axis: (x: 0, y: 1, z: 0), perspective: 0.4)
+    }
+}
+
+extension AnyTransition {
+    static var bookFlip: AnyTransition {
+        .asymmetric(
+            insertion: .modifier(active: BookFlipModifier(angle: 90), identity: BookFlipModifier(angle: 0)),
+            removal: .modifier(active: BookFlipModifier(angle: -90), identity: BookFlipModifier(angle: 0))
+        )
     }
 }
 

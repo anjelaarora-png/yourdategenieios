@@ -30,6 +30,10 @@ struct DatePlanStop: Identifiable, Hashable, Codable {
     var phoneNumber: String?
     var openingHours: [String]?
     var estimatedCostPerPerson: String?
+    /// Direct reservation URL (OpenTable, Resy, or venue booking page). Especially for dinner/restaurants.
+    var bookingUrl: String?
+    /// Place photo URL from Google Business Profile (Place Details photos), for cards and lists.
+    var imageUrl: String?
     
     init(
         order: Int,
@@ -52,7 +56,9 @@ struct DatePlanStop: Identifiable, Hashable, Codable {
         websiteUrl: String? = nil,
         phoneNumber: String? = nil,
         openingHours: [String]? = nil,
-        estimatedCostPerPerson: String? = nil
+        estimatedCostPerPerson: String? = nil,
+        bookingUrl: String? = nil,
+        imageUrl: String? = nil
     ) {
         self.id = UUID()
         self.order = order
@@ -76,6 +82,8 @@ struct DatePlanStop: Identifiable, Hashable, Codable {
         self.phoneNumber = phoneNumber
         self.openingHours = openingHours
         self.estimatedCostPerPerson = estimatedCostPerPerson
+        self.bookingUrl = bookingUrl
+        self.imageUrl = imageUrl
     }
 }
 
@@ -97,8 +105,9 @@ struct GiftSuggestion: Identifiable, Hashable, Codable {
     let whyItFits: String
     let emoji: String
     var storeSearchQuery: String?
+    var imageUrl: String?
     
-    init(name: String, description: String, priceRange: String, whereToBuy: String, purchaseUrl: String? = nil, whyItFits: String, emoji: String, storeSearchQuery: String? = nil) {
+    init(name: String, description: String, priceRange: String, whereToBuy: String, purchaseUrl: String? = nil, whyItFits: String, emoji: String, storeSearchQuery: String? = nil, imageUrl: String? = nil) {
         self.id = UUID()
         self.name = name
         self.description = description
@@ -108,6 +117,21 @@ struct GiftSuggestion: Identifiable, Hashable, Codable {
         self.whyItFits = whyItFits
         self.emoji = emoji
         self.storeSearchQuery = storeSearchQuery
+        self.imageUrl = imageUrl
+    }
+    
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = (try? c.decode(UUID.self, forKey: .id)) ?? UUID()
+        name = try c.decode(String.self, forKey: .name)
+        description = try c.decode(String.self, forKey: .description)
+        priceRange = try c.decodeIfPresent(String.self, forKey: .priceRange) ?? ""
+        whereToBuy = try c.decodeIfPresent(String.self, forKey: .whereToBuy) ?? ""
+        purchaseUrl = try c.decodeIfPresent(String.self, forKey: .purchaseUrl)
+        whyItFits = try c.decodeIfPresent(String.self, forKey: .whyItFits) ?? ""
+        emoji = try c.decodeIfPresent(String.self, forKey: .emoji) ?? "🎁"
+        storeSearchQuery = try c.decodeIfPresent(String.self, forKey: .storeSearchQuery)
+        imageUrl = try c.decodeIfPresent(String.self, forKey: .imageUrl)
     }
 }
 
@@ -126,6 +150,14 @@ struct ConversationStarter: Identifiable, Hashable, Codable {
     }
 }
 
+// MARK: - Starting Point (departure for route; not a step in the itinerary)
+struct StartingPoint: Codable, Equatable {
+    let name: String
+    let address: String
+    let latitude: Double
+    let longitude: Double
+}
+
 // MARK: - Date Plan
 struct DatePlan: Identifiable, Equatable, Codable {
     let id: UUID
@@ -135,6 +167,8 @@ struct DatePlan: Identifiable, Equatable, Codable {
     let totalDuration: String
     let estimatedCost: String
     let stops: [DatePlanStop]
+    /// Departure location for the route; itinerary steps start at 1 (first venue). Not encoded as a stop.
+    var startingPoint: StartingPoint?
     let genieSecretTouch: GenieSecretTouch
     let packingList: [String]
     let weatherNote: String
@@ -146,6 +180,7 @@ struct DatePlan: Identifiable, Equatable, Codable {
     /// When the user added this plan to the calendar; shown on saved-plan cards.
     var scheduledDate: Date?
     
+    /// Use when creating a new plan (generates new id).
     init(
         optionLabel: String? = nil,
         title: String,
@@ -153,6 +188,7 @@ struct DatePlan: Identifiable, Equatable, Codable {
         totalDuration: String,
         estimatedCost: String,
         stops: [DatePlanStop],
+        startingPoint: StartingPoint? = nil,
         genieSecretTouch: GenieSecretTouch,
         packingList: [String],
         weatherNote: String,
@@ -167,12 +203,84 @@ struct DatePlan: Identifiable, Equatable, Codable {
         self.totalDuration = totalDuration
         self.estimatedCost = estimatedCost
         self.stops = stops
+        self.startingPoint = startingPoint
         self.genieSecretTouch = genieSecretTouch
         self.packingList = packingList
         self.weatherNote = weatherNote
         self.giftSuggestions = giftSuggestions
         self.conversationStarters = conversationStarters
         self.scheduledDate = scheduledDate
+    }
+    
+    /// Use when restoring from cloud (preserves plan id for sync).
+    init(
+        id: UUID,
+        optionLabel: String? = nil,
+        title: String,
+        tagline: String,
+        totalDuration: String,
+        estimatedCost: String,
+        stops: [DatePlanStop],
+        startingPoint: StartingPoint? = nil,
+        genieSecretTouch: GenieSecretTouch,
+        packingList: [String],
+        weatherNote: String,
+        giftSuggestions: [GiftSuggestion]? = nil,
+        conversationStarters: [ConversationStarter]? = nil,
+        scheduledDate: Date? = nil
+    ) {
+        self.id = id
+        self.optionLabel = optionLabel
+        self.title = title
+        self.tagline = tagline
+        self.totalDuration = totalDuration
+        self.estimatedCost = estimatedCost
+        self.stops = stops
+        self.startingPoint = startingPoint
+        self.genieSecretTouch = genieSecretTouch
+        self.packingList = packingList
+        self.weatherNote = weatherNote
+        self.giftSuggestions = giftSuggestions
+        self.conversationStarters = conversationStarters
+        self.scheduledDate = scheduledDate
+    }
+    
+    /// Preferred image for cards/lists: first stop's Google place photo, or a theme-based stock image.
+    var displayImageUrl: String {
+        if let url = stops.first?.imageUrl, !url.isEmpty { return url }
+        return Self.themeStockImageUrl(for: self)
+    }
+    
+    /// Returns a stock image URL that matches the date plan theme (title, tagline, venue types).
+    static func themeStockImageUrl(for plan: DatePlan) -> String {
+        let t = (plan.title + " " + plan.tagline).lowercased()
+        let venueTypes = plan.stops.map { $0.venueType.lowercased() }.joined(separator: " ")
+        let combined = t + " " + venueTypes
+        if combined.contains("rooftop") || combined.contains("sunset") || combined.contains("skyline") {
+            return "https://images.unsplash.com/photo-1517457373958-b7bdd4587205?w=400&h=300&fit=crop"
+        }
+        if combined.contains("wine") || combined.contains("vineyard") || combined.contains("vino") {
+            return "https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?w=400&h=300&fit=crop"
+        }
+        if combined.contains("jazz") || combined.contains("music") || combined.contains("live") {
+            return "https://images.unsplash.com/photo-1415201364774-f6f0bb35f28f?w=400&h=300&fit=crop"
+        }
+        if combined.contains("picnic") || combined.contains("park") || combined.contains("outdoor") || combined.contains("garden") {
+            return "https://images.unsplash.com/photo-1528495612343-9ca9f4a4de28?w=400&h=300&fit=crop"
+        }
+        if combined.contains("beach") || combined.contains("coastal") || combined.contains("sea") {
+            return "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=400&h=300&fit=crop"
+        }
+        if combined.contains("art") || combined.contains("museum") || combined.contains("gallery") {
+            return "https://images.unsplash.com/photo-1499781350541-7783f6c6a0c8?w=400&h=300&fit=crop"
+        }
+        if combined.contains("adventure") || combined.contains("hike") || combined.contains("explore") {
+            return "https://images.unsplash.com/photo-1533130061792-64b345e4a833?w=400&h=300&fit=crop"
+        }
+        if combined.contains("cozy") || combined.contains("intimate") || combined.contains("candle") {
+            return "https://images.unsplash.com/photo-1559339352-11d035aa65de?w=400&h=300&fit=crop"
+        }
+        return "https://images.unsplash.com/photo-1517457373958-b7bdd4587205?w=400&h=300&fit=crop"
     }
 }
 
@@ -410,4 +518,160 @@ extension DatePlan {
         giftSuggestions: nil,
         conversationStarters: nil
     )
+}
+
+// MARK: - Travel Mode Icon (SF Symbol for itinerary and route map)
+enum TravelModeIcon {
+    /// Normalized mode key for consistent icon and label lookup (walking, driving, transit, biking, rideshare).
+    /// Handles exact values and substrings so "20 mins driving" or "by car" still map correctly.
+    static func normalizedMode(_ travelMode: String?) -> String {
+        guard let raw = travelMode?.trimmingCharacters(in: .whitespaces), !raw.isEmpty else { return "walking" }
+        let mode = raw.lowercased()
+        switch mode {
+        case "car", "drive", "driving", "by car", "driven": return "driving"
+        case "uber", "lyft", "taxi", "rideshare", "ride-share": return "rideshare"
+        case "transit", "public-transit", "bus", "train", "subway", "metro", "public transport": return "transit"
+        case "bike", "bicycle", "biking", "cycling", "cycle": return "biking"
+        case "walk", "walking", "by foot", "on foot", "foot": return "walking"
+        default:
+            if mode.contains("driv") || mode.contains("car") || mode.contains("drive") { return "driving" }
+            if mode.contains("walk") || mode.contains("foot") { return "walking" }
+            if mode.contains("bike") || mode.contains("cycl") { return "biking" }
+            if mode.contains("transit") || mode.contains("bus") || mode.contains("train") || mode.contains("subway") || mode.contains("metro") { return "transit" }
+            if mode.contains("uber") || mode.contains("lyft") || mode.contains("taxi") || mode.contains("rideshare") { return "rideshare" }
+            return "walking"
+        }
+    }
+    
+    /// SF Symbol for the given transportation mode. Driving = car, Walking = figure.walk, etc.
+    /// When travelMode is nil/empty, infers from time text (e.g. "Drive 15 mins" or "15 mins by driving" → car).
+    static func sfSymbol(for travelMode: String?, inferFromTimeText timeText: String? = nil) -> String {
+        let mode = effectiveMode(travelMode: travelMode, timeText: timeText)
+        switch mode {
+        case "driving": return "car.fill"
+        case "rideshare": return "car.fill"
+        case "transit": return "tram.fill"
+        case "biking": return "bicycle"
+        case "walking": return "figure.walk"
+        default: return "figure.walk"
+        }
+    }
+
+    /// Resolves mode from explicit travelMode or by inferring from time text (e.g. "Drive 12 mins" → driving).
+    private static func effectiveMode(travelMode: String?, timeText: String?) -> String {
+        if let raw = travelMode?.trimmingCharacters(in: .whitespaces), !raw.isEmpty {
+            return normalizedMode(raw)
+        }
+        guard let text = timeText?.trimmingCharacters(in: .whitespaces), !text.isEmpty else {
+            return "walking"
+        }
+        let lower = text.lowercased()
+        if lower.contains("driv") || lower.contains("car") || lower.contains("drive") { return "driving" }
+        if lower.contains("uber") || lower.contains("lyft") || lower.contains("taxi") || lower.contains("rideshare") { return "rideshare" }
+        if lower.contains("transit") || lower.contains("bus") || lower.contains("train") || lower.contains("subway") || lower.contains("metro") { return "transit" }
+        if lower.contains("bike") || lower.contains("cycl") { return "biking" }
+        if lower.contains("walk") || lower.contains("foot") { return "walking" }
+        return "walking"
+    }
+    
+    /// Short display label for route legs: "Walking", "Driving", "Transit", "Biking", "Rideshare".
+    static func displayLabel(for travelMode: String?) -> String {
+        switch normalizedMode(travelMode) {
+        case "driving": return "Driving"
+        case "rideshare": return "Rideshare"
+        case "transit": return "Transit"
+        case "biking": return "Biking"
+        case "walking": return "Walking"
+        default: return "Walking"
+        }
+    }
+}
+
+// MARK: - Map URL Helper
+/// Builds Google Maps URLs so "View in Maps" / Directions open the correct business by name.
+enum MapURLHelper {
+    /// Last comma-separated segment of address (e.g. "123 Main St, Newark, NJ" → "NJ").
+    static func cityFromAddress(_ address: String?) -> String {
+        guard let address = address?.trimmingCharacters(in: .whitespaces), !address.isEmpty else { return "" }
+        let parts = address.split(separator: ",", omittingEmptySubsequences: true).map { String($0.trimmingCharacters(in: .whitespaces)) }
+        return parts.last ?? ""
+    }
+    
+    /// City and state/region for display (e.g. "Newark, NJ", "London, Greater London"); no zip/postal code.
+    /// Uses last two meaningful parts of the address; skips known country names; strips zip/postal from the result.
+    static func cityStateOrRegionFromAddress(_ address: String?) -> String {
+        guard let address = address?.trimmingCharacters(in: .whitespaces), !address.isEmpty else { return "" }
+        let parts = address.split(separator: ",", omittingEmptySubsequences: true).map { String($0.trimmingCharacters(in: .whitespaces)) }
+        guard parts.count >= 2 else {
+            let single = parts.first ?? ""
+            return stripZipPostalFromSegment(single)
+        }
+        let countryLike = Set(["usa", "u.s.a.", "united states", "canada", "uk", "united kingdom", "australia", "germany", "france", "spain", "italy", "japan", "india", "mexico", "brazil", "netherlands", "ireland", "new zealand", "south africa", "uae", "singapore", "thailand"])
+        let last = parts[parts.count - 1].lowercased()
+        let dropCountry = parts.count >= 3 && countryLike.contains(last)
+        let from = dropCountry ? parts.count - 3 : parts.count - 2
+        let to = dropCountry ? parts.count - 1 : parts.count
+        var segment = parts[from..<to].map { stripZipPostalFromSegment($0) }
+        segment = segment.filter { !$0.isEmpty }
+        return segment.joined(separator: ", ")
+    }
+    
+    /// Remove zip/postal codes from a segment for display (any country). Never show zipcodes on nav/home.
+    private static func stripZipPostalFromSegment(_ segment: String) -> String {
+        var s = segment.trimmingCharacters(in: .whitespaces)
+        // Whole segment is only digits (US zip alone, AU/FR/DE etc. postal as segment)
+        if s.range(of: #"^\d{3,10}(-\d{2,6})?$"#, options: .regularExpression) != nil {
+            return ""
+        }
+        // UK-style postcode: whole segment like "SW1A 1AA" or "M1 1AA"
+        if s.range(of: #"^[A-Za-z]{1,2}\d[A-Za-z0-9]?\s*\d[A-Za-z]{2}$"#, options: .regularExpression) != nil {
+            return ""
+        }
+        // Canadian postcode: A1A 1A1
+        if s.range(of: #"^[A-Za-z]\d[A-Za-z]\s*\d[A-Za-z]\d$"#, options: .regularExpression) != nil {
+            return ""
+        }
+        // Trailing space + digits (US 5/5+4, and other countries' numeric postal)
+        if let r = s.range(of: #" \d{3,10}(-\d{2,6})?$"#, options: .regularExpression) {
+            s = String(s[..<r.lowerBound]).trimmingCharacters(in: .whitespaces)
+        }
+        // Trailing space + UK/Canadian-style alphanumeric postcode
+        if let r = s.range(of: #" [A-Za-z]{1,2}\d[A-Za-z0-9]?\s*\d[A-Za-z]{2}$"#, options: .regularExpression) {
+            s = String(s[..<r.lowerBound]).trimmingCharacters(in: .whitespaces)
+        }
+        return s.trimmingCharacters(in: .whitespaces)
+    }
+
+    /// Google Maps search URL by place name and optional city (opens the correct business).
+    static func googleMapsSearchURL(placeName: String, city: String?) -> URL? {
+        let name = placeName.trimmingCharacters(in: .whitespaces)
+        guard !name.isEmpty else { return nil }
+        let query = city?.isEmpty == false ? "\(name) \(city!)" : name
+        let encoded = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? query
+        return URL(string: "https://www.google.com/maps/search/?api=1&query=\(encoded)")
+    }
+
+    /// URL for a single stop: always use search-by-name so the place opens correctly in Maps (place_id can fail to resolve).
+    static func urlForStop(_ stop: DatePlanStop) -> URL? {
+        let city = cityFromAddress(stop.address)
+        return googleMapsSearchURL(placeName: stop.name, city: city.isEmpty ? nil : city)
+    }
+
+    /// Value for Google Maps directions origin/destination/waypoints: "place_id:xxx" or encoded "Name, City".
+    static func directionsQueryValue(for stop: DatePlanStop) -> String {
+        if let placeId = stop.placeId, !placeId.isEmpty {
+            return "place_id:\(placeId)"
+        }
+        let city = cityFromAddress(stop.address)
+        let query = city.isEmpty ? stop.name : "\(stop.name), \(city)"
+        return query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? query
+    }
+    
+    /// URL to open directions from starting point to a destination stop (e.g. "Get to stop 1").
+    static func directionsURL(origin: StartingPoint, destination: DatePlanStop) -> URL? {
+        let originStr = "\(origin.latitude),\(origin.longitude)"
+        let destStr = directionsQueryValue(for: destination)
+        let destEncoded = destStr.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? destStr
+        return URL(string: "https://www.google.com/maps/dir/?api=1&origin=\(originStr)&destination=\(destEncoded)")
+    }
 }

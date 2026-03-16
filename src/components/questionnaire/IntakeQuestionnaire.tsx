@@ -30,6 +30,8 @@ interface IntakeQuestionnaireProps {
   onOpenChange: (open: boolean) => void;
   existingData?: QuestionnaireData | null;
   onSubmit: (data: QuestionnaireData) => void;
+  /** Called when dialog is closed without submitting; use to save draft to DB */
+  onCloseWithDraft?: (data: QuestionnaireData) => void;
 }
 
 const STEP_LABELS = ["Location", "Travel", "Vibe", "Food", "Avoid", "Extras"];
@@ -47,6 +49,7 @@ const IntakeQuestionnaire = ({
   onOpenChange,
   existingData,
   onSubmit,
+  onCloseWithDraft,
 }: IntakeQuestionnaireProps) => {
   const [step, setStep] = useState(1);
   const [data, setData] = useState<QuestionnaireData>(initialQuestionnaireData);
@@ -218,6 +221,14 @@ const IntakeQuestionnaire = ({
     }
   };
 
+  const handleOpenChange = useCallback(
+    (next: boolean) => {
+      if (!next) onCloseWithDraft?.(data);
+      onOpenChange(next);
+    },
+    [data, onOpenChange, onCloseWithDraft]
+  );
+
   const isStepValid = () => {
     switch (step) {
       case 1:
@@ -267,7 +278,7 @@ const IntakeQuestionnaire = ({
   // Welcome prompt for first-time users
   if (showWelcomePrompt) {
     return (
-      <Dialog open={open} onOpenChange={onOpenChange}>
+      <Dialog open={open} onOpenChange={handleOpenChange}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle className="font-display text-2xl">Your Perfect Date Awaits ✨</DialogTitle>
@@ -323,7 +334,7 @@ const IntakeQuestionnaire = ({
   // Existing preferences prompt
   if (showExistingPrompt && existingData) {
     return (
-      <Dialog open={open} onOpenChange={onOpenChange}>
+      <Dialog open={open} onOpenChange={handleOpenChange}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle className="font-display text-2xl">Welcome Back! 👋</DialogTitle>
@@ -406,7 +417,7 @@ const IntakeQuestionnaire = ({
       : undefined;
 
     return (
-      <Dialog open={open} onOpenChange={onOpenChange}>
+      <Dialog open={open} onOpenChange={handleOpenChange}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle className="font-display text-2xl">Quick Details ⚡</DialogTitle>
@@ -535,7 +546,7 @@ const IntakeQuestionnaire = ({
   // Resume in-progress prompt
   if (showResumePrompt && storedProgress) {
     return (
-      <Dialog open={open} onOpenChange={onOpenChange}>
+      <Dialog open={open} onOpenChange={handleOpenChange}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle className="font-display text-2xl">Continue Where You Left Off? 📝</DialogTitle>
@@ -580,7 +591,7 @@ const IntakeQuestionnaire = ({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-2xl w-[95vw] max-h-[90vh] sm:max-h-[85vh] flex flex-col p-0 overflow-hidden">
         <div className="flex flex-col h-full min-h-0">
           {/* Fixed header - extra padding to avoid close button (top-right X) */}

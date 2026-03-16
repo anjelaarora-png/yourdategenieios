@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { DatePlanStop } from "@/types/datePlan";
+import { DatePlanStop, StartingPoint } from "@/types/datePlan";
 import { Loader2, Navigation, Car, Footprints, Train, Bike, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import L from "leaflet";
@@ -7,6 +7,8 @@ import "leaflet/dist/leaflet.css";
 
 interface RouteMapProps {
   stops: DatePlanStop[];
+  /** When set, route origin is the starting point (not the first stop). Itinerary steps remain 1, 2, 3... */
+  startingPoint?: StartingPoint | null;
   transportationMode?: string;
   className?: string;
 }
@@ -87,19 +89,23 @@ L.Icon.Default.mergeOptions({
   shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png",
 });
 
-// Leaflet-based fallback map component
+// Leaflet-based fallback map component (supports optional starting point = itinerary address)
 const LeafletRouteMap = ({ 
   verifiedStops, 
+  startingPoint,
   effectiveMode, 
   className 
 }: { 
   verifiedStops: DatePlanStop[]; 
+  startingPoint?: StartingPoint | null;
   effectiveMode: string; 
   className: string;
 }) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  const hasStart = startingPoint && Number.isFinite(startingPoint.latitude) && Number.isFinite(startingPoint.longitude);
 
   useEffect(() => {
     if (!mapRef.current || mapInstanceRef.current) return;
@@ -137,9 +143,41 @@ const LeafletRouteMap = ({
       });
     };
 
+    // Start marker (house icon / "S") when starting point is provided
+    const routePoints: L.LatLng[] = [];
+    if (hasStart && startingPoint) {
+      const startIcon = L.divIcon({
+        className: "custom-marker",
+        html: `<div style="
+          background: #f5f0e6;
+          width: 32px;
+          height: 32px;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+          border: 2px solid #d4a853;
+          font-weight: bold;
+          font-size: 12px;
+          color: #5c4033;
+        ">S</div>`,
+        iconSize: [32, 32],
+        iconAnchor: [16, 32],
+        popupAnchor: [0, -32],
+      });
+      const startLatLng = L.latLng(startingPoint.latitude, startingPoint.longitude);
+      const startMarker = L.marker(startLatLng, { icon: startIcon }).addTo(map);
+      startMarker.bindPopup(`
+        <div style="min-width: 180px;">
+          <h3 style="margin: 0 0 6px; font-weight: 600; font-size: 14px;">🏠 Start</h3>
+          <p style="margin: 0; font-size: 12px; color: #666;">${startingPoint.address || startingPoint.name || "Your starting location"}</p>
+        </div>
+      `);
+      routePoints.push(startLatLng);
+    }
+
     // Add markers for each stop
-    const markers: L.LatLng[] = [];
-    
     verifiedStops.forEach((stop, index) => {
       const lat = Number(stop.latitude);
       const lng = Number(stop.longitude);
@@ -149,7 +187,7 @@ const LeafletRouteMap = ({
           icon: createNumberedIcon(index + 1) 
         }).addTo(map);
 
-        markers.push(L.latLng(lat, lng));
+        routePoints.push(L.latLng(lat, lng));
 
         marker.bindPopup(`
           <div style="min-width: 200px;">
@@ -162,9 +200,9 @@ const LeafletRouteMap = ({
       }
     });
 
-    // Draw route line connecting all stops
-    if (markers.length > 1) {
-      const routeLine = L.polyline(markers, {
+    // Draw route line: Start → stop 1 → stop 2 → ...
+    if (routePoints.length > 1) {
+      L.polyline(routePoints, {
         color: "#d4a853",
         weight: 4,
         opacity: 0.8,
@@ -172,9 +210,9 @@ const LeafletRouteMap = ({
       }).addTo(map);
     }
 
-    // Fit bounds to show all markers
-    if (markers.length > 0) {
-      const bounds = L.latLngBounds(markers);
+    // Fit bounds to show all points (start + stops)
+    if (routePoints.length > 0) {
+      const bounds = L.latLngBounds(routePoints);
       map.fitBounds(bounds, { padding: [50, 50] });
     } else {
       map.setView([40.7128, -74.006], 12); // Default to NYC
@@ -188,16 +226,17 @@ const LeafletRouteMap = ({
         mapInstanceRef.current = null;
       }
     };
-  }, [verifiedStops]);
+  }, [verifiedStops, hasStart, startingPoint]);
 
   const openInGoogleMaps = () => {
     if (verifiedStops.length === 0) return;
 
-    const o = verifiedStops[0];
+    const origin = hasStart && startingPoint
+      ? `${startingPoint.latitude},${startingPoint.longitude}`
+      : (verifiedStops[0].placeId ? `place_id:${verifiedStops[0].placeId}` : `${verifiedStops[0].latitude},${verifiedStops[0].longitude}`);
     const d = verifiedStops[verifiedStops.length - 1];
-    const wayStops = verifiedStops.slice(1, -1);
-    const origin = o.placeId ? `place_id:${o.placeId}` : `${o.latitude},${o.longitude}`;
     const destination = d.placeId ? `place_id:${d.placeId}` : `${d.latitude},${d.longitude}`;
+    const wayStops = verifiedStops.slice(1, -1); // middle stops only (exclude first and last)
     const waypoints = wayStops
       .map((s) => (s.placeId ? `place_id:${s.placeId}` : `${s.latitude},${s.longitude}`))
       .join("|");
@@ -236,7 +275,7 @@ const LeafletRouteMap = ({
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mt-3 gap-2">
           <div className="flex items-center gap-3 text-sm text-muted-foreground flex-wrap">
             <span className="flex items-center gap-1.5">
-              {getTravelModeIcon(effectiveMode)} {verifiedStops.length} stop{verifiedStops.length !== 1 ? "s" : ""}
+              {getTravelModeIcon(effectiveMode)} {hasStart ? "Start + " : ""}{verifiedStops.length} stop{verifiedStops.length !== 1 ? "s" : ""}
             </span>
             <span className="text-xs bg-muted px-2 py-1 rounded">
               Open in Google Maps for turn-by-turn directions
@@ -257,7 +296,7 @@ const LeafletRouteMap = ({
   );
 };
 
-const RouteMap = ({ stops, transportationMode, className = "" }: RouteMapProps) => {
+const RouteMap = ({ stops, startingPoint, transportationMode, className = "" }: RouteMapProps) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<GoogleMap | null>(null);
   const directionsRendererRef = useRef<DirectionsRenderer | null>(null);
@@ -267,7 +306,7 @@ const RouteMap = ({ stops, transportationMode, className = "" }: RouteMapProps) 
   const [error, setError] = useState<string | null>(null);
   const [totalDistance, setTotalDistance] = useState<string>("");
   const [totalDuration, setTotalDuration] = useState<string>("");
-  const [routeLegs, setRouteLegs] = useState<Array<{ from: number; to: number; distance: string; duration: string }>>([]);
+  const [routeLegs, setRouteLegs] = useState<Array<{ from: number | string; to: number | string; distance: string; duration: string }>>([]);
   const [selectedMode, setSelectedMode] = useState<string>(() => transportationMode || "walking");
   const [useLeaflet, setUseLeaflet] = useState(!GOOGLE_MAPS_API_KEY);
   
@@ -318,7 +357,7 @@ const RouteMap = ({ stops, transportationMode, className = "" }: RouteMapProps) 
       );
     }
     
-    return <LeafletRouteMap verifiedStops={stopsWithCoords} effectiveMode={effectiveMode} className={className} />;
+    return <LeafletRouteMap verifiedStops={stopsWithCoords} startingPoint={startingPoint} effectiveMode={effectiveMode} className={className} />;
   }
 
   // Effect 1: Load Google Maps script and initialize map once
@@ -388,12 +427,12 @@ const RouteMap = ({ stops, transportationMode, className = "" }: RouteMapProps) 
     };
   }, [useLeaflet]);
 
-  // Effect 2: Recalculate route when stops or selected transport mode changes
+  // Effect 2: Recalculate route when stops, starting point, or selected transport mode changes
   useEffect(() => {
     if (!mapReady || !mapInstanceRef.current) return;
     
     calculateRoute();
-  }, [mapReady, stops, effectiveMode]);
+  }, [mapReady, stops, startingPoint, effectiveMode]);
 
   // Clear previous markers and overlays
   const clearMarkers = () => {
@@ -425,8 +464,10 @@ const RouteMap = ({ stops, transportationMode, className = "" }: RouteMapProps) 
       return;
     }
 
-    if (stopsWithCoords.length === 1) {
-      // If only one stop, just show a marker
+    const hasStart = startingPoint && Number.isFinite(startingPoint.latitude) && Number.isFinite(startingPoint.longitude);
+
+    if (stopsWithCoords.length === 1 && !hasStart) {
+      // If only one stop and no starting point, just show a marker
       const lat = Number(stopsWithCoords[0].latitude);
       const lng = Number(stopsWithCoords[0].longitude);
       addCustomMarker(stopsWithCoords[0], 1);
@@ -438,19 +479,22 @@ const RouteMap = ({ stops, transportationMode, className = "" }: RouteMapProps) 
 
     const directionsService = new window.google.maps.DirectionsService();
 
-    const origin = {
-      lat: Number(stopsWithCoords[0].latitude),
-      lng: Number(stopsWithCoords[0].longitude),
-    };
+    const origin = hasStart
+      ? { lat: startingPoint!.latitude, lng: startingPoint!.longitude }
+      : { lat: Number(stopsWithCoords[0].latitude), lng: Number(stopsWithCoords[0].longitude) };
     const destination = {
       lat: Number(stopsWithCoords[stopsWithCoords.length - 1].latitude),
       lng: Number(stopsWithCoords[stopsWithCoords.length - 1].longitude),
     };
-
-    const waypoints = stopsWithCoords.slice(1, -1).map((stop) => ({
-      location: { lat: Number(stop.latitude), lng: Number(stop.longitude) },
-      stopover: true,
-    }));
+    const waypoints = hasStart
+      ? stopsWithCoords.slice(0, -1).map((stop) => ({
+          location: { lat: Number(stop.latitude), lng: Number(stop.longitude) },
+          stopover: true,
+        }))
+      : stopsWithCoords.slice(1, -1).map((stop) => ({
+          location: { lat: Number(stop.latitude), lng: Number(stop.longitude) },
+          stopover: true,
+        }));
 
     try {
       const result = await directionsService.route({
@@ -465,12 +509,18 @@ const RouteMap = ({ stops, transportationMode, className = "" }: RouteMapProps) 
         directionsRendererRef.current.setDirections(result);
       }
 
-      // Add custom markers for each stop
+      // Add marker for starting point when present (label "S"), then numbered markers for itinerary stops
+      if (hasStart) {
+        addCustomMarker(
+          { ...stopsWithCoords[0], latitude: startingPoint!.latitude, longitude: startingPoint!.longitude, name: "Your location" } as DatePlanStop,
+          0
+        );
+      }
       stopsWithCoords.forEach((stop, index) => {
         addCustomMarker(stop, index + 1);
       });
 
-      // Calculate totals and per-leg info
+      // Calculate totals and per-leg info (from/to labels: Start or 1, 2, 3...)
       let distance = 0;
       let duration = 0;
       const legs = result.routes[0].legs.map((leg, i) => {
@@ -478,9 +528,11 @@ const RouteMap = ({ stops, transportationMode, className = "" }: RouteMapProps) 
         const t = leg.duration?.value || 0;
         distance += d;
         duration += t;
+        const fromLabel = hasStart ? (i === 0 ? "Start" : String(i)) : String(i + 1);
+        const toLabel = hasStart ? String(i + 1) : String(i + 2);
         return {
-          from: i + 1,
-          to: i + 2,
+          from: fromLabel,
+          to: toLabel,
           distance: leg.distance?.text || "",
           duration: leg.duration?.text || "",
         };
@@ -491,6 +543,12 @@ const RouteMap = ({ stops, transportationMode, className = "" }: RouteMapProps) 
     } catch (err) {
       console.error("Directions error:", err);
       // Fallback: just show markers without route
+      if (hasStart) {
+        addCustomMarker(
+          { ...stopsWithCoords[0], latitude: startingPoint!.latitude, longitude: startingPoint!.longitude, name: "Your location" } as DatePlanStop,
+          0
+        );
+      }
       stopsWithCoords.forEach((stop, index) => {
         addCustomMarker(stop, index + 1);
       });
@@ -522,7 +580,7 @@ const RouteMap = ({ stops, transportationMode, className = "" }: RouteMapProps) 
         font-weight: bold;
         font-size: 14px;
         color: #1a1a1a;
-      ">${order}</div>
+      ">${order === 0 ? "S" : order}</div>
     `;
 
     const overlay = new window.google.maps.OverlayView();
@@ -570,6 +628,9 @@ const RouteMap = ({ stops, transportationMode, className = "" }: RouteMapProps) 
     if (!mapInstanceRef.current || !window.google || stopsWithCoords.length === 0) return;
 
     const bounds = new window.google.maps.LatLngBounds();
+    if (startingPoint && Number.isFinite(startingPoint.latitude) && Number.isFinite(startingPoint.longitude)) {
+      bounds.extend({ lat: startingPoint.latitude, lng: startingPoint.longitude });
+    }
     stopsWithCoords.forEach((stop) => {
       bounds.extend({ lat: Number(stop.latitude), lng: Number(stop.longitude) });
     });
@@ -579,11 +640,13 @@ const RouteMap = ({ stops, transportationMode, className = "" }: RouteMapProps) 
   const openInGoogleMaps = () => {
     if (stopsWithCoords.length === 0) return;
 
-    const o = stopsWithCoords[0];
+    const hasStart = startingPoint && Number.isFinite(startingPoint.latitude) && Number.isFinite(startingPoint.longitude);
+    const origin = hasStart && startingPoint
+      ? `${startingPoint.latitude},${startingPoint.longitude}`
+      : (stopsWithCoords[0].placeId ? `place_id:${stopsWithCoords[0].placeId}` : `${stopsWithCoords[0].latitude},${stopsWithCoords[0].longitude}`);
     const d = stopsWithCoords[stopsWithCoords.length - 1];
-    const wayStops = stopsWithCoords.slice(1, -1);
-    const origin = o.placeId ? `place_id:${o.placeId}` : `${o.latitude},${o.longitude}`;
     const destination = d.placeId ? `place_id:${d.placeId}` : `${d.latitude},${d.longitude}`;
+    const wayStops = stopsWithCoords.slice(1, -1);
     const waypoints = wayStops
       .map((s) => (s.placeId ? `place_id:${s.placeId}` : `${s.latitude},${s.longitude}`))
       .join("|");
@@ -636,7 +699,7 @@ const RouteMap = ({ stops, transportationMode, className = "" }: RouteMapProps) 
         </div>
       );
     }
-    return <LeafletRouteMap verifiedStops={stopsWithCoords} effectiveMode={effectiveMode} className={className} />;
+    return <LeafletRouteMap verifiedStops={stopsWithCoords} startingPoint={startingPoint} effectiveMode={effectiveMode} className={className} />;
   }
 
   if (stopsWithCoords.length === 0) {

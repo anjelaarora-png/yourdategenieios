@@ -8,8 +8,8 @@ export const datePlanTool = {
     parameters: {
       type: "object",
       properties: {
-        title: { type: "string", description: "Creative name for the date" },
-        tagline: { type: "string", description: "Romantic one-liner" },
+        title: { type: "string", description: "Short creative name (2-6 words), not only cuisine/neighborhood; e.g. 'Sunset & Vinyl'" },
+        tagline: { type: "string", description: "Romantic one-liner; can mention cuisine or area" },
         totalDuration: {
           type: "string",
           description: "Total time like '3-4 hours'",

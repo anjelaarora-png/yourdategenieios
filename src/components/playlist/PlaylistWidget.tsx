@@ -1,6 +1,6 @@
 import { useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
-import { Music, Play, Loader2, Check, Copy, RefreshCw, Clock, Plus, Save, X } from "lucide-react";
+import { Music, Play, Loader2, Check, Copy, RefreshCw, Clock, Plus, Save, X, Replace } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { DatePlan } from "@/types/datePlan";
 import { usePlaylistStorage } from "@/hooks/usePlaylistStorage";
 import SongSearchInput from "./SongSearchInput";
+import MusicRecordAnimation from "./MusicRecordAnimation";
 
 interface PlaylistWidgetProps {
   datePlan: DatePlan;
@@ -73,6 +74,7 @@ const PlaylistWidget = ({ datePlan, open, onOpenChange }: PlaylistWidgetProps) =
   const [openingProgress, setOpeningProgress] = useState(0);
   const [isSaved, setIsSaved] = useState(false);
   const [showAddSong, setShowAddSong] = useState(false);
+  const [replaceSongId, setReplaceSongId] = useState<string | null>(null);
   const { toast } = useToast();
   const { savePlaylist } = usePlaylistStorage();
 
@@ -129,12 +131,13 @@ const PlaylistWidget = ({ datePlan, open, onOpenChange }: PlaylistWidgetProps) =
     await handleGenerate();
   };
 
-  // Save playlist to storage
+  // Save playlist to storage (with stops so it can be regenerated from Music tab)
   const handleSavePlaylist = () => {
     const vibeLabel = vibeOptions.find(v => v.value === vibe)?.label || vibe;
     const playlistName = `${vibeLabel} Playlist`;
-    
-    savePlaylist(playlistName, datePlan.title, vibe, songs);
+    const stops = (datePlan.stops ?? []).map((s) => ({ name: s.name, venueType: s.venueType }));
+
+    savePlaylist(playlistName, datePlan.title, vibe, songs, stops.length ? stops : undefined);
     setIsSaved(true);
     toast({
       title: "Playlist saved! 💾",
@@ -160,7 +163,22 @@ const PlaylistWidget = ({ datePlan, open, onOpenChange }: PlaylistWidgetProps) =
   // Remove a song
   const handleRemoveSong = (songId: string) => {
     setSongs(prev => prev.filter(s => s.id !== songId));
+    setReplaceSongId(null);
     setIsSaved(false); // Mark as unsaved
+  };
+
+  // Replace a song with one from search
+  const handleReplaceSong = (songId: string, newSong: { title: string; artist: string }) => {
+    setSongs(prev =>
+      prev.map(s =>
+        s.id === songId
+          ? { ...s, title: newSong.title, artist: newSong.artist, isCustom: true }
+          : s
+      )
+    );
+    setReplaceSongId(null);
+    setIsSaved(false);
+    toast({ title: "Song replaced! 🎵" });
   };
 
   // Open a single song on a platform (works with or without artist)
@@ -233,6 +251,7 @@ const PlaylistWidget = ({ datePlan, open, onOpenChange }: PlaylistWidgetProps) =
     setSongs([]);
     setGenerated(false);
     setIsOpeningAll(false);
+    setReplaceSongId(null);
   };
 
   // Platform icons
@@ -291,6 +310,11 @@ const PlaylistWidget = ({ datePlan, open, onOpenChange }: PlaylistWidgetProps) =
                 </div>
               </div>
 
+              {isGenerating && (
+                <div className="flex justify-center py-4">
+                  <MusicRecordAnimation size={72} showNotes />
+                </div>
+              )}
               <Button
                 onClick={handleGenerate}
                 disabled={isGenerating}
@@ -354,67 +378,94 @@ const PlaylistWidget = ({ datePlan, open, onOpenChange }: PlaylistWidgetProps) =
               {/* Song list */}
               <div className="space-y-1.5 max-h-[250px] overflow-y-auto pr-1">
                 {songs.map((song, index) => (
-                  <div
-                    key={song.id || index}
-                    className="flex items-center justify-between p-2.5 sm:p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors group"
-                  >
-                    <div className="flex items-center gap-3 flex-1 min-w-0">
-                      <span className="text-xs text-muted-foreground w-5 text-right shrink-0">
-                        {index + 1}
-                      </span>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-sm truncate flex items-center gap-2">
-                          {song.title}
-                          {song.isCustom && (
-                            <Badge variant="outline" className="text-[10px] px-1 py-0 shrink-0">
-                              Custom
-                            </Badge>
-                          )}
-                        </p>
-                        <p className="text-xs text-muted-foreground truncate">
-                          {song.artist || <span className="italic">Search by title</span>}
-                          {song.year && <span className="ml-1">({song.year})</span>}
-                        </p>
+                  <div key={song.id || index} className="space-y-1.5">
+                    {replaceSongId === (song.id ?? String(index)) ? (
+                      <div className="bg-muted/50 rounded-lg p-3 border border-border">
+                        <p className="text-xs text-muted-foreground mb-2">Replace &quot;{song.title}&quot;</p>
+                        <SongSearchInput
+                          onSelectSong={(selected) => song.id && handleReplaceSong(song.id, selected)}
+                          placeholder="Search for a song..."
+                          autoFocus
+                        />
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="mt-2 h-7 text-xs"
+                          onClick={() => setReplaceSongId(null)}
+                        >
+                          Cancel
+                        </Button>
                       </div>
-                    </div>
-                    <div className="flex gap-0.5 shrink-0 items-center">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 hover:bg-[#1DB954]/10 hover:text-[#1DB954]"
-                        onClick={() => openSong(song, "spotify")}
-                        title="Open in Spotify"
-                      >
-                        <SpotifyIcon />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 hover:bg-[#FC3C44]/10 hover:text-[#FC3C44]"
-                        onClick={() => openSong(song, "apple")}
-                        title="Open in Apple Music"
-                      >
-                        <AppleMusicIcon />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 hover:bg-[#FF0000]/10 hover:text-[#FF0000]"
-                        onClick={() => openSong(song, "youtube")}
-                        title="Open in YouTube Music"
-                      >
-                        <YouTubeMusicIcon />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
-                        onClick={() => song.id && handleRemoveSong(song.id)}
-                        title="Remove song"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </Button>
-                    </div>
+                    ) : (
+                      <div className="flex items-center justify-between p-2.5 sm:p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors group">
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          <span className="text-xs text-muted-foreground w-5 text-right shrink-0">
+                            {index + 1}
+                          </span>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-sm truncate flex items-center gap-2">
+                              {song.title}
+                              {song.isCustom && (
+                                <Badge variant="outline" className="text-[10px] px-1 py-0 shrink-0">
+                                  Custom
+                                </Badge>
+                              )}
+                            </p>
+                            <p className="text-xs text-muted-foreground truncate">
+                              {song.artist || <span className="italic">Search by title</span>}
+                              {song.year && <span className="ml-1">({song.year})</span>}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex gap-0.5 shrink-0 items-center">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 hover:bg-[#1DB954]/10 hover:text-[#1DB954]"
+                            onClick={() => openSong(song, "spotify")}
+                            title="Open in Spotify"
+                          >
+                            <SpotifyIcon />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 hover:bg-[#FC3C44]/10 hover:text-[#FC3C44]"
+                            onClick={() => openSong(song, "apple")}
+                            title="Open in Apple Music"
+                          >
+                            <AppleMusicIcon />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 hover:bg-[#FF0000]/10 hover:text-[#FF0000]"
+                            onClick={() => openSong(song, "youtube")}
+                            title="Open in YouTube Music"
+                          >
+                            <YouTubeMusicIcon />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-primary"
+                            onClick={() => setReplaceSongId(song.id ?? String(index))}
+                            title="Replace song"
+                          >
+                            <Replace className="w-3.5 h-3.5" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
+                            onClick={() => song.id && handleRemoveSong(song.id)}
+                            title="Remove song"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

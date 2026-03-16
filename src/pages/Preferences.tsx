@@ -1,13 +1,12 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { PlacesAutocompleteInput } from "@/components/ui/PlacesAutocompleteInput";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, Save, MapPin, Car, Zap, Utensils, AlertTriangle, Accessibility, Wind, Lock, Loader2, CheckCircle } from "lucide-react";
+import { ArrowLeft, Save, MapPin, Car, Zap, Utensils, AlertTriangle, Accessibility, Wind, Lock, Loader2, CheckCircle, ChevronDown, Users } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserPreferences } from "@/hooks/useUserPreferences";
 import { useToast } from "@/hooks/use-toast";
@@ -27,9 +26,19 @@ import {
   SMOKING_PREFERENCES,
   SMOKING_ACTIVITIES,
 } from "@/components/questionnaire/types";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { supabase } from "@/integrations/supabase/client";
 
+const GENDER_OPTIONS = [
+  { value: "male", label: "Male", emoji: "👨" },
+  { value: "female", label: "Female", emoji: "👩" },
+  { value: "non-binary", label: "Non-binary", emoji: "🧑" },
+  { value: "prefer-not-to-say", label: "Prefer not to say", emoji: "🙂" },
+] as const;
+
 interface EditablePreferences {
+  gender: string;
+  partner_gender: string;
   default_city: string;
   default_neighborhood: string;
   transportation_mode: string;
@@ -38,7 +47,7 @@ interface EditablePreferences {
   activity_preferences: string[];
   food_preferences: string[];
   dietary_restrictions: string[];
-  drink_preferences: string;
+  drink_preferences: string[];
   budget_range: string;
   allergies: string[];
   deal_breakers: string[];
@@ -54,6 +63,8 @@ const Preferences = () => {
   const { toast } = useToast();
   const [saving, setSaving] = useState(false);
   const [edited, setEdited] = useState<EditablePreferences>({
+    gender: "",
+    partner_gender: "",
     default_city: "",
     default_neighborhood: "",
     transportation_mode: "",
@@ -62,7 +73,7 @@ const Preferences = () => {
     activity_preferences: [],
     food_preferences: [],
     dietary_restrictions: [],
-    drink_preferences: "",
+    drink_preferences: [],
     budget_range: "",
     allergies: [],
     deal_breakers: [],
@@ -138,6 +149,8 @@ const Preferences = () => {
   useEffect(() => {
     if (preferences) {
       setEdited({
+        gender: preferences.gender || "",
+        partner_gender: preferences.partner_gender || "",
         default_city: preferences.default_city || "",
         default_neighborhood: preferences.default_neighborhood || "",
         transportation_mode: preferences.transportation_mode || "",
@@ -146,7 +159,11 @@ const Preferences = () => {
         activity_preferences: preferences.activity_preferences || [],
         food_preferences: preferences.food_preferences || [],
         dietary_restrictions: preferences.dietary_restrictions || [],
-        drink_preferences: preferences.drink_preferences || "",
+        drink_preferences: Array.isArray(preferences.drink_preferences)
+          ? preferences.drink_preferences
+          : preferences.drink_preferences
+            ? [preferences.drink_preferences]
+            : [],
         budget_range: preferences.budget_range || "",
         allergies: preferences.allergies || [],
         deal_breakers: preferences.deal_breakers || [],
@@ -172,38 +189,47 @@ const Preferences = () => {
   };
 
   const handleSave = async () => {
-    if (!user || !preferences) return;
-    
+    if (!user) return;
+
     setSaving(true);
     try {
-      const { error } = await supabase
-        .from("user_preferences")
-        .update({
-          default_city: edited.default_city || null,
-          default_neighborhood: edited.default_neighborhood || null,
-          preferred_location: `${edited.default_city}${edited.default_neighborhood ? `, ${edited.default_neighborhood}` : ""}`,
-          transportation_mode: edited.transportation_mode || null,
-          travel_radius: edited.travel_radius || null,
-          energy_level: edited.energy_level || null,
-          activity_preferences: edited.activity_preferences,
-          food_preferences: edited.food_preferences,
-          dietary_restrictions: edited.dietary_restrictions.filter(d => d !== "none"),
-          drink_preferences: edited.drink_preferences || null,
-          budget_range: edited.budget_range || null,
-          allergies: edited.allergies.filter(a => a !== "none"),
-          deal_breakers: edited.deal_breakers,
-          accessibility_needs: edited.accessibility_needs.filter(a => a !== "none"),
-          smoking_preference: edited.smoking_preference || null,
-          smoking_activities: edited.smoking_activities.filter(s => s !== "none"),
-        })
-        .eq("id", preferences.id);
+      const payload = {
+        gender: edited.gender || null,
+        partner_gender: edited.partner_gender || null,
+        default_city: edited.default_city || null,
+        default_neighborhood: edited.default_neighborhood || null,
+        preferred_location: `${edited.default_city}${edited.default_neighborhood ? `, ${edited.default_neighborhood}` : ""}`,
+        transportation_mode: edited.transportation_mode || null,
+        travel_radius: edited.travel_radius || null,
+        energy_level: edited.energy_level || null,
+        activity_preferences: edited.activity_preferences,
+        food_preferences: edited.food_preferences,
+        dietary_restrictions: edited.dietary_restrictions.filter(d => d !== "none"),
+        drink_preferences: edited.drink_preferences?.length ? edited.drink_preferences : null,
+        budget_range: edited.budget_range || null,
+        allergies: edited.allergies.filter(a => a !== "none"),
+        deal_breakers: edited.deal_breakers,
+        accessibility_needs: edited.accessibility_needs.filter(a => a !== "none"),
+        smoking_preference: edited.smoking_preference || null,
+        smoking_activities: edited.smoking_activities.filter(s => s !== "none"),
+      };
 
-      if (error) throw error;
+      if (preferences) {
+        const { error } = await supabase
+          .from("user_preferences")
+          .update(payload)
+          .eq("id", preferences.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from("user_preferences")
+          .insert({ user_id: user.id, ...payload })
+          .select()
+          .single();
+        if (error) throw error;
+      }
 
-      toast({
-        title: "Preferences saved! ✨",
-        description: "Your preferences will be used for future date plans.",
-      });
+      toast({ title: "Preferences saved." });
       refetch();
     } catch (error) {
       console.error("Error saving preferences:", error);
@@ -232,61 +258,101 @@ const Preferences = () => {
     );
   }
 
-  if (!preferences) {
-    return (
-      <div className="min-h-screen bg-background p-6">
-        <div className="max-w-4xl mx-auto">
-          <Button variant="ghost" onClick={() => navigate("/dashboard")} className="mb-6">
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Dashboard
-          </Button>
-          <Card>
-            <CardContent className="pt-6 text-center">
-              <p className="text-muted-foreground mb-4">
-                No preferences saved yet. Create a date plan first to save your preferences!
-              </p>
-              <Button onClick={() => navigate("/dashboard")}>
-                Go to Dashboard
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    );
-  }
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>({
+    gender: true,
+    location: true,
+    transport: false,
+    energy: false,
+    food: false,
+    avoid: false,
+    accessibility: false,
+    smoke: false,
+    password: false,
+  });
+  const toggleSection = (key: string) => setOpenSections((p) => ({ ...p, [key]: !p[key] }));
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="max-w-4xl mx-auto p-6 space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
+      <div className="max-w-4xl mx-auto p-6 space-y-3">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-2">
             <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")}>
               <ArrowLeft className="w-5 h-5" />
             </Button>
             <div>
-              <h1 className="text-2xl font-bold">My Preferences</h1>
-              <p className="text-muted-foreground text-sm">
-                These will pre-fill your questionnaire
-              </p>
+              <h1 className="text-xl font-bold">My Preferences</h1>
+              <p className="text-muted-foreground text-xs">Edit below and save. Stored on your account only.</p>
             </div>
           </div>
-          <Button onClick={handleSave} disabled={saving} className="gradient-gold text-primary-foreground">
-            <Save className="w-4 h-4 mr-2" />
-            {saving ? "Saving..." : "Save Changes"}
+          <Button onClick={handleSave} disabled={saving} size="sm" className="gradient-gold text-primary-foreground shrink-0">
+            <Save className="w-4 h-4 mr-1" />
+            {saving ? "Saving..." : "Save"}
           </Button>
         </div>
 
+        {/* You & partner (gender) */}
+        <Collapsible open={openSections.gender} onOpenChange={() => toggleSection("gender")}>
+          <Card>
+            <CollapsibleTrigger className="w-full">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 py-3">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Users className="w-4 h-4 text-primary" />
+                  You & partner
+                </CardTitle>
+                <ChevronDown className={`h-4 w-4 transition-transform ${openSections.gender ? "rotate-180" : ""}`} />
+              </CardHeader>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+          <CardContent className="space-y-3 pt-0">
+            <div>
+              <Label className="text-sm text-muted-foreground mb-2 block">Your gender</Label>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {GENDER_OPTIONS.map((opt) => (
+                  <OptionCard
+                    key={opt.value}
+                    selected={edited.gender === opt.value}
+                    onClick={() => setEdited((prev) => ({ ...prev, gender: opt.value }))}
+                    emoji={opt.emoji}
+                    label={opt.label}
+                    compact
+                  />
+                ))}
+              </div>
+            </div>
+            <div>
+              <Label className="text-sm text-muted-foreground mb-2 block">Partner&apos;s gender</Label>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {GENDER_OPTIONS.map((opt) => (
+                  <OptionCard
+                    key={opt.value}
+                    selected={edited.partner_gender === opt.value}
+                    onClick={() => setEdited((prev) => ({ ...prev, partner_gender: opt.value }))}
+                    emoji={opt.emoji}
+                    label={opt.label}
+                    compact
+                  />
+                ))}
+              </div>
+            </div>
+          </CardContent>
+            </CollapsibleContent>
+          </Card>
+        </Collapsible>
+
         {/* Location */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <MapPin className="w-5 h-5 text-primary" />
-              Default Location
-            </CardTitle>
-            <CardDescription>Your go-to date location</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <Collapsible open={openSections.location} onOpenChange={() => toggleSection("location")}>
+          <Card>
+            <CollapsibleTrigger className="w-full">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 py-3">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <MapPin className="w-4 h-4 text-primary" />
+                  Location
+                </CardTitle>
+                <ChevronDown className={`h-4 w-4 transition-transform ${openSections.location ? "rotate-180" : ""}`} />
+              </CardHeader>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+          <CardContent className="space-y-3 pt-0">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>City</Label>
@@ -308,17 +374,23 @@ const Preferences = () => {
               </div>
             </div>
           </CardContent>
-        </Card>
+            </CollapsibleContent>
+          </Card>
+        </Collapsible>
 
-        {/* Transportation */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <Car className="w-5 h-5 text-primary" />
-              Transportation
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <Collapsible open={openSections.transport} onOpenChange={() => toggleSection("transport")}>
+          <Card>
+            <CollapsibleTrigger className="w-full">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 py-3">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Car className="w-4 h-4 text-primary" />
+                  Transportation
+                </CardTitle>
+                <ChevronDown className={`h-4 w-4 transition-transform ${openSections.transport ? "rotate-180" : ""}`} />
+              </CardHeader>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+          <CardContent className="space-y-3 pt-0">
             <div>
               <Label className="text-sm text-muted-foreground mb-3 block">How do you get around?</Label>
               <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
@@ -351,17 +423,23 @@ const Preferences = () => {
               </div>
             </div>
           </CardContent>
-        </Card>
+            </CollapsibleContent>
+          </Card>
+        </Collapsible>
 
-        {/* Energy & Activities */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <Zap className="w-5 h-5 text-primary" />
-              Energy & Activities
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <Collapsible open={openSections.energy} onOpenChange={() => toggleSection("energy")}>
+          <Card>
+            <CollapsibleTrigger className="w-full">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 py-3">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Zap className="w-4 h-4 text-primary" />
+                  Energy & Activities
+                </CardTitle>
+                <ChevronDown className={`h-4 w-4 transition-transform ${openSections.energy ? "rotate-180" : ""}`} />
+              </CardHeader>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+          <CardContent className="space-y-3 pt-0">
             <div>
               <Label className="text-sm text-muted-foreground mb-3 block">Preferred energy level</Label>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -393,17 +471,23 @@ const Preferences = () => {
               </div>
             </div>
           </CardContent>
-        </Card>
+            </CollapsibleContent>
+          </Card>
+        </Collapsible>
 
-        {/* Food & Drinks */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <Utensils className="w-5 h-5 text-primary" />
-              Food & Drinks
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <Collapsible open={openSections.food} onOpenChange={() => toggleSection("food")}>
+          <Card>
+            <CollapsibleTrigger className="w-full">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 py-3">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Utensils className="w-4 h-4 text-primary" />
+                  Food & Drinks
+                </CardTitle>
+                <ChevronDown className={`h-4 w-4 transition-transform ${openSections.food ? "rotate-180" : ""}`} />
+              </CardHeader>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+          <CardContent className="space-y-3 pt-0">
             <div>
               <Label className="text-sm text-muted-foreground mb-3 block">Favorite cuisines</Label>
               <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
@@ -435,13 +519,13 @@ const Preferences = () => {
               </div>
             </div>
             <div>
-              <Label className="text-sm text-muted-foreground mb-3 block">Drink of choice</Label>
+              <Label className="text-sm text-muted-foreground mb-3 block">Preferred beverages (pick any)</Label>
               <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
                 {DRINK_PREFERENCES.map(drink => (
                   <OptionCard
                     key={drink.value}
-                    selected={edited.drink_preferences === drink.value}
-                    onClick={() => setEdited(prev => ({ ...prev, drink_preferences: drink.value }))}
+                    selected={edited.drink_preferences.includes(drink.value)}
+                    onClick={() => toggleArrayValue("drink_preferences", drink.value)}
                     emoji={drink.emoji}
                     label={drink.label}
                     compact
@@ -464,17 +548,23 @@ const Preferences = () => {
               </div>
             </div>
           </CardContent>
-        </Card>
+            </CollapsibleContent>
+          </Card>
+        </Collapsible>
 
-        {/* Deal Breakers */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <AlertTriangle className="w-5 h-5 text-primary" />
-              Avoid These
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <Collapsible open={openSections.avoid} onOpenChange={() => toggleSection("avoid")}>
+          <Card>
+            <CollapsibleTrigger className="w-full">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 py-3">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <AlertTriangle className="w-4 h-4 text-primary" />
+                  Avoid
+                </CardTitle>
+                <ChevronDown className={`h-4 w-4 transition-transform ${openSections.avoid ? "rotate-180" : ""}`} />
+              </CardHeader>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+          <CardContent className="space-y-3 pt-0">
             <div>
               <Label className="text-sm text-muted-foreground mb-3 block">Food allergies</Label>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -506,17 +596,23 @@ const Preferences = () => {
               </div>
             </div>
           </CardContent>
-        </Card>
+            </CollapsibleContent>
+          </Card>
+        </Collapsible>
 
-        {/* Accessibility */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <Accessibility className="w-5 h-5 text-primary" />
-              Accessibility Needs
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
+        <Collapsible open={openSections.accessibility} onOpenChange={() => toggleSection("accessibility")}>
+          <Card>
+            <CollapsibleTrigger className="w-full">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 py-3">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Accessibility className="w-4 h-4 text-primary" />
+                  Accessibility
+                </CardTitle>
+                <ChevronDown className={`h-4 w-4 transition-transform ${openSections.accessibility ? "rotate-180" : ""}`} />
+              </CardHeader>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+          <CardContent className="pt-0">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               {ACCESSIBILITY_OPTIONS.map(option => (
                 <OptionCard
@@ -531,17 +627,23 @@ const Preferences = () => {
               ))}
             </div>
           </CardContent>
-        </Card>
+            </CollapsibleContent>
+          </Card>
+        </Collapsible>
 
-        {/* Smoke & Vibe */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <Wind className="w-5 h-5 text-primary" />
-              Smoke & Vibe
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <Collapsible open={openSections.smoke} onOpenChange={() => toggleSection("smoke")}>
+          <Card>
+            <CollapsibleTrigger className="w-full">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 py-3">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Wind className="w-4 h-4 text-primary" />
+                  Smoke & Vibe
+                </CardTitle>
+                <ChevronDown className={`h-4 w-4 transition-transform ${openSections.smoke ? "rotate-180" : ""}`} />
+              </CardHeader>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+          <CardContent className="space-y-3 pt-0">
             <div>
               <Label className="text-sm text-muted-foreground mb-3 block">Venue atmosphere</Label>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
@@ -575,18 +677,23 @@ const Preferences = () => {
               </div>
             </div>
           </CardContent>
-        </Card>
+            </CollapsibleContent>
+          </Card>
+        </Collapsible>
 
-        {/* Change Password */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <Lock className="w-5 h-5 text-primary" />
-              Change Password
-            </CardTitle>
-            <CardDescription>Update your account password</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <Collapsible open={openSections.password} onOpenChange={() => toggleSection("password")}>
+          <Card>
+            <CollapsibleTrigger className="w-full">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 py-3">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Lock className="w-4 h-4 text-primary" />
+                  Password
+                </CardTitle>
+                <ChevronDown className={`h-4 w-4 transition-transform ${openSections.password ? "rotate-180" : ""}`} />
+              </CardHeader>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+          <CardContent className="space-y-3 pt-0">
             {passwordChanged ? (
               <div className="flex items-center gap-3 p-4 bg-primary/10 rounded-lg">
                 <CheckCircle className="w-5 h-5 text-primary" />
@@ -637,13 +744,14 @@ const Preferences = () => {
               </>
             )}
           </CardContent>
-        </Card>
+            </CollapsibleContent>
+          </Card>
+        </Collapsible>
 
-        {/* Bottom Save Button */}
-        <div className="flex justify-end pb-8">
-          <Button onClick={handleSave} disabled={saving} size="lg" className="gradient-gold text-primary-foreground">
-            <Save className="w-4 h-4 mr-2" />
-            {saving ? "Saving..." : "Save All Changes"}
+        <div className="flex justify-end py-4">
+          <Button onClick={handleSave} disabled={saving} size="sm" className="gradient-gold text-primary-foreground">
+            <Save className="w-4 h-4 mr-1" />
+            {saving ? "Saving..." : "Save preferences"}
           </Button>
         </div>
       </div>

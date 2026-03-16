@@ -4,9 +4,11 @@ struct DatePlanResultView: View {
     let plan: DatePlan
     var onSave: (() -> Void)?
     var onRegenerate: (() -> Void)?
+    var onDelete: (() -> Void)?
     var isViewingMode: Bool = false
     
     @Environment(\.dismiss) private var dismiss
+    @State private var showDeleteConfirmation = false
     @EnvironmentObject var coordinator: NavigationCoordinator
     @State private var showPlaylist = false
     @State private var showMap = false
@@ -18,6 +20,10 @@ struct DatePlanResultView: View {
     @State private var calendarDate = Date()
     @State private var calendarMessage: String?
     @State private var showCalendarAlert = false
+    @State private var mainPlanCardAppeared = false
+    @State private var showNoReservableAlert = false
+    @State private var showReserveVenuePicker = false
+    @State private var reservableStopsForPicker: [DatePlanStop] = []
     
     var body: some View {
         NavigationStack {
@@ -29,8 +35,14 @@ struct DatePlanResultView: View {
                 VStack(spacing: 0) {
                     // Main scrollable content
                     ScrollView(.vertical, showsIndicators: false) {
-                        VStack(spacing: 0) {
+                        VStack(spacing: 16) {
+                            if let names = coordinator.currentPlanPartnerNames {
+                                partnerBadgeView(names: names)
+                            }
                             mainPlanCard
+                            if coordinator.currentPlanPartnerNames != nil {
+                                bothLoveSection
+                            }
                         }
                         .padding(.horizontal, 16)
                         .padding(.top, 8)
@@ -43,16 +55,43 @@ struct DatePlanResultView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button {
-                        dismiss()
+                        coordinator.dismissSheet()
                     } label: {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundColor(Color.luxuryGold)
+                        HStack(spacing: 6) {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 14, weight: .medium))
+                            Text("Close")
+                                .font(Font.inter(14, weight: .medium))
+                        }
+                        .foregroundColor(Color.luxuryGold)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(Color.luxuryMaroonLight.opacity(0.8))
+                        .cornerRadius(20)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 20)
+                                .stroke(Color.luxuryGold.opacity(0.4), lineWidth: 1)
+                        )
                     }
+                    .buttonStyle(.plain)
                 }
                 
                 ToolbarItem(placement: .navigationBarTrailing) {
                     HStack(spacing: 16) {
+                        if onDelete != nil {
+                            Menu {
+                                Button(role: .destructive) {
+                                    showDeleteConfirmation = true
+                                } label: {
+                                    Label("Delete plan", systemImage: "trash")
+                                }
+                            } label: {
+                                Image(systemName: "ellipsis.circle")
+                                    .font(.system(size: 15))
+                                    .foregroundColor(Color.luxuryGold)
+                            }
+                        }
+                        
                         Button {
                             showPartnerShare = true
                         } label: {
@@ -76,11 +115,14 @@ struct DatePlanResultView: View {
             }
         }
         .sheet(isPresented: $showPlaylist) {
-            PlaylistWidgetView(planTitle: plan.title)
+            PlaylistWidgetView(
+                planTitle: plan.title,
+                stops: plan.stops.map { PlaylistStop(name: $0.name, venueType: $0.venueType) }
+            )
         }
         .sheet(isPresented: $showMap) {
             NavigationStack {
-                RouteMapView(stops: plan.stops)
+                RouteMapView(stops: itineraryStops, startingPoint: plan.startingPoint)
                     .navigationTitle("Route")
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar {
@@ -102,21 +144,75 @@ struct DatePlanResultView: View {
                 venueName: venue.name,
                 venueType: venue.venueType,
                 address: venue.address,
-                phoneNumber: venue.phoneNumber
+                phoneNumber: venue.phoneNumber,
+                bookingUrl: venue.bookingUrl,
+                websiteUrl: venue.websiteUrl,
+                openingHours: venue.openingHours
             )
         }
         .sheet(isPresented: $showAddToCalendar) {
             addToCalendarSheet
+        }
+        .sheet(isPresented: $showReserveVenuePicker) {
+            NavigationStack {
+                List {
+                    ForEach(Array(reservableStopsForPicker.enumerated()), id: \.offset) { _, stop in
+                        Button {
+                            selectedVenue = stop
+                            showReserveVenuePicker = false
+                        } label: {
+                            HStack {
+                                Text(stop.name)
+                                    .foregroundColor(.primary)
+                                Spacer()
+                                if let url = stop.bookingUrl?.lowercased() {
+                                    if url.contains("opentable") {
+                                        Text("OpenTable")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                    } else if url.contains("resy") {
+                                        Text("Resy")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                .navigationTitle("Choose a venue to reserve")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Button("Cancel") { showReserveVenuePicker = false }
+                            .foregroundColor(Color.luxuryGold)
+                    }
+                }
+            }
         }
         .alert("Calendar", isPresented: $showCalendarAlert) {
             Button("OK") { calendarMessage = nil }
         } message: {
             if let msg = calendarMessage { Text(msg) }
         }
+        .alert("Reservations", isPresented: $showNoReservableAlert) {
+            Button("OK") { showNoReservableAlert = false }
+        } message: {
+            Text("This plan doesn't include any reservable venues (e.g. restaurant or bar).")
+        }
+        .alert("Delete plan?", isPresented: $showDeleteConfirmation) {
+            Button("Cancel", role: .cancel) { showDeleteConfirmation = false }
+            Button("Delete", role: .destructive) {
+                onDelete?()
+            }
+        } message: {
+            Text("This plan will be permanently removed. This cannot be undone.")
+        }
         .onAppear {
             if coordinator.savedPlans.contains(where: { $0.id == plan.id }) {
                 isSaved = true
             }
+            mainPlanCardAppeared = true
         }
     }
     
@@ -188,62 +284,89 @@ struct DatePlanResultView: View {
         }
     }
     
-    // MARK: - Main Plan Card
+    // MARK: - Main Plan Card (love letter paper style)
     private var mainPlanCard: some View {
-        VStack(spacing: 0) {
-            // Header
-            cardHeader
-            
-            Divider()
-                .background(Color.luxuryGold.opacity(0.2))
-                .padding(.horizontal, 20)
-            
-            // Title & Tagline
-            titleSection
-            
-            // Timeline Stops
-            stopsTimeline
-            
-            Divider()
-                .background(Color.luxuryGold.opacity(0.2))
-                .padding(.horizontal, 20)
-            
-            // Stats Row
-            statsRow
-            
-            // Weather Note
-            weatherNote
-            
-            // Conversation Starter
-            if let starters = plan.conversationStarters, let first = starters.first {
-                conversationCard(starter: first)
+        LoveLetterItineraryBackground(cornerRadius: 24) {
+            VStack(spacing: 0) {
+                cardHeader
+                Divider()
+                    .background(Color.luxuryGold.opacity(0.4))
+                    .padding(.horizontal, 20)
+                titleSection
+                if let start = plan.startingPoint {
+                    startingPointSection(firstStop: itineraryStops.first, start: start)
+                }
+                stopsTimeline
+                Divider()
+                    .background(Color.luxuryGold.opacity(0.4))
+                    .padding(.horizontal, 20)
+                statsRow
+                weatherNote
+                conversationStartersSection
+                giftSuggestionsSection
+                packingChips
+                pageDots
             }
-            
-            // Packing List
-            packingChips
-            
-            // Page dots placeholder (for multiple plans)
-            pageDots
         }
-        .background(Color.luxuryMaroonLight.opacity(0.6))
-        .cornerRadius(24)
-        .overlay(
-            RoundedRectangle(cornerRadius: 24)
-                .stroke(Color.luxuryGold.opacity(0.25), lineWidth: 1)
+        .opacity(mainPlanCardAppeared ? 1 : 0)
+        .offset(y: mainPlanCardAppeared ? 0 : 8)
+        .animation(.easeOut(duration: 0.4), value: mainPlanCardAppeared)
+    }
+    
+    // MARK: - Partner badge ("Made for A & B")
+    private func partnerBadgeView(names: (String, String)) -> some View {
+        Text("Made for \(names.0) & \(names.1)")
+            .font(Font.bodySans(14, weight: .semibold))
+            .foregroundColor(Color.luxuryGold)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .background(
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(Color.luxuryMaroonLight.opacity(0.8))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 20)
+                    .stroke(Color.luxuryGold, lineWidth: 1.5)
+            )
+    }
+    
+    // MARK: - Both of you will love this because...
+    private var bothLoveSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Both of you will love this because...")
+                .font(Font.bodySans(15, weight: .semibold))
+                .foregroundColor(Color.luxuryCream)
+            Text(plan.tagline)
+                .font(Font.bodySans(14, weight: .regular))
+                .foregroundColor(Color.luxuryCreamMuted)
+            Text(plan.genieSecretTouch.description)
+                .font(Font.bodySans(13, weight: .regular))
+                .foregroundColor(Color.luxuryCreamMuted)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(18)
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(Color.luxuryMaroonLight.opacity(0.7))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20)
+                        .stroke(Color.luxuryGold.opacity(0.25), lineWidth: 1)
+                )
+                .shadow(color: Color.luxuryGold.opacity(0.15), radius: 12, y: 4)
         )
     }
     
-    // MARK: - Card Header
+    // MARK: - Card Header (on paper: dark text)
     private var cardHeader: some View {
         HStack {
             HStack(spacing: 8) {
                 Image(systemName: "sparkles")
                     .font(.system(size: 14))
-                    .foregroundColor(Color.luxuryGold)
+                    .foregroundColor(Color.luxuryGoldDark)
                 
                 Text("Your Date Plan")
                     .font(Font.inter(14, weight: .semibold))
-                    .foregroundColor(Color.luxuryGold)
+                    .foregroundColor(Color(hex: "4A0E0E"))
             }
             
             Spacer()
@@ -263,24 +386,73 @@ struct DatePlanResultView: View {
         VStack(alignment: .leading, spacing: 6) {
             Text(plan.title)
                 .font(Font.header(28, weight: .semibold))
-                .foregroundColor(Color.luxuryCream)
+                .foregroundColor(Color(hex: "3D2C2C"))
             
             Text(plan.tagline)
                 .font(Font.playfair(15, weight: .regular))
-                .foregroundColor(Color.luxuryGold)
+                .foregroundColor(Color.luxuryGoldDark)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 20)
         .padding(.vertical, 16)
     }
     
-    // MARK: - Stops Timeline
+    /// Itinerary = venues only (step 1, 2, 3...). Starting point is not a step.
+    private var itineraryStops: [DatePlanStop] {
+        plan.stops.filter { $0.venueType != "Starting point" && $0.name != "Your location" }
+    }
+    
+    // MARK: - Starting Point (before timeline)
+    private func startingPointSection(firstStop: DatePlanStop?, start: StartingPoint) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .top, spacing: 8) {
+                Image(systemName: "mappin.circle.fill")
+                    .font(.system(size: 16))
+                    .foregroundColor(Color.luxuryGoldDark)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Starting point")
+                        .font(Font.inter(14, weight: .semibold))
+                        .foregroundColor(Color(hex: "3D2C2C"))
+                    Text(start.address)
+                        .font(Font.inter(12, weight: .regular))
+                        .foregroundColor(Color.luxuryGoldDark)
+                }
+                Spacer(minLength: 0)
+            }
+            if let first = firstStop, let url = MapURLHelper.directionsURL(origin: start, destination: first) {
+                Button {
+                    UIApplication.shared.open(url)
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "arrow.triangle.turn.up.right.diamond.fill")
+                            .font(.system(size: 12))
+                        Text("Get to stop 1: \(first.name)")
+                            .font(Font.inter(13, weight: .medium))
+                    }
+                    .foregroundColor(Color.luxuryGold)
+                }
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 8)
+    }
+    
+    // MARK: - Stops Timeline (on paper: dark style)
     private var stopsTimeline: some View {
         VStack(spacing: 0) {
-            ForEach(plan.stops) { stop in
+            ForEach(Array(itineraryStops.enumerated()), id: \.element.id) { index, stop in
+                if index > 0, let time = stop.travelTimeFromPrevious, !time.isEmpty {
+                    TravelLegRow(
+                        travelMode: stop.travelMode,
+                        timeText: time,
+                        distanceText: stop.travelDistanceFromPrevious,
+                        useDarkStyle: true
+                    )
+                }
                 CompactStopRow(
                     stop: stop,
-                    isLast: stop.id == plan.stops.last?.id,
+                    isLast: index == itineraryStops.count - 1,
+                    useDarkStyle: true,
                     onTap: {
                         if isReservable(stop) {
                             selectedVenue = stop
@@ -293,60 +465,53 @@ struct DatePlanResultView: View {
         .padding(.vertical, 8)
     }
     
-    // MARK: - Stats Row
+    // MARK: - Stats Row (on paper: dark text)
     private var statsRow: some View {
         HStack(spacing: 0) {
-            // Duration
             HStack(spacing: 6) {
                 Image(systemName: "clock")
                     .font(.system(size: 13))
-                    .foregroundColor(Color.luxuryGold)
+                    .foregroundColor(Color.luxuryGoldDark)
                 Text(plan.totalDuration)
                     .font(Font.inter(13, weight: .medium))
-                    .foregroundColor(Color.luxuryCream)
+                    .foregroundColor(Color(hex: "3D2C2C"))
             }
-            
             Text("·")
-                .foregroundColor(Color.luxuryMuted)
+                .foregroundColor(Color(hex: "6B5344"))
                 .padding(.horizontal, 12)
-            
-            // Cost
             Text(plan.estimatedCost)
                 .font(Font.inter(13, weight: .medium))
-                .foregroundColor(Color.luxuryCream)
-            
+                .foregroundColor(Color(hex: "3D2C2C"))
             Spacer()
-            
-            // Accessibility badge (if applicable)
             HStack(spacing: 4) {
                 Image(systemName: "figure.roll")
                     .font(.system(size: 11))
                 Text("Accessible")
                     .font(Font.inter(11, weight: .medium))
             }
-            .foregroundColor(Color.luxuryGold)
+            .foregroundColor(Color.luxuryGoldDark)
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 14)
     }
     
-    // MARK: - Weather Note
+    // MARK: - Weather Note (on paper: dark text)
     private var weatherNote: some View {
         Group {
             if !plan.weatherNote.isEmpty {
                 HStack(spacing: 10) {
                     Image(systemName: "sun.max.fill")
                         .font(.system(size: 14))
-                        .foregroundColor(Color.luxuryGoldLight)
+                        .foregroundColor(Color.luxuryGoldDark)
                     
                     Text(plan.weatherNote)
                         .font(Font.inter(13, weight: .regular))
-                        .foregroundColor(Color.luxuryCreamMuted)
+                        .foregroundColor(Color(hex: "5C4A3D"))
                         .lineLimit(2)
                 }
                 .padding(14)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.luxuryMaroon.opacity(0.5))
+                .background(Color.luxuryGold.opacity(0.12))
                 .cornerRadius(12)
                 .padding(.horizontal, 20)
                 .padding(.vertical, 8)
@@ -354,31 +519,90 @@ struct DatePlanResultView: View {
         }
     }
     
-    // MARK: - Conversation Card
-    private func conversationCard(starter: ConversationStarter) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 6) {
-                Image(systemName: "bubble.left.fill")
-                    .font(.system(size: 12))
-                Text("Conversation Starter")
-                    .font(Font.inter(12, weight: .semibold))
+    // MARK: - Conversation Starters Section (on paper: all starters when selected)
+    private var conversationStartersSection: some View {
+        Group {
+            if let starters = plan.conversationStarters, !starters.isEmpty {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "bubble.left.fill")
+                            .font(.system(size: 12))
+                        Text("Conversation Starters")
+                            .font(Font.inter(12, weight: .semibold))
+                    }
+                    .foregroundColor(Color.luxuryGoldDark)
+                    
+                    ForEach(starters) { starter in
+                        Text("\"\(starter.question)\"")
+                            .font(Font.playfairItalic(14))
+                            .foregroundColor(Color(hex: "5C4A3D"))
+                            .lineLimit(4)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+                .padding(14)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.luxuryGold.opacity(0.12))
+                .cornerRadius(12)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 8)
             }
-            .foregroundColor(Color.luxuryGold)
-            
-            Text("\"\(starter.question)\"")
-                .font(Font.playfairItalic(14))
-                .foregroundColor(Color.luxuryCreamMuted)
-                .lineLimit(2)
         }
-        .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.luxuryMaroon.opacity(0.5))
-        .cornerRadius(12)
-        .padding(.horizontal, 20)
-        .padding(.vertical, 8)
     }
     
-    // MARK: - Packing Chips
+    // MARK: - Gift Suggestions Section (on paper: when selected)
+    private var giftSuggestionsSection: some View {
+        Group {
+            if let gifts = plan.giftSuggestions, !gifts.isEmpty {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "gift.fill")
+                            .font(.system(size: 12))
+                        Text("Gift Suggestions")
+                            .font(Font.inter(12, weight: .semibold))
+                    }
+                    .foregroundColor(Color.luxuryGoldDark)
+                    
+                    ForEach(gifts) { gift in
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack(alignment: .top) {
+                                Text(gift.emoji)
+                                    .font(.system(size: 16))
+                                Text(gift.name)
+                                    .font(Font.inter(13, weight: .semibold))
+                                    .foregroundColor(Color(hex: "3D2C2C"))
+                                Spacer(minLength: 8)
+                                Text(gift.priceRange)
+                                    .font(Font.inter(11, weight: .medium))
+                                    .foregroundColor(Color.luxuryGoldDark)
+                            }
+                            Text(gift.description)
+                                .font(Font.inter(12, weight: .regular))
+                                .foregroundColor(Color(hex: "5C4A3D"))
+                                .lineLimit(2)
+                            if !gift.whereToBuy.isEmpty {
+                                Text("Where: \(gift.whereToBuy)")
+                                    .font(Font.inter(11, weight: .regular))
+                                    .foregroundColor(Color.luxuryGoldDark)
+                            }
+                        }
+                        .padding(12)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Color.luxuryGold.opacity(0.08))
+                        .cornerRadius(10)
+                    }
+                }
+                .padding(14)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.luxuryGold.opacity(0.12))
+                .cornerRadius(12)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 8)
+            }
+        }
+    }
+    
+    // MARK: - Packing Chips (on paper: dark text)
     private var packingChips: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 10) {
@@ -389,10 +613,10 @@ struct DatePlanResultView: View {
                         Text(item)
                             .font(Font.inter(12, weight: .medium))
                     }
-                    .foregroundColor(Color.luxuryCreamMuted)
+                    .foregroundColor(Color(hex: "5C4A3D"))
                     .padding(.horizontal, 12)
                     .padding(.vertical, 8)
-                    .background(Color.luxuryMaroon.opacity(0.5))
+                    .background(Color.luxuryGold.opacity(0.15))
                     .cornerRadius(20)
                 }
             }
@@ -405,15 +629,15 @@ struct DatePlanResultView: View {
     private var pageDots: some View {
         HStack(spacing: 6) {
             Circle()
-                .fill(Color.luxuryMuted.opacity(0.4))
+                .fill(Color.luxuryGold.opacity(0.3))
                 .frame(width: 6, height: 6)
             
             Capsule()
-                .fill(Color.luxuryGold)
+                .fill(Color.luxuryGoldDark)
                 .frame(width: 20, height: 6)
             
             Circle()
-                .fill(Color.luxuryMuted.opacity(0.4))
+                .fill(Color.luxuryGold.opacity(0.3))
                 .frame(width: 6, height: 6)
         }
         .padding(.vertical, 16)
@@ -438,6 +662,18 @@ struct DatePlanResultView: View {
                 
                 QuickActionButton(icon: "gift.fill", label: "Gifts") {
                     showGiftFinder = true
+                }
+                
+                QuickActionButton(icon: "fork.knife.circle", label: "Reserve") {
+                    let reservable = plan.stops.filter { isReservable($0) }
+                    if reservable.isEmpty {
+                        showNoReservableAlert = true
+                    } else if reservable.count == 1 {
+                        selectedVenue = reservable[0]
+                    } else {
+                        reservableStopsForPicker = reservable
+                        showReserveVenuePicker = true
+                    }
                 }
                 
                 QuickActionButton(icon: "camera.fill", label: "Photo") {
@@ -473,7 +709,7 @@ struct DatePlanResultView: View {
                 .disabled(isSaved)
             }
 
-            // Move to Past Magic — when plan is saved, user can mark date as done
+            // Move to Past Dates — when plan is saved, user can mark date as done
             if isSaved && coordinator.savedPlans.contains(where: { $0.id == plan.id }) {
                 Button {
                     coordinator.markPlanAsPast(plan)
@@ -482,7 +718,7 @@ struct DatePlanResultView: View {
                     HStack(spacing: 8) {
                         Image(systemName: "clock.arrow.circlepath")
                             .font(.system(size: 14))
-                        Text("We did this date — move to Past Magic")
+                        Text("We did this date — move to Past Dates")
                             .font(Font.inter(13, weight: .medium))
                     }
                     .foregroundColor(Color.luxuryGold.opacity(0.9))
@@ -518,67 +754,132 @@ struct DatePlanResultView: View {
     }
 }
 
+// MARK: - Travel Leg Row (between stops: mode icon + time + distance)
+struct TravelLegRow: View {
+    let travelMode: String?
+    let timeText: String
+    let distanceText: String?
+    var useDarkStyle: Bool = false
+    
+    private var accentColor: Color { useDarkStyle ? Color.luxuryGoldDark : Color.luxuryGold }
+    private var secondaryText: Color { useDarkStyle ? Color(hex: "5C4A3D") : Color.luxuryMuted }
+    
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: TravelModeIcon.sfSymbol(for: travelMode, inferFromTimeText: timeText))
+                .font(.system(size: 12))
+                .foregroundColor(accentColor)
+            Text(timeText)
+                .font(Font.inter(11, weight: .medium))
+                .foregroundColor(secondaryText)
+            if let dist = distanceText, !dist.isEmpty {
+                Text("·")
+                    .foregroundColor(secondaryText)
+                Text(dist)
+                    .font(Font.inter(11, weight: .regular))
+                    .foregroundColor(secondaryText)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background(accentColor.opacity(0.12))
+        .cornerRadius(8)
+        .padding(.leading, 56)
+        .padding(.bottom, 6)
+    }
+}
+
 // MARK: - Compact Stop Row
 struct CompactStopRow: View {
     let stop: DatePlanStop
     let isLast: Bool
+    var useDarkStyle: Bool = false
     var onTap: (() -> Void)?
     
+    @State private var hoursExpanded = false
+    
+    private var primaryText: Color { useDarkStyle ? Color(hex: "3D2C2C") : Color.luxuryCream }
+    private var secondaryText: Color { useDarkStyle ? Color(hex: "5C4A3D") : Color.luxuryMuted }
+    private var accentColor: Color { useDarkStyle ? Color.luxuryGoldDark : Color.luxuryGold }
+    private var linkColor: Color { useDarkStyle ? Color.luxuryGoldDark : Color.luxuryGoldLight }
+    
     var body: some View {
-        HStack(alignment: .top, spacing: 14) {
-            // Icon with line
+        HStack(alignment: .top, spacing: 12) {
             VStack(spacing: 0) {
                 ZStack {
                     Circle()
-                        .stroke(Color.luxuryGold.opacity(0.4), lineWidth: 1.5)
+                        .stroke(accentColor.opacity(0.4), lineWidth: 1.5)
                         .frame(width: 36, height: 36)
                     
                     Image(systemName: venueIcon)
                         .font(.system(size: 14))
-                        .foregroundColor(Color.luxuryGold)
+                        .foregroundColor(accentColor)
                 }
                 
                 if !isLast {
                     Rectangle()
-                        .fill(Color.luxuryGold.opacity(0.25))
+                        .fill(accentColor.opacity(0.25))
                         .frame(width: 1.5, height: 50)
                 }
             }
             
-            // Content
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 6) {
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 5) {
                     Text(stop.name)
                         .font(Font.playfair(16, weight: .semibold))
-                        .foregroundColor(Color.luxuryCream)
+                        .foregroundColor(primaryText)
                     
-                    // Verified badge
                     if stop.isVerified {
                         VerifiedBadge()
                     }
                 }
                 
-                HStack(spacing: 8) {
+                HStack(spacing: 6) {
                     HStack(spacing: 4) {
                         Image(systemName: "clock")
                             .font(.system(size: 10))
                         Text(stop.timeSlot)
                             .font(Font.inter(12, weight: .regular))
                     }
-                    .foregroundColor(Color.luxuryMuted)
+                    .foregroundColor(secondaryText)
                     
                     Text("·")
-                        .foregroundColor(Color.luxuryMuted)
+                        .foregroundColor(secondaryText)
                     
                     Text(stop.formattedAddress)
                         .font(Font.inter(12, weight: .regular))
-                        .foregroundColor(Color.luxuryMuted)
+                        .foregroundColor(secondaryText)
                         .lineLimit(1)
                 }
                 
-                // Phone & Website if verified
-                if stop.isVerified {
-                    HStack(spacing: 12) {
+                if let hours = stop.openingHours, !hours.isEmpty {
+                    Button {
+                        hoursExpanded.toggle()
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "clock")
+                                .font(.system(size: 9))
+                            Text("Hours")
+                                .font(Font.inter(10, weight: .medium))
+                            Image(systemName: hoursExpanded ? "chevron.up" : "chevron.down")
+                                .font(.system(size: 9, weight: .semibold))
+                        }
+                        .foregroundColor(secondaryText)
+                    }
+                    .buttonStyle(.plain)
+                    if hoursExpanded {
+                        VStack(alignment: .leading, spacing: 1) {
+                            ForEach(hours, id: \.self) { line in
+                                Text(line)
+                                    .font(Font.inter(10, weight: .regular))
+                                    .foregroundColor(secondaryText)
+                            }
+                        }
+                        .padding(.top, 2)
+                    }
+                }
+                if stop.phoneNumber != nil || (stop.websiteUrl != nil && !(stop.websiteUrl?.isEmpty ?? true)) {
+                    HStack(spacing: 10) {
                         if let phone = stop.phoneNumber {
                             HStack(spacing: 4) {
                                 Image(systemName: "phone.fill")
@@ -586,23 +887,23 @@ struct CompactStopRow: View {
                                 Text(phone)
                                     .font(Font.inter(10, weight: .regular))
                             }
-                            .foregroundColor(Color.luxuryGoldLight)
+                            .foregroundColor(linkColor)
                         }
-                        
-                        if stop.websiteUrl != nil {
-                            HStack(spacing: 4) {
-                                Image(systemName: "globe")
-                                    .font(.system(size: 9))
-                                Text("Website")
-                                    .font(Font.inter(10, weight: .regular))
+                        if let webUrl = stop.websiteUrl, let url = URL(string: webUrl) {
+                            Link(destination: url) {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "globe")
+                                        .font(.system(size: 9))
+                                    Text("Website")
+                                        .font(Font.inter(10, weight: .regular))
+                                }
+                                .foregroundColor(linkColor)
                             }
-                            .foregroundColor(Color.luxuryGoldLight)
                         }
                     }
                     .padding(.top, 2)
                 }
                 
-                // Special note (romanticTip as feature)
                 HStack(spacing: 4) {
                     Image(systemName: noteIcon)
                         .font(.system(size: 10))
@@ -610,7 +911,7 @@ struct CompactStopRow: View {
                         .font(Font.inter(11, weight: .medium))
                         .lineLimit(1)
                 }
-                .foregroundColor(Color.luxuryGold)
+                .foregroundColor(accentColor)
                 .padding(.top, 2)
             }
             .padding(.bottom, isLast ? 8 : 16)

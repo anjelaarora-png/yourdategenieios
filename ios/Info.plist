@@ -85,5 +85,9 @@
 	<!-- Calendar access for adding date plans -->
 	<key>NSCalendarsUsageDescription</key>
 	<string>Your Date Genie adds your chosen date plan to your calendar so you don't miss the adventure.</string>
+	
+	<!-- Photo Library: save love note as image to share -->
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Save your love note as a photo so you can share it with someone special.</string>
 </dict>
 </plist>

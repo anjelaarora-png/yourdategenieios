@@ -8,9 +8,9 @@ const corsHeaders = {
 const GATEWAY_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
 
 interface PlaylistRequest {
-  vibe: "romantic" | "upbeat" | "chill" | "adventurous" | "jazzy" | "indie" | "classic" | "rnb";
+  vibe: string;
   datePlanTitle: string;
-  stops: Array<{ name: string; venueType: string }>;
+  stops?: Array<{ name: string; venueType: string }>;
 }
 
 interface SongSuggestion {
@@ -63,15 +63,92 @@ const vibeConfig: Record<string, { description: string; artists: string[]; subge
     artists: ["SZA", "Brent Faiyaz", "Steve Lacy", "Ravyn Lenae", "Chlöe", "Kehlani", "6LACK", "Victoria Monét", "Kali Uchis", "Ari Lennox"],
     subgenres: ["contemporary R&B", "alternative R&B", "neo-soul", "trap soul"],
   },
+  // Global / other major genres (expandable in Music tab)
+  latin: {
+    description: "Latin pop, reggaeton, salsa, bachata, and Latin urban",
+    artists: ["Bad Bunny", "Karol G", "J Balvin", "Shakira", "Daddy Yankee", "Rosalía", "Rauw Alejandro", "Peso Pluma", "Camilo", "Marc Anthony"],
+    subgenres: ["reggaeton", "Latin pop", "bachata", "salsa", "Latin urban"],
+  },
+  afrobeats: {
+    description: "Afrobeats, Afropop, and West African fusion",
+    artists: ["Burna Boy", "Wizkid", "Davido", "Tems", "Rema", "Ayra Starr", "Asake", "Omah Lay", "Ckay", "Fireboy DML"],
+    subgenres: ["afrobeats", "afropop", "Afro-fusion", "highlife"],
+  },
+  kpop: {
+    description: "K-pop, K-R&B, and Korean pop",
+    artists: ["BTS", "BLACKPINK", "NewJeans", "Stray Kids", "SEVENTEEN", "aespa", "LE SSERAFIM", "IU", "TWICE", "ENHYPEN"],
+    subgenres: ["K-pop", "K-R&B", "K-hip-hop", "Korean ballads"],
+  },
+  reggae: {
+    description: "Reggae, dancehall, and Caribbean vibes",
+    artists: ["Bob Marley", "Burning Spear", "Chronixx", "Koffee", "Protoje", "Damian Marley", "Sean Paul", "Shaggy", "Skip Marley", "Lila Iké"],
+    subgenres: ["reggae", "dancehall", "reggae fusion", "lovers rock"],
+  },
+  country: {
+    description: "Country, Americana, and singer-songwriter",
+    artists: ["Chris Stapleton", "Luke Combs", "Morgan Wallen", "Kacey Musgraves", "Zach Bryan", "Maren Morris", "Brandi Carlile", "Jason Isbell", "Mickey Guyton", "Carly Pearce"],
+    subgenres: ["country", "Americana", "outlaw country", "country pop"],
+  },
+  metal: {
+    description: "Metal, rock, and heavy riffs",
+    artists: ["Metallica", "Foo Fighters", "Ghost", "Bring Me the Horizon", "Sleep Token", "Slipknot", "System of a Down", "Deftones", "Muse", "Royal Blood"],
+    subgenres: ["metal", "hard rock", "alternative metal", "metalcore"],
+  },
+  classical: {
+    description: "Classical, film scores, and orchestral",
+    artists: ["Ludovico Einaudi", "Yiruma", "Max Richter", "Ólafur Arnalds", "Hans Zimmer", "Joe Hisaishi", "Philip Glass", "Johann Johannsson", "Nils Frahm", "Alexandre Desplat"],
+    subgenres: ["classical", "film score", "modern classical", "piano"],
+  },
+  folk: {
+    description: "Folk, singer-songwriter, and acoustic",
+    artists: ["Noah Kahan", "Hozier", "Gregory Alan Isakov", "The Lumineers", "Mumford & Sons", "Iron & Wine", "Fleet Foxes", "Bon Iver", "José González", "Sufjan Stevens"],
+    subgenres: ["folk", "singer-songwriter", "indie folk", "Americana"],
+  },
+  hiphop: {
+    description: "Hip-hop, rap, and R&B-adjacent",
+    artists: ["Kendrick Lamar", "Drake", "J. Cole", "Travis Scott", "Tyler, the Creator", "Megan Thee Stallion", "Doja Cat", "Lil Nas X", "Cardi B", "Post Malone"],
+    subgenres: ["hip-hop", "rap", "trap", "melodic rap"],
+  },
+  electronic: {
+    description: "Electronic, EDM, house, and dance",
+    artists: ["Daft Punk", "Calvin Harris", "The Chemical Brothers", "Disclosure", "ODESZA", "Flume", "Porter Robinson", "Madeon", "Rüfüs Du Sol", "Fred again.."],
+    subgenres: ["electronic", "house", "EDM", "synth-pop"],
+  },
+  bollywood: {
+    description: "Bollywood, Indian film and pop, romantic and dance",
+    artists: ["Arijit Singh", "Shreya Ghoshal", "A.R. Rahman", "Pritam", "Amit Trivedi", "Neha Kakkar", "Badshah", "Diljit Dosanjh", "A.R. Rahman", "Sonu Nigam"],
+    subgenres: ["Bollywood", "Indian pop", "filmi", "Indi-pop"],
+  },
+  arabic: {
+    description: "Arabic pop, Middle Eastern, romantic and dance",
+    artists: ["Amr Diab", "Nancy Ajram", "Khaled", "Fairuz", "Maher Zain", "Elissa", "Tamer Hosny", "Ragheb Alama", "Haifa Wehbe", "Mohamed Ramadan"],
+    subgenres: ["Arabic pop", "Middle Eastern", "Khaleeji", "Egyptian pop"],
+  },
+  jpop: {
+    description: "J-Pop, Japanese pop and ballads",
+    artists: ["Kenshi Yonezu", "Official HIGE DANDism", "Gen Hoshino", "Yoasobi", "Ado", "LiSA", "Aimer", "Fujii Kaze", "Back Number", "Mrs. Green Apple"],
+    subgenres: ["J-Pop", "J-rock", "Japanese ballads", "anison"],
+  },
+  rock: {
+    description: "Rock, alternative rock, and anthems",
+    artists: ["Foo Fighters", "Coldplay", "Imagine Dragons", "The Killers", "Arctic Monkeys", "Muse", "Queen", "Led Zeppelin", "Guns N' Roses", "Red Hot Chili Peppers"],
+    subgenres: ["rock", "alternative", "indie rock", "classic rock"],
+  },
+  blues: {
+    description: "Blues, soul, and roots",
+    artists: ["B.B. King", "Stevie Ray Vaughan", "Etta James", "Aretha Franklin", "Gary Clark Jr.", "Buddy Guy", "John Mayer", "The Black Keys", "Tedeschi Trucks Band", "Christone Kingfish Ingram"],
+    subgenres: ["blues", "soul", "blues rock", "roots"],
+  },
 };
 
 async function generateSongSuggestions(
   apiKey: string,
   request: PlaylistRequest
 ): Promise<SongSuggestion[]> {
-  const venueContext = request.stops
-    .map((s) => `${s.name} (${s.venueType})`)
-    .join(", ");
+  const stops = request.stops ?? [];
+  const venueContext = stops.length > 0
+    ? stops.map((s) => `${s.name} (${s.venueType})`).join(", ")
+    : "general listening";
 
   const config = vibeConfig[request.vibe] || vibeConfig.romantic;
   const currentYear = new Date().getFullYear();
@@ -80,7 +157,7 @@ async function generateSongSuggestions(
 
 DATE CONTEXT:
 - Event: "${request.datePlanTitle}"
-- Venues: ${venueContext}
+- Venues/context: ${venueContext}
 - Desired vibe: ${config.description}
 
 REQUIREMENTS:
@@ -166,9 +243,9 @@ serve(async (req) => {
 
     const { vibe, datePlanTitle, stops } = (await req.json()) as PlaylistRequest;
 
-    if (!vibe || !datePlanTitle || !stops?.length) {
+    if (!vibe || !datePlanTitle) {
       return new Response(
-        JSON.stringify({ error: "Missing required fields" }),
+        JSON.stringify({ error: "Missing required fields: vibe, datePlanTitle" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -176,7 +253,7 @@ serve(async (req) => {
     const songs = await generateSongSuggestions(apiKey, {
       vibe,
       datePlanTitle,
-      stops,
+      stops: stops ?? [],
     });
 
     const playlistName = `Date Night: ${datePlanTitle}`;

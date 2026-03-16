@@ -38,7 +38,7 @@ const exportUsersToCSV = (users: UserStat[], preferences: Record<string, UserPre
       prefs?.budget_range || '',
       prefs?.energy_level || '',
       prefs?.food_preferences?.join('; ') || '',
-      prefs?.drink_preferences || '',
+      (Array.isArray(prefs?.drink_preferences) ? prefs.drink_preferences.join('; ') : prefs?.drink_preferences) || '',
       prefs?.dietary_restrictions?.join('; ') || '',
       prefs?.allergies?.join('; ') || '',
       prefs?.deal_breakers?.join('; ') || '',
@@ -343,8 +343,8 @@ export default function Admin() {
                                     {userPreferences[user.user_id].food_preferences?.length ? (
                                       <p>🍽️ Food: {userPreferences[user.user_id].food_preferences?.join(', ')}</p>
                                     ) : null}
-                                    {userPreferences[user.user_id].drink_preferences && (
-                                      <p>🍷 Drinks: {userPreferences[user.user_id].drink_preferences}</p>
+                                    {(userPreferences[user.user_id].drink_preferences?.length ?? 0) > 0 && (
+                                      <p>🍷 Drinks: {userPreferences[user.user_id].drink_preferences?.join(', ')}</p>
                                     )}
                                     {userPreferences[user.user_id].dietary_restrictions?.length ? (
                                       <p>🥗 Dietary: {userPreferences[user.user_id].dietary_restrictions?.join(', ')}</p>

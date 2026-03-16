@@ -7,6 +7,8 @@ struct AuthenticationView: View {
     @StateObject private var profileManager = UserProfileManager.shared
     @FocusState private var focusedField: AuthInputField?
     @State private var showResetPasswordSheet = false
+    /// When set, show an X to dismiss (skip login on initial screen, or close auth-required sheet).
+    var onDismiss: (() -> Void)? = nil
     
     var body: some View {
         ZStack {
@@ -19,28 +21,32 @@ struct AuthenticationView: View {
             
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 0) {
-                    authHeader
-                    
-                    authModeToggle
-                        .padding(.top, 24)
-                    
-                    if viewModel.isSignUp {
-                        signUpForm
+                    if profileManager.pendingEmailConfirmation {
+                        confirmEmailSection
                     } else {
-                        signInForm
-                    }
-                    
-                    authButton
-                        .padding(.top, 24)
-                    
-                    if !viewModel.isSignUp {
-                        forgotPasswordButton
-                            .padding(.top, 12)
-                    }
-                    
-                    if viewModel.isSignUp {
-                        signUpBenefits
-                            .padding(.top, 32)
+                        authHeader
+                        
+                        authModeToggle
+                            .padding(.top, 24)
+                        
+                        if viewModel.isSignUp {
+                            signUpForm
+                        } else {
+                            signInForm
+                        }
+                        
+                        authButton
+                            .padding(.top, 24)
+                        
+                        if !viewModel.isSignUp {
+                            forgotPasswordButton
+                                .padding(.top, 12)
+                        }
+                        
+                        if viewModel.isSignUp {
+                            signUpBenefits
+                                .padding(.top, 32)
+                        }
                     }
                     
                     Spacer(minLength: 100)
@@ -60,6 +66,26 @@ struct AuthenticationView: View {
             
             if viewModel.isLoading {
                 loadingOverlay
+            }
+            
+            if let onDismiss = onDismiss {
+                VStack {
+                    HStack {
+                        Spacer()
+                        Button {
+                            onDismiss()
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 28))
+                                .foregroundStyle(Color.luxuryGold.opacity(0.9))
+                                .symbolRenderingMode(.hierarchical)
+                        }
+                        .padding(.top, 56)
+                        .padding(.trailing, 20)
+                    }
+                    Spacer()
+                }
+                .allowsHitTesting(true)
             }
         }
         .toolbar {
@@ -126,6 +152,46 @@ struct AuthenticationView: View {
         }
     }
     
+    private var confirmEmailSection: some View {
+        VStack(spacing: 24) {
+            Image("Logo")
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(width: 100, height: 100)
+                .shadow(color: Color.luxuryGold.opacity(0.3), radius: 16)
+                .padding(.top, 60)
+            
+            Text("Confirm your email")
+                .font(Font.tangerine(32, weight: .bold))
+                .italic()
+                .foregroundColor(Color.luxuryGold)
+            
+            Text("We sent a confirmation link to \(profileManager.pendingConfirmationEmail ?? viewModel.email). Open the link in that email to verify your account, then tap Continue below to sign in.")
+                .font(Font.bodySans(15, weight: .regular))
+                .foregroundColor(Color.luxuryCreamMuted)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+            
+            Button {
+                performSignIn()
+            } label: {
+                Text("Continue to sign in")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(LuxuryGoldButtonStyle())
+            .padding(.top, 16)
+            
+            Button {
+                profileManager.clearPendingEmailConfirmation()
+            } label: {
+                Text("Use a different email")
+                    .font(Font.bodySans(14, weight: .medium))
+                    .foregroundColor(Color.luxuryMuted)
+            }
+            .padding(.top, 12)
+        }
+    }
+    
     private var authHeader: some View {
         VStack(spacing: 16) {
             Image("Logo")
@@ -134,9 +200,10 @@ struct AuthenticationView: View {
                 .frame(width: 120, height: 120)
                 .shadow(color: Color.luxuryGold.opacity(0.3), radius: 20)
             
-            Text(viewModel.isSignUp ? "Create your account" : "Welcome back")
-                .font(Font.header(22, weight: .regular))
-                .foregroundColor(Color.luxuryCream)
+            Text(viewModel.isSignUp ? "Create Your Account" : "Welcome Back")
+                .font(Font.tangerine(36, weight: .bold))
+                .italic()
+                .foregroundColor(Color.luxuryGold)
             
             Text(viewModel.isSignUp ? "Start planning unforgettable dates" : "Sign in to continue your journey")
                 .font(Font.bodySans(15, weight: .regular))

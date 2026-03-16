@@ -1,55 +1,32 @@
 import SwiftUI
 
-// MARK: - Luxury Quick Tile
+// MARK: - Luxury Quick Tile (tab-bar style: icon + label, matches bottom pane)
 struct LuxuryQuickTile: View {
     let icon: String
     let title: String
     let color: Color
     let action: () -> Void
-    var imageUrl: String? = nil
-    
-    private var defaultImageUrl: String {
-        switch icon {
-        case "gift.fill": return "https://images.unsplash.com/photo-1549465220-1a8b9238cd48?w=120&h=120&fit=crop"
-        case "photo.stack.fill": return "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=120&h=120&fit=crop"
-        case "bookmark.fill": return "https://images.unsplash.com/photo-1529333166437-7750a6dd5a70?w=120&h=120&fit=crop"
-        case "clock.fill": return "https://images.unsplash.com/photo-1501139083538-0139583c060f?w=120&h=120&fit=crop"
-        case "music.note.list": return "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=120&h=120&fit=crop"
-        case "bubble.left.and.bubble.right.fill": return "https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=120&h=120&fit=crop"
-        default: return "https://images.unsplash.com/photo-1529333166437-7750a6dd5a70?w=120&h=120&fit=crop"
-        }
-    }
     
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 12) {
-                AsyncImage(url: URL(string: imageUrl ?? defaultImageUrl)) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                    case .empty, .failure:
-                        Image(systemName: icon)
-                            .font(.system(size: 24))
-                            .foregroundColor(color)
-                    @unknown default:
-                        EmptyView()
-                    }
+            VStack(spacing: 6) {
+                ZStack {
+                    Circle()
+                        .fill(color.opacity(0.2))
+                        .frame(width: 52, height: 52)
+                    Image(systemName: icon)
+                        .font(.system(size: 22))
+                        .foregroundColor(color)
                 }
-                .frame(width: 56, height: 56)
-                .clipShape(RoundedRectangle(cornerRadius: 16))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16)
-                        .stroke(color.opacity(0.3), lineWidth: 1)
-                )
-                
                 Text(title)
-                    .font(Font.bodySans(12, weight: .medium))
+                    .font(Font.bodySans(11, weight: .medium))
                     .foregroundColor(Color.luxuryCream)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.center)
             }
-            .frame(width: 80)
+            .frame(width: 72)
         }
+        .buttonStyle(.plain)
     }
 }
 
@@ -70,7 +47,7 @@ struct LuxurySavedPlanCard: View {
                 
                 VStack(alignment: .leading, spacing: 6) {
                     Text(plan.title)
-                        .font(Font.header(15, weight: .bold))
+                        .font(Font.bodySans(14, weight: .semibold))
                         .foregroundColor(Color.luxuryCream)
                         .lineLimit(1)
                     
@@ -91,6 +68,7 @@ struct LuxuryFeatureTile: View {
     let icon: String
     let title: String
     let subtitle: String
+    var action: (() -> Void)? = nil
     
     private var imageUrl: String {
         switch icon {
@@ -98,11 +76,12 @@ struct LuxuryFeatureTile: View {
         case "map.fill": return "https://images.unsplash.com/photo-1524661135-423995f22d0b?w=100&h=100&fit=crop"
         case "music.note": return "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=100&h=100&fit=crop"
         case "heart.circle.fill": return "https://images.unsplash.com/photo-1518199266791-5375a83190b7?w=100&h=100&fit=crop"
+        case "sparkles": return "https://images.unsplash.com/photo-1529634806980-85c3dd6d34ac?w=100&h=100&fit=crop"
         default: return "https://images.unsplash.com/photo-1529333166437-7750a6dd5a70?w=100&h=100&fit=crop"
         }
     }
     
-    var body: some View {
+    private var tileContent: some View {
         HStack(spacing: 14) {
             AsyncImage(url: URL(string: imageUrl)) { phase in
                 switch phase {
@@ -139,5 +118,62 @@ struct LuxuryFeatureTile: View {
         }
         .padding(16)
         .luxuryCard(hasBorder: false)
+    }
+    
+    @ViewBuilder
+    var body: some View {
+        if let action = action {
+            Button(action: action) {
+                tileContent
+            }
+            .buttonStyle(.plain)
+        } else {
+            tileContent
+        }
+    }
+}
+
+// MARK: - Love Letter Itinerary Background
+/// Paper/parchment-style background for date plan itinerary (matches LoveLetterCardView aesthetic).
+struct LoveLetterItineraryBackground<Content: View>: View {
+    let content: Content
+    var cornerRadius: CGFloat = 24
+    
+    init(cornerRadius: CGFloat = 24, @ViewBuilder content: () -> Content) {
+        self.cornerRadius = cornerRadius
+        self.content = content()
+    }
+    
+    var body: some View {
+        content
+            .background(
+                RoundedRectangle(cornerRadius: cornerRadius)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color(hex: "FDF8F0"),
+                                Color(hex: "F5EDE0"),
+                                Color(hex: "F0E6D8")
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerRadius)
+                    .stroke(
+                        LinearGradient(
+                            colors: [
+                                Color.luxuryGold.opacity(0.6),
+                                Color.luxuryGold.opacity(0.2)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 2
+                    )
+            )
+            .shadow(color: Color.black.opacity(0.15), radius: 20, y: 8)
     }
 }

@@ -21,7 +21,7 @@ export interface UserPreferenceSummary {
   budget_range: string | null;
   energy_level: string | null;
   food_preferences: string[] | null;
-  drink_preferences: string | null;
+  drink_preferences: string[] | null;
   dietary_restrictions: string[] | null;
   allergies: string[] | null;
   deal_breakers: string[] | null;
