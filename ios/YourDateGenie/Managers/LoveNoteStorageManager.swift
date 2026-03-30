@@ -83,6 +83,7 @@ final class LoveNoteStorageManager: ObservableObject {
     private func save() {
         guard let data = try? JSONEncoder().encode(savedNotes) else { return }
         UserDefaults.standard.set(data, forKey: key)
+        UserIosContentSync.schedulePushIfLoggedIn()
     }
 
     func add(message: String, signOffName: String? = nil) {
@@ -95,6 +96,15 @@ final class LoveNoteStorageManager: ObservableObject {
         savedNotes.removeAll { $0.id == id }
         save()
     }
+
+    func replaceFromCloud(_ notes: [SavedLoveNote]) {
+        savedNotes = notes.sorted { $0.createdAt > $1.createdAt }
+        if let data = try? JSONEncoder().encode(savedNotes) {
+            UserDefaults.standard.set(data, forKey: key)
+        }
+    }
+
+    func exportNotes() -> [SavedLoveNote] { savedNotes }
 
     // MARK: - Draft (auto-save)
 

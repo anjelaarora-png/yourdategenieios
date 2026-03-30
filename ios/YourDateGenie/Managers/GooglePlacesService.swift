@@ -288,18 +288,24 @@ class GooglePlacesService {
         return parsePlaceResult(from: firstResult)
     }
     
-    /// Map ExploreCategory id to Google Places text search terms for trending in city.
+    /// Map ExploreCategory id to Google Places text search terms. Each category gets distinct terms so results match the chip.
     private static func trendingQueryTerms(for categoryId: String?) -> String {
         switch categoryId {
-        case "restaurants": return "restaurant"
-        case "cafes": return "cafe coffee"
-        case "bars": return "bar lounge"
-        case "romantic": return "romantic restaurant"
-        case "date_night", nil: return "restaurant bar romantic date night"
-        case "outdoor": return "parks outdoor activities"
+        case "restaurants": return "restaurant dining"
+        case "cafes": return "cafe coffee shop"
+        case "bars": return "bar lounge cocktails"
+        case "romantic": return "romantic restaurant dinner"
+        case "date_night", nil: return "date night restaurant bar"
+        case "brunch": return "brunch breakfast"
+        case "wine": return "wine bar vineyard winery"
+        case "outdoor": return "parks outdoor activities nature"
         case "arts": return "museum art gallery"
         case "nightlife": return "nightclub nightlife"
-        default: return "restaurant bar romantic date night"
+        case "live_music": return "live music venue jazz club concert"
+        case "bakeries": return "bakery dessert pastry"
+        case "rooftop": return "rooftop bar restaurant"
+        case "spa": return "spa wellness massage"
+        default: return "restaurant bar date night"
         }
     }
     
@@ -344,12 +350,137 @@ class GooglePlacesService {
         }
         
         var places: [PlaceSearchResult] = []
-        for result in results.prefix(limit) {
+        for result in results {
             if let place = parsePlaceResult(from: result) {
                 places.append(place)
             }
         }
-        return places
+        // Sort by rating then review count so we surface the best places; then take exactly `limit` (e.g. 6 for Home)
+        let sorted = places.sorted { a, b in
+            let ratingA = a.rating ?? 0
+            let ratingB = b.rating ?? 0
+            if ratingA != ratingB { return ratingA > ratingB }
+            return (a.userRatingsTotal ?? 0) > (b.userRatingsTotal ?? 0)
+        }
+        return Array(sorted.prefix(limit))
+    }
+    
+    /// Result of a single page of trending places (for "Generate more" pagination).
+    struct TrendingPlacesPage {
+        let places: [PlaceSearchResult]
+        let nextPageToken: String?
+    }
+    
+    /// Fetch one page of trending places. Pass `pageToken` from a previous response to get the next page (up to 20 more; API max 60 total).
+    /// When `pageToken` is nil, runs a new search; when non-nil, requests only with the token (other params ignored by API).
+    func fetchTrendingPlacesPage(city: String, categoryId: String?, pageToken: String?) async throws -> TrendingPlacesPage {
+        let trimmed = city.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard Config.isGooglePlacesConfigured else { return TrendingPlacesPage(places: [], nextPageToken: nil) }
+        
+        let urlString: String
+        if let token = pageToken, !token.isEmpty {
+            // Next page: only pagetoken and key (API ignores other params). Token may need a short delay after first response.
+            guard let encoded = token.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) else {
+                return TrendingPlacesPage(places: [], nextPageToken: nil)
+            }
+            urlString = "\(Config.googlePlacesEndpoint)/textsearch/json?pagetoken=\(encoded)&key=\(Config.googlePlacesAPIKey)"
+        } else {
+            guard !trimmed.isEmpty else { return TrendingPlacesPage(places: [], nextPageToken: nil) }
+            var locationBias: (lat: Double, lon: Double)?
+            if let geo = try? await geocodeAddress(trimmed) {
+                locationBias = (geo.latitude, geo.longitude)
+            }
+            let queryTerms = Self.trendingQueryTerms(for: categoryId)
+            let query = "\(queryTerms) \(trimmed)"
+            guard let encodedQuery = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) else {
+                return TrendingPlacesPage(places: [], nextPageToken: nil)
+            }
+            var base = "\(Config.googlePlacesEndpoint)/textsearch/json?query=\(encodedQuery)"
+            if let bias = locationBias {
+                base += "&location=\(bias.lat),\(bias.lon)&radius=25000"
+            }
+            urlString = "\(base)&key=\(Config.googlePlacesAPIKey)"
+        }
+        
+        guard let url = URL(string: urlString) else { return TrendingPlacesPage(places: [], nextPageToken: nil) }
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 12
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            return TrendingPlacesPage(places: [], nextPageToken: nil)
+        }
+        
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let results = json["results"] as? [[String: Any]] else {
+            return TrendingPlacesPage(places: [], nextPageToken: nil)
+        }
+        
+        var places: [PlaceSearchResult] = []
+        for result in results {
+            if let place = parsePlaceResult(from: result) {
+                places.append(place)
+            }
+        }
+        let sorted = places.sorted { a, b in
+            let ratingA = a.rating ?? 0
+            let ratingB = b.rating ?? 0
+            if ratingA != ratingB { return ratingA > ratingB }
+            return (a.userRatingsTotal ?? 0) > (b.userRatingsTotal ?? 0)
+        }
+        let nextToken = json["next_page_token"] as? String
+        return TrendingPlacesPage(places: sorted, nextPageToken: nextToken)
+    }
+    
+    /// Fetch recommended mix: highly rated restaurants + things to do (arts, outdoor, romantic) for "Recommended in your area" and Explore tab.
+    /// Merges results, sorts by rating then review count, returns top `limit` (default 6).
+    func fetchRecommendedInCity(city: String, limit: Int = 6) async throws -> [PlaceSearchResult] {
+        let trimmed = city.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, Config.isGooglePlacesConfigured else { return [] }
+        
+        let restaurants = (try? await fetchTrendingPlacesInCity(city: trimmed, categoryId: "restaurants", limit: 8)) ?? []
+        let arts = (try? await fetchTrendingPlacesInCity(city: trimmed, categoryId: "arts", limit: 4)) ?? []
+        let outdoor = (try? await fetchTrendingPlacesInCity(city: trimmed, categoryId: "outdoor", limit: 4)) ?? []
+        let romantic = (try? await fetchTrendingPlacesInCity(city: trimmed, categoryId: "romantic", limit: 4)) ?? []
+        
+        var combined = restaurants
+        var seen = Set(combined.map(\.placeId))
+        for place in arts + outdoor + romantic {
+            if seen.insert(place.placeId).inserted { combined.append(place) }
+        }
+        
+        let sorted = combined.sorted { a, b in
+            let ratingA = a.rating ?? 0
+            let ratingB = b.rating ?? 0
+            if ratingA != ratingB { return ratingA > ratingB }
+            return (a.userRatingsTotal ?? 0) > (b.userRatingsTotal ?? 0)
+        }
+        return Array(sorted.prefix(limit))
+    }
+    
+    /// "All" category: mix of restaurants + things to do, 4–5 star, trending. Returns at least 10 when possible (no pagination).
+    func fetchTrendingPlacesAllCategory(city: String, minCount: Int = 10) async throws -> TrendingPlacesPage {
+        let trimmed = city.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, Config.isGooglePlacesConfigured else { return TrendingPlacesPage(places: [], nextPageToken: nil) }
+        // Fetch more from each category so we have a strong mix of 4+ star places
+        let restaurants = (try? await fetchTrendingPlacesInCity(city: trimmed, categoryId: "restaurants", limit: 10)) ?? []
+        let arts = (try? await fetchTrendingPlacesInCity(city: trimmed, categoryId: "arts", limit: 6)) ?? []
+        let outdoor = (try? await fetchTrendingPlacesInCity(city: trimmed, categoryId: "outdoor", limit: 6)) ?? []
+        let romantic = (try? await fetchTrendingPlacesInCity(city: trimmed, categoryId: "romantic", limit: 6)) ?? []
+        var combined = restaurants
+        var seen = Set(combined.map(\.placeId))
+        for place in arts + outdoor + romantic {
+            if seen.insert(place.placeId).inserted { combined.append(place) }
+        }
+        let sorted = combined.sorted { a, b in
+            let ratingA = a.rating ?? 0
+            let ratingB = b.rating ?? 0
+            if ratingA != ratingB { return ratingA > ratingB }
+            return (a.userRatingsTotal ?? 0) > (b.userRatingsTotal ?? 0)
+        }
+        let fourPlusStar = sorted.filter { ($0.rating ?? 0) >= 4.0 }
+        let result = fourPlusStar.count >= minCount ? fourPlusStar : sorted
+        return TrendingPlacesPage(places: Array(result.prefix(20)), nextPageToken: nil)
     }
     
     /// Heuristic: address contains city name (or known variation) or place is within maxDistanceKm of city center. Reject e.g. Spain when user asked Chennai.

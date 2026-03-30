@@ -118,8 +118,8 @@ struct LuxuryMainAppView: View {
             }
         case .giftFinder(let datePlan, let dateLocation):
             GiftFinderView(datePlan: datePlan, dateLocation: dateLocation)
-        case .playlist(let title):
-            PlaylistWidgetView(planTitle: title)
+        case .playlist(let title, let planId):
+            PlaylistWidgetView(planTitle: title, planId: planId)
         case .reservation(let name, let type, let address, let phone, let bookingUrl, let websiteUrl, let openingHours):
             ReservationWidgetView(
                 venueName: name,
@@ -198,8 +198,11 @@ struct LuxuryMainAppView: View {
                 PartnerPlanningSheetView()
                     .environmentObject(coordinator)
             }
+        case .partnerJoin(let sessionId, let inviterName):
+            PartnerJoinView(sessionId: sessionId, inviterName: inviterName)
+                .environmentObject(coordinator)
         case .authRequired:
-            AuthenticationView(onDismiss: { coordinator.dismissAuthRequiredSheet() })
+            AuthenticationView(onDismiss: { coordinator.dismissAuthRequiredSheet() }, allowSkipToExplore: false)
                 .environmentObject(coordinator)
         }
     }

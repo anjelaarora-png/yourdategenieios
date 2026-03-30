@@ -5,9 +5,19 @@ import Foundation
 // See Secrets.xcconfig.example for setup instructions.
 
 struct Config {
+    /// Resolves a build setting from Info.plist. Empty if missing, blank, unsubstituted `$(VAR)`, or obvious placeholder.
+    private static func resolvedPlistString(key: String, placeholderSuffix: String? = nil) -> String {
+        let raw = Bundle.main.infoDictionary?[key] as? String ?? ""
+        let t = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        if t.isEmpty { return "" }
+        if t.hasPrefix("$(") { return "" }
+        if let suffix = placeholderSuffix, t.hasSuffix(suffix), t.contains("your_") { return "" }
+        return t
+    }
+    
     // MARK: - OpenAI API
     static let openAIAPIKey: String = {
-        Bundle.main.infoDictionary?["OPENAI_API_KEY"] as? String ?? ""
+        resolvedPlistString(key: "OPENAI_API_KEY", placeholderSuffix: "_here")
     }()
     static let openAIAPIEndpoint = "https://api.openai.com/v1/chat/completions"
     static let openAIModel = "gpt-4o"
@@ -16,7 +26,12 @@ struct Config {
     /// Same key is used for: Places API (autocomplete, place details) and Geocoding API.
     /// In Google Cloud Console enable: Places API, Geocoding API.
     static let googlePlacesAPIKey: String = {
-        Bundle.main.infoDictionary?["GOOGLE_PLACES_API_KEY"] as? String ?? ""
+        let env = ProcessInfo.processInfo.environment["GOOGLE_PLACES_API_KEY"]?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if !env.isEmpty, !env.hasPrefix("$("), env != "your_google_places_api_key_here" {
+            return env
+        }
+        return resolvedPlistString(key: "GOOGLE_PLACES_API_KEY", placeholderSuffix: "_here")
     }()
     static let googlePlacesEndpoint = "https://maps.googleapis.com/maps/api/place"
     

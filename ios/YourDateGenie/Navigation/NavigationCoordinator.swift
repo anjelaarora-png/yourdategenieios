@@ -10,7 +10,7 @@ enum AppDestination: Hashable {
     case giftFinder(datePlan: DatePlan?, dateLocation: String?)
     case routeMap(stops: [DatePlanStop])
     case memoryGallery
-    case playlist(planTitle: String)
+    case playlist(planTitle: String, planId: UUID? = nil)
     case reservation(venueName: String, venueType: String, address: String?, phone: String?)
     case partnerShare(plan: DatePlan)
     case savedPlans
@@ -25,7 +25,7 @@ enum AppDestination: Hashable {
         case .giftFinder(let plan, _): hasher.combine("giftFinder-\(plan?.id.uuidString ?? "standalone")")
         case .routeMap: hasher.combine("routeMap")
         case .memoryGallery: hasher.combine("memoryGallery")
-        case .playlist(let title): hasher.combine("playlist-\(title)")
+        case .playlist(let title, let planId): hasher.combine("playlist-\(title)-\(planId?.uuidString ?? "")")
         case .reservation(let name, _, _, _): hasher.combine("reservation-\(name)")
         case .partnerShare(let plan): hasher.combine("share-\(plan.id)")
         case .savedPlans: hasher.combine("savedPlans")
@@ -77,6 +77,27 @@ class NavigationCoordinator: ObservableObject {
     
     /// When non-nil, the current date plan result is from partner (merged) flow; show "Made for A & B" badge. Cleared when showing non-partner result.
     @Published var currentPlanPartnerNames: (String, String)?
+
+    /// When app opens via partner/join deep link, holds session id and optional inviter name for PartnerJoinView.
+    @Published var pendingPartnerJoinSessionId: String?
+    @Published var pendingPartnerJoinInviterName: String?
+
+    /// After partner merge generation, the backend row ids of the 3 plans (for submitting inviter rank).
+    @Published var partnerSessionPlanRowIds: [UUID]?
+
+    /// When questionnaire is opened from PartnerJoinView (partner has no prefs), on complete we submit to this session and dismiss.
+    @Published var partnerJoinSessionId: String?
+
+    /// After onboarding, open auth on Sign Up tab once (then cleared).
+    @Published var preferSignUpTabOnNextAuth: Bool = false
+
+    /// After email-confirm deep link with session, show hero once before initial preferences questionnaire.
+    @Published var presentHeroBeforeInitialPreferences: Bool = false
+
+    /// True while root shows full-screen questionnaire for first-time preferences (replaces PreferencesSetupView).
+    @Published var isPresentingInitialPreferencesFlow: Bool = false
+    /// User chose "finish later" on initial preferences; allow main tabs without completing the questionnaire.
+    @Published var hasDeferredInitialPreferences: Bool = false
     
     private var cancellables = Set<AnyCancellable>()
     
@@ -91,9 +112,9 @@ class NavigationCoordinator: ObservableObject {
         var tabBarTitle: String {
             switch self {
             case .home: return "Home"
-            case .loveNote: return "Love"
+            case .loveNote: return "Love Notes"
             case .gifts: return "Gifts"
-            case .memories: return "Photos"
+            case .memories: return "Memories"
             case .profile: return "Profile"
             }
         }
@@ -114,7 +135,7 @@ class NavigationCoordinator: ObservableObject {
         case datePlanResult
         case datePlanOptions
         case giftFinder(datePlan: DatePlan?, dateLocation: String?)
-        case playlist(planTitle: String)
+        case playlist(planTitle: String, planId: UUID? = nil)
         case reservation(venueName: String, venueType: String, address: String?, phone: String?, bookingUrl: String?, websiteUrl: String?, openingHours: [String]?)
         case partnerShare(plan: DatePlan)
         case routeMap(stops: [DatePlanStop], startingPoint: StartingPoint?, showRouteLine: Bool = true)
@@ -126,6 +147,7 @@ class NavigationCoordinator: ObservableObject {
         case explore
         case playbook
         case partnerPlanning
+        case partnerJoin(sessionId: String, inviterName: String?)
         case authRequired(PlanIntent)
 
         var id: String {
@@ -134,7 +156,7 @@ class NavigationCoordinator: ObservableObject {
             case .datePlanResult: return "datePlanResult"
             case .datePlanOptions: return "datePlanOptions"
             case .giftFinder: return "giftFinder"
-            case .playlist: return "playlist"
+            case .playlist(_, _): return "playlist"
             case .reservation(_, _, _, _, _, _, _): return "reservation"
             case .partnerShare: return "partnerShare"
             case .routeMap: return "routeMap"
@@ -146,11 +168,73 @@ class NavigationCoordinator: ObservableObject {
             case .explore: return "explore"
             case .playbook: return "playbook"
             case .partnerPlanning: return "partnerPlanning"
+            case .partnerJoin(let sessionId, _): return "partnerJoin-\(sessionId)"
             case .authRequired(let intent): return "authRequired-\(intent)"
             }
         }
     }
-    
+
+    /// Present partner join sheet (e.g. from deep link yourdategenie://partner/join?session=XXX).
+    func showPartnerJoin(sessionId: String, inviterName: String?) {
+        pendingPartnerJoinSessionId = sessionId
+        pendingPartnerJoinInviterName = inviterName
+        activeSheet = .partnerJoin(sessionId: sessionId, inviterName: inviterName)
+    }
+
+    /// When polling detects partner_data: merge, generate 3 plans, save to backend, then present DatePlanOptions (no interstitial).
+    func partnerDataReceivedMergeAndGenerate() {
+        guard let merged = PartnerSessionManager.shared.mergedQuestionnaireData(),
+              let sessionId = PartnerSessionManager.shared.sessionId else { return }
+        let inviterName = PartnerSessionManager.shared.inviteInfo?.partnerName.trimmingCharacters(in: .whitespaces)
+            ?? PartnerSessionManager.shared.inviterName ?? "You"
+        isRegeneratingFromOptions = true
+        activeSheet = nil
+        Task {
+            do {
+                let generator = DatePlanGeneratorService.shared
+                let plans = try await generator.generateDatePlan(from: merged)
+                let session = try await SupabaseService.shared.getPartnerSession(sessionId: sessionId)
+                var planRowIds: [UUID]?
+                if let rowId = session?.id {
+                    let saved = try await SupabaseService.shared.savePartnerSessionPlans(partnerSessionId: rowId, plans: plans)
+                    planRowIds = saved.map(\.id)
+                }
+                await MainActor.run {
+                    generatedPlans = plans
+                    generatedPlansSelectedIndex = 0
+                    currentDatePlan = plans.first
+                    currentPlanPartnerNames = (inviterName, "Partner")
+                    partnerSessionPlanRowIds = planRowIds
+                    isRegeneratingFromOptions = false
+                    activeSheet = .datePlanOptions
+                }
+            } catch {
+                await MainActor.run {
+                    isRegeneratingFromOptions = false
+                }
+            }
+        }
+    }
+
+    /// Open a past Plan Together session: load saved plans and present DatePlanOptionsView (e.g. from Plan Together → Past list).
+    func showPastPartnerPlans(partnerSessionId: UUID, inviterName: String?) {
+        activeSheet = nil
+        Task {
+            do {
+                let planRows = try await SupabaseService.shared.getPartnerSessionPlans(partnerSessionId: partnerSessionId)
+                let plans = planRows.map(\.planJson)
+                await MainActor.run {
+                    generatedPlans = plans
+                    generatedPlansSelectedIndex = 0
+                    currentDatePlan = plans.first
+                    currentPlanPartnerNames = (inviterName ?? "You", "Partner")
+                    partnerSessionPlanRowIds = planRows.map(\.id)
+                    activeSheet = .datePlanOptions
+                }
+            } catch { }
+        }
+    }
+
     private init() {
         loadSavedState()
         setupGeneratorSubscription()
@@ -176,6 +260,9 @@ class NavigationCoordinator: ObservableObject {
                 guard let self = self else { return }
                 if self.hasCompletedPreferences != hasCompletedPreferences {
                     self.hasCompletedPreferences = hasCompletedPreferences
+                    if hasCompletedPreferences {
+                        self.hasDeferredInitialPreferences = false
+                    }
                     self.saveState()
                 }
             }
@@ -211,7 +298,7 @@ class NavigationCoordinator: ObservableObject {
     // MARK: - Navigation Actions
     
     func startDatePlanning() {
-        activeSheet = .questionnaire
+        startDatePlanning(mode: .fresh)
     }
     
     /// Intent for questionnaire: fresh (new), useLast (prefill from saved preferences), or resume (restore from stored progress).
@@ -287,8 +374,8 @@ class NavigationCoordinator: ObservableObject {
         activeSheet = .giftFinder(datePlan: datePlan, dateLocation: dateLocation)
     }
     
-    func showPlaylist(for planTitle: String) {
-        activeSheet = .playlist(planTitle: planTitle)
+    func showPlaylist(for planTitle: String, planId: UUID? = nil) {
+        activeSheet = .playlist(planTitle: planTitle, planId: planId)
     }
     
     func showReservation(venueName: String, venueType: String, address: String?, phone: String?, bookingUrl: String? = nil, websiteUrl: String? = nil, openingHours: [String]? = nil) {
@@ -352,15 +439,18 @@ class NavigationCoordinator: ObservableObject {
     
     func savePlan(_ plan: DatePlan) {
         removeFromExperiencesWaiting(planId: plan.id)
-        if !savedPlans.contains(where: { $0.id == plan.id }) {
-            var planToSave = plan
-            if let date = lastQuestionnaireScheduledDate {
-                planToSave.scheduledDate = date
-            }
-            savedPlans.append(planToSave)
-            saveState()
-            Task { await uploadPlanToCloud(planToSave, status: "planned") }
+        var planToSave = plan
+        if let date = lastQuestionnaireScheduledDate {
+            planToSave.scheduledDate = date
         }
+        if let idx = savedPlans.firstIndex(where: { $0.id == plan.id }) {
+            savedPlans[idx] = planToSave
+        } else {
+            savedPlans.append(planToSave)
+        }
+        saveState()
+        // Always sync to Supabase (retries first-time failures; RLS/JWT must succeed on each save).
+        Task { await uploadPlanToCloud(planToSave, status: "planned") }
         // Do not remove from generatedPlans here — keeps the options sheet on the same plan and avoids showing sample (e.g. NYC) when all three are saved. Cleared on sheet dismiss.
     }
     
@@ -428,7 +518,12 @@ class NavigationCoordinator: ObservableObject {
     
     func completeOnboarding() {
         hasCompletedOnboarding = true
+        preferSignUpTabOnNextAuth = true
         saveState()
+    }
+
+    func consumePreferSignUpTab() {
+        preferSignUpTabOnNextAuth = false
     }
 
     /// Re-read onboarding state from UserDefaults. Call when splash ends so we use current storage state (avoids stale value after reinstall).
@@ -448,8 +543,11 @@ class NavigationCoordinator: ObservableObject {
     func completeSignUp() {
         hasCompletedSignUp = true
         isLoggedIn = true
+        if !hasCompletedOnboarding {
+            hasCompletedOnboarding = true
+        }
         saveState()
-        
+
         if let intent = authRequiredForIntent {
             authRequiredForIntent = nil
             activeSheet = nil
@@ -479,16 +577,47 @@ class NavigationCoordinator: ObservableObject {
     func completeSignIn() {
         hasCompletedSignUp = true
         isLoggedIn = true
-        
+        if !hasCompletedOnboarding {
+            hasCompletedOnboarding = true
+        }
         if UserProfileManager.shared.hasCompletedPreferences {
             hasCompletedPreferences = true
+        }
+        if authRequiredForIntent != nil {
+            authRequiredForIntent = nil
+            activeSheet = nil
         }
         saveState()
     }
     
     func completePreferences() {
         hasCompletedPreferences = true
+        hasDeferredInitialPreferences = false
         saveState()
+    }
+    
+    /// Close initial preferences (hero or questionnaire) without saving; user can finish from Profile later.
+    func deferInitialPreferences() {
+        hasDeferredInitialPreferences = true
+        presentHeroBeforeInitialPreferences = false
+        isPresentingInitialPreferencesFlow = false
+        questionnairePreferencesOnly = false
+        saveState()
+    }
+
+    /// Call from post-email-confirm hero CTA: show full-screen preferences questionnaire at root.
+    func transitionFromHeroToInitialPreferences() {
+        presentHeroBeforeInitialPreferences = false
+        isPresentingInitialPreferencesFlow = true
+        planIntent = .fresh
+        questionnairePreferencesOnly = true
+    }
+
+    /// First-time prefs at root without hero (straight to questionnaire).
+    func startInitialPreferencesQuestionnaireAtRoot() {
+        isPresentingInitialPreferencesFlow = true
+        planIntent = .fresh
+        questionnairePreferencesOnly = true
     }
     
     func signOut() {
@@ -496,10 +625,28 @@ class NavigationCoordinator: ObservableObject {
         isLoggedIn = false
         hasCompletedSignUp = false
         hasCompletedPreferences = false
+        hasDeferredInitialPreferences = false
         currentDatePlan = nil
         savedPlans = []
         generatedPlans = []
         pastPlans = []
+        currentTab = .home
+        navigationPath = NavigationPath()
+        saveState()
+    }
+
+    /// Force-auth gate on next launch while preserving onboarding completion.
+    /// Used when product requires returning to login after app is closed and reopened.
+    func requireLoginOnLaunch() {
+        UserProfileManager.shared.signOut()
+        isLoggedIn = false
+        hasCompletedSignUp = false
+        hasCompletedPreferences = false
+        hasSkippedLogin = false
+        hasDeferredInitialPreferences = false
+        presentHeroBeforeInitialPreferences = false
+        isPresentingInitialPreferencesFlow = false
+        activeSheet = nil
         currentTab = .home
         navigationPath = NavigationPath()
         saveState()
@@ -510,6 +657,7 @@ class NavigationCoordinator: ObservableObject {
     private static let savedPlansKey = "dateGenie_savedPlans"
     private static let pastPlansKey = "dateGenie_pastPlans"
     private static let experiencesWaitingKey = "dateGenie_experiencesWaiting"
+    private static let deferredInitialPreferencesKey = "dateGenie_deferredInitialPreferences"
     
     private func loadSavedState() {
         hasCompletedOnboarding = UserDefaults.standard.bool(forKey: "hasCompletedOnboarding")
@@ -534,6 +682,18 @@ class NavigationCoordinator: ObservableObject {
         if let data = UserDefaults.standard.data(forKey: Self.experiencesWaitingKey),
            let plans = try? JSONDecoder().decode([DatePlan].self, from: data) {
             experiencesWaiting = plans
+        }
+        
+        hasDeferredInitialPreferences = UserDefaults.standard.bool(forKey: Self.deferredInitialPreferencesKey)
+        
+        // If there is no account session but prefs were never finished, do not skip onboarding just because
+        // UserDefaults survived an update — otherwise users can land on the questionnaire without auth.
+        // Skip this when keychain may still be restoring a session (async).
+        if !UserProfileManager.shared.isLoggedIn && !hasSkippedLogin && !hasCompletedPreferences && hasCompletedOnboarding,
+           !SupabaseService.shared.hasCachedSession() {
+            hasCompletedOnboarding = false
+            UserDefaults.standard.set(false, forKey: "hasCompletedOnboarding")
+            saveState()
         }
     }
     
@@ -578,6 +738,7 @@ class NavigationCoordinator: ObservableObject {
         UserDefaults.standard.set(hasCompletedSignUp, forKey: "hasCompletedSignUp")
         UserDefaults.standard.set(hasCompletedPreferences, forKey: "hasCompletedPreferences")
         UserDefaults.standard.set(hasSkippedLogin, forKey: "hasSkippedLogin")
+        UserDefaults.standard.set(hasDeferredInitialPreferences, forKey: Self.deferredInitialPreferencesKey)
         
         if let data = try? JSONEncoder().encode(savedPlans) {
             UserDefaults.standard.set(data, forKey: Self.savedPlansKey)
@@ -599,8 +760,8 @@ class NavigationCoordinator: ObservableObject {
                 let dbPlans = try await SupabaseService.shared.getDatePlans(coupleId: coupleId)
                 let planned = dbPlans.filter { $0.status == "planned" }
                 let completed = dbPlans.filter { $0.status == "completed" }
-                let saved: [DatePlan] = planned.compactMap { DatePlanSyncHelpers.datePlan(from: $0) }
-                let past: [DatePlan] = completed.compactMap { DatePlanSyncHelpers.datePlan(from: $0) }
+                let saved: [DatePlan] = planned.map { DatePlanSyncHelpers.datePlan(from: $0) }
+                let past: [DatePlan] = completed.map { DatePlanSyncHelpers.datePlan(from: $0) }
                 await MainActor.run {
                     if !saved.isEmpty || !past.isEmpty {
                         savedPlans = saved
@@ -616,16 +777,70 @@ class NavigationCoordinator: ObservableObject {
     
     /// Upload or update a single plan on Supabase so history persists across reinstalls.
     private func uploadPlanToCloud(_ plan: DatePlan, status: String) async {
-        guard let coupleId = UserProfileManager.shared.coupleId else { return }
-        let dbPlan = DatePlanSyncHelpers.dbDatePlan(from: plan, coupleId: coupleId, status: status)
+        print("[uploadPlanToCloud] called planId=\(plan.id) status=\(status)")
         do {
-            if try await SupabaseService.shared.getDatePlan(planId: plan.id) != nil {
+            let userId = try await SupabaseService.shared.syncAuthSessionAndReturnUserId()
+            await MainActor.run {
+                if UserProfileManager.shared.userId == nil {
+                    UserProfileManager.shared.userId = userId
+                }
+            }
+            var coupleId = await MainActor.run { UserProfileManager.shared.coupleId }
+            if coupleId == nil {
+                coupleId = try await SupabaseService.shared.getCoupleForUser(userId: userId)?.coupleId
+                if let cid = coupleId {
+                    await MainActor.run { UserProfileManager.shared.coupleId = cid }
+                }
+            }
+            if coupleId == nil {
+                let context = await MainActor.run { () -> (email: String, name: String) in
+                    let em = UserProfileManager.shared.currentUser?.email ?? SupabaseService.shared.currentUser?.email ?? ""
+                    let fromProfile = UserProfileManager.shared.currentUser?.fullName.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                    if !fromProfile.isEmpty { return (em, fromProfile) }
+                    if let n = SupabaseService.shared.currentUser?.name?.trimmingCharacters(in: .whitespacesAndNewlines), !n.isEmpty {
+                        return (em, n)
+                    }
+                    let fallback: String
+                    if !em.isEmpty {
+                        fallback = em.split(separator: "@").first.map { String($0) } ?? "User"
+                    } else {
+                        fallback = "User"
+                    }
+                    return (em, fallback)
+                }
+                print("[uploadPlanToCloud] no coupleId yet; calling ensureUserAndCoupleIfMissing")
+                try await SupabaseService.shared.ensureUserAndCoupleIfMissing(
+                    userId: userId,
+                    email: context.email.trimmingCharacters(in: .whitespaces).lowercased(),
+                    name: context.name
+                )
+                coupleId = try await SupabaseService.shared.getCoupleForUser(userId: userId)?.coupleId
+                if let cid = coupleId {
+                    await MainActor.run { UserProfileManager.shared.coupleId = cid }
+                }
+            }
+            guard let coupleId = coupleId else {
+                print("[uploadPlanToCloud] error: no coupleId for user_id=\(userId) after ensure")
+                return
+            }
+            print("[uploadPlanToCloud] before upsert date_plans user_id=\(userId) couple_id=\(coupleId)")
+            let dbPlan = DatePlanSyncHelpers.dbDatePlan(from: plan, userId: userId, coupleId: coupleId, status: status)
+            let existingPlan = try? await SupabaseService.shared.getDatePlan(planId: plan.id)
+            if existingPlan != nil {
                 _ = try await SupabaseService.shared.updateDatePlan(dbPlan)
+                print("[uploadPlanToCloud] updateDatePlan success planId=\(plan.id)")
             } else {
-                _ = try await SupabaseService.shared.createDatePlan(dbPlan)
+                do {
+                    _ = try await SupabaseService.shared.createDatePlan(dbPlan)
+                    print("[uploadPlanToCloud] createDatePlan success planId=\(plan.id)")
+                } catch {
+                    print("[uploadPlanToCloud] createDatePlan failed, trying update: \(error)")
+                    _ = try await SupabaseService.shared.updateDatePlan(dbPlan)
+                    print("[uploadPlanToCloud] updateDatePlan success after failed create planId=\(plan.id)")
+                }
             }
         } catch {
-            // User may be offline
+            print("[uploadPlanToCloud] error: \(error)")
         }
     }
     
@@ -661,12 +876,12 @@ struct RootNavigationView: View {
     @StateObject private var coordinator = NavigationCoordinator.shared
     @StateObject private var userProfileManager = UserProfileManager.shared
     @State private var showSplash = true
-    
+
     var body: some View {
         ZStack {
             Color.luxuryMaroon
                 .ignoresSafeArea()
-            
+
             if showSplash {
                 LuxurySplashView()
                     .transition(.opacity)
@@ -674,15 +889,16 @@ struct RootNavigationView: View {
                 MobileOnboardingView()
                     .environmentObject(coordinator)
             } else if !coordinator.isLoggedIn && !coordinator.hasSkippedLogin {
-                AuthenticationView(onDismiss: { coordinator.skipLogin() })
+                AuthenticationView(isReinstallFlow: false, onDismiss: nil, allowSkipToExplore: false)
                     .environmentObject(coordinator)
             } else if !coordinator.isLoggedIn && coordinator.hasSkippedLogin {
                 LuxuryMainAppView()
                     .environmentObject(coordinator)
                     .environmentObject(userProfileManager)
-            } else if !coordinator.hasCompletedPreferences {
-                PreferencesSetupView()
+            } else if !coordinator.hasCompletedPreferences && !coordinator.hasDeferredInitialPreferences {
+                InitialPreferencesGateView()
                     .environmentObject(coordinator)
+                    .environmentObject(userProfileManager)
             } else {
                 LuxuryMainAppView()
                     .environmentObject(coordinator)
@@ -694,9 +910,14 @@ struct RootNavigationView: View {
         .animation(.easeInOut(duration: 0.4), value: coordinator.isLoggedIn)
         .animation(.easeInOut(duration: 0.4), value: coordinator.hasSkippedLogin)
         .animation(.easeInOut(duration: 0.4), value: coordinator.hasCompletedPreferences)
+        .animation(.easeInOut(duration: 0.4), value: coordinator.hasDeferredInitialPreferences)
         .onAppear {
             DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
                 coordinator.syncOnboardingFromUserDefaults()
+                // Always return to auth after app relaunch once onboarding is completed.
+                if coordinator.hasCompletedOnboarding {
+                    coordinator.requireLoginOnLaunch()
+                }
                 withAnimation {
                     showSplash = false
                 }

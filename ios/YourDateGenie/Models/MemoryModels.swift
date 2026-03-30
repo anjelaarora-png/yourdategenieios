@@ -130,21 +130,21 @@ class MemoryManager: ObservableObject {
     }
     
     /// Restore memories from Supabase after login so history persists across reinstalls.
-    func syncMemoriesFromCloud(coupleId: UUID) {
+    func syncMemoriesFromCloud(userId: UUID) {
         Task {
             do {
-                let dbMemories = try await SupabaseService.shared.getMemories(coupleId: coupleId)
+                let dbMemories = try await SupabaseService.shared.getMemories(userId: userId)
                 let converted: [DateMemory] = dbMemories.map { db in
                     DateMemory(
-                        id: db.memoryId,
-                        title: db.notes ?? "Memory",
-                        date: db.createdAt,
+                        id: db.id,
+                        title: db.caption ?? "Memory",
+                        date: db.takenAt,
                         location: "",
                         photoData: nil,
-                        imageUrl: db.photoUrls?.first,
-                        caption: db.notes,
-                        datePlanId: db.planId,
-                        createdAt: db.createdAt
+                        imageUrl: db.imageUrl,
+                        caption: db.caption,
+                        datePlanId: db.datePlanId,
+                        createdAt: db.createdAt ?? db.takenAt
                     )
                 }
                 await MainActor.run {
@@ -160,25 +160,43 @@ class MemoryManager: ObservableObject {
     }
     
     private func uploadMemoryToCloudIfNeeded(_ memory: DateMemory) async {
-        guard let coupleId = UserProfileManager.shared.coupleId,
-              let planId = memory.datePlanId,
-              let data = memory.photoData, !data.isEmpty else { return }
+        print("[uploadMemoryToCloudIfNeeded] called memoryId=\(memory.id)")
+        guard let data = memory.photoData, !data.isEmpty else {
+            print("[uploadMemoryToCloudIfNeeded] skip: no photo data")
+            return
+        }
         do {
-            let path = "\(UserProfileManager.shared.userId?.uuidString ?? "user")/\(memory.id.uuidString).jpg"
-            _ = try await SupabaseService.shared.uploadImage(data: data, bucket: "memories", path: path)
-            let publicURL = SupabaseService.shared.getPublicURL(bucket: "memories", path: path).absoluteString
+            let userId = try await SupabaseService.shared.syncAuthSessionAndReturnUserId()
+            await MainActor.run {
+                if UserProfileManager.shared.userId == nil {
+                    UserProfileManager.shared.userId = userId
+                }
+            }
+            let bucket = SupabaseService.dateMemoriesStorageBucket
+            let path = "\(userId.uuidString)/\(memory.id.uuidString).jpg"
+            print("[uploadMemoryToCloudIfNeeded] before upload + createMemory user_id=\(userId)")
+            _ = try await SupabaseService.shared.uploadImage(data: data, bucket: bucket, path: path)
             let db = DBDateMemory(
-                memoryId: memory.id,
-                planId: planId,
-                coupleId: coupleId,
-                rating: nil,
-                notes: memory.caption ?? memory.title,
-                photoUrls: [publicURL],
-                createdAt: memory.createdAt
+                id: memory.id,
+                userId: userId,
+                datePlanId: memory.datePlanId,
+                venueId: nil,
+                imageUrl: path,
+                caption: memory.caption ?? memory.title,
+                takenAt: memory.date,
+                isPublic: false,
+                createdAt: nil
             )
             _ = try await SupabaseService.shared.createMemory(db)
+            print("[uploadMemoryToCloudIfNeeded] createMemory success")
+            await MainActor.run {
+                if let idx = memories.firstIndex(where: { $0.id == memory.id }) {
+                    memories[idx].imageUrl = path
+                    saveMemories()
+                }
+            }
         } catch {
-            // User may be offline
+            print("[uploadMemoryToCloudIfNeeded] error: \(error)")
         }
     }
     

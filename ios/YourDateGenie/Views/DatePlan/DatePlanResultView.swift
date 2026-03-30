@@ -117,6 +117,7 @@ struct DatePlanResultView: View {
         .sheet(isPresented: $showPlaylist) {
             PlaylistWidgetView(
                 planTitle: plan.title,
+                planId: plan.id,
                 stops: plan.stops.map { PlaylistStop(name: $0.name, venueType: $0.venueType) }
             )
         }

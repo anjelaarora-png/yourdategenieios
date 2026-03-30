@@ -85,6 +85,69 @@ struct DatePlanStop: Identifiable, Hashable, Codable {
         self.bookingUrl = bookingUrl
         self.imageUrl = imageUrl
     }
+    
+    enum CodingKeys: String, CodingKey {
+        case id, order, name, venueType, timeSlot, duration, description, whyItFits, romanticTip, emoji
+        case travelTimeFromPrevious, travelDistanceFromPrevious, travelMode
+        case validated, placeId, address, latitude, longitude
+        case websiteUrl, phoneNumber, openingHours, estimatedCostPerPerson, bookingUrl, imageUrl
+    }
+    
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = (try? c.decode(UUID.self, forKey: .id)) ?? UUID()
+        order = try c.decode(Int.self, forKey: .order)
+        name = try c.decode(String.self, forKey: .name)
+        venueType = try c.decodeIfPresent(String.self, forKey: .venueType) ?? ""
+        timeSlot = try c.decodeIfPresent(String.self, forKey: .timeSlot) ?? ""
+        duration = try c.decodeIfPresent(String.self, forKey: .duration) ?? ""
+        description = try c.decodeIfPresent(String.self, forKey: .description) ?? ""
+        whyItFits = try c.decodeIfPresent(String.self, forKey: .whyItFits) ?? ""
+        romanticTip = try c.decodeIfPresent(String.self, forKey: .romanticTip) ?? ""
+        emoji = try c.decodeIfPresent(String.self, forKey: .emoji) ?? "📍"
+        travelTimeFromPrevious = try c.decodeIfPresent(String.self, forKey: .travelTimeFromPrevious)
+        travelDistanceFromPrevious = try c.decodeIfPresent(String.self, forKey: .travelDistanceFromPrevious)
+        travelMode = try c.decodeIfPresent(String.self, forKey: .travelMode)
+        validated = try c.decodeIfPresent(Bool.self, forKey: .validated)
+        placeId = try c.decodeIfPresent(String.self, forKey: .placeId)
+        address = try c.decodeIfPresent(String.self, forKey: .address)
+        latitude = try c.decodeIfPresent(Double.self, forKey: .latitude)
+        longitude = try c.decodeIfPresent(Double.self, forKey: .longitude)
+        websiteUrl = try c.decodeIfPresent(String.self, forKey: .websiteUrl)
+        phoneNumber = try c.decodeIfPresent(String.self, forKey: .phoneNumber)
+        openingHours = try c.decodeIfPresent([String].self, forKey: .openingHours)
+        estimatedCostPerPerson = try c.decodeIfPresent(String.self, forKey: .estimatedCostPerPerson)
+        bookingUrl = try c.decodeIfPresent(String.self, forKey: .bookingUrl)
+        imageUrl = try c.decodeIfPresent(String.self, forKey: .imageUrl)
+    }
+    
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
+        try c.encode(order, forKey: .order)
+        try c.encode(name, forKey: .name)
+        try c.encode(venueType, forKey: .venueType)
+        try c.encode(timeSlot, forKey: .timeSlot)
+        try c.encode(duration, forKey: .duration)
+        try c.encode(description, forKey: .description)
+        try c.encode(whyItFits, forKey: .whyItFits)
+        try c.encode(romanticTip, forKey: .romanticTip)
+        try c.encode(emoji, forKey: .emoji)
+        try c.encodeIfPresent(travelTimeFromPrevious, forKey: .travelTimeFromPrevious)
+        try c.encodeIfPresent(travelDistanceFromPrevious, forKey: .travelDistanceFromPrevious)
+        try c.encodeIfPresent(travelMode, forKey: .travelMode)
+        try c.encodeIfPresent(validated, forKey: .validated)
+        try c.encodeIfPresent(placeId, forKey: .placeId)
+        try c.encodeIfPresent(address, forKey: .address)
+        try c.encodeIfPresent(latitude, forKey: .latitude)
+        try c.encodeIfPresent(longitude, forKey: .longitude)
+        try c.encodeIfPresent(websiteUrl, forKey: .websiteUrl)
+        try c.encodeIfPresent(phoneNumber, forKey: .phoneNumber)
+        try c.encodeIfPresent(openingHours, forKey: .openingHours)
+        try c.encodeIfPresent(estimatedCostPerPerson, forKey: .estimatedCostPerPerson)
+        try c.encodeIfPresent(bookingUrl, forKey: .bookingUrl)
+        try c.encodeIfPresent(imageUrl, forKey: .imageUrl)
+    }
 }
 
 // MARK: - Genie Secret Touch
@@ -147,6 +210,26 @@ struct ConversationStarter: Identifiable, Hashable, Codable {
         self.question = question
         self.category = category
         self.emoji = emoji
+    }
+    
+    enum CodingKeys: String, CodingKey {
+        case id, question, category, emoji
+    }
+    
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = (try? c.decode(UUID.self, forKey: .id)) ?? UUID()
+        question = try c.decode(String.self, forKey: .question)
+        category = try c.decodeIfPresent(String.self, forKey: .category) ?? "General"
+        emoji = try c.decodeIfPresent(String.self, forKey: .emoji) ?? "💬"
+    }
+    
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
+        try c.encode(question, forKey: .question)
+        try c.encode(category, forKey: .category)
+        try c.encode(emoji, forKey: .emoji)
     }
 }
 

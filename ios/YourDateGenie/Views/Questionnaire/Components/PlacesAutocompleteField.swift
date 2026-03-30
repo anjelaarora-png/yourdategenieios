@@ -13,6 +13,8 @@ struct PlacesAutocompleteField: View {
     @State private var isFetchingPlaceDetails = false
     @State private var debounceTask: Task<Void, Never>?
     @State private var showPredictions = false
+    @State private var predictionFetchGeneration: UInt64 = 0
+    @State private var fetchErrorMessage: String?
     @FocusState private var isFocused: Bool
     
     enum AutocompleteMode {
@@ -44,7 +46,11 @@ struct PlacesAutocompleteField: View {
                             debounceTask = Task {
                                 try? await Task.sleep(nanoseconds: 300_000_000) // 0.3s
                                 guard !Task.isCancelled else { return }
-                                await fetchPredictions(for: newValue)
+                                let gen = await MainActor.run {
+                                    predictionFetchGeneration += 1
+                                    return predictionFetchGeneration
+                                }
+                                await fetchPredictions(for: newValue, generation: gen)
                             }
                         }
                         .onChange(of: isFocused) { _, focused in
@@ -60,8 +66,9 @@ struct PlacesAutocompleteField: View {
                         .stroke(text.isEmpty ? Color.luxuryGold.opacity(0.2) : Color.luxuryGold.opacity(0.5), lineWidth: 1)
                 )
                 .overlay(alignment: .trailing) {
-                    if isFetchingPlaceDetails {
+                    if isSearching || isFetchingPlaceDetails {
                         ProgressView()
+                            .scaleEffect(0.9)
                             .tint(Color.luxuryGold)
                             .padding(.trailing, 16)
                     }
@@ -107,20 +114,39 @@ struct PlacesAutocompleteField: View {
                     .padding(.top, 4)
                 }
             }
+            
+            if !Config.isGooglePlacesConfigured {
+                Text("Add GOOGLE_PLACES_API_KEY (Places API + Geocoding) to enable address search.")
+                    .font(Font.inter(11, weight: .regular))
+                    .foregroundColor(Color.luxuryGold.opacity(0.85))
+                    .fixedSize(horizontal: false, vertical: true)
+            } else if let err = fetchErrorMessage, isFocused {
+                Text(err)
+                    .font(Font.inter(11, weight: .regular))
+                    .foregroundColor(Color.luxuryMuted)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
     }
     
-    private func fetchPredictions(for input: String) async {
+    private func fetchPredictions(for input: String, generation: UInt64) async {
         let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.count >= 2 else {
             await MainActor.run {
+                guard generation == predictionFetchGeneration else { return }
                 predictions = []
                 showPredictions = false
+                fetchErrorMessage = nil
+                isSearching = false
             }
             return
         }
         
-        await MainActor.run { isSearching = true }
+        await MainActor.run {
+            guard generation == predictionFetchGeneration else { return }
+            isSearching = true
+            fetchErrorMessage = nil
+        }
         
         do {
             let results: [GooglePlacesService.AutocompletePrediction]
@@ -132,32 +158,34 @@ struct PlacesAutocompleteField: View {
                     results = try await GooglePlacesService.shared.fetchAutocompleteAddresses(input: trimmed)
                 }
             } else {
-                #if DEBUG
-                print("[PlacesAutocomplete] Google Places not configured. Set GOOGLE_PLACES_API_KEY in Secrets.xcconfig")
-                #endif
                 results = []
             }
             
             await MainActor.run {
+                guard generation == predictionFetchGeneration else { return }
                 predictions = Array(results.prefix(5))
                 showPredictions = isFocused && !predictions.isEmpty
+                isSearching = false
             }
         } catch {
             #if DEBUG
             print("[PlacesAutocomplete] Error: \(error.localizedDescription)")
             #endif
             await MainActor.run {
+                guard generation == predictionFetchGeneration else { return }
                 predictions = []
+                showPredictions = false
+                fetchErrorMessage = "Couldn’t load suggestions. Check your connection and API key."
+                isSearching = false
             }
         }
-        
-        await MainActor.run { isSearching = false }
     }
     
     /// On selection: in address mode fetch Place Details for full accurate address; otherwise use prediction description.
     private func selectPrediction(_ prediction: GooglePlacesService.AutocompletePrediction) {
         predictions = []
         showPredictions = false
+        fetchErrorMessage = nil
         isFocused = false
         text = prediction.description
 

@@ -1,84 +1,38 @@
 import SwiftUI
 
-// MARK: - Genie Lamp Shape (vector, resolution-independent)
-
-private struct GenieLampShape: Shape {
-    /// Draws a genie lamp + smoke wisps + sparkles in unit coordinates; scales crisply at any size.
+// MARK: - Aladdin / genie lamp (outline to match Icons8-style lamp)
+private struct AladdinLampShape: Shape {
     func path(in rect: CGRect) -> Path {
         let w = rect.width
         let h = rect.height
-        func pt(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
-            CGPoint(x: rect.minX + x * w, y: rect.minY + y * h)
-        }
-        var path = Path()
+        func x(_ u: CGFloat) -> CGFloat { rect.minX + u * w }
+        func y(_ u: CGFloat) -> CGFloat { rect.minY + u * h }
+        var p = Path()
 
-        // Lamp body (rounded vase)
-        let bodyCenterX: CGFloat = 0.5
-        let bodyCenterY: CGFloat = 0.72
-        let bodyW: CGFloat = 0.32
-        let bodyH: CGFloat = 0.26
-        path.addEllipse(in: CGRect(
-            x: (bodyCenterX - bodyW / 2) * w,
-            y: (bodyCenterY - bodyH / 2) * h,
-            width: bodyW * w,
-            height: bodyH * h
-        ))
+        // Body: single ellipse (main vase)
+        p.addEllipse(in: CGRect(x: x(0.26), y: y(0.38), width: w * 0.48, height: h * 0.38))
 
-        // Spout (curved left and up)
-        let spoutTip = pt(0.22, 0.42)
-        let spoutBase = pt(0.34, 0.62)
-        path.move(to: spoutBase)
-        path.addQuadCurve(to: spoutTip, control: pt(0.12, 0.48))
-        path.addLine(to: pt(0.20, 0.46))
-        path.addQuadCurve(to: pt(0.36, 0.64), control: pt(0.14, 0.56))
-        path.closeSubpath()
+        // Lid: small ellipse on top of body
+        p.addEllipse(in: CGRect(x: x(0.38), y: y(0.26), width: w * 0.24, height: h * 0.14))
 
-        // Handle (right side)
-        path.addArc(center: pt(0.72, 0.70), radius: 0.06 * w, startAngle: .degrees(-70), endAngle: .degrees(70), clockwise: false)
-        path.addLine(to: pt(0.78, 0.68))
-        path.addArc(center: pt(0.72, 0.70), radius: 0.04 * w, startAngle: .degrees(70), endAngle: .degrees(-70), clockwise: true)
-        path.closeSubpath()
+        // Spout: curved tube (left side) — simple ribbon so stroke is clear
+        p.move(to: CGPoint(x: x(0.30), y: y(0.54)))
+        p.addQuadCurve(to: CGPoint(x: x(0.08), y: y(0.26)), control: CGPoint(x: x(0.00), y: y(0.38)))
+        p.addLine(to: CGPoint(x: x(0.12), y: y(0.28)))
+        p.addQuadCurve(to: CGPoint(x: x(0.34), y: y(0.56)), control: CGPoint(x: x(0.16), y: y(0.42)))
+        p.closeSubpath()
 
-        // Lid (domed cap)
-        path.addEllipse(in: CGRect(x: (0.5 - 0.06) * w, y: (0.54 - 0.04) * h, width: 0.12 * w, height: 0.08 * h))
+        // Handle: C-shape on right — arc from bottom to top, then bridge to inner arc
+        let hx = x(0.76)
+        let hy = y(0.52)
+        let ro = w * 0.08
+        let ri = w * 0.045
+        p.addArc(center: CGPoint(x: hx, y: hy), radius: ro, startAngle: .degrees(-90), endAngle: .degrees(90), clockwise: false)
+        p.addLine(to: CGPoint(x: hx, y: hy - ri))
+        p.addArc(center: CGPoint(x: hx, y: hy), radius: ri, startAngle: .degrees(90), endAngle: .degrees(-90), clockwise: false)
+        p.closeSubpath()
 
-        // Smoke wisps (3 wavy strokes as filled ribbons)
-        addSmokeWisp(to: &path, from: spoutTip, w: w, h: h, dy: -0.18, dx: 0.08)
-        addSmokeWisp(to: &path, from: pt(0.20, 0.44), w: w, h: h, dy: -0.14, dx: 0.06)
-        addSmokeWisp(to: &path, from: pt(0.24, 0.40), w: w, h: h, dy: -0.10, dx: 0.04)
-
-        // Sparkles (4-pointed stars)
-        for (cx, cy, size) in [(0.28, 0.32, 0.018), (0.34, 0.28, 0.014), (0.22, 0.36, 0.012), (0.38, 0.30, 0.011), (0.30, 0.26, 0.010), (0.26, 0.30, 0.009)] {
-            addSparkle(to: &path, center: pt(cx, cy), size: size * w, w: w, h: h)
-        }
-
-        return path
-    }
-
-    private func addSmokeWisp(to path: inout Path, from start: CGPoint, w: CGFloat, h: CGFloat, dy: CGFloat, dx: CGFloat) {
-        let end = CGPoint(x: start.x + dx * w, y: start.y + dy * h)
-        let c1 = CGPoint(x: start.x - 0.02 * w, y: start.y + dy * h * 0.4)
-        let c2 = CGPoint(x: end.x + 0.02 * w, y: end.y - dy * h * 0.2)
-        path.move(to: start)
-        path.addCurve(to: end, control1: c1, control2: c2)
-        path.addLine(to: CGPoint(x: end.x + 0.008 * w, y: end.y))
-        path.addCurve(to: CGPoint(x: start.x + 0.008 * w, y: start.y), control1: CGPoint(x: c2.x + 0.008 * w, y: c2.y), control2: CGPoint(x: c1.x + 0.008 * w, y: c1.y))
-        path.closeSubpath()
-    }
-
-    private func addSparkle(to path: inout Path, center: CGPoint, size: CGFloat, w: CGFloat, h: CGFloat) {
-        let s = size
-        let s2 = s * 0.45
-        path.move(to: CGPoint(x: center.x, y: center.y - s))
-        path.addLine(to: CGPoint(x: center.x + s2, y: center.y))
-        path.addLine(to: CGPoint(x: center.x, y: center.y + s))
-        path.addLine(to: CGPoint(x: center.x - s2, y: center.y))
-        path.closeSubpath()
-        path.move(to: CGPoint(x: center.x - s, y: center.y))
-        path.addLine(to: CGPoint(x: center.x, y: center.y - s2))
-        path.addLine(to: CGPoint(x: center.x + s, y: center.y))
-        path.addLine(to: CGPoint(x: center.x, y: center.y + s2))
-        path.closeSubpath()
+        return p
     }
 }
 
@@ -189,17 +143,17 @@ struct MagicalLoadingView: View {
                 .opacity(glowOpacity)
                 .scaleEffect(glowScale)
                 
-                // 4 + 5: Hero on top, then text block below (so both fully visible)
+                // 4 + 5: Hero and text block centered together (sparkles stay above)
                 VStack(spacing: 0) {
-                    Spacer(minLength: 20)
+                    Spacer()
                     GenieLampHeroView(progress: routeProgress)
                         .frame(width: 140, height: 200)
-                    Spacer(minLength: 16)
+                    Spacer()
                     ScrollView(showsIndicators: false) {
                         VStack(spacing: 12) {
                             Text("Crafting your date plan")
-                                .font(Font.tangerine(32, weight: .bold))
-                                .foregroundColor(Color.luxuryCream)
+                                .font(Font.tangerine(44, weight: .bold))
+                                .foregroundStyle(LinearGradient.goldShimmer)
                                 .multilineTextAlignment(.center)
                                 .opacity(titleOpacity)
                                 .scaleEffect(titleScale)
@@ -260,10 +214,12 @@ struct MagicalLoadingView: View {
                     y: CGFloat.random(in: 100...(size.height - 100))
                 )
             }
+            // Keep sparkles in upper area so they don't cover the text block
+            let sparkleMaxY = size.height * 0.38
             sparklePositions = (0..<20).map { _ in
                 CGPoint(
                     x: CGFloat.random(in: 20...(size.width - 20)),
-                    y: CGFloat.random(in: 100...(size.height - 100))
+                    y: CGFloat.random(in: 60...(sparkleMaxY))
                 )
             }
             startSparkleAnimations()
@@ -303,11 +259,13 @@ struct MagicalLoadingView: View {
         let size = UIScreen.main.bounds.size
         let centerX = size.width / 2
         let centerY = size.height / 2
+        // Keep confetti in upper area so it doesn't cover the text block
+        let confettiMaxY = size.height * 0.38
         var endStates: [(x: CGFloat, y: CGFloat, opacity: Double, rotation: Double)] = []
         for _ in confettiPieces.indices {
             endStates.append((
                 centerX + CGFloat.random(in: -170...170),
-                centerY + CGFloat.random(in: -130...130),
+                CGFloat.random(in: 60...(confettiMaxY)),
                 0.92,
                 Double.random(in: 180...540)
             ))
@@ -413,7 +371,7 @@ struct RosePetal: Shape {
     }
 }
 
-// MARK: - Genie Lamp Hero (golden lamp image + glow + swirling smoke)
+// MARK: - Genie Lamp Hero (golden lamp + glow blended to maroon background)
 
 private struct GenieLampHeroView: View {
     var progress: CGFloat
@@ -422,59 +380,85 @@ private struct GenieLampHeroView: View {
     @State private var smokeSwirl: Double = 0
     @State private var smokeOpacity1: Double = 0.5
     @State private var smokeOpacity2: Double = 0.4
-    @State private var pulseScale: CGFloat = 0.98
-    @State private var shimmerOffset: CGFloat = -80
-    
+    @State private var pulseScale: CGFloat = 0.94
+    @State private var iconOpacity: Double = 0.9
+    @State private var glowScale: CGFloat = 0.85
+    @State private var glowOpacity: Double = 0.5
+
     var body: some View {
         ZStack(alignment: .bottom) {
-            // Swirling smoke wisps (golden motion behind lamp)
+            // Big flashy glow behind bulb (pulses)
+            RadialGradient(
+                colors: [
+                    Color.luxuryGold.opacity(glowOpacity),
+                    Color.luxuryGold.opacity(glowOpacity * 0.4),
+                    Color.luxuryMaroonLight.opacity(0.3),
+                    Color.clear
+                ],
+                center: .center,
+                startRadius: 10,
+                endRadius: 140
+            )
+            .frame(width: 280, height: 320)
+            .scaleEffect(glowScale)
+            .blur(radius: 30)
+            .offset(y: -10)
+
+            // Soft halo
+            RadialGradient(
+                colors: [
+                    Color.luxuryGold.opacity(0.12),
+                    Color.luxuryMaroonLight.opacity(0.5),
+                    Color.clear
+                ],
+                center: .center,
+                startRadius: 30,
+                endRadius: 130
+            )
+            .frame(width: 240, height: 280)
+            .blur(radius: 22)
+            .offset(y: -15)
+
+            // Swirling wisps
             SwirlingSmokeWisp(phase: smokeSwirl, rise: smokeRise, opacity: smokeOpacity1)
                 .frame(width: 85, height: 95)
                 .offset(y: -18 - smokeRise)
             SwirlingSmokeWisp(phase: smokeSwirl + .pi * 0.6, rise: smokeRise * 0.9, opacity: smokeOpacity2)
                 .frame(width: 65, height: 75)
                 .offset(x: 10, y: -28 - smokeRise * 0.9)
-            
-            // Glow under lamp
+
+            // Glow under bulb
             Ellipse()
                 .fill(
                     RadialGradient(
                         colors: [
-                            Color.luxuryGold.opacity(0.4),
-                            Color.luxuryGold.opacity(0.1),
+                            Color.luxuryGold.opacity(0.45),
+                            Color.luxuryGold.opacity(0.15),
                             Color.clear
                         ],
                         center: .center,
                         startRadius: 0,
-                        endRadius: 50
+                        endRadius: 60
                     )
                 )
-                .frame(width: 100, height: 24)
-                .blur(radius: 8)
-                .offset(y: -8)
-            
-            // Golden genie lamp (vector shape — crisp at any scale)
-            ZStack {
-                GenieLampShape()
-                    .fill(LinearGradient.goldShimmer)
-                    .scaleEffect(pulseScale)
+                .frame(width: 130, height: 32)
+                .blur(radius: 14)
+                .offset(y: -12)
 
-                // Shimmer gleam overlay
-                LinearGradient(
-                    colors: [
-                        Color.clear,
-                        Color.luxuryGoldLight.opacity(0.35),
-                        Color.clear
-                    ],
-                    startPoint: .leading,
-                    endPoint: .trailing
-                )
-                .frame(width: 60, height: 200)
-                .offset(x: shimmerOffset)
-                .mask(GenieLampShape())
+            // Lightbulb with glow
+            ZStack {
+                Image(systemName: "lightbulb")
+                    .font(.system(size: 100, weight: .medium))
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(LinearGradient.goldShimmer)
+                    .shadow(color: Color.luxuryGold.opacity(0.8), radius: 25, x: 0, y: 0)
+                    .shadow(color: Color.luxuryGoldLight.opacity(0.5), radius: 40, x: 0, y: 0)
             }
-            .frame(width: 140, height: 200)
+            .scaleEffect(pulseScale)
+            .opacity(iconOpacity)
+            .shadow(color: Color.luxuryGold.opacity(0.5), radius: 24, x: 0, y: 4)
         }
+        .frame(width: 140, height: 200)
         .onAppear {
             withAnimation(.easeInOut(duration: 2.4).repeatForever(autoreverses: true)) {
                 smokeRise = 40
@@ -484,11 +468,11 @@ private struct GenieLampHeroView: View {
             withAnimation(.linear(duration: 4).repeatForever(autoreverses: false)) {
                 smokeSwirl = .pi * 2
             }
-            withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
-                pulseScale = 1.02
-            }
-            withAnimation(.linear(duration: 2.2).repeatForever(autoreverses: true)) {
-                shimmerOffset = 80
+            withAnimation(.easeInOut(duration: 1.4).repeatForever(autoreverses: true)) {
+                pulseScale = 1.08
+                iconOpacity = 1.0
+                glowScale = 1.15
+                glowOpacity = 0.75
             }
         }
     }
@@ -506,6 +490,7 @@ private struct SwirlingSmokeWisp: View {
                     colors: [
                         Color.luxuryCream.opacity(opacity),
                         Color.luxuryGold.opacity(opacity * 0.5),
+                        Color.luxuryMaroonLight.opacity(opacity * 0.3),
                         Color.clear
                     ],
                     startPoint: .bottom,

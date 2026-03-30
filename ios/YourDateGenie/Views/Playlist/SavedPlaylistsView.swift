@@ -8,14 +8,14 @@ struct SavedPlaylistsView: View {
     @State private var exploreGenresExpanded = false
     
     private let genreLabels: [String: String] = [
-        "romantic": "Romantic", "upbeat": "Upbeat", "chill": "Chill", "adventurous": "Eclectic",
+        "romantic": "Romantic", "pop": "Pop", "upbeat": "Upbeat", "chill": "Chill", "adventurous": "Eclectic",
         "jazzy": "Jazzy", "indie": "Indie", "classic": "Classic", "rnb": "R&B",
         "latin": "Latin", "afrobeats": "Afrobeats", "kpop": "K-Pop", "reggae": "Reggae", "country": "Country",
         "bollywood": "Bollywood", "arabic": "Arabic", "jpop": "J-Pop", "rock": "Rock", "electronic": "Electronic", "blues": "Blues"
     ]
     
     private let vibeEmojis: [String: String] = [
-        "romantic": "💕", "upbeat": "🎉", "chill": "🌙", "adventurous": "✨",
+        "romantic": "💕", "pop": "🎵", "upbeat": "🎉", "chill": "🌙", "adventurous": "✨",
         "jazzy": "🎷", "indie": "🎸", "classic": "🎻", "rnb": "🎤",
         "latin": "🌴", "afrobeats": "🔥", "kpop": "💜", "reggae": "🎵", "country": "🤠",
         "bollywood": "🎬", "arabic": "🕌", "jpop": "🌸", "rock": "🤘", "electronic": "⚡", "blues": "🎸"
@@ -59,6 +59,16 @@ struct SavedPlaylistsView: View {
                     playlist: binding(for: playlist),
                     onDismiss: { selectedPlaylist = nil }
                 )
+            }
+            .onAppear {
+                guard let coupleId = UserProfileManager.shared.coupleId else { return }
+                Task {
+                    if let list = try? await SupabaseService.shared.getPlaylists(coupleId: coupleId), !list.isEmpty {
+                        await MainActor.run {
+                            storage.mergeFromSupabase(dbPlaylists: list)
+                        }
+                    }
+                }
             }
         }
     }
@@ -192,7 +202,7 @@ struct SavedPlaylistDetailView: View {
     }
     
     private let vibeEmojis: [String: String] = [
-        "romantic": "💕", "upbeat": "🎉", "chill": "🌙", "adventurous": "✨",
+        "romantic": "💕", "pop": "🎵", "upbeat": "🎉", "chill": "🌙", "adventurous": "✨",
         "jazzy": "🎷", "indie": "🎸", "classic": "🎻", "rnb": "🎤",
         "latin": "🌴", "afrobeats": "🔥", "kpop": "💜", "reggae": "🎵", "country": "🤠",
         "bollywood": "🎬", "arabic": "🕌", "jpop": "🌸", "rock": "🤘", "electronic": "⚡", "blues": "🎸"
@@ -250,7 +260,7 @@ struct SavedPlaylistDetailView: View {
                                     .buttonStyle(.plain)
                                     let subtitleParts: [String] = [
                                         displayedPlaylist.energy.flatMap { EnergyLevel(rawValue: $0) }.map { $0.label },
-                                        displayedPlaylist.era.flatMap { EraOption(rawValue: $0) }.flatMap { $0 != .any ? $0.label : nil },
+                                        displayedPlaylist.era.flatMap { EraOption.fromStored($0) }.flatMap { $0 != .any ? $0.label : nil },
                                         displayedPlaylist.mood.flatMap { MoodOption(rawValue: $0) }.flatMap { $0 != .none ? $0.label : nil }
                                     ].compactMap { $0 }
                                     if !subtitleParts.isEmpty {
@@ -370,30 +380,50 @@ struct SavedPlaylistDetailView: View {
         guard !isRegenerating else { return }
         isRegenerating = true
         let normalizedVibe = normalizeVibe(displayedPlaylist.vibe)
-        guard let vibe = PlaylistWidgetView.VibeOption(rawValue: normalizedVibe) else {
+        guard let vibeOption = PlaylistWidgetView.VibeOption(rawValue: normalizedVibe) else {
             isRegenerating = false
             return
         }
         let energy = (displayedPlaylist.energy.flatMap { EnergyLevel(rawValue: $0) }) ?? .balanced
-        let era = (displayedPlaylist.era.flatMap { EraOption(rawValue: $0) }) ?? .any
+        let era = EraOption.fromStored(displayedPlaylist.era)
         let mood = (displayedPlaylist.mood.flatMap { MoodOption(rawValue: $0) }) ?? .none
         let playlistId = displayedPlaylist.id
-        let excludingKeys = Set(currentSongs.map { "\($0.title)|\($0.artist)" })
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-            let datePlaylist = PlaylistWidgetView.generateSongsForVibeStatic(
-                vibe: vibe,
-                energy: energy,
-                era: era,
-                mood: mood,
-                excludingSongKeys: excludingKeys
-            )
-            let now = ISO8601DateFormatter().string(from: Date())
-            let newSongs = datePlaylist.songs.map { s in
-                SavedPlaylistSong(title: s.title, artist: s.artist, isCustom: false, addedAt: now)
+        Task {
+            do {
+                let result = try await SupabaseService.shared.generatePlaylist(
+                    vibe: vibeOption.rawValue,
+                    datePlanTitle: displayedPlaylist.datePlanTitle,
+                    stops: nil,
+                    era: era == .any ? nil : era.rawValue,
+                    mood: mood == .none ? nil : mood.rawValue,
+                    energy: energy.rawValue
+                )
+                let now = ISO8601DateFormatter().string(from: Date())
+                let newSongs = result.songs.map { s in
+                    SavedPlaylistSong(title: s.title, artist: s.artist, isCustom: false, addedAt: now)
+                }
+                await MainActor.run {
+                    storage.updateSongs(playlistId: playlistId, songs: newSongs)
+                    if let updated = storage.getPlaylist(id: playlist.id) { playlist = updated }
+                    isRegenerating = false
+                }
+            } catch {
+                await MainActor.run {
+                    let datePlaylist = PlaylistWidgetView.generateSongsForVibeStatic(
+                        vibe: vibeOption,
+                        energy: energy,
+                        era: era,
+                        mood: mood,
+                        excludingSongKeys: Set(currentSongs.map { "\($0.title)|\($0.artist)" })
+                    )
+                    let fallbackSongs = datePlaylist.songs.map { s in
+                        SavedPlaylistSong(title: s.title, artist: s.artist, isCustom: false, addedAt: ISO8601DateFormatter().string(from: Date()))
+                    }
+                    storage.updateSongs(playlistId: playlistId, songs: fallbackSongs)
+                    if let updated = storage.getPlaylist(id: playlist.id) { playlist = updated }
+                    isRegenerating = false
+                }
             }
-            storage.updateSongs(playlistId: playlistId, songs: newSongs)
-            if let updated = storage.getPlaylist(id: playlist.id) { playlist = updated }
-            isRegenerating = false
         }
     }
     

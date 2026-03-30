@@ -24,21 +24,23 @@ struct PlaybookCategory: Identifiable {
     let id: String
     let title: String
     let emoji: String
+    /// SF Symbol name for golden icon on iOS (emojis don't tint).
+    let sfSymbol: String
 }
 
 // MARK: - Playbook Content
 enum PlaybookContent {
     static let categories: [PlaybookCategory] = [
-        PlaybookCategory(id: "how-to-dress", title: "How to Dress", emoji: "👔"),
-        PlaybookCategory(id: "beauty-grooming", title: "Beauty & Grooming", emoji: "✨"),
-        PlaybookCategory(id: "chivalrous-actions", title: "Chivalrous Actions", emoji: "🤝"),
-        PlaybookCategory(id: "who-should-pay", title: "Who Should Pay", emoji: "💳"),
-        PlaybookCategory(id: "body-language", title: "Body Language", emoji: "💬"),
-        PlaybookCategory(id: "how-to-plan-date", title: "How to Plan the Date", emoji: "📅"),
-        PlaybookCategory(id: "texting-before-after", title: "Texting Before & After", emoji: "📱"),
-        PlaybookCategory(id: "physical-affection", title: "Physical Affection", emoji: "💕"),
-        PlaybookCategory(id: "conversation-starters", title: "Conversation Starters", emoji: "💬"),
-        PlaybookCategory(id: "red-flags", title: "Red Flags to Avoid", emoji: "🚩"),
+        PlaybookCategory(id: "how-to-dress", title: "How to Dress", emoji: "👔", sfSymbol: "tshirt.fill"),
+        PlaybookCategory(id: "beauty-grooming", title: "Beauty & Grooming", emoji: "✨", sfSymbol: "sparkles"),
+        PlaybookCategory(id: "chivalrous-actions", title: "Chivalrous Actions", emoji: "🤝", sfSymbol: "hand.raised.fill"),
+        PlaybookCategory(id: "who-should-pay", title: "Who Should Pay", emoji: "💳", sfSymbol: "creditcard.fill"),
+        PlaybookCategory(id: "body-language", title: "Body Language", emoji: "💬", sfSymbol: "bubble.left.and.bubble.right.fill"),
+        PlaybookCategory(id: "how-to-plan-date", title: "How to Plan the Date", emoji: "📅", sfSymbol: "calendar"),
+        PlaybookCategory(id: "texting-before-after", title: "Texting Before & After", emoji: "📱", sfSymbol: "message.fill"),
+        PlaybookCategory(id: "physical-affection", title: "Physical Affection", emoji: "💕", sfSymbol: "heart.fill"),
+        PlaybookCategory(id: "conversation-starters", title: "Conversation Starters", emoji: "💬", sfSymbol: "text.bubble.fill"),
+        PlaybookCategory(id: "red-flags", title: "Red Flags to Avoid", emoji: "🚩", sfSymbol: "flag.fill"),
     ]
 
     static func tips(categoryId: String, comboKey: PlaybookComboKey) -> [String] {

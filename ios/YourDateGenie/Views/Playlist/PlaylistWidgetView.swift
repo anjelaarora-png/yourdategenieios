@@ -2,6 +2,7 @@ import SwiftUI
 
 struct PlaylistWidgetView: View {
     let planTitle: String
+    var planId: UUID? = nil
     var stops: [PlaylistStop]? = nil
     
     @Environment(\.dismiss) private var dismiss
@@ -18,11 +19,13 @@ struct PlaylistWidgetView: View {
     @State private var showSavedPlaylists = false
     @State private var savedMessage = false
     @State private var moreVibesExpanded = false
+    @State private var playlistGenerationError: String?
     @StateObject private var storage = PlaylistStorageManager.shared
     @StateObject private var previewPlayer = PreviewPlayerManager()
     
     enum VibeOption: String, CaseIterable {
         case romantic = "romantic"
+        case pop = "pop"
         case upbeat = "upbeat"
         case chill = "chill"
         case jazzy = "jazzy"
@@ -45,6 +48,7 @@ struct PlaylistWidgetView: View {
         var label: String {
             switch self {
             case .romantic: return "Romantic"
+            case .pop: return "Pop"
             case .upbeat: return "Upbeat"
             case .chill: return "Chill"
             case .jazzy: return "Jazzy"
@@ -69,6 +73,7 @@ struct PlaylistWidgetView: View {
         var emoji: String {
             switch self {
             case .romantic: return "💕"
+            case .pop: return "🎵"
             case .upbeat: return "🎉"
             case .chill: return "🌙"
             case .jazzy: return "🎷"
@@ -93,6 +98,7 @@ struct PlaylistWidgetView: View {
         var description: String {
             switch self {
             case .romantic: return "Intimate love songs"
+            case .pop: return "Pop hits & radio favorites"
             case .upbeat: return "Dance & party hits"
             case .chill: return "Lo-fi & relaxed"
             case .jazzy: return "Smooth jazz & soul"
@@ -116,12 +122,12 @@ struct PlaylistWidgetView: View {
         
         /// Key vibes shown prominently on the main screen (first 8).
         static var keyVibes: [VibeOption] {
-            [.romantic, .upbeat, .chill, .jazzy, .indie, .classic, .rnb, .adventurous]
+            [.romantic, .pop, .upbeat, .chill, .jazzy, .classic, .rnb, .adventurous]
         }
         
         /// Additional famous genres in the "More" section (global).
         static var moreVibes: [VibeOption] {
-            [.latin, .afrobeats, .kpop, .reggae, .country, .bollywood, .arabic, .jpop, .rock, .electronic, .blues]
+            [.indie, .latin, .afrobeats, .kpop, .reggae, .country, .bollywood, .arabic, .jpop, .rock, .electronic, .blues]
         }
     }
     
@@ -169,7 +175,7 @@ struct PlaylistWidgetView: View {
     
     var body: some View {
         NavigationStack {
-            ZStack {
+            ZStack(alignment: .top) {
                 Color.luxuryMaroon
                     .ignoresSafeArea()
                 
@@ -177,6 +183,31 @@ struct PlaylistWidgetView: View {
                     playlistContent(currentPlaylist)
                 } else {
                     generateView
+                }
+                
+                if let err = playlistGenerationError {
+                    HStack(spacing: 10) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundColor(Color.luxuryGold)
+                        Text("Showing suggestions. \(err)")
+                            .font(Font.inter(12, weight: .medium))
+                            .foregroundColor(Color.luxuryCreamMuted)
+                            .lineLimit(2)
+                        Spacer(minLength: 8)
+                        Button("OK") { playlistGenerationError = nil }
+                            .font(Font.inter(12, weight: .semibold))
+                            .foregroundColor(Color.luxuryGold)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+                    .background(Color.luxuryMaroonLight.opacity(0.95))
+                    .overlay(
+                        Rectangle()
+                            .frame(height: 1)
+                            .foregroundColor(Color.luxuryGold.opacity(0.3)),
+                        alignment: .bottom
+                    )
+                    .padding(.horizontal, 0)
                 }
             }
             .navigationTitle("Date Playlist")
@@ -254,6 +285,7 @@ struct PlaylistWidgetView: View {
         )
         savedMessage = true
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) { savedMessage = false }
+        persistPlaylistToSupabaseIfNeeded(current)
     }
     
     // MARK: - Generate View
@@ -554,6 +586,7 @@ struct PlaylistWidgetView: View {
                     
                     Button {
                         playlist = nil
+                        playlistGenerationError = nil
                     } label: {
                         HStack(spacing: 8) {
                             Image(systemName: "slider.horizontal.3")
@@ -577,19 +610,95 @@ struct PlaylistWidgetView: View {
     private func generatePlaylist() {
         guard let energy = selectedEnergy else { return }
         isGenerating = true
-        let currentKeys = playlist.map { Set($0.songs.map { "\($0.title)|\($0.artist)" }) } ?? []
         let vibe = selectedVibe
         let era = selectedEra
         let mood = selectedMood
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
-            self.playlist = Self.generateSongsForVibeStatic(
-                vibe: vibe,
-                energy: energy,
-                era: era,
-                mood: mood,
-                excludingSongKeys: currentKeys.isEmpty ? nil : currentKeys
+        let stopsForApi = stops
+        let planTitleForApi = planTitle
+        Task {
+            do {
+                let result = try await SupabaseService.shared.generatePlaylist(
+                    vibe: vibe.rawValue,
+                    datePlanTitle: planTitleForApi,
+                    stops: stopsForApi?.map { (name: $0.name, venueType: $0.venueType) },
+                    era: era == .any ? nil : era.rawValue,
+                    mood: mood == .none ? nil : mood.rawValue,
+                    energy: energy.rawValue
+                )
+                let songs = result.songs.map { s in
+                    PlaylistSong(
+                        title: s.title,
+                        artist: s.artist,
+                        duration: "—",
+                        energy: nil,
+                        era: nil
+                    )
+                }
+                let datePlaylist = DatePlaylist(
+                    name: result.playlistName,
+                    mood: result.vibeDescription,
+                    totalDuration: "~\(songs.count * 4) min",
+                    songs: songs
+                )
+                await MainActor.run {
+                    self.playlist = datePlaylist
+                    self.isGenerating = false
+                    self.playlistGenerationError = nil
+                    persistPlaylistToSupabaseIfNeeded(datePlaylist)
+                }
+            } catch {
+                let errorMessage = (error as? SupabaseError)?.localizedDescription ?? error.localizedDescription
+                await MainActor.run {
+                    self.playlistGenerationError = errorMessage
+                    let currentKeys = playlist.map { Set($0.songs.map { "\($0.title)|\($0.artist)" }) } ?? []
+                    self.playlist = Self.generateSongsForVibeStatic(
+                        vibe: vibe,
+                        energy: energy,
+                        era: era,
+                        mood: mood,
+                        excludingSongKeys: currentKeys.isEmpty ? nil : currentKeys
+                    )
+                    self.isGenerating = false
+                }
+            }
+        }
+    }
+    
+    /// Persist current playlist to Supabase when the user has a session (resolves couple_id if needed).
+    private func persistPlaylistToSupabaseIfNeeded(_ datePlaylist: DatePlaylist) {
+        let tracks = datePlaylist.songs.enumerated().map { index, s in
+            PlaylistTrack(
+                trackNumber: index + 1,
+                title: s.title,
+                artist: s.artist,
+                album: nil,
+                duration: s.duration,
+                whyItFits: nil
             )
-            self.isGenerating = false
+        }
+        let pid = planId
+        Task {
+            do {
+                let coupleId = try await SupabaseService.shared.resolveCoupleIdForCurrentUser()
+                let dbPlaylist = DBPlaylist(
+                    planId: pid,
+                    coupleId: coupleId,
+                    title: datePlaylist.name,
+                    description: datePlaylist.mood,
+                    tracks: tracks,
+                    totalDurationMinutes: max(1, datePlaylist.songs.count * 4),
+                    generatedAt: Date()
+                )
+                do {
+                    _ = try await SupabaseService.shared.createPlaylist(dbPlaylist)
+                    print("[PlaylistWidget] createPlaylist success playlist_id=\(dbPlaylist.playlistId)")
+                } catch {
+                    print("[PlaylistWidget] createPlaylist error: \(error); trying update")
+                    _ = try? await SupabaseService.shared.updatePlaylist(dbPlaylist)
+                }
+            } catch {
+                print("[PlaylistWidget] persistPlaylistToSupabaseIfNeeded failed (no session or couple): \(error)")
+            }
         }
     }
     
@@ -644,6 +753,25 @@ struct PlaylistWidgetView: View {
                 PlaylistSong(title: "Truly Madly Deeply", artist: "Savage Garden", duration: "4:37", energy: .balanced, era: .nineties),
                 PlaylistSong(title: "I Will Always Love You", artist: "Whitney Houston", duration: "4:31", energy: .chill, era: .nineties),
                 PlaylistSong(title: "Kiss Me", artist: "Ed Sheeran", duration: "3:40", energy: .chill, era: .twentyTensNow),
+            ]
+        case .pop:
+            moodLabel = "Pop Hits & Radio Favorites"
+            fullPool = [
+                PlaylistSong(title: "Blinding Lights", artist: "The Weeknd", duration: "3:20", energy: .energetic, era: .twentyTensNow),
+                PlaylistSong(title: "Levitating", artist: "Dua Lipa", duration: "3:23", energy: .energetic, era: .twentyTensNow),
+                PlaylistSong(title: "Watermelon Sugar", artist: "Harry Styles", duration: "2:54", energy: .energetic, era: .twentyTensNow),
+                PlaylistSong(title: "Shake It Off", artist: "Taylor Swift", duration: "3:39", energy: .energetic, era: .twentyTensNow),
+                PlaylistSong(title: "Uptown Funk", artist: "Bruno Mars", duration: "4:30", energy: .energetic, era: .twentyTensNow),
+                PlaylistSong(title: "Happy", artist: "Pharrell Williams", duration: "3:53", energy: .energetic, era: .twentyTensNow),
+                PlaylistSong(title: "Flowers", artist: "Miley Cyrus", duration: "3:20", energy: .energetic, era: .twentyTensNow),
+                PlaylistSong(title: "As It Was", artist: "Harry Styles", duration: "2:47", energy: .balanced, era: .twentyTensNow),
+                PlaylistSong(title: "Don't Start Now", artist: "Dua Lipa", duration: "3:03", energy: .energetic, era: .twentyTensNow),
+                PlaylistSong(title: "Locked Out of Heaven", artist: "Bruno Mars", duration: "3:53", energy: .energetic, era: .twentyTensNow),
+                PlaylistSong(title: "Shape of You", artist: "Ed Sheeran", duration: "3:53", energy: .energetic, era: .twentyTensNow),
+                PlaylistSong(title: "Someone Like You", artist: "Adele", duration: "4:45", energy: .chill, era: .twentyTensNow),
+                PlaylistSong(title: "Rolling in the Deep", artist: "Adele", duration: "3:48", energy: .energetic, era: .twentyTensNow),
+                PlaylistSong(title: "Firework", artist: "Katy Perry", duration: "3:47", energy: .energetic, era: .twentyTensNow),
+                PlaylistSong(title: "Roar", artist: "Katy Perry", duration: "3:43", energy: .energetic, era: .twentyTensNow),
             ]
         case .upbeat:
             moodLabel = "Fun & Energetic"
@@ -982,11 +1110,16 @@ struct PlaylistWidgetView: View {
             guard let songEnergy = song.energy else { return true }
             return allowedEnergies.contains(songEnergy)
         }
-        // Filter by era (nil or .any = any)
+        // Filter by era (nil or .any = any). 2020s+ offline pool includes 2010s–now tracks when needed.
         if era != .any {
             filtered = filtered.filter { song in
                 guard let songEra = song.era else { return true }
-                return songEra == era
+                switch era {
+                case .twentyTwenties:
+                    return songEra == .twentyTwenties || songEra == .twentyTensNow
+                default:
+                    return songEra == era
+                }
             }
         }
         // Complete refresh: exclude current playlist songs; fall back only when too few match so we still show 8
@@ -1003,7 +1136,14 @@ struct PlaylistWidgetView: View {
             let relaxed = fullPool.filter { song in
                 guard let songEnergy = song.energy else { return true }
                 guard allowedEnergies.contains(songEnergy) else { return false }
-                if era != .any, let songEra = song.era { return songEra == era }
+                if era != .any, let songEra = song.era {
+                    switch era {
+                    case .twentyTwenties:
+                        return songEra == .twentyTwenties || songEra == .twentyTensNow
+                    default:
+                        return songEra == era
+                    }
+                }
                 return true
             }
             if relaxed.count >= 8 {
@@ -1284,7 +1424,9 @@ enum EraOption: String, CaseIterable {
     case seventiesEighties = "70s-80s"
     case nineties = "90s"
     case twoThousands = "2000s"
-    case twentyTensNow = "2010s-now"
+    /// Sent to generate-playlist as `2010s` (Last.fm decade tag); aligns with label "2010s–2019".
+    case twentyTensNow = "2010s"
+    case twentyTwenties = "2020s-now"
     
     var label: String {
         switch self {
@@ -1292,8 +1434,19 @@ enum EraOption: String, CaseIterable {
         case .seventiesEighties: return "70s–80s"
         case .nineties: return "90s"
         case .twoThousands: return "2000s"
-        case .twentyTensNow: return "2010s–now"
+        case .twentyTensNow: return "2010s–2019"
+        case .twentyTwenties: return "2020s–now"
         }
+    }
+}
+
+extension EraOption {
+    /// Decodes saved playlists; legacy value `2010s-now` equals `.twentyTensNow`.
+    static func fromStored(_ raw: String?) -> EraOption {
+        guard let r = raw?.lowercased(), !r.isEmpty, r != "any" else { return .any }
+        if let e = EraOption(rawValue: r) { return e }
+        if r == "2010s-now" { return .twentyTensNow }
+        return .any
     }
 }
 

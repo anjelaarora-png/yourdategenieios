@@ -1,5 +1,6 @@
 import SwiftUI
 import Combine
+import UIKit
 
 struct AuthenticationView: View {
     @EnvironmentObject var coordinator: NavigationCoordinator
@@ -7,9 +8,21 @@ struct AuthenticationView: View {
     @StateObject private var profileManager = UserProfileManager.shared
     @FocusState private var focusedField: AuthInputField?
     @State private var showResetPasswordSheet = false
-    /// When set, show an X to dismiss (skip login on initial screen, or close auth-required sheet).
+    @State private var resendCooldownRemaining = 0
+    @State private var resendFeedbackMessage: String?
+    @State private var showResendSuccess = false
+    @State private var verificationPollingElapsed = 0
+    @State private var isAutoCheckingVerification = false
+    private let verificationPollingDurationSeconds = 180
+    /// Spaced to limit silent sign-in attempts while email confirmation is pending.
+    private let verificationPollingIntervalSeconds = 15
+    /// When true, returning user after reinstall; default to Sign In and show welcome-back messaging.
+    var isReinstallFlow: Bool = false
+    /// When set, show an X to dismiss (e.g. close auth sheet or skip login).
     var onDismiss: (() -> Void)? = nil
-    
+    /// When true, show "Explore without an account" link (root flow only; not when auth is required for Plan my date).
+    var allowSkipToExplore: Bool = false
+
     var body: some View {
         ZStack {
             Color.luxuryMaroon
@@ -19,39 +32,46 @@ struct AuthenticationView: View {
                 .opacity(0.15)
                 .ignoresSafeArea()
             
-            ScrollView(showsIndicators: false) {
-                VStack(spacing: 0) {
-                    if profileManager.pendingEmailConfirmation {
-                        confirmEmailSection
-                    } else {
-                        authHeader
-                        
-                        authModeToggle
-                            .padding(.top, 24)
-                        
-                        if viewModel.isSignUp {
-                            signUpForm
-                        } else {
-                            signInForm
+            Group {
+                if profileManager.pendingEmailConfirmation {
+                    emailConfirmationWaitScreen
+                } else {
+                    ScrollView(showsIndicators: false) {
+                        VStack(spacing: 0) {
+                            authHeader
+
+                            authModeToggle
+                                .padding(.top, 24)
+
+                            if viewModel.isSignUp {
+                                signUpForm
+                            } else {
+                                signInForm
+                            }
+
+                            authButton
+                                .padding(.top, 24)
+
+                            if !viewModel.isSignUp {
+                                forgotPasswordButton
+                                    .padding(.top, 12)
+                            }
+
+                            if viewModel.isSignUp {
+                                signUpBenefits
+                                    .padding(.top, 32)
+                            }
+
+                            if allowSkipToExplore {
+                                exploreWithoutAccountButton
+                                    .padding(.top, 28)
+                            }
+
+                            Spacer(minLength: 100)
                         }
-                        
-                        authButton
-                            .padding(.top, 24)
-                        
-                        if !viewModel.isSignUp {
-                            forgotPasswordButton
-                                .padding(.top, 12)
-                        }
-                        
-                        if viewModel.isSignUp {
-                            signUpBenefits
-                                .padding(.top, 32)
-                        }
+                        .padding(.horizontal, 24)
                     }
-                    
-                    Spacer(minLength: 100)
                 }
-                .padding(.horizontal, 24)
             }
             .sheet(isPresented: $showResetPasswordSheet) {
                 ResetPasswordSheet(
@@ -68,7 +88,7 @@ struct AuthenticationView: View {
                 loadingOverlay
             }
             
-            if let onDismiss = onDismiss {
+            if let onDismiss = onDismiss, !profileManager.pendingEmailConfirmation {
                 VStack {
                     HStack {
                         Spacer()
@@ -107,6 +127,40 @@ struct AuthenticationView: View {
         } message: {
             Text("If an account exists with that email, you will receive a password reset link.")
         }
+        .alert("Confirmation Email Sent", isPresented: $showResendSuccess) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text("We sent another confirmation email. Please check your inbox and spam folder.")
+        }
+        .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { _ in
+            if resendCooldownRemaining > 0 {
+                resendCooldownRemaining -= 1
+            }
+            if profileManager.pendingEmailConfirmation {
+                if verificationPollingElapsed < verificationPollingDurationSeconds {
+                    verificationPollingElapsed += 1
+                    if verificationPollingElapsed % verificationPollingIntervalSeconds == 0 {
+                        performAutoVerificationCheck()
+                    }
+                }
+            } else {
+                verificationPollingElapsed = 0
+            }
+        }
+        .onAppear {
+            if profileManager.pendingEmailConfirmation, SupabaseService.shared.isAuthenticated {
+                profileManager.clearPendingEmailConfirmation()
+            }
+            if isReinstallFlow {
+                viewModel.isSignUp = false
+            } else if coordinator.preferSignUpTabOnNextAuth {
+                viewModel.isSignUp = true
+                coordinator.consumePreferSignUpTab()
+            }
+            if profileManager.pendingEmailConfirmation {
+                verificationPollingElapsed = 0
+            }
+        }
         .onChange(of: profileManager.isLoggedIn) { _, isLoggedIn in
             if isLoggedIn {
                 if profileManager.hasCompletedPreferences {
@@ -115,6 +169,17 @@ struct AuthenticationView: View {
                     coordinator.completeSignUp()
                 }
             }
+        }
+    }
+
+    /// "Explore without an account" / "Maybe later" — closes auth and goes to main nav.
+    private var exploreWithoutAccountButton: some View {
+        Button {
+            onDismiss?()
+        } label: {
+            Text("Explore without an account")
+                .font(Font.bodySans(15, weight: .medium))
+                .foregroundColor(Color.luxuryMuted)
         }
     }
     
@@ -152,43 +217,108 @@ struct AuthenticationView: View {
         }
     }
     
-    private var confirmEmailSection: some View {
-        VStack(spacing: 24) {
+    /// Full-screen wait after sign-up: no actions that bypass verification; updates automatically when the confirm link opens in-app.
+    private var emailConfirmationWaitScreen: some View {
+        let pendingEmail = profileManager.pendingConfirmationEmail ?? viewModel.email
+
+        return VStack(spacing: 0) {
+            Spacer(minLength: 32)
+
             Image("Logo")
                 .resizable()
                 .aspectRatio(contentMode: .fit)
-                .frame(width: 100, height: 100)
-                .shadow(color: Color.luxuryGold.opacity(0.3), radius: 16)
-                .padding(.top, 60)
-            
-            Text("Confirm your email")
-                .font(Font.tangerine(32, weight: .bold))
+                .frame(width: 96, height: 96)
+                .shadow(color: Color.luxuryGold.opacity(0.35), radius: 18)
+
+            EmailConfirmationMagicalWaitView()
+                .padding(.top, 40)
+                .padding(.bottom, 28)
+
+            Text("Check your email")
+                .font(Font.tangerine(30, weight: .bold))
                 .italic()
                 .foregroundColor(Color.luxuryGold)
-            
-            Text("We sent a confirmation link to \(profileManager.pendingConfirmationEmail ?? viewModel.email). Open the link in that email to verify your account, then tap Continue below to sign in.")
+                .multilineTextAlignment(.center)
+
+            Text("We sent a confirmation link to")
                 .font(Font.bodySans(15, weight: .regular))
                 .foregroundColor(Color.luxuryCreamMuted)
+                .padding(.top, 16)
+
+            Text(pendingEmail)
+                .font(Font.bodySans(16, weight: .semibold))
+                .foregroundColor(Color.luxuryCream)
                 .multilineTextAlignment(.center)
-                .fixedSize(horizontal: false, vertical: true)
-            
-            Button {
-                performSignIn()
-            } label: {
-                Text("Continue to sign in")
-                    .frame(maxWidth: .infinity)
+                .padding(.horizontal, 8)
+
+            Text("If you confirmed in Safari or Mail, the app may not receive the link. Use “Already verified? Sign in” below with the same password you chose—or keep this screen open; we’ll retry signing you in automatically.")
+                .font(Font.bodySans(14, weight: .regular))
+                .foregroundColor(Color.luxuryMuted)
+                .multilineTextAlignment(.center)
+                .padding(.top, 20)
+                .padding(.horizontal, 4)
+
+            VStack(spacing: 12) {
+                mailAppQuickActions
+
+                Button {
+                    performResendConfirmationEmail()
+                } label: {
+                    Text(resendCooldownRemaining > 0 ? "Resend available in \(resendCooldownRemaining)s" : "Resend confirmation email")
+                        .font(Font.bodySans(15, weight: .semibold))
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(LuxuryGoldButtonStyle())
+                .disabled(viewModel.isLoading || resendCooldownRemaining > 0 || pendingEmail.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .opacity((viewModel.isLoading || resendCooldownRemaining > 0) ? 0.6 : 1)
+
+                Button {
+                    useDifferentEmail()
+                } label: {
+                    Text("Use a different email")
+                        .font(Font.bodySans(14, weight: .medium))
+                        .foregroundColor(Color.luxuryGold)
+                }
+
+                Button {
+                    transitionToSignInAfterVerification()
+                } label: {
+                    Text("Already verified? Sign in")
+                        .font(Font.bodySans(15, weight: .semibold))
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(LuxuryMaroonButtonStyle())
             }
-            .buttonStyle(LuxuryGoldButtonStyle())
-            .padding(.top, 16)
-            
-            Button {
-                profileManager.clearPendingEmailConfirmation()
-            } label: {
-                Text("Use a different email")
-                    .font(Font.bodySans(14, weight: .medium))
-                    .foregroundColor(Color.luxuryMuted)
+            .padding(.top, 24)
+            .padding(.horizontal, 8)
+
+            Text("Did not receive it yet? Check spam/promotions or use a different email.")
+                .font(Font.bodySans(12, weight: .regular))
+                .foregroundColor(Color.luxuryMuted)
+                .multilineTextAlignment(.center)
+                .padding(.top, 10)
+                .padding(.horizontal, 8)
+
+            if let resendFeedbackMessage {
+                Text(resendFeedbackMessage)
+                    .font(Font.bodySans(13, weight: .regular))
+                    .foregroundColor(Color.luxuryCreamMuted)
+                    .multilineTextAlignment(.center)
+                    .padding(.top, 10)
+                    .padding(.horizontal, 8)
             }
-            .padding(.top, 12)
+
+            Spacer(minLength: 48)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(.horizontal, 28)
+    }
+
+    private var mailAppQuickActions: some View {
+        HStack(spacing: 10) {
+            MailQuickActionButton(title: "Open Mail") {
+                openURLIfPossible(URL(string: "message://") ?? URL(string: "mailto:")!)
+            }
         }
     }
     
@@ -502,6 +632,126 @@ struct AuthenticationView: View {
             }
         }
     }
+
+    private func performResendConfirmationEmail() {
+        let email = (profileManager.pendingConfirmationEmail ?? viewModel.email)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+        guard !email.isEmpty, email.contains("@") else {
+            viewModel.errorMessage = "We couldn't find a valid email to resend to."
+            viewModel.showError = true
+            return
+        }
+
+        viewModel.isLoading = true
+        resendFeedbackMessage = nil
+
+        Task {
+            do {
+                try await UserProfileManager.shared.resendEmailConfirmation(to: email)
+                await MainActor.run {
+                    resendCooldownRemaining = 30
+                    showResendSuccess = true
+                    resendFeedbackMessage = "Sent to \(email)."
+                }
+            } catch {
+                await MainActor.run {
+                    viewModel.errorMessage = error.localizedDescription
+                    viewModel.showError = true
+                    resendFeedbackMessage = "Unable to resend right now. Please try again shortly."
+                }
+            }
+
+            await MainActor.run {
+                viewModel.isLoading = false
+            }
+        }
+    }
+
+    private func useDifferentEmail() {
+        let previousEmail = profileManager.pendingConfirmationEmail ?? viewModel.email
+        profileManager.clearPendingEmailConfirmation()
+        viewModel.isSignUp = true
+        viewModel.email = previousEmail
+        viewModel.password = ""
+        viewModel.confirmPassword = ""
+        resendFeedbackMessage = nil
+        resendCooldownRemaining = 0
+    }
+
+    /// Leaves the wait screen and shows Sign in with the pending email (password must be entered if not still in memory).
+    private func transitionToSignInAfterVerification() {
+        let email = profileManager.pendingConfirmationEmail ?? viewModel.email
+        profileManager.clearPendingEmailConfirmation()
+        viewModel.email = email
+        viewModel.isSignUp = false
+        resendFeedbackMessage = nil
+        resendCooldownRemaining = 0
+        verificationPollingElapsed = 0
+    }
+
+    private func performAutoVerificationCheck() {
+        guard profileManager.pendingEmailConfirmation else { return }
+        guard !isAutoCheckingVerification else { return }
+        isAutoCheckingVerification = true
+        Task {
+            defer {
+                Task { @MainActor in
+                    isAutoCheckingVerification = false
+                }
+            }
+            let email = await MainActor.run {
+                (profileManager.pendingConfirmationEmail ?? viewModel.email)
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                    .lowercased()
+            }
+            let password = await MainActor.run { viewModel.password }
+
+            // Confirming in Mail/Safari often never opens the app with tokens; sign-in still works once the address is verified.
+            if password.count >= 6, !email.isEmpty {
+                do {
+                    try await UserProfileManager.shared.signIn(email: email, password: password)
+                    return
+                } catch {
+                    // Unconfirmed, wrong password, or offline — fall through to refreshSession.
+                }
+            }
+
+            try? await SupabaseService.shared.refreshSession()
+        }
+    }
+
+    private func openURLIfPossible(_ url: URL?) {
+        guard let url else { return }
+        let app = UIApplication.shared
+        if app.canOpenURL(url) {
+            app.open(url)
+        } else if let fallback = URL(string: "mailto:"), app.canOpenURL(fallback) {
+            app.open(fallback)
+        }
+    }
+}
+
+private struct MailQuickActionButton: View {
+    let title: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Text(title)
+                .font(Font.bodySans(12, weight: .semibold))
+                .foregroundColor(Color.luxuryGold)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 7)
+                .frame(maxWidth: .infinity)
+                .background(Color.luxuryMaroonLight.opacity(0.7))
+                .cornerRadius(10)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(Color.luxuryGold.opacity(0.25), lineWidth: 1)
+                )
+        }
+    }
 }
 
 // MARK: - Reset Password Sheet
@@ -646,6 +896,50 @@ private struct AuthSecureField: View {
                         lineWidth: 1
                     )
             )
+        }
+    }
+}
+
+// MARK: - Email confirmation wait (magical ring + sparkles)
+
+private struct EmailConfirmationMagicalWaitView: View {
+    var body: some View {
+        TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: false)) { timeline in
+            let t = timeline.date.timeIntervalSinceReferenceDate
+            let spin = (t.truncatingRemainder(dividingBy: 10) / 10) * 360
+            let pulse = 0.9 + 0.1 * sin(t * 2.8)
+
+            ZStack {
+                ForEach(0..<10, id: \.self) { i in
+                    Image(systemName: "sparkle")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(Color.luxuryGold.opacity(0.88))
+                        .offset(y: -52)
+                        .rotationEffect(.degrees(Double(i) * 36 + spin))
+                }
+
+                Circle()
+                    .stroke(
+                        AngularGradient(
+                            colors: [
+                                Color.luxuryGold.opacity(0.2),
+                                Color.luxuryGold,
+                                Color.luxuryGold.opacity(0.55),
+                                Color.luxuryGold.opacity(0.2)
+                            ],
+                            center: .center
+                        ),
+                        lineWidth: 3.5
+                    )
+                    .frame(width: 96, height: 96)
+                    .rotationEffect(.degrees(-spin * 1.25))
+
+                Image(systemName: "envelope.open.fill")
+                    .font(.system(size: 28, weight: .medium))
+                    .foregroundStyle(LinearGradient.goldShimmer)
+                    .scaleEffect(pulse)
+            }
+            .frame(width: 128, height: 128)
         }
     }
 }

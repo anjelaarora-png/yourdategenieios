@@ -1,9 +1,10 @@
 import Foundation
 
 struct ITunesSongResult: Codable {
-    let trackId: Int
-    let trackName: String
-    let artistName: String
+    /// Optional so one malformed iTunes row does not fail the whole decode.
+    let trackId: Int?
+    let trackName: String?
+    let artistName: String?
     let collectionName: String?
     let artworkUrl60: String?
     let previewUrl: String?
@@ -19,6 +20,7 @@ struct ITunesSongResult: Codable {
 }
 
 struct ITunesSearchResponse: Codable {
+    let resultCount: Int?
     let results: [ITunesSongResult]
 }
 
@@ -30,6 +32,13 @@ enum ITunesSearchService {
     private static let previewCache = NSMapTable<NSString, NSString>.strongToStrongObjects()
     private static let cacheLock = NSLock()
     
+    /// Two-letter storefront (e.g. US, IN). Improves catalog + preview availability vs default.
+    private static var searchCountryCode: String {
+        let id = Locale.current.region?.identifier.uppercased() ?? "US"
+        if id.count == 2 { return id }
+        return "US"
+    }
+    
     static func searchSongs(query: String, limit: Int = 15) async throws -> [ITunesSongResult] {
         guard !query.trimmingCharacters(in: .whitespaces).isEmpty else { return [] }
         guard query.count >= 2 else { return [] }
@@ -39,7 +48,8 @@ enum ITunesSearchService {
             URLQueryItem(name: "term", value: query),
             URLQueryItem(name: "media", value: "music"),
             URLQueryItem(name: "entity", value: "song"),
-            URLQueryItem(name: "limit", value: "\(limit)")
+            URLQueryItem(name: "limit", value: "\(limit)"),
+            URLQueryItem(name: "country", value: searchCountryCode),
         ]
         guard let url = comp.url else { return [] }
         
@@ -61,9 +71,13 @@ enum ITunesSearchService {
         }
         cacheLock.unlock()
         do {
-            let query = "\(title) \(artist)".trimmingCharacters(in: .whitespaces)
-            let results = try await searchSongs(query: query, limit: 15)
-            let withPreview = results.filter { $0.previewUrl != nil }
+            let fullQuery = "\(title) \(artist)".trimmingCharacters(in: .whitespaces)
+            var results = try await searchSongs(query: fullQuery, limit: 25)
+            var withPreview = results.filter { ($0.previewUrl?.isEmpty == false) && $0.trackName != nil && $0.artistName != nil }
+            if withPreview.isEmpty, !title.trimmingCharacters(in: .whitespaces).isEmpty {
+                results = try await searchSongs(query: title.trimmingCharacters(in: .whitespaces), limit: 25)
+                withPreview = results.filter { ($0.previewUrl?.isEmpty == false) && $0.trackName != nil && $0.artistName != nil }
+            }
             guard !withPreview.isEmpty else { return nil }
             let best = bestMatch(title: title, artist: artist, from: withPreview)
             let url = best.previewUrl
@@ -98,8 +112,8 @@ enum ITunesSearchService {
     }
     
     private static func scoreMatch(title: String, artist: String, track: ITunesSongResult) -> Int {
-        let t = normalizeForMatch(track.trackName)
-        let a = normalizeForMatch(track.artistName)
+        let t = normalizeForMatch(track.trackName ?? "")
+        let a = normalizeForMatch(track.artistName ?? "")
         var score = 0
         if t.contains(title) || title.contains(t) { score += 10 }
         if a.contains(artist) || artist.contains(a) { score += 10 }

@@ -176,6 +176,8 @@ class UserProfileManager: ObservableObject {
     private let userProfileKey = "userProfile"
     private let preferencesCompleteKey = "hasCompletedPreferences"
     private let loggedInKey = "isLoggedIn"
+    private let pendingEmailConfirmationKey = "dateGenie_pendingEmailConfirmation"
+    private let pendingConfirmationEmailKey = "dateGenie_pendingConfirmationEmail"
     
     private var cancellables = Set<AnyCancellable>()
     
@@ -190,12 +192,25 @@ class UserProfileManager: ObservableObject {
         supabase.$isAuthenticated
             .receive(on: DispatchQueue.main)
             .sink { [weak self] isAuthenticated in
-                self?.isLoggedIn = isAuthenticated
+                guard let self = self else { return }
+                if self.pendingEmailConfirmation && !isAuthenticated {
+                    self.isLoggedIn = false
+                    return
+                }
                 if isAuthenticated {
-                    self?.pendingEmailConfirmation = false
-                    self?.pendingConfirmationEmail = nil
-                    self?.userId = self?.supabase.currentUser?.id
-                    self?.loadProfileFromDatabase()
+                    self.isLoggedIn = true
+                    UserDefaults.standard.set(true, forKey: self.loggedInKey)
+                    self.pendingEmailConfirmation = false
+                    self.pendingConfirmationEmail = nil
+                    self.persistPendingEmailConfirmationToDisk()
+                    self.userId = self.supabase.currentUser?.id
+                    self.keychain.setHasEverLoggedIn(true)
+                    self.loadProfileFromDatabase()
+                } else {
+                    // Do not trust keychain alone: stale tokens skip auth and can show the preferences
+                    // questionnaire without a valid Supabase session (e.g. after reinstall / failed restore).
+                    self.isLoggedIn = false
+                    UserDefaults.standard.set(false, forKey: self.loggedInKey)
                 }
             }
             .store(in: &cancellables)
@@ -216,13 +231,13 @@ class UserProfileManager: ObservableObject {
         defer { Task { await setLoading(false) } }
         
         let name = [firstName, lastName].filter { !$0.isEmpty }.joined(separator: " ")
-        let supabaseUser = try await supabase.signUp(
+        let signUpResult = try await supabase.signUp(
             email: email,
             password: password,
             name: name
         )
+        let supabaseUser = signUpResult.user
         
-        let hasSession = supabase.isAuthenticated
         await MainActor.run {
             var profile = UserProfile()
             profile.firstName = firstName
@@ -232,21 +247,31 @@ class UserProfileManager: ObservableObject {
             profile.dateOfBirth = dateOfBirth
             profile.location = location
             self.currentUser = profile
-            self.userId = supabaseUser.id
-            if hasSession {
-                self.isLoggedIn = true
-                UserDefaults.standard.set(true, forKey: self.loggedInKey)
-                self.pendingEmailConfirmation = false
-                self.pendingConfirmationEmail = nil
-            } else {
+            
+            if signUpResult.requiresEmailVerification {
+                self.userId = nil
                 self.isLoggedIn = false
                 UserDefaults.standard.set(false, forKey: self.loggedInKey)
                 self.pendingEmailConfirmation = true
                 self.pendingConfirmationEmail = email.lowercased()
+            } else if self.supabase.isAuthenticated {
+                self.userId = supabaseUser.id
+                self.isLoggedIn = true
+                UserDefaults.standard.set(true, forKey: self.loggedInKey)
+                self.pendingEmailConfirmation = false
+                self.pendingConfirmationEmail = nil
+                self.keychain.setHasEverLoggedIn(true)
+            } else {
+                self.userId = nil
+                self.isLoggedIn = false
+                UserDefaults.standard.set(false, forKey: self.loggedInKey)
+                self.pendingEmailConfirmation = false
+                self.pendingConfirmationEmail = nil
             }
+            self.persistPendingEmailConfirmationToDisk()
         }
         
-        if hasSession, let uid = userId {
+        if !signUpResult.requiresEmailVerification, supabase.isAuthenticated, let uid = userId {
             let couple = try await supabase.getCoupleForUser(userId: uid)
             await MainActor.run {
                 self.coupleId = couple?.coupleId
@@ -259,35 +284,60 @@ class UserProfileManager: ObservableObject {
         defer { Task { await setLoading(false) } }
         
         let supabaseUser = try await supabase.signIn(email: email, password: password)
+        let name = [supabaseUser.firstName, supabaseUser.lastName].filter { !$0.isEmpty }.joined(separator: " ")
         
-        if let dbUser = try await supabase.getUser(userId: supabaseUser.id) {
-            let preferences = try await supabase.getPreferences(userId: supabaseUser.id)
-            let couple = try await supabase.getCoupleForUser(userId: supabaseUser.id)
-            
-                await MainActor.run {
-                var profile = UserProfile()
-                profile.firstName = supabaseUser.firstName
-                profile.lastName = supabaseUser.lastName
+        // Ensure user + couple exist (e.g. after reinstall or if backend trigger didn't run when they signed up)
+        do {
+            try await supabase.ensureUserAndCoupleIfMissing(
+                userId: supabaseUser.id,
+                email: supabaseUser.email ?? email,
+                name: name.isEmpty ? (supabaseUser.email ?? email) : name
+            )
+        } catch {
+            print("ensureUserAndCoupleIfMissing after signIn: \(error)")
+        }
+        
+        let dbUser = try await supabase.getUser(userId: supabaseUser.id)
+        let preferences = try await supabase.getPreferences(userId: supabaseUser.id)
+        let couple = try await supabase.getCoupleForUser(userId: supabaseUser.id)
+        
+        await MainActor.run {
+            var profile = UserProfile()
+            if let dbUser = dbUser {
+                let nameParts = dbUser.name.components(separatedBy: " ")
+                profile.firstName = nameParts.first ?? ""
+                profile.lastName = nameParts.count > 1 ? nameParts.dropFirst().joined(separator: " ") : ""
                 profile.email = dbUser.email
                 profile.dateOfBirth = dbUser.birthday
                 profile.location = dbUser.homeAddress ?? ""
-                // Preserve phone from local profile if present (not in DB)
-                if let existing = self.currentUser, !existing.phoneNumber.isEmpty {
-                    profile.phoneNumber = existing.phoneNumber
-                }
-                
-                if let prefs = preferences {
-                    profile.preferences = self.convertToDatePreferences(prefs)
-                    self.hasCompletedPreferences = true
-                }
-                
-                self.currentUser = profile
-                self.userId = supabaseUser.id
-                self.coupleId = couple?.coupleId
-                self.isLoggedIn = true
-                UserDefaults.standard.set(true, forKey: self.loggedInKey)
-                UserDefaults.standard.set(self.hasCompletedPreferences, forKey: self.preferencesCompleteKey)
+            } else {
+                profile.firstName = supabaseUser.firstName
+                profile.lastName = supabaseUser.lastName
+                profile.email = supabaseUser.email ?? email
             }
+            if let existing = self.currentUser, !existing.phoneNumber.isEmpty {
+                profile.phoneNumber = existing.phoneNumber
+            }
+            if let prefs = preferences {
+                profile.preferences = self.convertToDatePreferences(prefs)
+                self.hasCompletedPreferences = true
+            }
+            self.currentUser = profile
+            self.userId = supabaseUser.id
+            self.coupleId = couple?.coupleId
+            self.isLoggedIn = true
+            UserDefaults.standard.set(true, forKey: self.loggedInKey)
+            UserDefaults.standard.set(self.hasCompletedPreferences, forKey: self.preferencesCompleteKey)
+            self.keychain.setHasEverLoggedIn(true)
+        }
+        if let cid = couple?.coupleId {
+            NavigationCoordinator.shared.syncDatePlansFromCloud(coupleId: cid)
+            PlaylistStorageManager.shared.syncFromSupabaseWhenLoggedIn(coupleId: cid)
+            PartnerSessionManager.shared.restoreFromSupabaseIfNeeded(userId: supabaseUser.id)
+        }
+        MemoryManager.shared.syncMemoriesFromCloud(userId: supabaseUser.id)
+        Task {
+            await UserIosContentSync.syncFromSupabase(userId: supabaseUser.id)
         }
     }
     
@@ -301,17 +351,24 @@ class UserProfileManager: ObservableObject {
         coupleId = nil
         pendingEmailConfirmation = false
         pendingConfirmationEmail = nil
+        persistPendingEmailConfirmationToDisk()
         UserDefaults.standard.set(false, forKey: loggedInKey)
+        PartnerSessionManager.shared.clearSession()
     }
     
     /// Call when user wants to go back from "Confirm your email" to the sign-up form.
     func clearPendingEmailConfirmation() {
         pendingEmailConfirmation = false
         pendingConfirmationEmail = nil
+        persistPendingEmailConfirmationToDisk()
     }
     
     func sendPasswordReset(to email: String) async throws {
         try await supabase.sendPasswordReset(email: email)
+    }
+
+    func resendEmailConfirmation(to email: String) async throws {
+        try await supabase.resendSignUpConfirmation(email: email)
     }
     
     func deleteAccount(password: String) async throws {
@@ -332,40 +389,77 @@ class UserProfileManager: ObservableObject {
         
         Task {
             do {
-                if let dbUser = try await supabase.getUser(userId: uid) {
-                    let preferences = try await supabase.getPreferences(userId: uid)
-                    let couple = try await supabase.getCoupleForUser(userId: uid)
-                    
-                    await MainActor.run {
-                        var profile = UserProfile()
-                        let nameParts = dbUser.name.components(separatedBy: " ")
-                        profile.firstName = nameParts.first ?? ""
-                        profile.lastName = nameParts.count > 1 ? nameParts.dropFirst().joined(separator: " ") : ""
-                        profile.email = dbUser.email
-                        profile.dateOfBirth = dbUser.birthday
-                        profile.location = dbUser.homeAddress ?? ""
-                        // Preserve phone from local profile (not stored in DB yet)
-                        if let existing = self.currentUser, !existing.phoneNumber.isEmpty {
-                            profile.phoneNumber = existing.phoneNumber
+                var dbUser = try await supabase.getUser(userId: uid)
+                if dbUser == nil {
+                    let context = await MainActor.run { () -> (email: String, name: String) in
+                        let em = self.currentUser?.email ?? self.supabase.currentUser?.email ?? ""
+                        let fromProfile = self.currentUser?.fullName.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                        if !fromProfile.isEmpty { return (em, fromProfile) }
+                        if let n = self.supabase.currentUser?.name?.trimmingCharacters(in: .whitespacesAndNewlines), !n.isEmpty {
+                            return (em, n)
                         }
-                        
-                        if let prefs = preferences {
-                            profile.preferences = self.convertToDatePreferences(prefs)
-                            self.hasCompletedPreferences = true
+                        let fallback: String
+                        if !em.isEmpty {
+                            fallback = em.split(separator: "@").first.map { String($0) } ?? "User"
+                        } else {
+                            fallback = "User"
                         }
-                        
-                        self.currentUser = profile
-                        self.coupleId = couple?.coupleId
-                        if let cid = couple?.coupleId {
-                            NavigationCoordinator.shared.syncDatePlansFromCloud(coupleId: cid)
-                            MemoryManager.shared.syncMemoriesFromCloud(coupleId: cid)
-                        }
-                        self.isProfileComplete = !profile.firstName.isEmpty
+                        return (em, fallback)
                     }
+                    do {
+                        try await supabase.ensureUserAndCoupleIfMissing(
+                            userId: uid,
+                            email: context.email.lowercased(),
+                            name: context.name
+                        )
+                    } catch {
+                        print("ensureUserAndCoupleIfMissing in loadProfileFromDatabase: \(error)")
+                    }
+                    dbUser = try await supabase.getUser(userId: uid)
                 }
+                
+                guard let dbUser = dbUser else {
+                    print("loadProfileFromDatabase: no public.users row for \(uid) after ensure")
+                    await MainActor.run { self.loadLocalProfile() }
+                    return
+                }
+                
+                let preferences = try await supabase.getPreferences(userId: uid)
+                let couple = try await supabase.getCoupleForUser(userId: uid)
+                
+                await MainActor.run {
+                    var profile = UserProfile()
+                    let nameParts = dbUser.name.components(separatedBy: " ")
+                    profile.firstName = nameParts.first ?? ""
+                    profile.lastName = nameParts.count > 1 ? nameParts.dropFirst().joined(separator: " ") : ""
+                    profile.email = dbUser.email
+                    profile.dateOfBirth = dbUser.birthday
+                    profile.location = dbUser.homeAddress ?? ""
+                    if let existing = self.currentUser, !existing.phoneNumber.isEmpty {
+                        profile.phoneNumber = existing.phoneNumber
+                    }
+                    
+                    if let prefs = preferences {
+                        profile.preferences = self.convertToDatePreferences(prefs)
+                        self.hasCompletedPreferences = true
+                    }
+                    
+                    self.currentUser = profile
+                    self.coupleId = couple?.coupleId
+                    if let cid = couple?.coupleId {
+                        NavigationCoordinator.shared.syncDatePlansFromCloud(coupleId: cid)
+                        PlaylistStorageManager.shared.syncFromSupabaseWhenLoggedIn(coupleId: cid)
+                        if let uid = self.userId {
+                            PartnerSessionManager.shared.restoreFromSupabaseIfNeeded(userId: uid)
+                        }
+                    }
+                    MemoryManager.shared.syncMemoriesFromCloud(userId: uid)
+                    self.isProfileComplete = !profile.firstName.isEmpty
+                }
+                await UserIosContentSync.syncFromSupabase(userId: uid)
             } catch {
                 print("Failed to load profile from database: \(error)")
-                loadLocalProfile()
+                await MainActor.run { self.loadLocalProfile() }
             }
         }
     }
@@ -377,10 +471,53 @@ class UserProfileManager: ObservableObject {
         hasCompletedPreferences = true
         UserDefaults.standard.set(true, forKey: preferencesCompleteKey)
         
-        if let uid = userId {
-            Task {
-                let dbPrefs = convertToDBPreferences(preferences, userId: uid)
-                _ = try? await supabase.savePreferences(dbPrefs)
+        Task {
+            print("[updatePreferences] called")
+            do {
+                let sessionUserId = try await supabase.syncAuthSessionAndReturnUserId()
+                await MainActor.run {
+                    if self.userId == nil { self.userId = sessionUserId }
+                }
+                let uid = sessionUserId
+                print("[updatePreferences] using user_id from auth.session: \(uid)")
+                let context = await MainActor.run { () -> (email: String, name: String) in
+                    let em = self.currentUser?.email ?? self.supabase.currentUser?.email ?? ""
+                    let fromProfile = self.currentUser?.fullName.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                    if !fromProfile.isEmpty { return (em, fromProfile) }
+                    if let n = self.supabase.currentUser?.name?.trimmingCharacters(in: .whitespacesAndNewlines), !n.isEmpty {
+                        return (em, n)
+                    }
+                    let fallback: String
+                    if !em.isEmpty {
+                        fallback = em.split(separator: "@").first.map { String($0) } ?? "User"
+                    } else {
+                        fallback = "User"
+                    }
+                    return (em, fallback)
+                }
+                print("[updatePreferences] before ensureUserAndCoupleIfMissing")
+                try await supabase.ensureUserAndCoupleIfMissing(
+                    userId: uid,
+                    email: context.email.lowercased(),
+                    name: context.name
+                )
+                let couple = try await supabase.getCoupleForUser(userId: uid)
+                let existingPrefs = try await supabase.getPreferences(userId: uid)
+                let cid = couple?.coupleId
+                await MainActor.run {
+                    if let cid = cid { self.coupleId = cid }
+                }
+                let dbPrefs = convertToDBPreferences(
+                    preferences,
+                    userId: uid,
+                    coupleId: cid,
+                    existingPreferenceId: existingPrefs?.preferenceId
+                )
+                print("[updatePreferences] before savePreferences (upsert)")
+                _ = try await supabase.savePreferences(dbPrefs)
+                print("[updatePreferences] savePreferences success user_id=\(uid)")
+            } catch {
+                print("[updatePreferences] error: \(error)")
             }
         }
     }
@@ -401,6 +538,8 @@ class UserProfileManager: ObservableObject {
         prefs.hardNos = data.hardNos
         prefs.accessibilityNeeds = data.accessibilityNeeds
         prefs.dietaryRestrictions = data.dietaryRestrictions
+        let langs = (data.loveLanguageRaws ?? []).compactMap { LoveLanguage(rawValue: $0) }
+        prefs.loveLanguages = langs.isEmpty ? [.qualityTime] : langs
         updatePreferences(prefs)
     }
     
@@ -420,7 +559,7 @@ class UserProfileManager: ObservableObject {
         profile.dateOfBirth = dateOfBirth
         profile.location = location
         currentUser = profile
-        
+
         if let uid = userId {
             Task {
                 let name = [firstName, lastName].filter { !$0.isEmpty }.joined(separator: " ")
@@ -435,6 +574,39 @@ class UserProfileManager: ObservableObject {
                     travelMode: nil
                 )
                 try? await supabase.updateUser(dbUser)
+            }
+        }
+    }
+
+    /// Update account display info (name, email, phone). Name and email sync to Supabase; phone is local-only.
+    func updateAccountInfo(firstName: String, lastName: String, email: String, phoneNumber: String) {
+        guard var profile = currentUser else { return }
+        profile.firstName = firstName
+        profile.lastName = lastName
+        profile.email = email
+        profile.phoneNumber = phoneNumber
+        currentUser = profile
+
+        if let uid = userId {
+            Task {
+                do {
+                    guard let existing = try await supabase.getUser(userId: uid) else { return }
+                    let name = [firstName, lastName].filter { !$0.isEmpty }.joined(separator: " ")
+                    let dbUser = DBUser(
+                        userId: uid,
+                        name: name,
+                        email: email.trimmingCharacters(in: .whitespaces).lowercased(),
+                        passwordHash: existing.passwordHash,
+                        gender: existing.gender,
+                        birthday: existing.birthday,
+                        homeAddress: existing.homeAddress,
+                        travelMode: existing.travelMode,
+                        createdAt: existing.createdAt
+                    )
+                    try await supabase.updateUser(dbUser)
+                } catch {
+                    print("Failed to update account in database: \(error)")
+                }
             }
         }
     }
@@ -456,9 +628,32 @@ class UserProfileManager: ObservableObject {
     // MARK: - Local Storage Helpers
     
     private func loadLocalState() {
-        isLoggedIn = supabase.isAuthenticated || UserDefaults.standard.bool(forKey: loggedInKey)
+        pendingEmailConfirmation = UserDefaults.standard.bool(forKey: pendingEmailConfirmationKey)
+        pendingConfirmationEmail = pendingEmailConfirmation
+            ? UserDefaults.standard.string(forKey: pendingConfirmationEmailKey)
+            : nil
+        
+        if pendingEmailConfirmation {
+            isLoggedIn = false
+            UserDefaults.standard.set(false, forKey: loggedInKey)
+        } else {
+            // Only the Supabase SDK session counts as logged in (not UserDefaults, not keychain hints).
+            isLoggedIn = supabase.isAuthenticated
+            if UserDefaults.standard.bool(forKey: loggedInKey) && !supabase.isAuthenticated {
+                UserDefaults.standard.set(false, forKey: loggedInKey)
+            }
+        }
         hasCompletedPreferences = UserDefaults.standard.bool(forKey: preferencesCompleteKey)
         loadLocalProfile()
+    }
+    
+    private func persistPendingEmailConfirmationToDisk() {
+        UserDefaults.standard.set(pendingEmailConfirmation, forKey: pendingEmailConfirmationKey)
+        if pendingEmailConfirmation, let email = pendingConfirmationEmail {
+            UserDefaults.standard.set(email, forKey: pendingConfirmationEmailKey)
+        } else {
+            UserDefaults.standard.removeObject(forKey: pendingConfirmationEmailKey)
+        }
     }
     
     private func loadLocalProfile() {
@@ -488,13 +683,22 @@ class UserProfileManager: ObservableObject {
     
     // MARK: - Conversion Helpers
     
-    private func convertToDBPreferences(_ prefs: DatePreferences, userId: UUID) -> DBPreferences {
+    private func convertToDBPreferences(
+        _ prefs: DatePreferences,
+        userId: UUID,
+        coupleId explicitCoupleId: UUID? = nil,
+        existingPreferenceId: UUID? = nil
+    ) -> DBPreferences {
         DBPreferences(
+            preferenceId: existingPreferenceId ?? UUID(),
             userId: userId,
-            coupleId: coupleId,
+            coupleId: explicitCoupleId ?? coupleId,
+            defaultCity: prefs.defaultCity.isEmpty ? nil : prefs.defaultCity,
+            defaultStartingPoint: prefs.defaultStartingPoint.isEmpty ? nil : prefs.defaultStartingPoint,
             cuisineTypes: prefs.favoriteCuisines.isEmpty ? nil : prefs.favoriteCuisines,
             activityTypes: prefs.favoriteActivities.isEmpty ? nil : prefs.favoriteActivities,
             drinkPreferences: prefs.beveragePreferences.isEmpty ? nil : prefs.beveragePreferences,
+            dietaryRestrictions: prefs.dietaryRestrictions.isEmpty ? nil : prefs.dietaryRestrictions,
             budgetRange: prefs.defaultBudget.isEmpty ? nil : prefs.defaultBudget,
             loveLanguages: prefs.loveLanguages.map { $0.rawValue },
             foodAllergies: prefs.allergies.isEmpty ? nil : prefs.allergies,
@@ -507,9 +711,12 @@ class UserProfileManager: ObservableObject {
     
     private func convertToDatePreferences(_ dbPrefs: DBPreferences) -> DatePreferences {
         var prefs = DatePreferences()
+        prefs.defaultCity = dbPrefs.defaultCity ?? ""
+        prefs.defaultStartingPoint = dbPrefs.defaultStartingPoint ?? ""
         prefs.favoriteCuisines = dbPrefs.cuisineTypes ?? []
         prefs.favoriteActivities = dbPrefs.activityTypes ?? []
         prefs.beveragePreferences = dbPrefs.drinkPreferences ?? []
+        prefs.dietaryRestrictions = dbPrefs.dietaryRestrictions ?? []
         prefs.defaultBudget = dbPrefs.budgetRange ?? ""
         prefs.loveLanguages = (dbPrefs.loveLanguages ?? []).compactMap { LoveLanguage(rawValue: $0) }
         if prefs.loveLanguages.isEmpty { prefs.loveLanguages = [.qualityTime] }
@@ -559,6 +766,12 @@ class UserProfileManager: ObservableObject {
         }
         data.userGender = prefs.gender.rawValue
         data.partnerGender = prefs.partnerGender.rawValue
+        data.loveLanguageRaws = prefs.loveLanguages.map(\.rawValue)
+    }
+
+    /// Applies saved profile preferences into questionnaire data (alias intent: single entry point for planning pre-fill).
+    func applySavedPreferences(to data: inout QuestionnaireData) {
+        prePopulateQuestionnaireData(&data)
     }
 }
 

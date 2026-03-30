@@ -30,10 +30,20 @@ struct YourDateGenieApp: App {
     }
     
     private func handleDeepLink(_ url: URL) {
-        guard url.scheme == "yourdategenie" else { return }
-        
+        // Support both app scheme and https (universal link) for partner join
+        let scheme = url.scheme ?? ""
         let host = url.host ?? ""
-        
+        let path = url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+
+        if scheme == "https", host.contains("yourdategenie"), path == "partner/join" {
+            if let sessionId = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.first(where: { $0.name == "session" })?.value {
+                coordinator.showPartnerJoin(sessionId: sessionId, inviterName: nil)
+            }
+            return
+        }
+
+        guard scheme == "yourdategenie" else { return }
+
         switch host {
         case "auth-callback":
             handleAuthCallback(url)
@@ -41,6 +51,10 @@ struct YourDateGenieApp: App {
             coordinator.dismissToHome()
         case "plan":
             break
+        case "partner":
+            if path == "join", let sessionId = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.first(where: { $0.name == "session" })?.value {
+                coordinator.showPartnerJoin(sessionId: sessionId, inviterName: nil)
+            }
         default:
             print("Unknown deep link: \(url)")
         }
@@ -55,8 +69,24 @@ struct YourDateGenieApp: App {
             Task {
                 do {
                     try await supabase.handleAuthCallback(accessToken: accessToken, refreshToken: refreshToken)
+                    let ensuredUser: (UUID, String, String)? = await MainActor.run {
+                        guard let user = supabase.currentUser else { return nil }
+                        let displayName = [user.firstName, user.lastName].filter { !$0.isEmpty }.joined(separator: " ")
+                        let nameForRow = displayName.isEmpty ? (user.email ?? "Guest") : displayName
+                        return (user.id, user.email ?? "", nameForRow)
+                    }
+                    if let (uid, email, name) = ensuredUser {
+                        do {
+                            try await supabase.ensureUserAndCoupleIfMissing(userId: uid, email: email, name: name)
+                        } catch {
+                            print("ensureUserAndCoupleIfMissing after auth callback: \(error)")
+                        }
+                    }
                     await MainActor.run {
                         coordinator.completeSignIn()
+                        if !UserProfileManager.shared.hasCompletedPreferences {
+                            coordinator.presentHeroBeforeInitialPreferences = true
+                        }
                     }
                 } catch {
                     print("Auth callback error: \(error)")
@@ -65,14 +95,8 @@ struct YourDateGenieApp: App {
             return
         }
         
-        // type=email_confirmation without tokens: user confirmed in browser; still need to sign in in app
-        if params["type"] == "email_confirmation" {
-            Task {
-                await MainActor.run {
-                    coordinator.completeSignIn()
-                }
-            }
-        }
+        // type=email_confirmation without tokens: link may have opened in browser only. We intentionally
+        // do not clear pending email state here — the user should open the link in the app or sign in after verifying.
     }
     
     /// Parses access_token, refresh_token, type etc. from URL query and/or fragment (Supabase uses fragment for redirects).

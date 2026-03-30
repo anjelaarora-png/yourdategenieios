@@ -7,6 +7,7 @@ struct SettingsSheetView: View {
     @ObservedObject private var profileManager = UserProfileManager.shared
     @State private var preferredMapsApp: String = UserDefaults.standard.string(forKey: "dateGenie_preferredMapsApp") ?? "apple"
     @State private var showMapsPicker = false
+    @State private var showEditAccount = false
 
     private var userProfile: UserProfile? {
         profileManager.currentUser
@@ -22,10 +23,19 @@ struct SettingsSheetView: View {
                     VStack(alignment: .leading, spacing: 24) {
                         // MARK: - Account (name, email, phone)
                         VStack(alignment: .leading, spacing: 16) {
-                            HStack(spacing: 6) {
+                            HStack {
                                 Text("Account")
                                     .font(Font.header(18, weight: .semibold))
                                     .foregroundColor(Color.luxuryCream)
+                                Spacer()
+                                Button {
+                                    showEditAccount = true
+                                } label: {
+                                    Text("Edit")
+                                        .font(Font.bodySans(14, weight: .semibold))
+                                        .foregroundColor(Color.luxuryGold)
+                                }
+                                .buttonStyle(.plain)
                             }
                             VStack(alignment: .leading, spacing: 14) {
                                 SettingsAccountRow(
@@ -133,6 +143,9 @@ struct SettingsSheetView: View {
                     }
                     .padding(20)
                 }
+            }
+            .sheet(isPresented: $showEditAccount) {
+                EditAccountSheetView()
             }
             .confirmationDialog("Maps app", isPresented: $showMapsPicker) {
                 Button("Apple Maps") {

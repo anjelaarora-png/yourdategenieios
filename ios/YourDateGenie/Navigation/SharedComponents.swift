@@ -1,6 +1,6 @@
 import SwiftUI
 
-// MARK: - Luxury Quick Tile (tab-bar style: icon + label, matches bottom pane)
+// MARK: - Luxury Quick Tile (icon + label; use .frame(maxWidth: .infinity) for even distribution in a row)
 struct LuxuryQuickTile: View {
     let icon: String
     let title: String
@@ -9,22 +9,26 @@ struct LuxuryQuickTile: View {
     
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 6) {
+            VStack(spacing: 8) {
                 ZStack {
                     Circle()
                         .fill(color.opacity(0.2))
-                        .frame(width: 52, height: 52)
+                        .frame(width: 48, height: 48)
                     Image(systemName: icon)
                         .font(.system(size: 22))
+                        .symbolRenderingMode(.monochrome)
                         .foregroundColor(color)
                 }
                 Text(title)
-                    .font(Font.bodySans(11, weight: .medium))
+                    .font(Font.bodySans(12, weight: .medium))
                     .foregroundColor(Color.luxuryCream)
                     .lineLimit(2)
                     .multilineTextAlignment(.center)
+                    .truncationMode(.tail)
+                    .minimumScaleFactor(0.85)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            .frame(width: 72)
+            .frame(maxWidth: .infinity)
         }
         .buttonStyle(.plain)
     }

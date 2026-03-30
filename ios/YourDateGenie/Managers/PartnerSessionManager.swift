@@ -21,6 +21,12 @@ final class PartnerSessionManager: ObservableObject {
         case bothFilled
     }
     
+    /// One proposed date/time slot (e.g. "Fri eve", "Sat eve", "Sun noon").
+    struct ProposedDateTime: Codable, Equatable {
+        var date: Date
+        var timeLabel: String
+    }
+
     struct InviteInfo: Codable {
         var partnerName: String
         var partnerEmail: String
@@ -28,6 +34,8 @@ final class PartnerSessionManager: ObservableObject {
         var sentAt: Date
         var plannedDate: Date?
         var plannedTime: String?
+        var specialNotes: String?
+        var proposedDateTimes: [ProposedDateTime]?
     }
     
     struct SessionInfo: Codable {
@@ -56,20 +64,53 @@ final class PartnerSessionManager: ObservableObject {
         let session = SessionInfo(sessionId: id, state: .none, inviterName: inviterName)
         saveSession(session)
         saveState()
+        pushSessionToSupabaseIfNeeded()
         return id
     }
     
-    /// Returns the shareable join URL for the current session. Call after createSession or when invite was already sent.
+    /// Returns the shareable join URL for the current session. Prefer app scheme so partner's app opens directly.
     func getJoinURL() -> URL? {
+        guard let id = sessionId ?? loadSessionId() else { return nil }
+        var comp = URLComponents(string: "yourdategenie://partner/join")!
+        comp.queryItems = [URLQueryItem(name: "session", value: id)]
+        return comp.url
+    }
+
+    /// HTTPS join URL for web fallback or when sharing to users who may not have the app.
+    func getJoinURLWeb() -> URL? {
         guard let id = sessionId ?? loadSessionId() else { return nil }
         var comp = URLComponents(string: "https://yourdategenie.com/partner/join")!
         comp.queryItems = [URLQueryItem(name: "session", value: id)]
         return comp.url
     }
+
+    /// Default three date/time slots: this weekend Fri eve, Sat eve, Sun noon.
+    static func defaultProposedDateTimes() -> [ProposedDateTime] {
+        let cal = Calendar.current
+        let now = Date()
+        var result: [ProposedDateTime] = []
+        guard let nextFriday = cal.nextDate(after: now, matching: DateComponents(weekday: 6), matchingPolicy: .nextTime),
+              let nextSaturday = cal.nextDate(after: now, matching: DateComponents(weekday: 7), matchingPolicy: .nextTime),
+              let nextSunday = cal.nextDate(after: now, matching: DateComponents(weekday: 1), matchingPolicy: .nextTime) else {
+            return [
+                ProposedDateTime(date: now, timeLabel: "Fri eve"),
+                ProposedDateTime(date: now.addingTimeInterval(86400), timeLabel: "Sat eve"),
+                ProposedDateTime(date: now.addingTimeInterval(2 * 86400), timeLabel: "Sun noon")
+            ]
+        }
+        result.append(ProposedDateTime(date: nextFriday, timeLabel: "Fri eve"))
+        result.append(ProposedDateTime(date: nextSaturday, timeLabel: "Sat eve"))
+        result.append(ProposedDateTime(date: nextSunday, timeLabel: "Sun noon"))
+        return result
+    }
     
-    /// Pre-filled message for share sheet. Includes planned date/time when set.
+    /// Pre-filled message for share sheet. Includes proposed date times when set.
     func getShareMessage() -> String {
-        let link = getJoinURL()?.absoluteString ?? ""
+        let link = getJoinURL()?.absoluteString ?? getJoinURLWeb()?.absoluteString ?? ""
+        if let slots = inviteInfo?.proposedDateTimes, !slots.isEmpty {
+            let labels = slots.map(\.timeLabel).joined(separator: ", ")
+            return "Let's plan a date — I'm thinking \(labels). Add your preferences here: \(link)"
+        }
         if let date = inviteInfo?.plannedDate, let time = inviteInfo?.plannedTime, !time.isEmpty {
             let formatter = DateFormatter()
             formatter.dateFormat = "EEEE, MMMM d"
@@ -101,14 +142,16 @@ final class PartnerSessionManager: ObservableObject {
     
     // MARK: - Invite
     
-    func saveInvite(partnerName: String, partnerEmail: String, message: String, plannedDate: Date? = nil, plannedTime: String? = nil) {
+    func saveInvite(partnerName: String, partnerEmail: String, message: String, plannedDate: Date? = nil, plannedTime: String? = nil, specialNotes: String? = nil, proposedDateTimes: [ProposedDateTime]? = nil) {
         let info = InviteInfo(
             partnerName: partnerName,
             partnerEmail: partnerEmail,
             message: message,
             sentAt: Date(),
             plannedDate: plannedDate,
-            plannedTime: plannedTime
+            plannedTime: plannedTime,
+            specialNotes: specialNotes,
+            proposedDateTimes: proposedDateTimes
         )
         inviteInfo = info
         if sessionId == nil {
@@ -124,6 +167,7 @@ final class PartnerSessionManager: ObservableObject {
             UserDefaults.standard.set(data, forKey: Self.inviteKey)
         }
         saveState()
+        pushSessionToSupabaseIfNeeded()
     }
     
     // MARK: - Partner state
@@ -141,6 +185,7 @@ final class PartnerSessionManager: ObservableObject {
         partnerState = .inviterFilled
         updateSessionState(.inviterFilled)
         saveState()
+        pushSessionToSupabaseIfNeeded()
     }
     
     func setPartnerFilled(_ data: QuestionnaireData) {
@@ -156,6 +201,27 @@ final class PartnerSessionManager: ObservableObject {
         partnerState = .bothFilled
         updateSessionState(.bothFilled)
         saveState()
+    }
+
+    /// Inviter side: when backend returns partner_data, write it locally and mark both filled so merge/generate can run.
+    func setPartnerDataFromBackend(_ data: QuestionnaireData) {
+        if let encoded = try? JSONEncoder().encode(data) {
+            UserDefaults.standard.set(encoded, forKey: Self.partnerDataKey)
+        }
+        partnerState = .partnerFilled
+        updateSessionState(.partnerFilled)
+        markBothFilled()
+        saveState()
+    }
+
+    /// Partner (on their device) submits their data for a session they joined via link. Posts to backend when available.
+    func submitPartnerData(sessionId: String, data: QuestionnaireData) {
+        if let encoded = try? JSONEncoder().encode(data) {
+            UserDefaults.standard.set(encoded, forKey: "dateGenie_partnerSubmit_\(sessionId)")
+        }
+        Task {
+            try? await SupabaseService.shared.submitPartnerSessionPartnerData(sessionId: sessionId, partnerData: data)
+        }
     }
     
     private func updateSessionState(_ state: PartnerState) {
@@ -228,6 +294,17 @@ final class PartnerSessionManager: ObservableObject {
         return result
     }
     
+    /// Switch to a session from Pending list (invite sent, waiting for partner). Call after fetching session from backend.
+    func switchToSession(sessionId: String, inviterName: String?) {
+        self.sessionId = sessionId
+        self.inviterName = inviterName
+        self.partnerState = .inviteSent
+        self.inviteInfo = nil
+        let session = SessionInfo(sessionId: sessionId, state: .inviteSent, inviterName: inviterName)
+        saveSession(session)
+        objectWillChange.send()
+    }
+
     // MARK: - Reset
     
     func clearSession() {
@@ -265,5 +342,58 @@ final class PartnerSessionManager: ObservableObject {
             saveSession(session)
         }
         objectWillChange.send()
+    }
+    
+    // MARK: - Supabase sync (survives reinstall when logged in)
+    
+    private func pushSessionToSupabaseIfNeeded() {
+        guard let userId = UserProfileManager.shared.userId,
+              let sid = sessionId else { return }
+        let inviterName = self.inviterName ?? UserProfileManager.shared.currentUser?.firstName ?? "A friend"
+        let inviterData = loadInviterData()
+        let plannedDates: [DBProposedDateTime]? = inviteInfo?.proposedDateTimes?.map { DBProposedDateTime(date: $0.date, timeLabel: $0.timeLabel) }
+        let notes = inviteInfo?.specialNotes
+        Task {
+            _ = try? await SupabaseService.shared.createOrUpdatePartnerSession(
+                sessionId: sid,
+                inviterName: inviterName,
+                inviterUserId: userId,
+                inviterData: inviterData,
+                inviterPlannedDates: plannedDates,
+                notes: notes
+            )
+        }
+    }
+    
+    /// Call after login to restore the most recent partner session so Pending/Plan Together state is visible again.
+    func restoreFromSupabaseIfNeeded(userId: UUID) {
+        Task {
+            guard let list = try? await SupabaseService.shared.listPartnerSessions(inviterUserId: userId),
+                  let session = list.first else { return }
+            await MainActor.run {
+                let state: PartnerState
+                if session.inviterData != nil && session.partnerData != nil {
+                    state = .bothFilled
+                } else if session.partnerData != nil {
+                    state = .partnerFilled
+                } else if session.inviterData != nil {
+                    state = .inviterFilled
+                } else {
+                    state = .inviteSent
+                }
+                sessionId = session.sessionId
+                inviterName = session.inviterName
+                partnerState = state
+                if let data = session.inviterData, let encoded = try? JSONEncoder().encode(data) {
+                    UserDefaults.standard.set(encoded, forKey: Self.inviterDataKey)
+                }
+                if let data = session.partnerData, let encoded = try? JSONEncoder().encode(data) {
+                    UserDefaults.standard.set(encoded, forKey: Self.partnerDataKey)
+                }
+                let sessionInfo = SessionInfo(sessionId: session.sessionId, state: state, inviterName: session.inviterName)
+                saveSession(sessionInfo)
+                objectWillChange.send()
+            }
+        }
     }
 }

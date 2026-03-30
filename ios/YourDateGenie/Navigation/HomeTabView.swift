@@ -21,7 +21,6 @@ struct LuxuryHomeTabView: View {
     @State private var showCalendarAlert = false
     @State private var trendingPlaces: [GooglePlacesService.PlaceSearchResult] = []
     @State private var trendingPlacesLoading = false
-    @State private var selectedTrendingCategory: ExploreCategory? = nil
     
     private var planForTonight: DatePlan? {
         let calendar = Calendar.current
@@ -228,9 +227,8 @@ struct LuxuryHomeTabView: View {
             ?? ""
         guard !location.isEmpty else { return }
         await MainActor.run { if trendingPlacesLoading { return }; trendingPlacesLoading = true }
-        let categoryId = selectedTrendingCategory?.id
         do {
-            let places = try await GooglePlacesService.shared.fetchTrendingPlacesInCity(city: location, categoryId: categoryId, limit: 6)
+            let places = try await GooglePlacesService.shared.fetchRecommendedInCity(city: location, limit: 6)
             await MainActor.run {
                 trendingPlaces = places
                 trendingPlacesLoading = false
@@ -275,86 +273,34 @@ struct LuxuryHomeTabView: View {
         }
     }
     
-    private static var fallbackTrendingCards: [(imageUrl: String, title: String, tagline: String, location: String)] {
-        [
-            ("https://images.unsplash.com/photo-1470337458703-46ad1756a187?w=400&h=300&fit=crop", "Rooftop Cocktail Night", "Skyline views & craft cocktails", "Rooftop Bar"),
-            ("https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=400&h=300&fit=crop", "Cooking Class", "Hands-on dinner for two", "Studio"),
-            ("https://images.unsplash.com/photo-1415201364774-f6f0bb35f28f?w=400&h=300&fit=crop", "Jazz Lounge", "Live music & intimate vibe", "Lounge"),
-        ]
-    }
-    
     private var trendingInYourAreaSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 6) {
-                Image(systemName: "map")
-                    .font(.system(size: 22))
-                    .foregroundColor(Color.luxuryGold)
-                Text("Trending in your Area")
-                    .font(Font.tangerine(32, weight: .bold))
-                    .italic()
-                    .foregroundColor(Color.luxuryGold)
-                Spacer(minLength: 8)
-                Button {
-                    coordinator.showExplore()
-                } label: {
-                    Image(systemName: "sparkles")
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 6) {
+                    Image(systemName: "map")
                         .font(.system(size: 22))
                         .foregroundColor(Color.luxuryGold)
+                    Text("Recommended in your area")
+                        .font(Font.tangerine(32, weight: .bold))
+                        .italic()
+                        .foregroundColor(Color.luxuryGold)
+                    Spacer(minLength: 8)
+                    Button {
+                        coordinator.showExplore()
+                    } label: {
+                        Image(systemName: "sparkles")
+                            .font(.system(size: 22))
+                            .foregroundColor(Color.luxuryGold)
+                    }
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
+                Text("Highly rated restaurants & things to do")
+                    .font(Font.bodySans(12, weight: .medium))
+                    .foregroundColor(Color.luxuryCreamMuted)
             }
             .padding(.horizontal, 20)
             
-            // Continue exploring — category chips; tap to load trending for that category
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 10) {
-                    Button {
-                        selectedTrendingCategory = nil
-                        Task { await loadTrendingPlacesIfNeeded() }
-                    } label: {
-                        let isSelected = selectedTrendingCategory == nil
-                        Text("All")
-                            .font(Font.bodySans(14, weight: .semibold))
-                            .foregroundColor(isSelected ? Color.luxuryMaroon : Color.luxuryCream)
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 10)
-                            .background(isSelected ? Color.luxuryGold : Color.luxuryMaroonLight.opacity(0.8))
-                            .cornerRadius(20)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 20)
-                                    .stroke(Color.luxuryGold.opacity(isSelected ? 1 : 0.35), lineWidth: 1)
-                            )
-                    }
-                    .buttonStyle(.plain)
-                    ForEach(ExploreCategory.all) { category in
-                        let isSelected = selectedTrendingCategory?.id == category.id
-                        Button {
-                            selectedTrendingCategory = category
-                            Task { await loadTrendingPlacesIfNeeded() }
-                        } label: {
-                            HStack(spacing: 6) {
-                                Text(category.emoji)
-                                    .font(.system(size: 16))
-                                Text(category.title)
-                                    .font(Font.bodySans(14, weight: .semibold))
-                                    .foregroundColor(isSelected ? Color.luxuryMaroon : Color.luxuryCream)
-                            }
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 10)
-                            .background(isSelected ? Color.luxuryGold : Color.luxuryMaroonLight.opacity(0.8))
-                            .cornerRadius(20)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 20)
-                                    .stroke(Color.luxuryGold.opacity(isSelected ? 1 : 0.35), lineWidth: 1)
-                            )
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(.horizontal, 20)
-            }
-            .padding(.bottom, 4)
-            
+            // Only show actual places from Google — no vague or fake cards
             if trendingPlacesLoading {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 14) {
@@ -369,6 +315,7 @@ struct LuxuryHomeTabView: View {
                     .padding(.horizontal, 20)
                 }
             } else if !trendingPlaces.isEmpty {
+                // Real places from Google Places (rating/reviews, View in Maps)
                 let preferredCity = userProfileManager.currentUser?.preferences.defaultCity.trimmingCharacters(in: .whitespaces) ?? userProfileManager.currentUser?.preferences.defaultStartingPoint.trimmingCharacters(in: .whitespaces) ?? ""
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 14) {
@@ -376,7 +323,14 @@ struct LuxuryHomeTabView: View {
                             let price = CurrencyHelper.formattedPriceLevel(place.priceLevel)
                             let cityState = MapURLHelper.cityStateOrRegionFromAddress(place.address)
                             let location = cityState.isEmpty ? preferredCity : cityState
-                            let tagline = place.rating.map { "★ \(String(format: "%.1f", $0))" } ?? "Trending on Google"
+                            let tagline: String = {
+                                if let r = place.rating {
+                                    let stars = "★ \(String(format: "%.1f", r))"
+                                    if let n = place.userRatingsTotal, n > 0 { return "\(stars) · \(n) reviews" }
+                                    return stars
+                                }
+                                return "On Google Maps"
+                            }()
                             LuxuryUnifiedDateCard(
                                 imageUrl: place.photoUrl ?? "https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=400&h=300&fit=crop",
                                 title: place.name,
@@ -393,26 +347,32 @@ struct LuxuryHomeTabView: View {
                     .padding(.horizontal, 20)
                 }
             } else {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 14) {
-                        ForEach(Array(Self.fallbackTrendingCards.enumerated()), id: \.offset) { _, card in
-                            LuxuryUnifiedDateCard(
-                                imageUrl: card.imageUrl,
-                                title: card.title,
-                                tagline: card.tagline,
-                                location: card.location,
-                                time: "",
-                                price: CurrencyHelper.formattedPriceLevel(1),
-                                actionTitle: "Plan a Date",
-                                action: { coordinator.startDatePlanning(mode: .fresh) }
-                            )
-                        }
-                        TrendingExploreCircleButton(action: { coordinator.showExplore() })
-                    }
-                    .padding(.horizontal, 20)
-                }
+                // No fake cards — clear empty state so users set location or try Continue exploring
+                trendingEmptyState
             }
         }
+    }
+    
+    /// Shown when we have no actual places (no location set or fetch failed). No vague placeholder cards.
+    private var trendingEmptyState: some View {
+        VStack(spacing: 14) {
+            if trendingLocationKey.isEmpty {
+                Text("Set your starting address (or city) in Settings to see recommended spots near you.")
+                    .font(Font.bodySans(14, weight: .medium))
+                    .foregroundColor(Color.luxuryCreamMuted)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 24)
+            } else {
+                Text("Highly rated restaurants and things to do will appear here. Pull down to refresh or tap below for more.")
+                    .font(Font.bodySans(14, weight: .medium))
+                    .foregroundColor(Color.luxuryCreamMuted)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 24)
+            }
+            TrendingExploreCircleButton(action: { coordinator.showExplore() })
+        }
+        .padding(.vertical, 16)
+        .padding(.horizontal, 20)
     }
     
     // MARK: - Your Upcoming Dates (saved plans with unified cards)
@@ -639,28 +599,32 @@ struct LuxuryHomeTabView: View {
             }
             .frame(maxWidth: .infinity)
             
-            HStack(spacing: 14) {
+            HStack(spacing: 8) {
                 LuxuryQuickTile(icon: "gift", title: "Gift Finder", color: Color.luxuryGold) {
                     coordinator.showGiftFinder(
                         datePlan: coordinator.currentDatePlan,
                         dateLocation: coordinator.currentDatePlan?.stops.first?.address
                     )
                 }
+                .frame(maxWidth: .infinity)
                 LuxuryQuickTile(icon: "music.note.list", title: "Date Playlist", color: Color.luxuryGoldLight) {
-                    coordinator.showPlaylist(for: coordinator.currentDatePlan?.title ?? "Date Night")
+                    coordinator.showPlaylist(for: coordinator.currentDatePlan?.title ?? "Date Night", planId: coordinator.currentDatePlan?.id)
                 }
+                .frame(maxWidth: .infinity)
                 LuxuryQuickTile(icon: "bubble.left.and.bubble.right", title: "Conversation Starters", color: Color.luxuryGold) {
                     coordinator.showConversationStarters()
                 }
+                .frame(maxWidth: .infinity)
                 LuxuryQuickTile(icon: "person.2.fill", title: "Plan Together", color: Color.luxuryGold) {
                     coordinator.showPartnerPlanning()
                 }
+                .frame(maxWidth: .infinity)
                 LuxuryQuickTile(icon: "clock", title: "Past Dates", color: Color.luxuryGoldLight) {
                     coordinator.showPastMagic()
                 }
+                .frame(maxWidth: .infinity)
             }
-            .frame(maxWidth: .infinity)
-            .padding(.horizontal, 24)
+            .padding(.horizontal, 16)
         }
     }
     
@@ -691,14 +655,14 @@ struct LuxuryHomeTabView: View {
                         }
                     }
                     LuxuryQuickTile(icon: "music.note", title: "Mood Music", color: Color.luxuryGold) {
-                        coordinator.showPlaylist(for: coordinator.currentDatePlan?.title ?? "Date Night")
+                        coordinator.showPlaylist(for: coordinator.currentDatePlan?.title ?? "Date Night", planId: coordinator.currentDatePlan?.id)
                     }
                     LuxuryQuickTile(icon: "heart", title: "Share Joy", color: Color.luxuryGoldLight) {
                         if let plan = coordinator.currentDatePlan {
                             coordinator.activeSheet = .partnerShare(plan: plan)
                         }
                     }
-                    LuxuryQuickTile(icon: "book.closed", title: "Date Tips", color: Color.luxuryGoldLight) {
+                    LuxuryQuickTile(icon: "book.closed", title: "Date Tips", color: Color.luxuryGold) {
                         coordinator.showPlaybook()
                     }
                 }

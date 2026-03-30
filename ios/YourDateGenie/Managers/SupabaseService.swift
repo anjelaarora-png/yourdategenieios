@@ -39,39 +39,8 @@ final class SupabaseService: ObservableObject {
         config.requestCachePolicy = .reloadIgnoringLocalCacheData
         self.session = URLSession(configuration: config)
         
-        self.decoder = JSONDecoder()
-        self.decoder.dateDecodingStrategy = .custom { decoder in
-            let container = try decoder.singleValueContainer()
-            let dateString = try container.decode(String.self)
-            
-            let formatters = [
-                ISO8601DateFormatter(),
-                { () -> DateFormatter in
-                    let f = DateFormatter()
-                    f.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSSSSZ"
-                    return f
-                }(),
-                { () -> DateFormatter in
-                    let f = DateFormatter()
-                    f.dateFormat = "yyyy-MM-dd'T'HH:mm:ssZ"
-                    return f
-                }(),
-                { () -> DateFormatter in
-                    let f = DateFormatter()
-                    f.dateFormat = "yyyy-MM-dd"
-                    return f
-                }()
-            ]
-            
-            for formatter in formatters {
-                if let iso = formatter as? ISO8601DateFormatter {
-                    if let date = iso.date(from: dateString) { return date }
-                } else if let df = formatter as? DateFormatter {
-                    if let date = df.date(from: dateString) { return date }
-                }
-            }
-            throw DecodingError.dataCorruptedError(in: container, debugDescription: "Cannot decode date: \(dateString)")
-        }
+        // Single strategy for every `/rest/v1` table row (`users`, `couples`, `preferences`, `date_plans`, `playlists`, etc.).
+        self.decoder = JSONDecoder.supabasePostgresREST()
         
         self.encoder = JSONEncoder()
         self.encoder.dateEncodingStrategy = .iso8601
@@ -81,36 +50,55 @@ final class SupabaseService: ObservableObject {
     
     // MARK: - Authentication
     
+    /// Email confirmation links must open the app with tokens (`yourdategenie://auth-callback`). Add this URL to Supabase Auth redirect allowlist.
+    private static let signUpEmailRedirectURL = URL(string: "yourdategenie://auth-callback")
+    
+    /// True when the account has no email (e.g. phone-only) or the email is confirmed.
+    private static func hasConfirmedEmailIfNeeded(user: User) -> Bool {
+        if user.email == nil { return true }
+        return user.emailConfirmedAt != nil
+    }
+    
     /// Sign up with email and password (uses Supabase SDK)
-    func signUp(email: String, password: String, name: String) async throws -> SupabaseUser {
+    func signUp(email: String, password: String, name: String) async throws -> EmailPasswordSignUpResult {
         await setLoading(true)
         defer { Task { await setLoading(false) } }
         
         let response = try await supabaseClient.auth.signUp(
             email: email.lowercased(),
             password: password,
-            data: ["name": .string(name)]
+            data: ["name": .string(name)],
+            redirectTo: Self.signUpEmailRedirectURL
         )
         
+        let authUser = response.user
+        let requiresEmailVerification = authUser.email != nil && authUser.emailConfirmedAt == nil
+        
         if let session = response.session {
-            await syncSessionFromSDK(session)
+            if Self.hasConfirmedEmailIfNeeded(user: session.user) {
+                await syncSessionFromSDK(session)
+            } else {
+                try? await supabaseClient.auth.signOut()
+                await MainActor.run {
+                    accessToken = nil
+                    refreshToken = nil
+                    try? keychain.clearSession()
+                    currentUser = nil
+                    isAuthenticated = false
+                }
+            }
         }
         
-        let supabaseUser = mapToSupabaseUser(response.user, defaultName: name)
-        if response.session != nil {
-            let dbUser = DBUser(
+        let supabaseUser = mapToSupabaseUser(authUser, defaultName: name)
+        if let session = response.session, Self.hasConfirmedEmailIfNeeded(user: session.user) {
+            try await ensureUserAndCoupleIfMissing(
                 userId: supabaseUser.id,
-                name: name,
                 email: email.lowercased(),
-                passwordHash: "",
-                createdAt: Date()
+                name: name.isEmpty ? (email.split(separator: "@").first.map { String($0) } ?? "User") : name
             )
-            try? await insertUser(dbUser)
-            let couple = DBCouple(userId1: supabaseUser.id)
-            _ = try? await insertCouple(couple)
         }
         
-        return supabaseUser
+        return EmailPasswordSignUpResult(user: supabaseUser, requiresEmailVerification: requiresEmailVerification)
     }
     
     /// Sign in with email and password (uses Supabase SDK)
@@ -144,6 +132,46 @@ final class SupabaseService: ObservableObject {
     func sendPasswordReset(email: String) async throws {
         try await supabaseClient.auth.resetPasswordForEmail(email.lowercased())
     }
+
+    /// Resend sign-up confirmation email for accounts waiting on email verification.
+    func resendSignUpConfirmation(email: String) async throws {
+        let normalizedEmail = email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !normalizedEmail.isEmpty else {
+            throw SupabaseError.authFailed("Please enter a valid email address.")
+        }
+
+        let base = baseURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleanBase = base.hasSuffix("/") ? String(base.dropLast()) : base
+        guard let url = URL(string: "\(cleanBase)/auth/v1/resend") else {
+            throw SupabaseError.authFailed("Invalid server configuration. Please check your connection.")
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.addValue(anonKey, forHTTPHeaderField: "apikey")
+
+        var payload: [String: Any] = [
+            "type": "signup",
+            "email": normalizedEmail
+        ]
+        if let redirect = Self.signUpEmailRedirectURL?.absoluteString {
+            payload["options"] = ["email_redirect_to": redirect]
+        }
+        request.httpBody = try JSONSerialization.data(withJSONObject: payload)
+
+        let (data, response) = try await session.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw SupabaseError.invalidResponse
+        }
+        guard (200...299).contains(httpResponse.statusCode) else {
+            if let errorJson = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let errorMessage = errorJson["error_description"] as? String ?? errorJson["msg"] as? String ?? errorJson["message"] as? String {
+                throw SupabaseError.authFailed(errorMessage)
+            }
+            throw SupabaseError.authFailed("Unable to resend confirmation email right now.")
+        }
+    }
     
     /// Refresh access token (uses Supabase SDK)
     func refreshSession() async throws {
@@ -151,6 +179,62 @@ final class SupabaseService: ObservableObject {
         if let session = supabaseClient.auth.currentSession {
             await syncSessionFromSDK(session)
         }
+    }
+
+    /// Fetches `auth.session` from the Supabase Swift SDK, syncs JWT for REST calls, returns `session.user.id`.
+    func syncAuthSessionAndReturnUserId() async throws -> UUID {
+        let session = try await supabaseClient.auth.session
+        await MainActor.run {
+            syncSessionFromSDK(session)
+        }
+        return session.user.id
+    }
+
+    /// Syncs JWT, ensures `public.users` + `public.couples` exist, returns `couple_id` for playlist/date-plan writes.
+    func resolveCoupleIdForCurrentUser() async throws -> UUID {
+        let userId = try await syncAuthSessionAndReturnUserId()
+        await MainActor.run {
+            if UserProfileManager.shared.userId == nil {
+                UserProfileManager.shared.userId = userId
+            }
+        }
+        var coupleId = await MainActor.run { UserProfileManager.shared.coupleId }
+        if coupleId == nil {
+            coupleId = try await getCoupleForUser(userId: userId)?.coupleId
+            if let cid = coupleId {
+                await MainActor.run { UserProfileManager.shared.coupleId = cid }
+            }
+        }
+        if coupleId == nil {
+            let context = await MainActor.run { () -> (email: String, name: String) in
+                let em = UserProfileManager.shared.currentUser?.email ?? self.currentUser?.email ?? ""
+                let fromProfile = UserProfileManager.shared.currentUser?.fullName.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                if !fromProfile.isEmpty { return (em, fromProfile) }
+                if let n = self.currentUser?.name?.trimmingCharacters(in: .whitespacesAndNewlines), !n.isEmpty {
+                    return (em, n)
+                }
+                let fallback: String
+                if !em.isEmpty {
+                    fallback = em.split(separator: "@").first.map { String($0) } ?? "User"
+                } else {
+                    fallback = "User"
+                }
+                return (em, fallback)
+            }
+            try await ensureUserAndCoupleIfMissing(
+                userId: userId,
+                email: context.email.trimmingCharacters(in: .whitespaces).lowercased(),
+                name: context.name
+            )
+            coupleId = try await getCoupleForUser(userId: userId)?.coupleId
+            if let cid = coupleId {
+                await MainActor.run { UserProfileManager.shared.coupleId = cid }
+            }
+        }
+        guard let coupleId = coupleId else {
+            throw SupabaseError.queryFailed
+        }
+        return coupleId
     }
     
     /// Handle auth callback from deep link (email confirmation)
@@ -163,6 +247,19 @@ final class SupabaseService: ObservableObject {
     
     @MainActor
     private func syncSessionFromSDK(_ session: Session) {
+        guard Self.hasConfirmedEmailIfNeeded(user: session.user) else {
+            Task {
+                try? await supabaseClient.auth.signOut()
+                await MainActor.run {
+                    self.accessToken = nil
+                    self.refreshToken = nil
+                    try? self.keychain.clearSession()
+                    self.currentUser = nil
+                    self.isAuthenticated = false
+                }
+            }
+            return
+        }
         accessToken = session.accessToken
         refreshToken = session.refreshToken
         currentUser = mapToSupabaseUser(session.user, defaultName: nil)
@@ -218,6 +315,26 @@ final class SupabaseService: ObservableObject {
         try await delete(table: "users", column: "user_id", value: userId.uuidString)
     }
     
+    /// Creates `public.users` and a solo `public.couples` row if missing (trigger may already have created them).
+    func ensureUserAndCoupleIfMissing(userId: UUID, email: String, name: String) async throws {
+        if try await getUser(userId: userId) == nil {
+            let dbUser = DBUser(userId: userId, name: name, email: email, passwordHash: "", createdAt: Date())
+            do {
+                try await insertUser(dbUser)
+            } catch {
+                if try await getUser(userId: userId) == nil { throw error }
+            }
+        }
+        if try await getCoupleForUser(userId: userId) == nil {
+            let couple = DBCouple(userId1: userId)
+            do {
+                _ = try await insertCouple(couple)
+            } catch {
+                if try await getCoupleForUser(userId: userId) == nil { throw error }
+            }
+        }
+    }
+    
     // Couples
     func insertCouple(_ couple: DBCouple) async throws -> DBCouple {
         return try await insert(table: "couples", data: couple)
@@ -253,6 +370,14 @@ final class SupabaseService: ObservableObject {
     func getPreferences(coupleId: UUID) async throws -> DBPreferences? {
         return try await selectSingle(table: "preferences", column: "couple_id", value: coupleId.uuidString)
     }
+
+    func getUserIosSync(userId: UUID) async throws -> DBUserIosSyncPayload? {
+        try await selectSingle(table: "user_ios_sync_payload", column: "user_id", value: userId.uuidString)
+    }
+
+    func upsertUserIosSync(_ payload: DBUserIosSyncPayload) async throws -> DBUserIosSyncPayload {
+        try await upsert(table: "user_ios_sync_payload", data: payload, onConflict: "user_id")
+    }
     
     // Date Plans
     func createDatePlan(_ plan: DBDatePlan) async throws -> DBDatePlan {
@@ -260,7 +385,7 @@ final class SupabaseService: ObservableObject {
     }
     
     func getDatePlan(planId: UUID) async throws -> DBDatePlan? {
-        return try await selectSingle(table: "date_plans", column: "plan_id", value: planId.uuidString)
+        return try await selectSingle(table: "date_plans", column: "id", value: planId.uuidString)
     }
     
     func getDatePlans(coupleId: UUID) async throws -> [DBDatePlan] {
@@ -278,12 +403,121 @@ final class SupabaseService: ObservableObject {
     }
     
     func updateDatePlan(_ plan: DBDatePlan) async throws -> DBDatePlan {
-        return try await update(table: "date_plans", data: plan, column: "plan_id", value: plan.planId.uuidString)
+        return try await update(table: "date_plans", data: plan, column: "id", value: plan.id.uuidString)
     }
     
     func deleteDatePlan(planId: UUID) async throws {
-        try await delete(table: "date_plans", column: "plan_id", value: planId.uuidString)
+        try await delete(table: "date_plans", column: "id", value: planId.uuidString)
     }
+
+    // MARK: - Partner Sessions (Plan Together)
+
+    /// Create or update a partner session. If session_id exists, updates; otherwise inserts.
+    func createOrUpdatePartnerSession(sessionId: String, inviterName: String?, inviterUserId: UUID?, inviterData: QuestionnaireData?, inviterPlannedDates: [DBProposedDateTime]?, notes: String?) async throws -> DBPartnerSession {
+        let enc = sessionId.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? sessionId
+        if let existing = try await getPartnerSession(sessionId: sessionId) {
+            var updated = existing
+            if inviterName != nil { updated.inviterName = inviterName }
+            if inviterUserId != nil { updated.inviterUserId = inviterUserId }
+            if inviterData != nil { updated.inviterData = inviterData }
+            if inviterPlannedDates != nil { updated.inviterPlannedDates = inviterPlannedDates }
+            if notes != nil { updated.notes = notes }
+            updated.updatedAt = Date()
+            return try await update(table: "partner_sessions", data: updated, column: "session_id", value: enc)
+        }
+        let row = DBPartnerSession(
+            id: nil,
+            sessionId: sessionId,
+            inviterName: inviterName,
+            inviterUserId: inviterUserId,
+            inviterData: inviterData,
+            partnerData: nil,
+            inviterPlannedDates: inviterPlannedDates,
+            notes: notes,
+            createdAt: Date(),
+            updatedAt: Date()
+        )
+        return try await insert(table: "partner_sessions", data: row)
+    }
+
+    func getPartnerSession(sessionId: String) async throws -> DBPartnerSession? {
+        let encoded = sessionId.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? sessionId
+        return try await selectSingle(table: "partner_sessions", column: "session_id", value: encoded)
+    }
+
+    /// List partner sessions where the given user is the inviter (for Pending / Past in Plan Together).
+    func listPartnerSessions(inviterUserId: UUID) async throws -> [DBPartnerSession] {
+        let list: [DBPartnerSession] = try await select(
+            table: "partner_sessions",
+            query: "inviter_user_id=eq.\(inviterUserId.uuidString)&order=updated_at.desc"
+        )
+        return list
+    }
+
+    /// Cancel/delete a partner session (inviter cancels invite). Removes the row so it no longer appears in Pending.
+    func deletePartnerSession(sessionId: String) async throws {
+        let encoded = sessionId.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? sessionId
+        try await delete(table: "partner_sessions", column: "session_id", value: encoded)
+    }
+
+    /// Partner submits their questionnaire data (call from partner device).
+    func submitPartnerSessionPartnerData(sessionId: String, partnerData: QuestionnaireData) async throws {
+        guard let session: DBPartnerSession = try await getPartnerSession(sessionId: sessionId) else { return }
+        var updated = session
+        updated.partnerData = partnerData
+        updated.updatedAt = Date()
+        _ = try await update(table: "partner_sessions", data: updated, column: "session_id", value: sessionId.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? sessionId)
+    }
+
+    /// Inviter updates their data (e.g. after "Fill my preferences").
+    func updatePartnerSessionInviterData(sessionId: String, inviterData: QuestionnaireData?, inviterPlannedDates: [DBProposedDateTime]?, notes: String?) async throws {
+        guard let session: DBPartnerSession = try await getPartnerSession(sessionId: sessionId) else { return }
+        var updated = session
+        if let d = inviterData { updated.inviterData = d }
+        if let p = inviterPlannedDates { updated.inviterPlannedDates = p }
+        if let n = notes { updated.notes = n }
+        updated.updatedAt = Date()
+        let enc = sessionId.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? sessionId
+        _ = try await update(table: "partner_sessions", data: updated, column: "session_id", value: enc)
+    }
+
+    /// Saves the 3 generated plans and returns the created rows (for ranking later).
+    func savePartnerSessionPlans(partnerSessionId: UUID, plans: [DatePlan]) async throws -> [DBPartnerSessionPlan] {
+        var result: [DBPartnerSessionPlan] = []
+        for (index, plan) in plans.prefix(3).enumerated() {
+            let row = DBPartnerSessionPlan(
+                id: UUID(),
+                partnerSessionId: partnerSessionId,
+                planIndex: index + 1,
+                planJson: plan,
+                inviterRank: nil,
+                partnerRank: nil,
+                createdAt: Date()
+            )
+            let inserted: DBPartnerSessionPlan = try await insert(table: "partner_session_plans", data: row)
+            result.append(inserted)
+        }
+        return result.sorted(by: { $0.planIndex < $1.planIndex })
+    }
+
+    func getPartnerSessionPlans(partnerSessionId: UUID) async throws -> [DBPartnerSessionPlan] {
+        let list: [DBPartnerSessionPlan] = try await select(
+            table: "partner_session_plans",
+            query: "partner_session_id=eq.\(partnerSessionId.uuidString)&order=plan_index.asc"
+        )
+        return list
+    }
+
+    func updatePartnerSessionPlanRank(planId: UUID, inviterRank: Int?, partnerRank: Int?) async throws {
+        var updates: [String: Any] = [:]
+        if let r = inviterRank { updates["inviter_rank"] = r }
+        if let r = partnerRank { updates["partner_rank"] = r }
+        guard !updates.isEmpty else { return }
+        try await patch(table: "partner_session_plans", column: "id", value: planId.uuidString, updates: updates)
+    }
+
+    /// Supabase Storage bucket for `date_memories.image_url` paths.
+    static let dateMemoriesStorageBucket = "date-memories"
     
     // Date Memories
     func createMemory(_ memory: DBDateMemory) async throws -> DBDateMemory {
@@ -291,26 +525,26 @@ final class SupabaseService: ObservableObject {
     }
     
     func getMemory(memoryId: UUID) async throws -> DBDateMemory? {
-        return try await selectSingle(table: "date_memories", column: "memory_id", value: memoryId.uuidString)
+        return try await selectSingle(table: "date_memories", column: "id", value: memoryId.uuidString)
     }
     
-    func getMemories(coupleId: UUID) async throws -> [DBDateMemory] {
+    func getMemories(userId: UUID) async throws -> [DBDateMemory] {
         return try await select(
             table: "date_memories",
-            query: "couple_id=eq.\(coupleId.uuidString)&order=created_at.desc"
+            query: "user_id=eq.\(userId.uuidString)&order=taken_at.desc"
         )
     }
     
     func getMemory(planId: UUID) async throws -> DBDateMemory? {
-        return try await selectSingle(table: "date_memories", column: "plan_id", value: planId.uuidString)
+        return try await selectSingle(table: "date_memories", column: "date_plan_id", value: planId.uuidString)
     }
     
     func updateMemory(_ memory: DBDateMemory) async throws -> DBDateMemory {
-        return try await update(table: "date_memories", data: memory, column: "memory_id", value: memory.memoryId.uuidString)
+        return try await update(table: "date_memories", data: memory, column: "id", value: memory.id.uuidString)
     }
     
     func deleteMemory(memoryId: UUID) async throws {
-        try await delete(table: "date_memories", column: "memory_id", value: memoryId.uuidString)
+        try await delete(table: "date_memories", column: "id", value: memoryId.uuidString)
     }
     
     // Gift Suggestions
@@ -371,6 +605,7 @@ final class SupabaseService: ObservableObject {
         recipient: String? = nil,
         giftStyle: [String]? = nil
     ) async throws -> [GiftSuggestion] {
+        try? await refreshRestAuthFromSDK()
         let urlString = baseURL.hasSuffix("/") ? "\(baseURL)functions/v1/generate-more-gifts" : "\(baseURL)/functions/v1/generate-more-gifts"
         guard let url = URL(string: urlString) else {
             throw SupabaseError.invalidResponse
@@ -439,8 +674,17 @@ final class SupabaseService: ObservableObject {
         let songs: [GeneratePlaylistSongItem]
     }
     
-    /// Calls the generate-playlist edge function for fresh, AI-generated song suggestions.
-    func generatePlaylist(vibe: String, datePlanTitle: String, stops: [(name: String, venueType: String)]? = nil) async throws -> GeneratePlaylistResult {
+    /// Calls the generate-playlist edge function for fresh, Last.fm–based song suggestions.
+    /// Pass era, mood, and energy so the search uses all selected tags.
+    func generatePlaylist(
+        vibe: String,
+        datePlanTitle: String,
+        stops: [(name: String, venueType: String)]? = nil,
+        era: String? = nil,
+        mood: String? = nil,
+        energy: String? = nil
+    ) async throws -> GeneratePlaylistResult {
+        try? await refreshRestAuthFromSDK()
         let urlString = baseURL.hasSuffix("/") ? "\(baseURL)functions/v1/generate-playlist" : "\(baseURL)/functions/v1/generate-playlist"
         guard let url = URL(string: urlString) else {
             throw SupabaseError.invalidResponse
@@ -459,15 +703,19 @@ final class SupabaseService: ObservableObject {
         if let stops = stops, !stops.isEmpty {
             body["stops"] = stops.map { ["name": $0.name, "venueType": $0.venueType] }
         }
+        if let era = era, !era.isEmpty, era != "any" { body["era"] = era }
+        if let mood = mood, !mood.isEmpty, mood != "none" { body["mood"] = mood }
+        if let energy = energy, !energy.isEmpty { body["energy"] = energy }
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
         let (data, response) = try await session.data(for: request)
         guard let http = response as? HTTPURLResponse else {
             throw SupabaseError.invalidResponse
         }
         if http.statusCode != 200 {
-            let errorMessage = (try? JSONDecoder().decode(GenerateGiftsErrorResponse.self, from: data))?.error ?? "Playlist generation failed"
+            let errorMessage = Self.parsePlaylistError(from: data, statusCode: http.statusCode)
             if http.statusCode == 429 { throw SupabaseError.authFailed("Rate limit. Try again in a moment.") }
-            if http.statusCode == 503 || http.statusCode == 502 { throw SupabaseError.authFailed("Playlist service temporarily unavailable.") }
+            if http.statusCode == 502 { throw SupabaseError.authFailed("Playlist service temporarily unavailable.") }
+            if http.statusCode == 503 { throw SupabaseError.authFailed(errorMessage) }
             throw SupabaseError.authFailed(errorMessage)
         }
         let decoded = try decoder.decode(GeneratePlaylistAPIResponse.self, from: data)
@@ -483,6 +731,27 @@ final class SupabaseService: ObservableObject {
             vibeDescription: decoded.vibeDescription ?? vibe,
             songs: songs
         )
+    }
+    
+    private static func parsePlaylistError(from data: Data, statusCode: Int) -> String {
+        if let decoded = try? JSONDecoder().decode(GenerateGiftsErrorResponse.self, from: data),
+           let msg = decoded.error, !msg.isEmpty {
+            return msg
+        }
+        if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+           let msg = (json["error"] as? String) ?? (json["message"] as? String), !msg.isEmpty {
+            return msg
+        }
+        if statusCode == 503 {
+            return "Playlist service unavailable. Add LASTFM_API_KEY in Supabase → Edge Functions → Secrets."
+        }
+        if statusCode == 401 {
+            return "Please sign in to generate playlists."
+        }
+        if statusCode == 404 {
+            return "Playlist function not deployed. In your project run: supabase functions deploy generate-playlist"
+        }
+        return "Playlist generation failed (\(statusCode)). Try again."
     }
     
     // Playlists
@@ -505,10 +774,15 @@ final class SupabaseService: ObservableObject {
         return try await update(table: "playlists", data: playlist, column: "playlist_id", value: playlist.playlistId.uuidString)
     }
     
+    func deletePlaylist(playlistId: UUID) async throws {
+        try await delete(table: "playlists", column: "playlist_id", value: playlistId.uuidString)
+    }
+    
     // MARK: - Storage Operations
     
     /// Upload an image to Supabase Storage
     func uploadImage(data: Data, bucket: String = "memories", path: String) async throws -> String {
+        try await refreshRestAuthFromSDK()
         guard let token = accessToken else {
             throw SupabaseError.unauthorized
         }
@@ -549,6 +823,7 @@ final class SupabaseService: ObservableObject {
     
     /// Generate a signed URL for private image access
     func getSignedURL(bucket: String = "memories", path: String, expiresIn: Int = 3600) async throws -> URL {
+        try await refreshRestAuthFromSDK()
         guard let token = accessToken else {
             throw SupabaseError.unauthorized
         }
@@ -579,6 +854,7 @@ final class SupabaseService: ObservableObject {
     
     /// Delete an image from storage
     func deleteImage(bucket: String = "memories", path: String) async throws {
+        try await refreshRestAuthFromSDK()
         guard let token = accessToken else {
             throw SupabaseError.unauthorized
         }
@@ -599,8 +875,17 @@ final class SupabaseService: ObservableObject {
     }
     
     // MARK: - Generic Database Operations
+
+    /// PostgREST RLS uses `auth.uid()` from the JWT. Manual `URLRequest` must use the same access token as `supabaseClient.auth` (it can be nil/stale right after launch or in background `Task`s).
+    private func refreshRestAuthFromSDK() async throws {
+        let s = try await supabaseClient.auth.session
+        await MainActor.run {
+            syncSessionFromSDK(s)
+        }
+    }
     
     private func select<T: Decodable>(table: String, query: String) async throws -> [T] {
+        try await refreshRestAuthFromSDK()
         let url = URL(string: "\(baseURL)/rest/v1/\(table)?\(query)")!
         
         var request = URLRequest(url: url)
@@ -623,45 +908,61 @@ final class SupabaseService: ObservableObject {
     }
     
     private func insert<T: Codable>(table: String, data: T) async throws -> T {
+        try await refreshRestAuthFromSDK()
+        print("[Supabase] insert called table=\(table)")
         let url = URL(string: "\(baseURL)/rest/v1/\(table)")!
         
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         addHeaders(to: &request)
         request.addValue("return=representation", forHTTPHeaderField: "Prefer")
+        print("[Supabase] insert before POST table=\(table)")
         request.httpBody = try encoder.encode(data)
         
         let (responseData, response) = try await session.data(for: request)
         
         guard let httpResponse = response as? HTTPURLResponse,
               (200...299).contains(httpResponse.statusCode) else {
+            let status = (response as? HTTPURLResponse)?.statusCode ?? -1
+            let body = String(data: responseData, encoding: .utf8) ?? ""
+            print("[Supabase] insert error table=\(table) status=\(status) body=\(body)")
             throw SupabaseError.insertFailed
         }
         
         let results = try decoder.decode([T].self, from: responseData)
         guard let result = results.first else {
+            print("[Supabase] insert error table=\(table) empty representation")
             throw SupabaseError.insertFailed
         }
+        print("[Supabase] insert success table=\(table)")
         return result
     }
     
     private func insert<T: Encodable>(table: String, data: T) async throws {
+        try await refreshRestAuthFromSDK()
+        print("[Supabase] insert called table=\(table) (no return)")
         let url = URL(string: "\(baseURL)/rest/v1/\(table)")!
         
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         addHeaders(to: &request)
+        print("[Supabase] insert before POST table=\(table) (no return)")
         request.httpBody = try encoder.encode(data)
         
-        let (_, response) = try await session.data(for: request)
+        let (responseData, response) = try await session.data(for: request)
         
         guard let httpResponse = response as? HTTPURLResponse,
               (200...299).contains(httpResponse.statusCode) else {
+            let status = (response as? HTTPURLResponse)?.statusCode ?? -1
+            let body = String(data: responseData, encoding: .utf8) ?? ""
+            print("[Supabase] insert error table=\(table) status=\(status) body=\(body)")
             throw SupabaseError.insertFailed
         }
+        print("[Supabase] insert success table=\(table) (no return)")
     }
     
     private func update<T: Codable>(table: String, data: T, column: String, value: String) async throws -> T {
+        try await refreshRestAuthFromSDK()
         let url = URL(string: "\(baseURL)/rest/v1/\(table)?\(column)=eq.\(value)")!
         
         var request = URLRequest(url: url)
@@ -674,41 +975,58 @@ final class SupabaseService: ObservableObject {
         
         guard let httpResponse = response as? HTTPURLResponse,
               (200...299).contains(httpResponse.statusCode) else {
+            let status = (response as? HTTPURLResponse)?.statusCode ?? -1
+            let body = String(data: responseData, encoding: .utf8) ?? ""
+            print("[Supabase] update error table=\(table) status=\(status) body=\(body)")
             throw SupabaseError.updateFailed
         }
         
         let results = try decoder.decode([T].self, from: responseData)
         guard let result = results.first else {
+            print("[Supabase] update error table=\(table) empty representation")
             throw SupabaseError.updateFailed
         }
+        print("[Supabase] update success table=\(table)")
         return result
     }
     
     private func upsert<T: Codable>(table: String, data: T, onConflict: String) async throws -> T {
-        let url = URL(string: "\(baseURL)/rest/v1/\(table)")!
+        try await refreshRestAuthFromSDK()
+        print("[Supabase] upsert called table=\(table) onConflict=\(onConflict)")
+        var components = URLComponents(string: "\(baseURL)/rest/v1/\(table)")!
+        components.queryItems = [URLQueryItem(name: "on_conflict", value: onConflict)]
+        guard let url = components.url else {
+            throw SupabaseError.upsertFailed
+        }
         
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         addHeaders(to: &request)
-        request.addValue("return=representation", forHTTPHeaderField: "Prefer")
-        request.addValue("resolution=merge-duplicates", forHTTPHeaderField: "Prefer")
+        request.addValue("return=representation, resolution=merge-duplicates", forHTTPHeaderField: "Prefer")
+        print("[Supabase] upsert before POST table=\(table)")
         request.httpBody = try encoder.encode(data)
         
         let (responseData, response) = try await session.data(for: request)
         
         guard let httpResponse = response as? HTTPURLResponse,
               (200...299).contains(httpResponse.statusCode) else {
+            let status = (response as? HTTPURLResponse)?.statusCode ?? -1
+            let body = String(data: responseData, encoding: .utf8) ?? ""
+            print("[Supabase] upsert error table=\(table) status=\(status) body=\(body)")
             throw SupabaseError.upsertFailed
         }
         
         let results = try decoder.decode([T].self, from: responseData)
         guard let result = results.first else {
+            print("[Supabase] upsert error table=\(table) empty representation")
             throw SupabaseError.upsertFailed
         }
+        print("[Supabase] upsert success table=\(table)")
         return result
     }
     
     private func patch(table: String, column: String, value: String, updates: [String: Any]) async throws {
+        try await refreshRestAuthFromSDK()
         let url = URL(string: "\(baseURL)/rest/v1/\(table)?\(column)=eq.\(value)")!
         
         var request = URLRequest(url: url)
@@ -725,6 +1043,7 @@ final class SupabaseService: ObservableObject {
     }
     
     private func delete(table: String, column: String, value: String) async throws {
+        try await refreshRestAuthFromSDK()
         let url = URL(string: "\(baseURL)/rest/v1/\(table)?\(column)=eq.\(value)")!
         
         var request = URLRequest(url: url)
@@ -834,21 +1153,25 @@ final class SupabaseService: ObservableObject {
                             syncSessionFromSDK(s)
                         }
                     } else {
+                        // Never mark authenticated without a session we can run through `syncSessionFromSDK`
+                        // (email confirmation and other invariants live there).
+                        try? keychain.clearSession()
                         await MainActor.run {
-                            accessToken = access
-                            refreshToken = refresh
-                            isAuthenticated = true
-                            if let userId = UUID(uuidString: session.userId) {
-                                currentUser = SupabaseUser(
-                                    id: userId,
-                                    email: session.email,
-                                    userMetadata: nil
-                                )
-                            }
+                            accessToken = nil
+                            refreshToken = nil
+                            currentUser = nil
+                            isAuthenticated = false
                         }
                     }
                 } catch {
                     print("Failed to load cached session: \(error)")
+                    try? keychain.clearSession()
+                    await MainActor.run {
+                        accessToken = nil
+                        refreshToken = nil
+                        currentUser = nil
+                        isAuthenticated = false
+                    }
                 }
             }
         }
@@ -874,6 +1197,13 @@ final class SupabaseService: ObservableObject {
 }
 
 // MARK: - Supabase Models
+
+/// Outcome of email/password sign-up; `requiresEmailVerification` is derived from the auth user, not from `isAuthenticated` timing.
+struct EmailPasswordSignUpResult {
+    let user: SupabaseUser
+    /// True when the account has an email address that is not yet confirmed — user must verify before the app treats them as signed in.
+    let requiresEmailVerification: Bool
+}
 
 struct SupabaseUser: Codable, Identifiable, Equatable {
     let id: UUID

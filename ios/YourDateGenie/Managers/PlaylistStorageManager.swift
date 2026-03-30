@@ -1,7 +1,7 @@
 import Foundation
 import Combine
 
-/// Persists saved playlists to UserDefaults (iOS equivalent of web localStorage).
+/// Persists saved playlists to UserDefaults and Supabase when user is logged in (survives reinstall).
 final class PlaylistStorageManager: ObservableObject {
     static let shared = PlaylistStorageManager()
     
@@ -22,9 +22,74 @@ final class PlaylistStorageManager: ObservableObject {
         playlists = decoded
     }
     
-    private func save() {
+    /// Persist to UserDefaults and optionally sync to Supabase (skip when loading from cloud).
+    private func save(skipSupabase: Bool = false) {
         guard let data = try? JSONEncoder().encode(playlists) else { return }
         UserDefaults.standard.set(data, forKey: key)
+        if !skipSupabase {
+            persistToSupabaseIfNeeded()
+        }
+    }
+    
+    /// When logged in, sync current playlists to Supabase so they survive reinstall.
+    private func persistToSupabaseIfNeeded() {
+        Task {
+            print("[PlaylistStorage] persistToSupabaseIfNeeded called")
+            do {
+                let coupleId = try await SupabaseService.shared.resolveCoupleIdForCurrentUser()
+                let list = await MainActor.run { self.playlists }
+                for playlist in list {
+                    persistOnePlaylistToSupabase(playlist, coupleId: coupleId)
+                }
+            } catch {
+                print("[PlaylistStorage] persistToSupabaseIfNeeded failed: \(error)")
+            }
+        }
+    }
+    
+    private func persistOnePlaylistToSupabase(_ playlist: SavedPlaylist, coupleId: UUID) {
+        guard let playlistId = UUID(uuidString: playlist.id) else { return }
+        let tracks = playlist.songs.enumerated().map { index, s in
+            PlaylistTrack(
+                trackNumber: index + 1,
+                title: s.title,
+                artist: s.artist,
+                album: nil,
+                duration: "—",
+                whyItFits: nil
+            )
+        }
+        let generatedAt: Date = {
+            let formatter = ISO8601DateFormatter()
+            formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            return formatter.date(from: playlist.createdAt) ?? formatter.date(from: String(playlist.createdAt.prefix(19)) + "Z") ?? Date()
+        }()
+        let db = DBPlaylist(
+            playlistId: playlistId,
+            planId: nil,
+            coupleId: coupleId,
+            title: playlist.name,
+            description: [playlist.datePlanTitle, playlist.vibe].filter { !$0.isEmpty }.joined(separator: " • "),
+            tracks: tracks,
+            totalDurationMinutes: max(1, playlist.songs.count * 4),
+            generatedAt: generatedAt
+        )
+        Task {
+            do {
+                _ = try await SupabaseService.shared.createPlaylist(db)
+                print("[PlaylistStorage] createPlaylist success playlist_id=\(db.playlistId)")
+            } catch {
+                print("[PlaylistStorage] createPlaylist error: \(error); trying update")
+                _ = try? await SupabaseService.shared.updatePlaylist(db)
+            }
+        }
+    }
+    
+    private func deletePlaylistFromSupabase(id: String) {
+        guard let playlistId = UUID(uuidString: id) else { return }
+        Task {
+            try? await SupabaseService.shared.deletePlaylist(playlistId: playlistId)
+        }
     }
     
     // MARK: - Public API
@@ -78,6 +143,7 @@ final class PlaylistStorageManager: ObservableObject {
     }
     
     func deletePlaylist(id: String) {
+        deletePlaylistFromSupabase(id: id)
         playlists.removeAll { $0.id == id }
         save()
     }
@@ -120,6 +186,49 @@ final class PlaylistStorageManager: ObservableObject {
     
     func getPlaylist(id: String) -> SavedPlaylist? {
         playlists.first { $0.id == id }
+    }
+    
+    /// Call after login to restore playlists from Supabase and push any local-only playlists to the cloud.
+    func syncFromSupabaseWhenLoggedIn(coupleId: UUID) {
+        Task {
+            guard let list = try? await SupabaseService.shared.getPlaylists(coupleId: coupleId) else { return }
+            await MainActor.run {
+                mergeFromSupabase(dbPlaylists: list)
+                let cloudIds = Set(list.map { $0.playlistId.uuidString })
+                for p in playlists where !cloudIds.contains(p.id) {
+                    persistOnePlaylistToSupabase(p, coupleId: coupleId)
+                }
+            }
+        }
+    }
+    
+    /// Merge playlists from Supabase (account) into local list; skips ones already present by id.
+    func mergeFromSupabase(dbPlaylists: [DBPlaylist]) {
+        var existingIds = Set(playlists.map(\.id))
+        for db in dbPlaylists {
+            let id = db.playlistId.uuidString
+            guard !existingIds.contains(id) else { continue }
+            let songs = (db.tracks ?? []).map { t in
+                SavedPlaylistSong(title: t.title, artist: t.artist, isCustom: false, addedAt: nil)
+            }
+            let saved = SavedPlaylist(
+                id: id,
+                name: db.title ?? "Playlist",
+                datePlanTitle: db.title ?? "Date Night",
+                vibe: "other",
+                songs: songs,
+                stops: nil,
+                energy: nil,
+                era: nil,
+                mood: nil,
+                createdAt: ISO8601DateFormatter().string(from: db.generatedAt),
+                updatedAt: ISO8601DateFormatter().string(from: db.generatedAt)
+            )
+            playlists.insert(saved, at: 0)
+            existingIds.insert(id)
+        }
+        save(skipSupabase: true)
+        objectWillChange.send()
     }
     
     /// Genre order for sectioned display (key + more + other)

@@ -1,5 +1,32 @@
 import Foundation
 
+// MARK: - Spark Item (stored in session; one question + follow-up)
+struct SparkItem: Codable, Equatable, Identifiable {
+    var id: String { openingQuestion }
+    let openingQuestion: String
+    let followUp: String
+    let tagsLabel: String
+}
+
+// MARK: - Spark Session (one run: relationship + vibe + optional topic → N sparks)
+struct SparkSession: Identifiable, Codable, Equatable {
+    let id: UUID
+    let relationshipStage: String
+    let mood: String
+    let topic: String?
+    let createdAt: Date
+    let sparks: [SparkItem]
+
+    init(id: UUID = UUID(), relationshipStage: String, mood: String, topic: String? = nil, createdAt: Date = Date(), sparks: [SparkItem]) {
+        self.id = id
+        self.relationshipStage = relationshipStage
+        self.mood = mood
+        self.topic = topic
+        self.createdAt = createdAt
+        self.sparks = sparks
+    }
+}
+
 // MARK: - Conversation Opener (for generator flow)
 /// One opening question + follow-up, tagged for relationship stage, mood, and optional topic.
 struct ConversationOpenerSet: Identifiable {
@@ -15,10 +42,10 @@ struct ConversationOpenerSet: Identifiable {
 // MARK: - Curated openers (Lume-style: thoughtful, no dead ends)
 enum ConversationOpenerContent {
     static let relationshipStages: [(value: String, label: String, subtitle: String)] = [
-        ("new_flame", "New flame", "Under 1 year"),
-        ("growing_bond", "Growing bond", "1–3 years"),
-        ("deeply_rooted", "Deeply rooted", "4–9 years"),
-        ("life_partners", "Life partners", "10+ years")
+        ("new_flame", "New Flame", "Early days, getting to know each other"),
+        ("growing_bond", "Growing Bond", "A few months in, things are blooming"),
+        ("deeply_rooted", "Deeply Rooted", "A year or more, real depth between you"),
+        ("life_partners", "Life Partners", "In it for the long haul, forever curious")
     ]
 
     static let moods: [(value: String, label: String)] = [
@@ -28,6 +55,14 @@ enum ConversationOpenerContent {
         ("daring", "Daring"),
         ("dreamy", "Dreamy"),
         ("tender", "Tender")
+    ]
+
+    /// Four vibe options for step 2 (reference layout): label, subtitle, maps to mood value.
+    static let vibeOptions: [(value: String, label: String, subtitle: String)] = [
+        ("playful", "Playful & light", "Fun, teasing, laughing all night"),
+        ("tender", "Romantic & slow", "Soft, intimate, savoring every moment"),
+        ("deep", "Deep & curious", "Real talk, going beneath the surface"),
+        ("daring", "Adventurous & bold", "Daring questions, no filter tonight")
     ]
 
     static let topics: [(value: String, label: String)] = [
@@ -178,5 +213,26 @@ enum ConversationOpenerContent {
             $0.relationshipStages.contains(relationshipStage) && $0.moods.contains(mood)
         }
         return matching.randomElement()
+    }
+
+    /// Pick multiple openers for a session. Prefers topic-matched; fills to requested count with stage+mood matches. Shuffled so each generation is different.
+    static func pickMultipleOpeners(relationshipStage: String, mood: String, topic: String?, count: Int = 10) -> [SparkItem] {
+        let topicMatching = openers.filter { set in
+            guard set.relationshipStages.contains(relationshipStage), set.moods.contains(mood) else { return false }
+            if topic == nil { return true }
+            return set.topics == nil || set.topics?.isEmpty == true || set.topics?.contains(topic!) == true
+        }
+        let stageMoodMatching = openers.filter {
+            $0.relationshipStages.contains(relationshipStage) && $0.moods.contains(mood)
+        }
+        var pool = topicMatching.isEmpty ? stageMoodMatching : topicMatching
+        if pool.count < count {
+            let seen = Set(pool.map { $0.openingQuestion })
+            let extra = stageMoodMatching.filter { !seen.contains($0.openingQuestion) }
+            pool.append(contentsOf: extra)
+        }
+        return pool.shuffled().prefix(count).map { o in
+            SparkItem(openingQuestion: o.openingQuestion, followUp: o.followUp, tagsLabel: o.tagsLabel)
+        }
     }
 }

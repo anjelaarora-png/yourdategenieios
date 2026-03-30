@@ -1,7 +1,7 @@
 import SwiftUI
 import MapKit
 
-// MARK: - Explore category (for trending spots in city)
+// MARK: - Explore category (for trending spots in city; ample options in Continue exploring)
 struct ExploreCategory: Identifiable {
     let id: String
     let title: String
@@ -12,18 +12,28 @@ struct ExploreCategory: Identifiable {
         ExploreCategory(id: "bars", title: "Bars & Lounges", emoji: "🍸"),
         ExploreCategory(id: "romantic", title: "Romantic", emoji: "🌹"),
         ExploreCategory(id: "date_night", title: "Date Night", emoji: "✨"),
+        ExploreCategory(id: "brunch", title: "Brunch", emoji: "🥞"),
+        ExploreCategory(id: "wine", title: "Wine & Vineyards", emoji: "🍷"),
         ExploreCategory(id: "outdoor", title: "Outdoor & Parks", emoji: "🌳"),
         ExploreCategory(id: "arts", title: "Arts & Culture", emoji: "🎨"),
-        ExploreCategory(id: "nightlife", title: "Nightlife", emoji: "🎉")
+        ExploreCategory(id: "nightlife", title: "Nightlife", emoji: "🎉"),
+        ExploreCategory(id: "live_music", title: "Live Music", emoji: "🎵"),
+        ExploreCategory(id: "bakeries", title: "Bakeries & Desserts", emoji: "🧁"),
+        ExploreCategory(id: "rooftop", title: "Rooftop & Views", emoji: "🌆"),
+        ExploreCategory(id: "spa", title: "Spa & Wellness", emoji: "💆"),
     ]
 }
 
-// MARK: - Luxury Explore Tab View (Google Places trending + View in Maps)
+// MARK: - Luxury Explore Tab View (6 recommended tiles → Continue exploring → categories + list)
 struct LuxuryExploreTabView: View {
     @EnvironmentObject var coordinator: NavigationCoordinator
     @State private var selectedExploreCategory: ExploreCategory? = nil
+    @State private var recommendedPlaces: [GooglePlacesService.PlaceSearchResult] = []
+    @State private var recommendedLoading = false
     @State private var explorePlaces: [GooglePlacesService.PlaceSearchResult] = []
     @State private var explorePlacesLoading = false
+    @State private var exploreNextPageToken: String?
+    @State private var exploreLoadMoreLoading = false
     
     /// Same as Home: starting point address first, then city (from Google Places / Maps).
     private var preferredCity: String {
@@ -42,114 +52,233 @@ struct LuxuryExploreTabView: View {
                     .ignoresSafeArea()
                 
                 ScrollView(.vertical, showsIndicators: false) {
-                    VStack(spacing: 24) {
-                        VStack(spacing: 10) {
-                            Text("Looking for trending spots in")
-                                .font(Font.bodySans(16, weight: .regular))
-                                .foregroundColor(Color.luxuryCreamMuted)
-                                .multilineTextAlignment(.center)
-                                .frame(maxWidth: .infinity)
-                            Text(preferredCity)
-                                .font(Font.tangerine(26, weight: .bold))
-                                .italic()
-                                .foregroundColor(Color.luxuryGold)
-                                .multilineTextAlignment(.center)
-                                .lineLimit(2)
-                                .minimumScaleFactor(0.6)
-                                .frame(maxWidth: geo.size.width - 40)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.top, 16)
-                        .padding(.horizontal, 20)
-                    
-                        // Category chips — tap to load trending from Google Places (same API as Home)
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("Pick a category")
-                                .font(Font.header(17, weight: .regular))
-                                .foregroundColor(Color.luxuryCream)
-                                .padding(.horizontal, 20)
+                        VStack(spacing: 24) {
+                            // Header: Recommended in [city]
+                            VStack(spacing: 6) {
+                                Text("Recommended in your area")
+                                    .font(Font.bodySans(16, weight: .regular))
+                                    .foregroundColor(Color.luxuryCreamMuted)
+                                    .multilineTextAlignment(.center)
+                                    .frame(maxWidth: .infinity)
+                                Text(preferredCity)
+                                    .font(Font.tangerine(26, weight: .bold))
+                                    .italic()
+                                    .foregroundColor(Color.luxuryGold)
+                                    .multilineTextAlignment(.center)
+                                    .lineLimit(2)
+                                    .minimumScaleFactor(0.6)
+                                    .frame(maxWidth: geo.size.width - 40)
+                                Text("Highly rated restaurants & things to do")
+                                    .font(Font.bodySans(12, weight: .medium))
+                                    .foregroundColor(Color.luxuryCreamMuted)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.top, 16)
+                            .padding(.horizontal, 20)
                             
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: 10) {
-                                    Button {
-                                        selectedExploreCategory = nil
-                                        Task { await loadExplorePlaces() }
-                                    } label: {
-                                        chipLabel("All", isSelected: selectedExploreCategory == nil)
-                                    }
-                                    .buttonStyle(.plain)
-                                    ForEach(ExploreCategory.all) { category in
+                            // 6 tiles: horizontal scroll of recommended places
+                            recommendedTilesSection(geo: geo)
+                            
+                            // Pick a category — isolated so horizontal scroll/taps don’t hit results below
+                            VStack(alignment: .leading, spacing: 12) {
+                                Text("Pick a category")
+                                    .font(Font.tangerine(32, weight: .bold))
+                                    .italic()
+                                    .foregroundColor(Color.luxuryGold)
+                                    .padding(.horizontal, 20)
+                                
+                                ScrollView(.horizontal, showsIndicators: true) {
+                                    HStack(spacing: 10) {
                                         Button {
-                                            selectedExploreCategory = category
+                                            selectedExploreCategory = nil
                                             Task { await loadExplorePlaces() }
                                         } label: {
-                                            HStack(spacing: 6) {
-                                                Text(category.emoji).font(.system(size: 14))
-                                                Text(category.title)
-                                                    .font(Font.bodySans(13, weight: .semibold))
-                                                    .foregroundColor(selectedExploreCategory?.id == category.id ? Color.luxuryMaroon : Color.luxuryCream)
-                                                    .lineLimit(1)
-                                                    .truncationMode(.tail)
-                                                    .minimumScaleFactor(0.8)
+                                            chipLabel("All", isSelected: selectedExploreCategory == nil)
+                                        }
+                                        .buttonStyle(ChipButtonStyle())
+                                        ForEach(ExploreCategory.all) { category in
+                                            Button {
+                                                selectedExploreCategory = category
+                                                Task { await loadExplorePlaces() }
+                                            } label: {
+                                                HStack(spacing: 6) {
+                                                    Text(category.emoji).font(.system(size: 14))
+                                                    Text(category.title)
+                                                        .font(Font.bodySans(13, weight: .semibold))
+                                                        .foregroundColor(selectedExploreCategory?.id == category.id ? Color.luxuryMaroon : Color.luxuryCream)
+                                                        .lineLimit(1)
+                                                        .truncationMode(.tail)
+                                                        .minimumScaleFactor(0.8)
+                                                }
+                                                .padding(.horizontal, 12)
+                                                .padding(.vertical, 8)
+                                                .background(selectedExploreCategory?.id == category.id ? Color.luxuryGold : Color.luxuryMaroonLight.opacity(0.8))
+                                                .cornerRadius(20)
+                                                .overlay(
+                                                    RoundedRectangle(cornerRadius: 20)
+                                                        .stroke(Color.luxuryGold.opacity(selectedExploreCategory?.id == category.id ? 1 : 0.35), lineWidth: 1)
+                                                )
+                                                .contentShape(Rectangle())
                                             }
-                                            .padding(.horizontal, 12)
-                                            .padding(.vertical, 8)
-                                            .background(selectedExploreCategory?.id == category.id ? Color.luxuryGold : Color.luxuryMaroonLight.opacity(0.8))
-                                            .cornerRadius(20)
-                                            .overlay(
-                                                RoundedRectangle(cornerRadius: 20)
-                                                    .stroke(Color.luxuryGold.opacity(selectedExploreCategory?.id == category.id ? 1 : 0.35), lineWidth: 1)
-                                            )
+                                            .buttonStyle(ChipButtonStyle())
+                                        }
+                                    }
+                                    .padding(.horizontal, 20)
+                                    .padding(.vertical, 4)
+                                }
+                                .scrollBounceBehavior(.automatic)
+                                .frame(height: 56)
+                                .frame(maxWidth: .infinity)
+                                .background(Color.luxuryMaroon)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.bottom, 20)
+                            .background(Color.luxuryMaroon)
+                            .zIndex(1)
+                            
+                            // Category results list — clear gap so chips scroll doesn’t hit first card
+                            if explorePlacesLoading {
+                                VStack(spacing: 16) {
+                                    ProgressView().tint(Color.luxuryGold)
+                                    Text("Finding spots…")
+                                        .font(Font.bodySans(14, weight: .medium))
+                                        .foregroundColor(Color.luxuryCreamMuted)
+                                }
+                                .frame(maxWidth: .infinity).padding(.vertical, 40)
+                            } else if explorePlaces.isEmpty {
+                                Text("Pick a category above to see more spots")
+                                    .font(Font.bodySans(15, weight: .medium))
+                                    .foregroundColor(Color.luxuryCreamMuted)
+                                    .multilineTextAlignment(.center)
+                                    .lineLimit(3)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.horizontal, 24)
+                                    .padding(.vertical, 40)
+                            } else {
+                                LazyVStack(spacing: 14) {
+                                    ForEach(explorePlaces, id: \.placeId) { place in
+                                        ExplorePlaceCard(place: place, preferredCity: preferredCity) {
+                                            openPlaceInPreferredMaps(place: place)
                                         }
                                         .buttonStyle(.plain)
                                     }
-                                }
-                                .padding(.horizontal, 20)
-                            }
-                            .frame(maxWidth: .infinity)
-                        }
-                        .frame(maxWidth: .infinity)
-                    
-                        // Google Places trending results — View in Maps opens Google/Apple Maps
-                        if explorePlacesLoading {
-                            VStack(spacing: 16) {
-                                ProgressView().tint(Color.luxuryGold)
-                                Text("Finding spots…")
-                                    .font(Font.bodySans(14, weight: .medium))
-                                    .foregroundColor(Color.luxuryCreamMuted)
-                            }
-                            .frame(maxWidth: .infinity).padding(.vertical, 40)
-                        } else if explorePlaces.isEmpty {
-                            Text("Pick a category above to see trending spots from Google")
-                                .font(Font.bodySans(15, weight: .medium))
-                                .foregroundColor(Color.luxuryCreamMuted)
-                                .multilineTextAlignment(.center)
-                                .lineLimit(3)
-                                .frame(maxWidth: .infinity)
-                                .padding(.horizontal, 24)
-                                .padding(.vertical, 40)
-                        } else {
-                            LazyVStack(spacing: 14) {
-                                ForEach(explorePlaces, id: \.placeId) { place in
-                                    ExplorePlaceCard(place: place, preferredCity: preferredCity) {
-                                        openPlaceInPreferredMaps(place: place)
+                                    // Regenerate — always show when there are results; fetches fresh list for current category
+                                    if !explorePlaces.isEmpty {
+                                        Button {
+                                            Task { await loadExplorePlaces() }
+                                        } label: {
+                                            HStack(spacing: 8) {
+                                                Image(systemName: "arrow.clockwise")
+                                                    .font(.system(size: 18, weight: .medium))
+                                                Text("Regenerate")
+                                                    .font(Font.bodySans(16, weight: .semibold))
+                                            }
+                                            .foregroundColor(Color.luxuryMaroon)
+                                            .padding(.horizontal, 24)
+                                            .padding(.vertical, 16)
+                                            .frame(maxWidth: .infinity)
+                                            .background(LinearGradient.goldShimmer)
+                                            .clipShape(RoundedRectangle(cornerRadius: 16))
+                                        }
+                                        .buttonStyle(.plain)
+                                        .disabled(explorePlacesLoading)
+                                        .padding(.top, 16)
+                                        .padding(.horizontal, 20)
+                                    }
+                                    // Generate more — next page (only when API returned a next-page token)
+                                    if !explorePlaces.isEmpty, exploreNextPageToken != nil {
+                                        Button {
+                                            Task { await loadMoreExplorePlaces() }
+                                        } label: {
+                                            HStack(spacing: 8) {
+                                                if exploreLoadMoreLoading {
+                                                    ProgressView()
+                                                        .tint(Color.luxuryMaroon)
+                                                } else {
+                                                    Image(systemName: "sparkles")
+                                                        .font(.system(size: 18, weight: .medium))
+                                                    Text("Generate more")
+                                                        .font(Font.bodySans(16, weight: .semibold))
+                                                }
+                                            }
+                                            .foregroundColor(Color.luxuryMaroon)
+                                            .padding(.horizontal, 24)
+                                            .padding(.vertical, 16)
+                                            .frame(maxWidth: .infinity)
+                                            .background(Color.luxuryMaroonLight.opacity(0.9))
+                                            .overlay(
+                                                RoundedRectangle(cornerRadius: 16)
+                                                    .stroke(Color.luxuryGold.opacity(0.6), lineWidth: 1)
+                                            )
+                                            .clipShape(RoundedRectangle(cornerRadius: 16))
+                                        }
+                                        .buttonStyle(.plain)
+                                        .disabled(exploreLoadMoreLoading)
+                                        .padding(.top, 10)
+                                        .padding(.horizontal, 20)
                                     }
                                 }
+                                .frame(maxWidth: .infinity)
+                                .padding(.horizontal, 20)
+                                .padding(.top, 8)
+                                .padding(.bottom, 24)
                             }
-                            .frame(maxWidth: .infinity)
-                            .padding(.horizontal, 20)
-                            .padding(.bottom, 24)
                         }
+                        .frame(minWidth: 0, maxWidth: .infinity)
+                        .padding(.bottom, 120)
                     }
-                    .frame(minWidth: 0, maxWidth: .infinity)
-                    .padding(.bottom, 120)
-                }
-                .scrollBounceBehavior(.basedOnSize)
+                    .scrollBounceBehavior(.basedOnSize)
             }
         }
         .toolbarBackground(Color.luxuryMaroon, for: .navigationBar)
-        .onAppear { Task { await loadExplorePlaces() } }
-        .refreshable { await loadExplorePlaces() }
+        .onAppear {
+            Task { await loadRecommendedPlaces() }
+            Task { await loadExplorePlaces() }
+        }
+        .refreshable {
+            await loadRecommendedPlaces()
+            await loadExplorePlaces()
+        }
+    }
+    
+    /// Top 6 recommended tiles (horizontal scroll); loading state or empty state when no location.
+    private func recommendedTilesSection(geo: GeometryProxy) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if recommendedLoading {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 14) {
+                        ForEach(0..<6, id: \.self) { _ in
+                            RoundedRectangle(cornerRadius: 24)
+                                .fill(Color.luxuryMaroonLight.opacity(0.5))
+                                .frame(width: 200, height: 200)
+                                .overlay(ProgressView().tint(Color.luxuryGold))
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                }
+            } else if recommendedPlaces.isEmpty {
+                Text("Set your starting address or city in Settings to see recommended spots here.")
+                    .font(Font.bodySans(14, weight: .medium))
+                    .foregroundColor(Color.luxuryCreamMuted)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity)
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 24)
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 14) {
+                        ForEach(recommendedPlaces.prefix(6), id: \.placeId) { place in
+                            ExplorePlaceCard(place: place, preferredCity: preferredCity) {
+                                openPlaceInPreferredMaps(place: place)
+                            }
+                            .frame(width: min(220, geo.size.width - 60))
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity)
     }
     
     private func chipLabel(_ title: String, isSelected: Bool) -> some View {
@@ -166,19 +295,66 @@ struct LuxuryExploreTabView: View {
             )
     }
     
+    private func loadRecommendedPlaces() async {
+        let city = preferredCity
+        guard city != "your area", !city.isEmpty else {
+            await MainActor.run { recommendedPlaces = []; recommendedLoading = false }
+            return
+        }
+        await MainActor.run { if recommendedLoading { return }; recommendedLoading = true }
+        do {
+            let places = try await GooglePlacesService.shared.fetchRecommendedInCity(city: city, limit: 6)
+            await MainActor.run { recommendedPlaces = places; recommendedLoading = false }
+        } catch {
+            await MainActor.run { recommendedPlaces = []; recommendedLoading = false }
+        }
+    }
+    
     private func loadExplorePlaces() async {
         let city = preferredCity
         guard city != "your area", !city.isEmpty else {
-            await MainActor.run { explorePlaces = []; explorePlacesLoading = false }
+            await MainActor.run { explorePlaces = []; exploreNextPageToken = nil; explorePlacesLoading = false }
             return
         }
         await MainActor.run { if explorePlacesLoading { return }; explorePlacesLoading = true }
+        let isAll = selectedExploreCategory == nil
+        do {
+            let page: GooglePlacesService.TrendingPlacesPage
+            if isAll {
+                page = try await GooglePlacesService.shared.fetchTrendingPlacesAllCategory(city: city, minCount: 10)
+            } else {
+                page = try await GooglePlacesService.shared.fetchTrendingPlacesPage(city: city, categoryId: selectedExploreCategory?.id, pageToken: nil)
+            }
+            await MainActor.run {
+                explorePlaces = page.places
+                exploreNextPageToken = page.nextPageToken
+                explorePlacesLoading = false
+            }
+        } catch {
+            await MainActor.run { explorePlaces = []; exploreNextPageToken = nil; explorePlacesLoading = false }
+        }
+    }
+    
+    /// Append next page of results. Uses stored nextPageToken; Google recommends a short delay before token is valid.
+    private func loadMoreExplorePlaces() async {
+        let city = preferredCity
+        guard city != "your area", !city.isEmpty,
+              let token = exploreNextPageToken, !token.isEmpty else { return }
+        await MainActor.run { if exploreLoadMoreLoading { return }; exploreLoadMoreLoading = true }
+        // Token from previous response can take a couple seconds to become valid.
+        try? await Task.sleep(nanoseconds: 2_000_000_000)
         let categoryId = selectedExploreCategory?.id
         do {
-            let places = try await GooglePlacesService.shared.fetchTrendingPlacesInCity(city: city, categoryId: categoryId, limit: 12)
-            await MainActor.run { explorePlaces = places; explorePlacesLoading = false }
+            let page = try await GooglePlacesService.shared.fetchTrendingPlacesPage(city: city, categoryId: categoryId, pageToken: token)
+            await MainActor.run {
+                var seen = Set(explorePlaces.map(\.placeId))
+                let newPlaces = page.places.filter { seen.insert($0.placeId).inserted }
+                explorePlaces.append(contentsOf: newPlaces)
+                exploreNextPageToken = page.nextPageToken
+                exploreLoadMoreLoading = false
+            }
         } catch {
-            await MainActor.run { explorePlaces = []; explorePlacesLoading = false }
+            await MainActor.run { exploreLoadMoreLoading = false }
         }
     }
     
@@ -211,6 +387,16 @@ struct LuxuryExploreTabView: View {
             mapItem.name = place.name
             mapItem.openInMaps(launchOptions: nil)
         }
+    }
+}
+
+// MARK: - Chip button style — ensures chip taps are consumed and don’t pass through to cards below
+private struct ChipButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .contentShape(Rectangle())
+            .opacity(configuration.isPressed ? 0.9 : 1)
+            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
     }
 }
 

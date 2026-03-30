@@ -44,9 +44,9 @@ struct SongSearchView: View {
                             .padding(.vertical, 24)
                     } else {
                         List {
-                            ForEach(results, id: \.trackId) { song in
+                            ForEach(Array(results.enumerated()), id: \.offset) { _, song in
                                 Button {
-                                    onSelect(song.trackName, song.artistName)
+                                    onSelect(song.trackName ?? "", song.artistName ?? "")
                                     dismiss()
                                 } label: {
                                     HStack(spacing: 12) {
@@ -66,11 +66,11 @@ struct SongSearchView: View {
                                                 .overlay(Image(systemName: "music.note").foregroundColor(Color.luxuryMuted))
                                         }
                                         VStack(alignment: .leading, spacing: 2) {
-                                            Text(song.trackName)
+                                            Text(song.trackName ?? "—")
                                                 .font(Font.playfair(14, weight: .semibold))
                                                 .foregroundColor(Color.luxuryCream)
                                                 .lineLimit(1)
-                                            Text(song.artistName)
+                                            Text(song.artistName ?? "—")
                                                 .font(Font.inter(12))
                                                 .foregroundColor(Color.luxuryMuted)
                                                 .lineLimit(1)

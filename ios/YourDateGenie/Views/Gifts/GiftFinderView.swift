@@ -35,12 +35,24 @@ struct GiftFinderView: View {
         if let firstStop = datePlan?.stops.first, let address = firstStop.address {
             return address
         }
+        // Fallback to user's saved location so "find near me" always has a usable location
+        let fromProfile = UserProfileManager.shared.currentUser?.preferences.defaultStartingPoint.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let loc = fromProfile, !loc.isEmpty { return loc }
+        let fromUserLocation = UserProfileManager.shared.currentUser?.location.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let loc = fromUserLocation, !loc.isEmpty { return loc }
         return ""
     }
 
-    /// Location for display only: no zip/postal code (any country).
+    /// Location for display only: no zip/postal code (any country). Uses "Near me" when no location so the nearby-stores option always shows.
     private var effectiveLocationDisplay: String {
-        MapURLHelper.cityStateOrRegionFromAddress(effectiveLocation.isEmpty ? nil : effectiveLocation)
+        if effectiveLocation.isEmpty { return "Near me" }
+        let parsed = MapURLHelper.cityStateOrRegionFromAddress(effectiveLocation)
+        return parsed.isEmpty ? effectiveLocation : parsed
+    }
+
+    /// Location string for map search queries. Use "me" when no address so Maps does a "near me" search.
+    private var mapSearchLocation: String {
+        effectiveLocation.isEmpty ? "me" : effectiveLocationDisplay
     }
     
     private let occasionOptions = [
@@ -219,22 +231,20 @@ struct GiftFinderView: View {
             .background(Color.luxuryGold.opacity(0.15))
             .cornerRadius(20)
             
-            if !effectiveLocationDisplay.isEmpty {
-                Button {
-                    openInAppleMaps(query: "gift shop", near: effectiveLocationDisplay)
-                } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "mappin.circle.fill")
-                            .font(.system(size: 11))
-                            .foregroundColor(Color.luxuryGold)
-                        Text(effectiveLocationDisplay)
-                            .font(Font.inter(11, weight: .regular))
-                            .foregroundColor(Color.luxuryGold)
-                            .lineLimit(1)
-                        Image(systemName: "arrow.up.right")
-                            .font(.system(size: 9))
-                            .foregroundColor(Color.luxuryGold)
-                    }
+            Button {
+                openInAppleMaps(query: "gift shop", near: mapSearchLocation)
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "mappin.circle.fill")
+                        .font(.system(size: 11))
+                        .foregroundColor(Color.luxuryGold)
+                    Text(effectiveLocationDisplay)
+                        .font(Font.inter(11, weight: .regular))
+                        .foregroundColor(Color.luxuryGold)
+                        .lineLimit(1)
+                    Image(systemName: "arrow.up.right")
+                        .font(.system(size: 9))
+                        .foregroundColor(Color.luxuryGold)
                 }
             }
         }
@@ -497,12 +507,10 @@ struct GiftFinderView: View {
                         .italic()
                         .foregroundColor(Color.luxuryGold)
                     
-                    if !effectiveLocationDisplay.isEmpty {
-                        Text("With stores near \(effectiveLocationDisplay)")
-                            .font(Font.inter(12, weight: .regular))
-                            .foregroundColor(Color.luxuryMuted)
-                            .lineLimit(1)
-                    }
+                    Text(effectiveLocation.isEmpty ? "With stores near you" : "With stores near \(effectiveLocationDisplay)")
+                        .font(Font.inter(12, weight: .regular))
+                        .foregroundColor(Color.luxuryMuted)
+                        .lineLimit(1)
                 }
                 
                 Spacer()
@@ -576,8 +584,8 @@ struct GiftFinderView: View {
             }
             .padding(.horizontal, 20)
             
-            // Nearby Stores Section - Opens Google Maps
-            if !nearbyStores.isEmpty && !effectiveLocationDisplay.isEmpty {
+            // Nearby Stores Section - always show when we have results so users can find gifts near them
+            if !nearbyStores.isEmpty {
                 nearbyStoresSection
             }
             
@@ -586,7 +594,7 @@ struct GiftFinderView: View {
                 ForEach(filteredGifts) { gift in
                     GiftResultCardWithMap(
                         gift: gift,
-                        location: effectiveLocationDisplay,
+                        location: mapSearchLocation,
                         isSaved: giftStore.isSaved(gift),
                         isBought: giftStore.isBought(gift),
                         onSave: {
@@ -634,7 +642,7 @@ struct GiftFinderView: View {
                 Image(systemName: "mappin.and.ellipse")
                     .font(.system(size: 14))
                     .foregroundColor(Color.luxuryGold)
-                Text("Find Stores Near Your Date")
+                Text(effectiveLocation.isEmpty ? "Find Stores Near You" : "Find Stores Near Your Date")
                     .font(Font.tangerine(28, weight: .bold))
                     .italic()
                     .foregroundColor(Color.luxuryGold)
@@ -644,7 +652,7 @@ struct GiftFinderView: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 12) {
                     ForEach(nearbyStores) { store in
-                        NearbyStoreCard(store: store, location: effectiveLocationDisplay)
+                        NearbyStoreCard(store: store, location: mapSearchLocation)
                     }
                 }
                 .padding(.horizontal, 20)
@@ -652,7 +660,7 @@ struct GiftFinderView: View {
             
             // View all on map button
             Button {
-                openInAppleMaps(query: "gift shop", near: effectiveLocationDisplay)
+                openInAppleMaps(query: "gift shop", near: mapSearchLocation)
             } label: {
                 HStack(spacing: 8) {
                     Image(systemName: "map.fill")

@@ -820,6 +820,7 @@ struct MemoryDetailView: View {
 // MARK: - Memory photo (local or cloud URL)
 private struct MemoryPhotoView: View {
     let memory: DateMemory
+    @State private var resolvedImageURL: URL?
     
     var body: some View {
         Group {
@@ -827,7 +828,7 @@ private struct MemoryPhotoView: View {
                 Image(uiImage: uiImage)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
-            } else if let url = memory.imageURL {
+            } else if let url = resolvedImageURL ?? memory.imageURL {
                 AsyncImage(url: url) { phase in
                     switch phase {
                     case .success(let image):
@@ -846,6 +847,25 @@ private struct MemoryPhotoView: View {
                 placeholder
             }
         }
+        .task(id: memory.imageUrl) {
+            await resolveCloudImageURLIfNeeded()
+        }
+    }
+    
+    /// Private bucket: `image_url` is a storage path (`userId/file.jpg`). Legacy rows may store a full URL.
+    private func resolveCloudImageURLIfNeeded() async {
+        guard let raw = memory.imageUrl?.trimmingCharacters(in: .whitespacesAndNewlines), !raw.isEmpty else {
+            await MainActor.run { resolvedImageURL = nil }
+            return
+        }
+        if raw.lowercased().hasPrefix("http") {
+            await MainActor.run { resolvedImageURL = URL(string: raw) }
+            return
+        }
+        let bucket = SupabaseService.dateMemoriesStorageBucket
+        let path = raw
+        let url = try? await SupabaseService.shared.getSignedURL(bucket: bucket, path: path, expiresIn: 3600)
+        await MainActor.run { resolvedImageURL = url }
     }
     
     private var placeholder: some View {

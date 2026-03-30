@@ -6,6 +6,9 @@ verify_jwt = false
 [functions.generate-more-gifts]
 verify_jwt = false
 
+[functions.generate-playlist]
+verify_jwt = false
+
 [functions.send-date-plan-email]
 verify_jwt = false
 

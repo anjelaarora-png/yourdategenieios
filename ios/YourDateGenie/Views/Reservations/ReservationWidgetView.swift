@@ -67,6 +67,17 @@ private func topTwoPlatforms(for region: ReservationRegion) -> [ReservationPlatf
     }
 }
 
+/// Search string sent to reservation platforms: restaurant name plus city when address is available.
+private func restaurantSearchTerm(venueName: String, address: String?) -> String {
+    let name = venueName.trimmingCharacters(in: .whitespaces)
+    let effectiveName = name.isEmpty ? "Restaurant" : name
+    guard let address = address, !address.isEmpty else { return effectiveName }
+    let parts = address.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+    guard parts.count >= 2 else { return effectiveName }
+    let city = String(parts[parts.count - 2])
+    return "\(effectiveName) \(city)"
+}
+
 private func regionDisplayName(_ region: ReservationRegion) -> String {
     switch region {
     case .us: return "USA"
@@ -215,7 +226,7 @@ struct ReservationWidgetView: View {
                 .padding(.horizontal, 20)
                 .padding(.top, 12)
                 
-                // Direct reservation link – use bookingUrl or websiteUrl when it's a booking platform (OpenTable/Resy)
+                // Direct reservation link – primary CTA when we have OpenTable/Resy booking URL
                 if let urlString = effectiveReservationUrl, let url = URL(string: urlString) {
                     Button {
                         UIApplication.shared.open(url)
@@ -232,41 +243,6 @@ struct ReservationWidgetView: View {
                         .background(LinearGradient.goldShimmer)
                         .cornerRadius(16)
                     }
-                    .padding(.horizontal, 20)
-                    .padding(.top, 8)
-                } else {
-                    // No direct link — show location-based reservation platforms
-                    let region = detectReservationRegion(from: address)
-                    let platforms = topTwoPlatforms(for: region)
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Reserve a table")
-                            .font(Font.playfair(16, weight: .semibold))
-                            .foregroundColor(Color.luxuryCream)
-                        HStack(spacing: 12) {
-                            ForEach(platforms) { platform in
-                                if let url = searchUrl(forPlatformId: platform.id) {
-                                    Button {
-                                        UIApplication.shared.open(url)
-                                    } label: {
-                                        HStack(spacing: 8) {
-                                            Image(systemName: "link.circle.fill")
-                                                .font(.system(size: 18))
-                                            Text(platform.name)
-                                                .font(Font.inter(15, weight: .semibold))
-                                        }
-                                        .foregroundColor(Color.luxuryMaroon)
-                                        .frame(maxWidth: .infinity)
-                                        .padding(.vertical, 14)
-                                        .background(Color.luxuryGold.opacity(0.2))
-                                        .cornerRadius(12)
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    .padding(20)
-                    .frame(maxWidth: .infinity)
-                    .luxuryCard()
                     .padding(.horizontal, 20)
                     .padding(.top, 8)
                 }
@@ -359,11 +335,55 @@ struct ReservationWidgetView: View {
                     .background(Color.luxuryMaroonLight)
                     .cornerRadius(16)
                     .overlay(
-                        RoundedRectangle(cornerRadius: 16)
-                            .stroke(Color.luxuryGold.opacity(0.3), lineWidth: 1)
-                    )
+                            RoundedRectangle(cornerRadius: 16)
+                                .stroke(Color.luxuryGold.opacity(0.3), lineWidth: 1)
+                        )
                 }
                 .padding(.horizontal, 20)
+                
+                // Reserve a table – platform buttons (use restaurant's booking URL when we have it for that platform)
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Reserve a table")
+                        .font(Font.playfair(16, weight: .semibold))
+                        .foregroundColor(Color.luxuryCream)
+                    Text("Select date & time above, then tap a platform to open it.")
+                        .font(Font.inter(12, weight: .regular))
+                        .foregroundColor(Color.luxuryMuted)
+                    HStack(spacing: 12) {
+                        ForEach(reservedPlatforms) { platform in
+                            if let url = reservationUrl(for: platform.id) {
+                                Button {
+                                    UIApplication.shared.open(url)
+                                } label: {
+                                    HStack(spacing: 10) {
+                                        ReservationPlatformIconView(platformId: platform.id, platformName: platform.name)
+                                        Text(platform.name)
+                                            .font(Font.inter(15, weight: .semibold))
+                                            .foregroundColor(Color.luxuryMaroon)
+                                            .lineLimit(2)
+                                            .minimumScaleFactor(0.85)
+                                            .multilineTextAlignment(.leading)
+                                            .fixedSize(horizontal: false, vertical: true)
+                                        Spacer(minLength: 4)
+                                        Image(systemName: "arrow.up.right")
+                                            .font(.system(size: 12, weight: .semibold))
+                                            .foregroundColor(Color.luxuryMaroon.opacity(0.8))
+                                    }
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 14)
+                                    .padding(.horizontal, 12)
+                                    .background(LinearGradient.goldShimmer)
+                                    .cornerRadius(12)
+                                }
+                            }
+                        }
+                    }
+                }
+                .padding(20)
+                .frame(maxWidth: .infinity)
+                .luxuryCard()
+                .padding(.horizontal, 20)
+                .padding(.top, 12)
                 
                 // Special requests
                 VStack(alignment: .leading, spacing: 12) {
@@ -508,6 +528,29 @@ struct ReservationWidgetView: View {
         return nil
     }
     
+    /// Top two reservation platforms for the detected region (for "Reserve a table" buttons).
+    private var reservedPlatforms: [ReservationPlatformItem] {
+        topTwoPlatforms(for: detectReservationRegion(from: address))
+    }
+    
+    /// Platform id for effectiveReservationUrl when it's a known booking platform (opentable / resy).
+    private var effectiveReservationPlatformId: String? {
+        guard let urlString = effectiveReservationUrl else { return nil }
+        let lower = urlString.lowercased()
+        if lower.contains("opentable.com") { return "opentable" }
+        if lower.contains("resy.com") { return "resy" }
+        return nil
+    }
+    
+    /// URL to open for a platform: use restaurant's actual booking page when we have it for this platform, else search URL.
+    private func reservationUrl(for platformId: String) -> URL? {
+        if let directId = effectiveReservationPlatformId, directId == platformId,
+           let urlString = effectiveReservationUrl, let url = URL(string: urlString) {
+            return url
+        }
+        return searchUrl(forPlatformId: platformId)
+    }
+    
     private var isoDateString: String {
         let f = DateFormatter()
         f.dateFormat = "yyyy-MM-dd"
@@ -524,10 +567,11 @@ struct ReservationWidgetView: View {
         return out.string(from: date)
     }
     
-    /// OpenTable search URL (USA top platform) using venue name, date, time, party size.
+    /// OpenTable search URL: send restaurant name + city so the platform can pre-fill search.
     private var openTableSearchUrl: URL? {
-        let term = venueName.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? venueName
-        let neighborhood = address?.split(separator: ",").first.map(String.init)?.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
+        let termRaw = restaurantSearchTerm(venueName: venueName, address: address)
+        let term = termRaw.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? venueName
+        let neighborhood = address?.split(separator: ",").first.map(String.init)?.trimmingCharacters(in: .whitespaces).addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
         var comp = URLComponents(string: "https://www.opentable.com/s")!
         comp.queryItems = [
             URLQueryItem(name: "covers", value: "\(partySize)"),
@@ -540,9 +584,10 @@ struct ReservationWidgetView: View {
         return comp.url
     }
     
-    /// Resy search URL (USA top platform) using venue name, date, party size, city from address.
+    /// Resy search URL: send restaurant name + city so the platform can pre-fill search.
     private var resySearchUrl: URL? {
-        let query = venueName.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? venueName
+        let termRaw = restaurantSearchTerm(venueName: venueName, address: address)
+        let query = termRaw.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? venueName
         let citySlug = resyCitySlugFromAddress(address)
         var comp = URLComponents(string: "https://resy.com/cities/\(citySlug)")!
         comp.queryItems = [
@@ -607,9 +652,10 @@ struct ReservationWidgetView: View {
         return "sg/singapore"
     }
     
-    /// Build search URL for a platform id (top-two per region).
+    /// Build search URL for a platform id; sends restaurant name + city so the platform can pre-fill search.
     private func searchUrl(forPlatformId id: String) -> URL? {
-        let term = venueName.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? venueName
+        let searchTerm = restaurantSearchTerm(venueName: venueName, address: address)
+        let term = searchTerm.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? venueName
         switch id {
         case "opentable": return openTableSearchUrl
         case "resy": return resySearchUrl
@@ -653,10 +699,8 @@ struct ReservationWidgetView: View {
             let area = tabelogAreaSlugFromAddress(address)
             return URL(string: "https://tabelog.com/en/\(area)/rstLst/?vs=1&sk=\(term)")
         case "swiggy":
-            let loc = address?.split(separator: ",").dropLast().last.map(String.init)?.trimmingCharacters(in: .whitespaces) ?? ""
-            let q = (loc.isEmpty ? venueName : "\(venueName) \(loc)").addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? term
             var c = URLComponents(string: "https://www.swiggy.com/dineout")!
-            c.queryItems = [URLQueryItem(name: "query", value: q)]
+            c.queryItems = [URLQueryItem(name: "query", value: term)]
             return c.url
         case "district":
             var c = URLComponents(string: "https://www.district.in/dine")!
@@ -670,10 +714,8 @@ struct ReservationWidgetView: View {
             let path = eatigoPathFromAddress(address)
             return URL(string: "https://eatigo.com/\(path)/en?search=\(term)")
         case "tripadvisor":
-            let loc = address?.split(separator: ",").dropLast().last.map(String.init)?.trimmingCharacters(in: .whitespaces) ?? ""
-            let q = loc.isEmpty ? "\(venueName) restaurant" : "\(venueName) restaurant \(loc)"
             var c = URLComponents(string: "https://www.tripadvisor.com/Search")!
-            c.queryItems = [URLQueryItem(name: "q", value: q)]
+            c.queryItems = [URLQueryItem(name: "q", value: "\(searchTerm) restaurant")]
             return c.url
         case "firsttable":
             let isNz = address.map { let l = $0.lowercased(); return l.contains("zealand") || l.contains("auckland") || l.contains("wellington") } ?? true
@@ -684,7 +726,7 @@ struct ReservationWidgetView: View {
         case "zomato":
             let city = address?.split(separator: ",").dropLast().last.map(String.init)?.trimmingCharacters(in: .whitespaces).lowercased().replacingOccurrences(of: " ", with: "-") ?? "mumbai"
             var c = URLComponents(string: "https://www.zomato.com/\(city)/restaurants")!
-            c.queryItems = [URLQueryItem(name: "q", value: venueName)]
+            c.queryItems = [URLQueryItem(name: "q", value: term)]
             return c.url
         default: return nil
         }
@@ -711,6 +753,83 @@ struct ReservationWidgetView: View {
                 showConfirmation = true
             }
         }
+    }
+}
+
+// MARK: - Platform brand icon (Simple Icons CDN per region, fallback initial when missing)
+private struct ReservationPlatformIconView: View {
+    let platformId: String
+    let platformName: String
+    
+    private static let iconSlugs: [String: String] = [
+        "opentable": "opentable",
+        "resy": "resy",
+        "thefork": "thefork",
+        "quandoo": "quandoo",
+        "tabelog": "tabelog",
+        "tripadvisor": "tripadvisor",
+        "zomato": "zomato",
+        "tablecheck": "tablecheck",
+        "swiggy": "swiggy",
+        "district": "district",
+        "eatapp": "eatapp",
+        "thechefz": "thechefz",
+        "chope": "chope",
+        "eatigo": "eatigo",
+        "firsttable": "firsttable",
+    ]
+    private static let iconColors: [String: String] = [
+        "opentable": "DA3741",
+        "resy": "2D2D2D",
+        "thefork": "F05537",
+        "quandoo": "00A0DC",
+        "tabelog": "E60012",
+        "tripadvisor": "34E0A1",
+        "zomato": "E23744",
+        "tablecheck": "0D9488",
+        "swiggy": "FC8019",
+        "district": "334155",
+        "eatapp": "212121",
+        "thechefz": "E31937",
+        "chope": "E31937",
+        "eatigo": "EE2E24",
+        "firsttable": "E31937",
+    ]
+    
+    var body: some View {
+        Group {
+            if let slug = Self.iconSlugs[platformId], let hex = Self.iconColors[platformId],
+               let url = URL(string: "https://cdn.simpleicons.org/\(slug)/\(hex)") {
+                AsyncImage(url: url) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                    case .failure, .empty:
+                        fallbackView
+                    @unknown default:
+                        fallbackView
+                    }
+                }
+                .frame(width: 24, height: 24)
+            } else {
+                fallbackView
+            }
+        }
+        .frame(width: 40, height: 40)
+        .background(Color.luxuryMaroonLight)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(Color.luxuryGold.opacity(0.3), lineWidth: 1)
+        )
+    }
+    
+    private var fallbackView: some View {
+        Text(String(platformName.prefix(1)))
+            .font(Font.inter(16, weight: .bold))
+            .foregroundColor(Color.luxuryGold)
     }
 }
 

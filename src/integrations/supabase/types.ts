@@ -116,6 +116,7 @@ export type Database = {
       date_plans: {
         Row: {
           conversation_starters: Json | null
+          couple_id: string | null
           created_at: string
           date_scheduled: string | null
           estimated_cost: string | null
@@ -123,8 +124,10 @@ export type Database = {
           gift_suggestions: Json | null
           id: string
           packing_list: string[] | null
+          plan_options: Json | null
           rating: number | null
           rating_notes: string | null
+          selected_option: string | null
           status: string
           stops: Json
           tagline: string | null
@@ -136,6 +139,7 @@ export type Database = {
         }
         Insert: {
           conversation_starters?: Json | null
+          couple_id?: string | null
           created_at?: string
           date_scheduled?: string | null
           estimated_cost?: string | null
@@ -143,8 +147,10 @@ export type Database = {
           gift_suggestions?: Json | null
           id?: string
           packing_list?: string[] | null
+          plan_options?: Json | null
           rating?: number | null
           rating_notes?: string | null
+          selected_option?: string | null
           status?: string
           stops?: Json
           tagline?: string | null
@@ -156,6 +162,7 @@ export type Database = {
         }
         Update: {
           conversation_starters?: Json | null
+          couple_id?: string | null
           created_at?: string
           date_scheduled?: string | null
           estimated_cost?: string | null
@@ -163,8 +170,10 @@ export type Database = {
           gift_suggestions?: Json | null
           id?: string
           packing_list?: string[] | null
+          plan_options?: Json | null
           rating?: number | null
           rating_notes?: string | null
+          selected_option?: string | null
           status?: string
           stops?: Json
           tagline?: string | null

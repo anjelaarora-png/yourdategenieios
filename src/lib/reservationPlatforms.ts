@@ -68,6 +68,20 @@ export const PRIMARY_PLATFORMS_BY_REGION: Record<Region, [string, string]> = {
   other: ["opentable", "quandoo"],
 };
 
+/**
+ * Build search string to send to reservation platforms: restaurant name plus city when available.
+ * Use this so the platform pre-fills the search with the right venue (we usually don't have a direct booking URL).
+ */
+export function restaurantSearchTerm(venueName: string, address?: string): string {
+  const name = (venueName || "").trim();
+  const effectiveName = name || "Restaurant";
+  if (!address) return effectiveName;
+  const parts = address.split(",").map((p) => p.trim()).filter(Boolean);
+  const city = parts.length >= 2 ? parts[parts.length - 2] : "";
+  if (!city) return effectiveName;
+  return `${effectiveName} ${city}`;
+}
+
 function getCitySlugFromAddress(addr?: string): string {
   if (!addr) return "ny";
   const parts = addr.split(",");
@@ -159,9 +173,10 @@ export const RESERVATION_PLATFORMS: ReservationPlatformConfig[] = [
     ctaLabel: "Reserve on OpenTable",
     regions: ["us", "uk", "au", "ca", "mx", "nz", "fr", "de", "it", "es", "jp", "th", "my", "br", "za", "eu", "latam", "other"],
     getUrl: ({ venueName, date, time, partySize, address }) => {
-      const searchQuery = encodeURIComponent(venueName);
+      const term = restaurantSearchTerm(venueName, address);
+      const searchQuery = encodeURIComponent(term);
       const locationQuery = address
-        ? encodeURIComponent(address.split(",")[0] || "")
+        ? encodeURIComponent(address.split(",")[0]?.trim() || "")
         : "";
       return `https://www.opentable.com/s?covers=${partySize}&dateTime=${date}T${time}&term=${searchQuery}${locationQuery ? `&metroId=&regionId=&neighborhood=${locationQuery}` : ""}`;
     },
@@ -172,7 +187,8 @@ export const RESERVATION_PLATFORMS: ReservationPlatformConfig[] = [
     ctaLabel: "Reserve on Resy",
     regions: ["us", "ca"],
     getUrl: ({ venueName, date, partySize, address }) => {
-      const searchQuery = encodeURIComponent(venueName);
+      const term = restaurantSearchTerm(venueName, address);
+      const searchQuery = encodeURIComponent(term);
       const city = getCitySlugFromAddress(address);
       return `https://resy.com/cities/${city}?query=${searchQuery}&date=${date}&seats=${partySize}`;
     },
@@ -182,8 +198,9 @@ export const RESERVATION_PLATFORMS: ReservationPlatformConfig[] = [
     name: "TheFork",
     ctaLabel: "Reserve on TheFork",
     regions: ["uk", "fr", "de", "it", "es", "eu", "latam", "sa"],
-    getUrl: ({ venueName, date, time, partySize }) => {
-      const searchQuery = encodeURIComponent(venueName);
+    getUrl: ({ venueName, date, time, partySize, address }) => {
+      const term = restaurantSearchTerm(venueName, address);
+      const searchQuery = encodeURIComponent(term);
       return `https://www.thefork.com/search?cityId=&queryText=${searchQuery}&date=${date}&time=${time}&partySize=${partySize}`;
     },
   },
@@ -192,8 +209,9 @@ export const RESERVATION_PLATFORMS: ReservationPlatformConfig[] = [
     name: "Quandoo",
     ctaLabel: "Reserve on Quandoo",
     regions: ["au", "de", "eu", "other"],
-    getUrl: ({ venueName, date, time, partySize }) => {
-      const searchQuery = encodeURIComponent(venueName);
+    getUrl: ({ venueName, date, time, partySize, address }) => {
+      const term = restaurantSearchTerm(venueName, address);
+      const searchQuery = encodeURIComponent(term);
       return `https://www.quandoo.com/en/search?query=${searchQuery}&date=${date}&time=${time}&pax=${partySize}`;
     },
   },
@@ -204,7 +222,8 @@ export const RESERVATION_PLATFORMS: ReservationPlatformConfig[] = [
     regions: ["jp"],
     getUrl: ({ venueName, address }) => {
       const area = getTabelogAreaSlug(address);
-      const query = encodeURIComponent(venueName);
+      const term = restaurantSearchTerm(venueName, address);
+      const query = encodeURIComponent(term);
       return `https://tabelog.com/en/${area}/rstLst/?vs=1&sk=${query}`;
     },
   },
@@ -214,10 +233,8 @@ export const RESERVATION_PLATFORMS: ReservationPlatformConfig[] = [
     ctaLabel: "Dineout on Swiggy",
     regions: ["india"],
     getUrl: ({ venueName, address }) => {
-      const q = encodeURIComponent(venueName);
-      const loc = address?.split(",").slice(-2, -1)[0]?.trim();
-      const query = loc ? `${venueName} ${loc}` : venueName;
-      return `https://www.swiggy.com/dineout?query=${encodeURIComponent(query)}`;
+      const term = restaurantSearchTerm(venueName, address);
+      return `https://www.swiggy.com/dineout?query=${encodeURIComponent(term)}`;
     },
   },
   {
@@ -225,8 +242,9 @@ export const RESERVATION_PLATFORMS: ReservationPlatformConfig[] = [
     name: "District",
     ctaLabel: "Reserve on District",
     regions: ["india"],
-    getUrl: ({ venueName }) => {
-      const query = encodeURIComponent(venueName);
+    getUrl: ({ venueName, address }) => {
+      const term = restaurantSearchTerm(venueName, address);
+      const query = encodeURIComponent(term);
       return `https://www.district.in/dine?q=${query}`;
     },
   },
@@ -235,8 +253,9 @@ export const RESERVATION_PLATFORMS: ReservationPlatformConfig[] = [
     name: "Eat App",
     ctaLabel: "Reserve on Eat App",
     regions: ["ae", "sa"],
-    getUrl: ({ venueName }) => {
-      const searchQuery = encodeURIComponent(venueName);
+    getUrl: ({ venueName, address }) => {
+      const term = restaurantSearchTerm(venueName, address);
+      const searchQuery = encodeURIComponent(term);
       return `https://eat.app/search?q=${searchQuery}`;
     },
   },
@@ -245,8 +264,9 @@ export const RESERVATION_PLATFORMS: ReservationPlatformConfig[] = [
     name: "The Chefz",
     ctaLabel: "Order & reserve on The Chefz",
     regions: ["sa"],
-    getUrl: ({ venueName }) => {
-      const query = encodeURIComponent(venueName);
+    getUrl: ({ venueName, address }) => {
+      const term = restaurantSearchTerm(venueName, address);
+      const query = encodeURIComponent(term);
       return `https://thechefz.co/en/search?q=${query}`;
     },
   },
@@ -257,7 +277,8 @@ export const RESERVATION_PLATFORMS: ReservationPlatformConfig[] = [
     regions: ["sg"],
     getUrl: ({ venueName, address }) => {
       const slug = getChopeCitySlug(address);
-      const query = encodeURIComponent(venueName);
+      const term = restaurantSearchTerm(venueName, address);
+      const query = encodeURIComponent(term);
       return `https://www.chope.co/${slug}-restaurants?query=${query}`;
     },
   },
@@ -268,7 +289,8 @@ export const RESERVATION_PLATFORMS: ReservationPlatformConfig[] = [
     regions: ["sg", "th", "my"],
     getUrl: ({ venueName, address }) => {
       const path = getEatigoPath(address);
-      const query = encodeURIComponent(venueName);
+      const term = restaurantSearchTerm(venueName, address);
+      const query = encodeURIComponent(term);
       return `https://eatigo.com/${path}/en?search=${query}`;
     },
   },
@@ -278,9 +300,9 @@ export const RESERVATION_PLATFORMS: ReservationPlatformConfig[] = [
     ctaLabel: "Find on TripAdvisor",
     regions: ["br", "mx"],
     getUrl: ({ venueName, address }) => {
-      const query = encodeURIComponent(`${venueName} restaurant`);
-      const loc = address ? encodeURIComponent(address.split(",").slice(-2, -1)[0]?.trim() || "") : "";
-      return `https://www.tripadvisor.com/Search?q=${query}${loc ? `+${encodeURIComponent(loc)}` : ""}`;
+      const term = restaurantSearchTerm(venueName, address);
+      const query = encodeURIComponent(`${term} restaurant`);
+      return `https://www.tripadvisor.com/Search?q=${query}`;
     },
   },
   {
@@ -289,7 +311,8 @@ export const RESERVATION_PLATFORMS: ReservationPlatformConfig[] = [
     ctaLabel: "Find on Zomato",
     regions: ["india", "ae", "za"],
     getUrl: ({ venueName, address }) => {
-      const searchQuery = encodeURIComponent(venueName);
+      const term = restaurantSearchTerm(venueName, address);
+      const searchQuery = encodeURIComponent(term);
       const city =
         address?.split(",").slice(-2, -1)[0]?.trim().toLowerCase() || "mumbai";
       const safeCity = city.replace(/\s+/g, "-");
@@ -302,7 +325,8 @@ export const RESERVATION_PLATFORMS: ReservationPlatformConfig[] = [
     ctaLabel: "Reserve on First Table",
     regions: ["nz", "au"],
     getUrl: ({ venueName, address }) => {
-      const query = encodeURIComponent(venueName);
+      const term = restaurantSearchTerm(venueName, address);
+      const query = encodeURIComponent(term);
       const isNz = !address || address.toLowerCase().includes("zealand") || address.toLowerCase().includes("auckland") || address.toLowerCase().includes("wellington");
       const base = isNz ? "https://www.firsttable.co.nz" : "https://www.firsttable.com.au";
       return `${base}/search?q=${query}`;
@@ -313,8 +337,9 @@ export const RESERVATION_PLATFORMS: ReservationPlatformConfig[] = [
     name: "TableCheck",
     ctaLabel: "Reserve on TableCheck",
     regions: ["jp"],
-    getUrl: ({ venueName, date, time, partySize }) => {
-      const searchQuery = encodeURIComponent(venueName);
+    getUrl: ({ venueName, date, time, partySize, address }) => {
+      const term = restaurantSearchTerm(venueName, address);
+      const searchQuery = encodeURIComponent(term);
       return `https://www.tablecheck.com/en/search?query=${searchQuery}&date=${date}&time=${time}&pax=${partySize}`;
     },
   },
@@ -420,20 +445,20 @@ export const PLATFORM_ICONS: Record<
   string,
   { slug?: string; color: string }
 > = {
-  opentable: { color: "DA3741" },
-  resy: { color: "2D2D2D" },
-  thefork: { color: "F05537" },
-  quandoo: { color: "00A0DC" },
+  opentable: { slug: "opentable", color: "DA3741" },
+  resy: { slug: "resy", color: "2D2D2D" },
+  thefork: { slug: "thefork", color: "F05537" },
+  quandoo: { slug: "quandoo", color: "00A0DC" },
   tabelog: { slug: "tabelog", color: "E60012" },
   swiggy: { slug: "swiggy", color: "FC8019" },
-  district: { color: "334155" },
-  eatapp: { color: "212121" },
-  thechefz: { color: "E31937" },
-  chope: { color: "E31937" },
-  eatigo: { color: "EE2E24" },
+  district: { slug: "district", color: "334155" },
+  eatapp: { slug: "eatapp", color: "212121" },
+  thechefz: { slug: "thechefz", color: "E31937" },
+  chope: { slug: "chope", color: "E31937" },
+  eatigo: { slug: "eatigo", color: "EE2E24" },
   tripadvisor: { slug: "tripadvisor", color: "34E0A1" },
   zomato: { slug: "zomato", color: "E23744" },
-  firsttable: { color: "E31937" },
+  firsttable: { slug: "firsttable", color: "E31937" },
   tablecheck: { slug: "tablecheck", color: "0D9488" },
 };
 

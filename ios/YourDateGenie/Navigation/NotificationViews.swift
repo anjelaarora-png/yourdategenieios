@@ -17,8 +17,9 @@ struct AppNotification: Identifiable, Equatable {
         case giftIdea = "gift"
         case specialOccasion = "occasion"
         case weekendSuggestion = "weekend"
+        case partnerSubmitted = "partner_submitted"
     }
-    
+
     var icon: String {
         switch type {
         case .datePlanReady: return "sparkles"
@@ -27,9 +28,10 @@ struct AppNotification: Identifiable, Equatable {
         case .giftIdea: return "gift.fill"
         case .specialOccasion: return "star.fill"
         case .weekendSuggestion: return "sun.max.fill"
+        case .partnerSubmitted: return "person.2.fill"
         }
     }
-    
+
     var accentColor: Color {
         switch type {
         case .datePlanReady: return Color.luxuryGold
@@ -38,6 +40,7 @@ struct AppNotification: Identifiable, Equatable {
         case .giftIdea: return Color(hex: "FF69B4")
         case .specialOccasion: return Color(hex: "FFB347")
         case .weekendSuggestion: return Color(hex: "87CEEB")
+        case .partnerSubmitted: return Color.luxuryGold
         }
     }
 }
@@ -142,15 +145,15 @@ struct NotificationBellButton: View {
                     Text("\(notificationManager.unreadCount)")
                         .font(Font.bodySans(10, weight: .bold))
                         .foregroundColor(Color.luxuryMaroon)
-                        .frame(width: 18, height: 18)
-                        .background(
-                            Circle()
-                                .fill(LinearGradient.goldShimmer)
-                        )
-                        .offset(x: 8, y: -8)
+                        .frame(width: 16, height: 16)
+                        .background(Circle().fill(LinearGradient.goldShimmer))
+                        .offset(x: 4, y: 2)
                 }
             }
+            .frame(width: 48, height: 44)
+            .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
         .onAppear {
             if notificationManager.unreadCount > 0 {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1) {

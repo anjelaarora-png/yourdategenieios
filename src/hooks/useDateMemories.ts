@@ -20,6 +20,21 @@ function pathBelongsToUser(filePath: string, userId: string): boolean {
   return firstSegment === userId;
 }
 
+/** Storage object path for signing: supports legacy full public URL or raw `userId/file` path (iOS + new web rows). */
+function storagePathFromImageUrl(imageUrl: string | null | undefined): string | null {
+  if (!imageUrl?.trim()) return null;
+  const raw = imageUrl.trim();
+  const marker = "/date-memories/";
+  const idx = raw.indexOf(marker);
+  if (idx !== -1) {
+    return raw.slice(idx + marker.length).split("?")[0] ?? null;
+  }
+  if (!raw.startsWith("http")) {
+    return raw;
+  }
+  return null;
+}
+
 export function useDateMemories() {
   const [memories, setMemories] = useState<DateMemory[]>([]);
   const [loading, setLoading] = useState(true);
@@ -48,20 +63,19 @@ export function useDateMemories() {
       // Only generate signed URLs for paths under the current user (prevents cross-account exposure)
       const memoriesWithSignedUrls = await Promise.all(
         (data || []).map(async (memory) => {
-          const urlParts = memory.image_url?.split("/date-memories/");
-          if (urlParts?.length > 1) {
-            const filePath = urlParts[1];
-            if (!pathBelongsToUser(filePath, currentUserId)) {
-              // Row points to another user's file; exclude so we never show it
-              return null;
-            }
-            const { data: signedUrlData } = await supabase.storage
-              .from("date-memories")
-              .createSignedUrl(filePath, 3600);
+          const filePath = storagePathFromImageUrl(memory.image_url);
+          if (!filePath) {
+            return memory;
+          }
+          if (!pathBelongsToUser(filePath, currentUserId)) {
+            return null;
+          }
+          const { data: signedUrlData } = await supabase.storage
+            .from("date-memories")
+            .createSignedUrl(filePath, 3600);
 
-            if (signedUrlData?.signedUrl) {
-              return { ...memory, image_url: signedUrlData.signedUrl };
-            }
+          if (signedUrlData?.signedUrl) {
+            return { ...memory, image_url: signedUrlData.signedUrl };
           }
           return memory;
         })
@@ -118,16 +132,12 @@ export function useDateMemories() {
         throw new Error("Failed to generate signed URL");
       }
 
-      const { data: publicUrlData } = supabase.storage
-        .from("date-memories")
-        .getPublicUrl(fileName);
-
       const { data, error } = await supabase
         .from("date_memories")
         .insert({
           user_id: currentUserId,
           date_plan_id: datePlanId || null,
-          image_url: publicUrlData.publicUrl,
+          image_url: fileName,
           caption,
           taken_at: new Date().toISOString(),
         })

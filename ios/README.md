@@ -107,6 +107,23 @@ See `ENV_TEMPLATE.txt` for a template.
 
 Then set the actual values in your Xcode scheme's environment variables.
 
+## Troubleshooting
+
+### Google Places / address autocomplete
+
+Suggestions appear only after **at least two characters**, and only if the app has a valid key.
+
+1. **Check the key**: `GOOGLE_PLACES_API_KEY` must be present in the **built** app. Copy `Secrets.xcconfig.example` → `Secrets.xcconfig` in the `ios` folder and set a real key (the Xcode project references this file). If Info.plist still contains the literal text `$(GOOGLE_PLACES_API_KEY)` (build setting not applied), autocomplete will fail — fix the xcconfig or set `GOOGLE_PLACES_API_KEY` under **Scheme → Run → Environment Variables** (the app reads that at runtime as an override).
+2. **Google Cloud Console**: Enable **Places API** (legacy Places used by the app: Autocomplete, Place Details) and **Geocoding API**. Ensure billing is active and quotas are not exceeded.
+3. **Key restrictions**: If the key is restricted, it must allow the APIs above and match how the app calls them (iOS apps use `URLSession` to `maps.googleapis.com`; restrictions must match Google’s guidance for your setup).
+4. **Legacy API deprecation**: If Google disables the legacy Places web service for your project, Autocomplete may return errors — check Xcode console for `[PlacesAutocomplete]` / `REQUEST_DENIED` in DEBUG builds.
+
+### Email sign-up and confirmation
+
+1. **Supabase**: Under Authentication → Providers → Email, enable **Confirm email** if you want accounts confirmed before sign-in.
+2. **Redirect URL**: Sign-up uses `yourdategenie://auth-callback`. Add exactly that URL under **Authentication → URL configuration → Redirect URLs** (and any https universal link you use for the same flow).
+3. **In-app flow**: The app only treats the user as signed in when the session’s email is **confirmed** (`emailConfirmedAt`). Unconfirmed sessions are cleared so the “waiting for email” screen stays until the user opens the verification link in the app (or uses “Already verified? Sign in”).
+
 ## Project Structure
 
 ```

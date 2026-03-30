@@ -30,22 +30,26 @@ struct QuestionnaireView: View {
                             .padding(.horizontal)
                             .padding(.top, 8)
                         
-                        // Step content
-                        TabView(selection: $viewModel.currentStep) {
-                            Step1LocationView(data: $viewModel.data)
-                                .tag(1)
-                            Step2TransportationView(data: $viewModel.data)
-                                .tag(2)
-                            Step3VibeView(data: $viewModel.data)
-                                .tag(3)
-                            Step4FoodView(data: $viewModel.data)
-                                .tag(4)
-                            Step5DealBreakersView(data: $viewModel.data)
-                                .tag(5)
-                            Step6ExtrasView(data: $viewModel.data, isPreferencesOnly: coordinator.questionnairePreferencesOnly)
-                                .tag(6)
+                        // Step content (custom switcher — not paging TabView — so Places autocomplete lists are not clipped)
+                        Group {
+                            switch viewModel.currentStep {
+                            case 1:
+                                Step1LocationView(data: $viewModel.data)
+                            case 2:
+                                Step2TransportationView(data: $viewModel.data)
+                            case 3:
+                                Step3VibeView(data: $viewModel.data)
+                            case 4:
+                                Step4FoodView(data: $viewModel.data)
+                            case 5:
+                                Step5DealBreakersView(data: $viewModel.data)
+                            case 6:
+                                Step6ExtrasView(data: $viewModel.data, isPreferencesOnly: coordinator.questionnairePreferencesOnly)
+                            default:
+                                Step1LocationView(data: $viewModel.data)
+                            }
                         }
-                        .tabViewStyle(.page(indexDisplayMode: .never))
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .animation(.easeInOut(duration: 0.3), value: viewModel.currentStep)
                         
                         // Navigation buttons
@@ -56,19 +60,22 @@ struct QuestionnaireView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 if !isGenerating {
-                    ToolbarItem(placement: .navigationBarLeading) {
-                        Button("Cancel") {
-                            dismiss()
-                        }
-                        .font(Font.bodySans(16, weight: .medium))
-                        .foregroundColor(Color.luxuryGold)
-                    }
-                    
                     ToolbarItem(placement: .principal) {
                         Text(viewModel.stepTitle)
                             .font(Font.tangerine(24, weight: .bold))
                             .italic()
                             .foregroundColor(Color.luxuryGold)
+                    }
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Button {
+                            closeQuestionnaireTapped()
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 28))
+                                .foregroundStyle(Color.luxuryGold.opacity(0.9))
+                                .symbolRenderingMode(.hierarchical)
+                        }
+                        .accessibilityLabel("Close")
                     }
                 }
             }
@@ -89,6 +96,9 @@ struct QuestionnaireView: View {
             .onChange(of: generator.generatedPlans) { _, plans in
                 if !plans.isEmpty && isGenerating {
                     LastQuestionnaireStore.save(viewModel.data)
+                    if UserProfileManager.shared.currentUser != nil {
+                        UserProfileManager.shared.savePreferencesFromQuestionnaire(viewModel.data)
+                    }
                     onComplete?(viewModel.data)
                     dismiss()
                 }
@@ -103,6 +113,7 @@ struct QuestionnaireView: View {
                 case .fresh:
                     QuestionnaireProgressStore.clear()
                     viewModel.data = QuestionnaireData()
+                    UserProfileManager.shared.applySavedPreferences(to: &viewModel.data)
                     viewModel.currentStep = 1
                 case .useLast:
                     if let last = LastQuestionnaireStore.load() {
@@ -126,14 +137,31 @@ struct QuestionnaireView: View {
                 if coordinator.planIntent != .fresh && !isGenerating {
                     QuestionnaireProgressStore.save(data: viewModel.data, step: viewModel.currentStep)
                 }
-                coordinator.questionnairePreferencesOnly = false
+                if !coordinator.isPresentingInitialPreferencesFlow {
+                    coordinator.questionnairePreferencesOnly = false
+                }
             }
         }
     }
     
+    /// Dismiss or defer: initial prefs → main tabs; preferences sheet → dismiss; plan questionnaire → dismiss sheet.
+    private func closeQuestionnaireTapped() {
+        if coordinator.isPresentingInitialPreferencesFlow {
+            coordinator.deferInitialPreferences()
+            return
+        }
+        if coordinator.questionnairePreferencesOnly {
+            coordinator.questionnairePreferencesOnly = false
+            coordinator.dismissSheet()
+            dismiss()
+            return
+        }
+        coordinator.dismissSheet()
+        dismiss()
+    }
+    
     private var navigationButtons: some View {
         HStack(spacing: 16) {
-            // Back button
             if viewModel.currentStep > 1 {
                 Button {
                     withAnimation {
@@ -149,40 +177,67 @@ struct QuestionnaireView: View {
             } else {
                 Spacer()
             }
-            
-            // Next/Submit button
-            Button {
-                if viewModel.currentStep == 6 {
-                    if coordinator.questionnairePreferencesOnly {
-                        savePreferencesOnly()
-                    } else {
-                        generateDatePlan()
-                    }
-                } else {
-                    withAnimation {
-                        viewModel.nextStep()
+
+            if viewModel.currentStep == 6,
+               coordinator.partnerJoinSessionId == nil,
+               !coordinator.questionnairePreferencesOnly {
+                Button {
+                    goToHomeFromQuestionnaire()
+                } label: {
+                    Text("Go to Home")
+                }
+                .buttonStyle(LuxuryOutlineButtonStyle(isSmall: true))
+
+                Button {
+                    generateDatePlan()
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "sparkles")
+                        Text("Create Plan")
                     }
                 }
-            } label: {
-                HStack(spacing: 8) {
+                .buttonStyle(LuxuryGoldButtonStyle(isSmall: true))
+                .disabled(!viewModel.isCurrentStepValid)
+                .opacity(viewModel.isCurrentStepValid ? 1 : 0.5)
+            } else {
+                Button {
                     if viewModel.currentStep == 6 {
-                        if coordinator.questionnairePreferencesOnly {
-                            Image(systemName: "checkmark.circle.fill")
-                            Text("Save preferences")
+                        if let sessionId = coordinator.partnerJoinSessionId {
+                            submitPartnerJoinAndDismiss(sessionId: sessionId)
+                        } else if coordinator.questionnairePreferencesOnly {
+                            savePreferencesOnly()
                         } else {
-                            Image(systemName: "sparkles")
-                            Text("Create Plan")
+                            generateDatePlan()
                         }
                     } else {
-                        Text("Next")
-                        Image(systemName: "chevron.right")
+                        withAnimation {
+                            viewModel.nextStep()
+                        }
                     }
+                } label: {
+                    HStack(spacing: 8) {
+                        if viewModel.currentStep == 6 {
+                            if coordinator.partnerJoinSessionId != nil {
+                                Image(systemName: "checkmark.circle.fill")
+                                Text("I'm in")
+                            } else if coordinator.questionnairePreferencesOnly {
+                                Image(systemName: "checkmark.circle.fill")
+                                Text("Save preferences")
+                            } else {
+                                Image(systemName: "sparkles")
+                                Text("Create Plan")
+                            }
+                        } else {
+                            Text("Next")
+                            Image(systemName: "chevron.right")
+                        }
+                    }
+                    .frame(maxWidth: viewModel.currentStep == 1 ? .infinity : nil)
                 }
-                .frame(maxWidth: viewModel.currentStep == 1 ? .infinity : nil)
+                .buttonStyle(LuxuryGoldButtonStyle(isSmall: true))
+                .disabled(!viewModel.isCurrentStepValid)
+                .opacity(viewModel.isCurrentStepValid ? 1 : 0.5)
             }
-            .buttonStyle(LuxuryGoldButtonStyle(isSmall: true))
-            .disabled(!viewModel.isCurrentStepValid)
-            .opacity(viewModel.isCurrentStepValid ? 1 : 0.5)
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 16)
@@ -191,13 +246,42 @@ struct QuestionnaireView: View {
                 .shadow(color: Color.black.opacity(0.3), radius: 10, y: -5)
         )
     }
+
+    private func goToHomeFromQuestionnaire() {
+        LastQuestionnaireStore.save(viewModel.data)
+        QuestionnaireProgressStore.clear()
+        if UserProfileManager.shared.currentUser != nil {
+            UserProfileManager.shared.savePreferencesFromQuestionnaire(viewModel.data)
+        }
+        if coordinator.isPresentingInitialPreferencesFlow {
+            coordinator.isPresentingInitialPreferencesFlow = false
+            coordinator.completePreferences()
+        }
+        coordinator.currentTab = .home
+        coordinator.questionnairePreferencesOnly = false
+        coordinator.dismissSheet()
+        dismiss()
+    }
     
     private func savePreferencesOnly() {
         LastQuestionnaireStore.save(viewModel.data)
         QuestionnaireProgressStore.clear()
         UserProfileManager.shared.savePreferencesFromQuestionnaire(viewModel.data)
+        if coordinator.isPresentingInitialPreferencesFlow {
+            coordinator.isPresentingInitialPreferencesFlow = false
+            coordinator.completePreferences()
+        }
         coordinator.questionnairePreferencesOnly = false
         coordinator.activeSheet = nil
+        dismiss()
+    }
+
+    private func submitPartnerJoinAndDismiss(sessionId: String) {
+        LastQuestionnaireStore.save(viewModel.data)
+        QuestionnaireProgressStore.clear()
+        PartnerSessionManager.shared.submitPartnerData(sessionId: sessionId, data: viewModel.data)
+        coordinator.partnerJoinSessionId = nil
+        coordinator.dismissSheet()
         dismiss()
     }
     
@@ -382,7 +466,7 @@ class QuestionnaireViewModel: ObservableObject {
     }
     
     private func prePopulateFromSavedPreferences() {
-        UserProfileManager.shared.prePopulateQuestionnaireData(&data)
+        UserProfileManager.shared.applySavedPreferences(to: &data)
     }
 }
 

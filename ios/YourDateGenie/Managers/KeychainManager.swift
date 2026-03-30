@@ -138,6 +138,8 @@ enum KeychainKey: String {
     case userEmail = "user_email"
     case userUID = "user_uid"
     case sessionData = "session_data"
+    /// Survives app reinstall; used to show sign-in directly for returning users.
+    case hasEverLoggedIn = "has_ever_logged_in"
 }
 
 // MARK: - Keychain Errors
@@ -204,5 +206,19 @@ extension KeychainManager {
         try delete(forKey: .userEmail)
         try delete(forKey: .userIdToken)
         try delete(forKey: .userRefreshToken)
+    }
+
+    /// Mark that user has signed in at least once (survives reinstall so we can show sign-in directly).
+    func setHasEverLoggedIn(_ value: Bool) {
+        if value {
+            try? save("1", forKey: .hasEverLoggedIn)
+        } else {
+            try? delete(forKey: .hasEverLoggedIn)
+        }
+    }
+
+    /// True if user has ever completed sign-in on this device (persists across reinstall).
+    func getHasEverLoggedIn() -> Bool {
+        (try? getString(forKey: .hasEverLoggedIn)) == "1"
     }
 }

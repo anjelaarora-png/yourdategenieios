@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import type { ReservationPlatformConfig } from "@/lib/reservationPlatforms";
 import { Button } from "@/components/ui/button";
 import { Calendar, Clock, Users, ExternalLink, Phone, AlertCircle, MapPin } from "lucide-react";
 import {
@@ -22,17 +23,8 @@ import {
   detectRegionFromAddress,
   getTopTwoPlatformsForRegion,
   PLATFORM_ICONS,
-  type ReservationPlatformConfig,
 } from "@/lib/reservationPlatforms";
 import { cn } from "@/lib/utils";
-
-/** Hex (without #) to rgba string with given alpha, for chip background. */
-function hexToRgba(hex: string, alpha: number): string {
-  const r = parseInt(hex.slice(0, 2), 16);
-  const g = parseInt(hex.slice(2, 4), 16);
-  const b = parseInt(hex.slice(4, 6), 16);
-  return `rgba(${r},${g},${b},${alpha})`;
-}
 
 interface ReservationWidgetProps {
   venueName: string;
@@ -70,6 +62,7 @@ const ReservationWidget = ({
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
   const [partySize, setPartySize] = useState("2");
+  const [failedIconSlugs, setFailedIconSlugs] = useState<Set<string>>(new Set());
 
   // Detect region and get top two dining reservation platforms for that country
   const { region, platforms } = useMemo(() => {
@@ -79,10 +72,30 @@ const ReservationWidget = ({
   }, [address]);
 
   const handlePlatformClick = (platform: ReservationPlatformConfig) => {
-    const url = platform.getUrl({ venueName, date, time, partySize, address });
+    // Use restaurant's actual booking page when we have a direct link for this platform
+    const useDirectLink =
+      bookingUrl &&
+      (platform.id === reservationPlatform || platform.id === inferPlatformFromUrl(bookingUrl));
+    const today = new Date().toISOString().slice(0, 10);
+    const url = useDirectLink
+      ? bookingUrl!
+      : platform.getUrl({
+          venueName: venueName || "Restaurant",
+          date: date || today,
+          time: time || "19:00",
+          partySize,
+          address,
+        });
     window.open(url, "_blank", "noopener,noreferrer");
     onReservationMade?.();
   };
+
+  function inferPlatformFromUrl(url: string): string | undefined {
+    const lower = url.toLowerCase();
+    if (lower.includes("opentable.com")) return "opentable";
+    if (lower.includes("resy.com")) return "resy";
+    return undefined;
+  }
 
   const handleCall = () => {
     if (phoneNumber) {
@@ -229,44 +242,43 @@ const ReservationWidget = ({
               {platforms.map((platform) => {
                 const iconConfig = PLATFORM_ICONS[platform.id];
                 const brandColor = iconConfig?.color ?? "6b7280";
-                const hasLogo = iconConfig?.slug != null;
-                const isDisabled = !date || !time;
-                const bgStyle =
-                  isDisabled ? undefined : {
-                    backgroundColor: hexToRgba(brandColor, 0.14),
-                    borderColor: `#${brandColor}`,
-                  };
+                const slug = iconConfig?.slug;
+                const hasLogo = slug != null && !failedIconSlugs.has(platform.id);
+                const useDirectLink =
+                  !!bookingUrl &&
+                  (platform.id === reservationPlatform || platform.id === inferPlatformFromUrl(bookingUrl));
                 return (
                   <button
                     key={platform.id}
                     type="button"
                     onClick={() => handlePlatformClick(platform)}
-                    disabled={isDisabled}
                     className={cn(
                       "flex items-center gap-3 rounded-xl border-2 p-3 text-left transition-all duration-200",
-                      !isDisabled &&
-                        "hover:shadow-lg hover:brightness-[1.02] active:scale-[0.98] active:brightness-[0.98]",
-                      "disabled:pointer-events-none disabled:opacity-50 disabled:cursor-not-allowed",
-                      "cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
-                      isDisabled && "border-border bg-muted/40"
+                      "border-border bg-card text-foreground",
+                      "hover:bg-accent/50 hover:border-accent hover:shadow-md active:scale-[0.98]",
+                      "cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                     )}
-                    style={!isDisabled ? bgStyle : undefined}
-                    aria-label={`Reserve on ${platform.name}`}
+                    aria-label={`Reserve on ${platform.name}${useDirectLink ? " (direct link)" : ""}`}
                   >
                     <span
                       className={cn(
-                        "flex shrink-0 items-center justify-center rounded-lg w-10 h-10",
-                        hasLogo ? "bg-white/80" : "text-white"
+                        "flex shrink-0 items-center justify-center rounded-lg w-10 h-10 border border-border",
+                        hasLogo ? "bg-muted" : "text-white"
                       )}
-                      style={!hasLogo ? { backgroundColor: `#${brandColor}` } : undefined}
+                      style={
+                        hasLogo
+                          ? { borderColor: `#${brandColor}40` }
+                          : { backgroundColor: `#${brandColor}` }
+                      }
                     >
-                      {hasLogo ? (
+                      {hasLogo && slug ? (
                         <img
-                          src={`https://cdn.simpleicons.org/${iconConfig.slug}/${brandColor}`}
+                          src={`https://cdn.simpleicons.org/${slug}/${brandColor}`}
                           alt=""
                           className="w-6 h-6 object-contain"
                           width={24}
                           height={24}
+                          onError={() => setFailedIconSlugs((s) => new Set(s).add(platform.id))}
                         />
                       ) : (
                         <span className="text-sm font-bold leading-none">
@@ -276,17 +288,14 @@ const ReservationWidget = ({
                     </span>
                     <span
                       className={cn(
-                        "font-semibold text-sm truncate",
-                        isDisabled ? "text-muted-foreground" : "text-foreground"
+                        "font-semibold text-sm text-foreground flex-1 min-w-0 break-words"
                       )}
+                      style={{ wordBreak: "break-word" }}
                     >
                       {platform.name}
                     </span>
                     <ExternalLink
-                      className={cn(
-                        "w-4 h-4 shrink-0 ml-auto",
-                        isDisabled ? "text-muted-foreground" : "text-foreground/70"
-                      )}
+                      className="w-4 h-4 shrink-0 text-foreground/70"
                       aria-hidden
                     />
                   </button>

@@ -21,7 +21,13 @@ struct DatePlanOptionsView: View {
     @State private var loadingSpinnerRotation: Double = 0
     @State private var showSavedBanner = false
     @State private var showCloseConfirmation = false
-    
+
+    @State private var inviterFirstChoiceIndex: Int?
+    @State private var inviterSecondChoiceIndex: Int?
+    @State private var inviterRankSubmitted = false
+
+    private var isPartnerPlanMode: Bool { coordinator.currentPlanPartnerNames != nil }
+
     var selectedPlan: DatePlan {
         guard selectedPlanIndex < plans.count else { return plans.first ?? DatePlan.sample }
         return plans[selectedPlanIndex]
@@ -36,6 +42,10 @@ struct DatePlanOptionsView: View {
                     .ignoresSafeArea()
                 
                 VStack(spacing: 0) {
+                    if isPartnerPlanMode, !inviterRankSubmitted {
+                        partnerRankPromptView
+                            .zIndex(3)
+                    }
                     optionChipsSection
                         .zIndex(2)
                     mainContentArea
@@ -183,6 +193,8 @@ struct DatePlanOptionsView: View {
             }
             Button("Close") {
                 showCloseConfirmation = false
+                coordinator.currentPlanPartnerNames = nil
+                coordinator.partnerSessionPlanRowIds = nil
                 coordinator.dismissSheet()
             }
         } message: {
@@ -392,20 +404,56 @@ struct DatePlanOptionsView: View {
         .shadow(color: Color.black.opacity(0.2), radius: 8, y: 4)
     }
     
+    @ViewBuilder
+    private var partnerRankPromptView: some View {
+        if inviterFirstChoiceIndex == nil {
+            Text("Tap your favorite")
+                .font(Font.bodySans(14, weight: .medium))
+                .foregroundColor(Color.luxuryCreamMuted)
+                .padding(.top, 12)
+                .padding(.bottom, 4)
+        } else if inviterSecondChoiceIndex == nil {
+            Text("Tap your second choice")
+                .font(Font.bodySans(14, weight: .medium))
+                .foregroundColor(Color.luxuryCreamMuted)
+                .padding(.top, 12)
+                .padding(.bottom, 4)
+        }
+    }
+
     // MARK: - Option chips (ExperienceCard-style: image, emoji, title — like navigation pane)
     private var optionChipsSection: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 12) {
                 ForEach(Array(plans.enumerated()), id: \.element.id) { index, plan in
+                    let rankBadge: Int? = {
+                        if inviterFirstChoiceIndex == index { return 1 }
+                        if inviterSecondChoiceIndex == index { return 2 }
+                        if inviterRankSubmitted, inviterFirstChoiceIndex != index, inviterSecondChoiceIndex != index { return 3 }
+                        return nil
+                    }()
                     OptionChipCard(
                         plan: plan,
                         optionLabel: plan.optionLabel ?? "Option \(["A", "B", "C"][min(index, 2)])",
                         isSelected: selectedPlanIndex == index,
                         isSaved: savedPlanIds.contains(plan.id),
-                        isVerifying: loadingPlanIndices.contains(index)
+                        isVerifying: loadingPlanIndices.contains(index),
+                        rankBadge: rankBadge
                     ) {
-                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                            selectedPlanIndex = index
+                        if isPartnerPlanMode, !inviterRankSubmitted {
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                                if inviterFirstChoiceIndex == nil {
+                                    inviterFirstChoiceIndex = index
+                                } else if inviterSecondChoiceIndex == nil, index != inviterFirstChoiceIndex {
+                                    inviterSecondChoiceIndex = index
+                                    submitInviterRanks()
+                                }
+                                selectedPlanIndex = index
+                            }
+                        } else {
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                                selectedPlanIndex = index
+                            }
                         }
                     }
                 }
@@ -416,6 +464,18 @@ struct DatePlanOptionsView: View {
         .frame(minHeight: 120)
         .background(Color.luxuryMaroon)
         .contentShape(Rectangle())
+    }
+
+    private func submitInviterRanks() {
+        guard let ids = coordinator.partnerSessionPlanRowIds, ids.count >= 3,
+              let first = inviterFirstChoiceIndex, let second = inviterSecondChoiceIndex else { return }
+        let third = [0, 1, 2].first(where: { $0 != first && $0 != second }) ?? 0
+        Task {
+            try? await SupabaseService.shared.updatePartnerSessionPlanRank(planId: ids[first], inviterRank: 1, partnerRank: nil)
+            try? await SupabaseService.shared.updatePartnerSessionPlanRank(planId: ids[second], inviterRank: 2, partnerRank: nil)
+            try? await SupabaseService.shared.updatePartnerSessionPlanRank(planId: ids[third], inviterRank: 3, partnerRank: nil)
+            await MainActor.run { inviterRankSubmitted = true }
+        }
     }
     
     // MARK: - Save Plan Bar
@@ -821,6 +881,7 @@ private struct OptionChipCard: View {
     let isSelected: Bool
     let isSaved: Bool
     let isVerifying: Bool
+    var rankBadge: Int? = nil
     let onTap: () -> Void
     
     private let cardWidth: CGFloat = 110
@@ -864,6 +925,15 @@ private struct OptionChipCard: View {
                         Image(systemName: "checkmark.circle.fill")
                             .font(.system(size: 14))
                             .foregroundColor(Color(hex: "4CAF50"))
+                            .padding(6)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                    }
+                    if let rank = rankBadge {
+                        Text("\(rank)")
+                            .font(Font.bodySans(12, weight: .bold))
+                            .foregroundColor(Color.luxuryMaroon)
+                            .frame(width: 20, height: 20)
+                            .background(Circle().fill(Color.luxuryGold))
                             .padding(6)
                             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
                     }

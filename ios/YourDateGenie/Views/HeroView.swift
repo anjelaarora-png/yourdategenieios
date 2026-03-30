@@ -3,7 +3,9 @@ import SwiftUI
 struct HeroView: View {
     @EnvironmentObject var coordinator: NavigationCoordinator
     @State private var glowPulse = false
-    
+    /// When set (e.g. post–email-confirm gate), overrides default `startDatePlanning()` CTA.
+    var onBeginJourney: (() -> Void)? = nil
+
     var body: some View {
         ZStack(alignment: .bottom) {
             // Background image with luxurious overlay
@@ -84,7 +86,11 @@ struct HeroView: View {
                 
                 // CTA Button
                 Button {
-                    coordinator.startDatePlanning()
+                    if let onBeginJourney {
+                        onBeginJourney()
+                    } else {
+                        coordinator.startDatePlanning()
+                    }
                 } label: {
                     HStack(spacing: 12) {
                         Text("Begin Your Journey")
@@ -111,6 +117,21 @@ struct HeroView: View {
                 }
             }
             .padding(.bottom, 60)
+        }
+        .overlay(alignment: .topTrailing) {
+            if onBeginJourney != nil {
+                Button {
+                    coordinator.deferInitialPreferences()
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 28))
+                        .foregroundStyle(Color.luxuryGold.opacity(0.9))
+                        .symbolRenderingMode(.hierarchical)
+                }
+                .padding(.top, 56)
+                .padding(.trailing, 20)
+                .accessibilityLabel("Skip for now")
+            }
         }
         .onAppear {
             withAnimation(.easeInOut(duration: 2.5).repeatForever(autoreverses: true)) {

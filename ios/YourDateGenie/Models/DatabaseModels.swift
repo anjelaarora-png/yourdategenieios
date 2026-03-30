@@ -90,9 +90,12 @@ struct DBPreferences: Codable, Identifiable, Equatable {
     let preferenceId: UUID
     let userId: UUID
     var coupleId: UUID?
+    var defaultCity: String?
+    var defaultStartingPoint: String?
     var cuisineTypes: [String]?
     var activityTypes: [String]?
     var drinkPreferences: [String]?
+    var dietaryRestrictions: [String]?
     var budgetRange: String?
     var loveLanguages: [String]?
     var foodAllergies: [String]?
@@ -108,9 +111,12 @@ struct DBPreferences: Codable, Identifiable, Equatable {
         case preferenceId = "preference_id"
         case userId = "user_id"
         case coupleId = "couple_id"
+        case defaultCity = "default_city"
+        case defaultStartingPoint = "default_starting_point"
         case cuisineTypes = "cuisine_types"
         case activityTypes = "activity_types"
         case drinkPreferences = "drink_preferences"
+        case dietaryRestrictions = "dietary_restrictions"
         case budgetRange = "budget_range"
         case loveLanguages = "love_languages"
         case foodAllergies = "food_allergies"
@@ -125,9 +131,12 @@ struct DBPreferences: Codable, Identifiable, Equatable {
         preferenceId: UUID = UUID(),
         userId: UUID,
         coupleId: UUID? = nil,
+        defaultCity: String? = nil,
+        defaultStartingPoint: String? = nil,
         cuisineTypes: [String]? = nil,
         activityTypes: [String]? = nil,
         drinkPreferences: [String]? = nil,
+        dietaryRestrictions: [String]? = nil,
         budgetRange: String? = nil,
         loveLanguages: [String]? = nil,
         foodAllergies: [String]? = nil,
@@ -140,9 +149,12 @@ struct DBPreferences: Codable, Identifiable, Equatable {
         self.preferenceId = preferenceId
         self.userId = userId
         self.coupleId = coupleId
+        self.defaultCity = defaultCity
+        self.defaultStartingPoint = defaultStartingPoint
         self.cuisineTypes = cuisineTypes
         self.activityTypes = activityTypes
         self.drinkPreferences = drinkPreferences
+        self.dietaryRestrictions = dietaryRestrictions
         self.budgetRange = budgetRange
         self.loveLanguages = loveLanguages
         self.foodAllergies = foodAllergies
@@ -154,108 +166,162 @@ struct DBPreferences: Codable, Identifiable, Equatable {
     }
 }
 
-// MARK: - Table 4: Date Plans
+// MARK: - Table 4: Date Plans (`public.date_plans` — same rows as web; iOS uses `id` + `couple_id` + shared columns)
 struct DBDatePlan: Codable, Identifiable, Equatable {
-    let planId: UUID
-    let coupleId: UUID
-    var scheduledAt: Date?
-    var planTitle: String?
-    var planTagline: String?
+    let id: UUID
+    let userId: UUID
+    var coupleId: UUID?
+    var dateScheduled: Date?
+    var title: String
+    var tagline: String?
+    var totalDuration: String?
+    var estimatedCost: String?
+    var stops: [DatePlanStop]
+    var genieSecretTouch: GenieSecretTouch?
+    var packingList: [String]?
+    var weatherNote: String?
+    var status: String
     var selectedOption: String?
     var planOptions: [PlanOptionSummary]?
-    var location: String?
-    var activityType: String?
-    var budget: Decimal?
-    var budgetRange: String?
-    var outfitSuggestion: String?
-    var whatToBring: [String]?
-    var weatherNote: String?
-    var geniesSecretTouch: String?
-    var conversationStarters: [String]?
     var giftSuggestions: [GiftSuggestion]?
-    var itinerary: [ItineraryStop]?
-    var totalTravelTime: String?
-    var venueCount: Int?
-    var routeMapUrl: String?
-    var status: String
-    var createdAt: Date
-    
-    var id: UUID { planId }
+    var conversationStarters: [ConversationStarter]?
+    var rating: Int?
+    var ratingNotes: String?
+    var createdAt: Date?
+    var updatedAt: Date?
     
     enum CodingKeys: String, CodingKey {
-        case planId = "plan_id"
+        case id
+        case userId = "user_id"
         case coupleId = "couple_id"
-        case scheduledAt = "scheduled_at"
-        case planTitle = "plan_title"
-        case planTagline = "plan_tagline"
+        case dateScheduled = "date_scheduled"
+        case title
+        case tagline
+        case totalDuration = "total_duration"
+        case estimatedCost = "estimated_cost"
+        case stops
+        case genieSecretTouch = "genie_secret_touch"
+        case packingList = "packing_list"
+        case weatherNote = "weather_note"
+        case status
         case selectedOption = "selected_option"
         case planOptions = "plan_options"
-        case location
-        case activityType = "activity_type"
-        case budget
-        case budgetRange = "budget_range"
-        case outfitSuggestion = "outfit_suggestion"
-        case whatToBring = "what_to_bring"
-        case weatherNote = "weather_note"
-        case geniesSecretTouch = "genies_secret_touch"
-        case conversationStarters = "conversation_starters"
         case giftSuggestions = "gift_suggestions"
-        case itinerary
-        case totalTravelTime = "total_travel_time"
-        case venueCount = "venue_count"
-        case routeMapUrl = "route_map_url"
-        case status
+        case conversationStarters = "conversation_starters"
+        case rating
+        case ratingNotes = "rating_notes"
         case createdAt = "created_at"
+        case updatedAt = "updated_at"
     }
     
     init(
-        planId: UUID = UUID(),
-        coupleId: UUID,
-        scheduledAt: Date? = nil,
-        planTitle: String? = nil,
-        planTagline: String? = nil,
+        id: UUID = UUID(),
+        userId: UUID,
+        coupleId: UUID? = nil,
+        dateScheduled: Date? = nil,
+        title: String,
+        tagline: String? = nil,
+        totalDuration: String? = nil,
+        estimatedCost: String? = nil,
+        stops: [DatePlanStop] = [],
+        genieSecretTouch: GenieSecretTouch? = nil,
+        packingList: [String]? = nil,
+        weatherNote: String? = nil,
+        status: String = "planned",
         selectedOption: String? = nil,
         planOptions: [PlanOptionSummary]? = nil,
-        location: String? = nil,
-        activityType: String? = nil,
-        budget: Decimal? = nil,
-        budgetRange: String? = nil,
-        outfitSuggestion: String? = nil,
-        whatToBring: [String]? = nil,
-        weatherNote: String? = nil,
-        geniesSecretTouch: String? = nil,
-        conversationStarters: [String]? = nil,
         giftSuggestions: [GiftSuggestion]? = nil,
-        itinerary: [ItineraryStop]? = nil,
-        totalTravelTime: String? = nil,
-        venueCount: Int? = nil,
-        routeMapUrl: String? = nil,
-        status: String = "planned",
-        createdAt: Date = Date()
+        conversationStarters: [ConversationStarter]? = nil,
+        rating: Int? = nil,
+        ratingNotes: String? = nil,
+        createdAt: Date? = nil,
+        updatedAt: Date? = nil
     ) {
-        self.planId = planId
+        self.id = id
+        self.userId = userId
         self.coupleId = coupleId
-        self.scheduledAt = scheduledAt
-        self.planTitle = planTitle
-        self.planTagline = planTagline
+        self.dateScheduled = dateScheduled
+        self.title = title
+        self.tagline = tagline
+        self.totalDuration = totalDuration
+        self.estimatedCost = estimatedCost
+        self.stops = stops
+        self.genieSecretTouch = genieSecretTouch
+        self.packingList = packingList
+        self.weatherNote = weatherNote
+        self.status = status
         self.selectedOption = selectedOption
         self.planOptions = planOptions
-        self.location = location
-        self.activityType = activityType
-        self.budget = budget
-        self.budgetRange = budgetRange
-        self.outfitSuggestion = outfitSuggestion
-        self.whatToBring = whatToBring
-        self.weatherNote = weatherNote
-        self.geniesSecretTouch = geniesSecretTouch
-        self.conversationStarters = conversationStarters
         self.giftSuggestions = giftSuggestions
-        self.itinerary = itinerary
-        self.totalTravelTime = totalTravelTime
-        self.venueCount = venueCount
-        self.routeMapUrl = routeMapUrl
-        self.status = status
+        self.conversationStarters = conversationStarters
+        self.rating = rating
+        self.ratingNotes = ratingNotes
         self.createdAt = createdAt
+        self.updatedAt = updatedAt
+    }
+    
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        userId = try c.decode(UUID.self, forKey: .userId)
+        coupleId = try c.decodeIfPresent(UUID.self, forKey: .coupleId)
+        dateScheduled = try c.decodeIfPresent(Date.self, forKey: .dateScheduled)
+        title = try c.decode(String.self, forKey: .title)
+        tagline = try c.decodeIfPresent(String.self, forKey: .tagline)
+        totalDuration = try c.decodeIfPresent(String.self, forKey: .totalDuration)
+        estimatedCost = try c.decodeIfPresent(String.self, forKey: .estimatedCost)
+        stops = (try? c.decode([DatePlanStop].self, forKey: .stops)) ?? []
+        if let touch = try? c.decode(GenieSecretTouch.self, forKey: .genieSecretTouch) {
+            genieSecretTouch = touch
+        } else if let s = try? c.decode(String.self, forKey: .genieSecretTouch),
+                  let data = s.data(using: .utf8),
+                  let obj = try? JSONDecoder().decode(GenieSecretTouch.self, from: data) {
+            genieSecretTouch = obj
+        } else {
+            genieSecretTouch = nil
+        }
+        packingList = try c.decodeIfPresent([String].self, forKey: .packingList)
+        weatherNote = try c.decodeIfPresent(String.self, forKey: .weatherNote)
+        status = try c.decodeIfPresent(String.self, forKey: .status) ?? "generated"
+        selectedOption = try c.decodeIfPresent(String.self, forKey: .selectedOption)
+        planOptions = try c.decodeIfPresent([PlanOptionSummary].self, forKey: .planOptions)
+        giftSuggestions = try c.decodeIfPresent([GiftSuggestion].self, forKey: .giftSuggestions)
+        if let starters = try? c.decode([ConversationStarter].self, forKey: .conversationStarters) {
+            conversationStarters = starters
+        } else if let strings = try? c.decode([String].self, forKey: .conversationStarters) {
+            conversationStarters = strings.map { ConversationStarter(question: $0, category: "Conversation", emoji: "💭") }
+        } else {
+            conversationStarters = nil
+        }
+        rating = try c.decodeIfPresent(Int.self, forKey: .rating)
+        ratingNotes = try c.decodeIfPresent(String.self, forKey: .ratingNotes)
+        createdAt = try c.decodeIfPresent(Date.self, forKey: .createdAt)
+        updatedAt = try c.decodeIfPresent(Date.self, forKey: .updatedAt)
+    }
+    
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
+        try c.encode(userId, forKey: .userId)
+        try c.encodeIfPresent(coupleId, forKey: .coupleId)
+        try c.encodeIfPresent(dateScheduled, forKey: .dateScheduled)
+        try c.encode(title, forKey: .title)
+        try c.encodeIfPresent(tagline, forKey: .tagline)
+        try c.encodeIfPresent(totalDuration, forKey: .totalDuration)
+        try c.encodeIfPresent(estimatedCost, forKey: .estimatedCost)
+        try c.encode(stops, forKey: .stops)
+        try c.encodeIfPresent(genieSecretTouch, forKey: .genieSecretTouch)
+        try c.encodeIfPresent(packingList, forKey: .packingList)
+        try c.encodeIfPresent(weatherNote, forKey: .weatherNote)
+        try c.encode(status, forKey: .status)
+        try c.encodeIfPresent(selectedOption, forKey: .selectedOption)
+        try c.encodeIfPresent(planOptions, forKey: .planOptions)
+        try c.encodeIfPresent(giftSuggestions, forKey: .giftSuggestions)
+        try c.encodeIfPresent(conversationStarters, forKey: .conversationStarters)
+        try c.encodeIfPresent(rating, forKey: .rating)
+        try c.encodeIfPresent(ratingNotes, forKey: .ratingNotes)
+        try c.encodeIfPresent(createdAt, forKey: .createdAt)
+        try c.encodeIfPresent(updatedAt, forKey: .updatedAt)
     }
 }
 
@@ -326,44 +392,77 @@ struct TravelInfo: Codable, Equatable {
     let mode: String
 }
 
-// MARK: - Table 5: Date Memories
+// MARK: - Table 5: Date Memories (`public.date_memories` — matches web; `image_url` is storage path or legacy full URL)
 struct DBDateMemory: Codable, Identifiable, Equatable {
-    let memoryId: UUID
-    let planId: UUID
-    let coupleId: UUID
-    var rating: Int?
-    var notes: String?
-    var photoUrls: [String]?
-    var createdAt: Date
-    
-    var id: UUID { memoryId }
+    let id: UUID
+    let userId: UUID
+    var datePlanId: UUID?
+    var venueId: UUID?
+    /// Object path inside `date-memories` bucket (e.g. `userId/file.jpg`) or legacy public URL string.
+    var imageUrl: String
+    var caption: String?
+    var takenAt: Date
+    var isPublic: Bool
+    var createdAt: Date?
     
     enum CodingKeys: String, CodingKey {
-        case memoryId = "memory_id"
-        case planId = "plan_id"
-        case coupleId = "couple_id"
-        case rating
-        case notes
-        case photoUrls = "photo_urls"
+        case id
+        case userId = "user_id"
+        case datePlanId = "date_plan_id"
+        case venueId = "venue_id"
+        case imageUrl = "image_url"
+        case caption
+        case takenAt = "taken_at"
+        case isPublic = "is_public"
         case createdAt = "created_at"
     }
     
     init(
-        memoryId: UUID = UUID(),
-        planId: UUID,
-        coupleId: UUID,
-        rating: Int? = nil,
-        notes: String? = nil,
-        photoUrls: [String]? = nil,
-        createdAt: Date = Date()
+        id: UUID = UUID(),
+        userId: UUID,
+        datePlanId: UUID? = nil,
+        venueId: UUID? = nil,
+        imageUrl: String,
+        caption: String? = nil,
+        takenAt: Date,
+        isPublic: Bool = false,
+        createdAt: Date? = nil
     ) {
-        self.memoryId = memoryId
-        self.planId = planId
-        self.coupleId = coupleId
-        self.rating = rating
-        self.notes = notes
-        self.photoUrls = photoUrls
+        self.id = id
+        self.userId = userId
+        self.datePlanId = datePlanId
+        self.venueId = venueId
+        self.imageUrl = imageUrl
+        self.caption = caption
+        self.takenAt = takenAt
+        self.isPublic = isPublic
         self.createdAt = createdAt
+    }
+    
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        userId = try c.decode(UUID.self, forKey: .userId)
+        datePlanId = try c.decodeIfPresent(UUID.self, forKey: .datePlanId)
+        venueId = try c.decodeIfPresent(UUID.self, forKey: .venueId)
+        imageUrl = try c.decode(String.self, forKey: .imageUrl)
+        caption = try c.decodeIfPresent(String.self, forKey: .caption)
+        takenAt = try c.decodeIfPresent(Date.self, forKey: .takenAt) ?? Date()
+        isPublic = try c.decodeIfPresent(Bool.self, forKey: .isPublic) ?? false
+        createdAt = try c.decodeIfPresent(Date.self, forKey: .createdAt)
+    }
+    
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
+        try c.encode(userId, forKey: .userId)
+        try c.encodeIfPresent(datePlanId, forKey: .datePlanId)
+        try c.encodeIfPresent(venueId, forKey: .venueId)
+        try c.encode(imageUrl, forKey: .imageUrl)
+        try c.encodeIfPresent(caption, forKey: .caption)
+        try c.encode(takenAt, forKey: .takenAt)
+        try c.encode(isPublic, forKey: .isPublic)
+        try c.encodeIfPresent(createdAt, forKey: .createdAt)
     }
 }
 
@@ -435,7 +534,8 @@ struct DBGiftSuggestion: Codable, Identifiable, Equatable {
 // MARK: - Table 7: Playlists
 struct DBPlaylist: Codable, Identifiable, Equatable {
     let playlistId: UUID
-    let planId: UUID
+    /// Optional when playlist is a standalone soundtrack not tied to a date plan.
+    let planId: UUID?
     let coupleId: UUID
     var title: String?
     var description: String?
@@ -445,9 +545,9 @@ struct DBPlaylist: Codable, Identifiable, Equatable {
     var tracks: [PlaylistTrack]?
     var totalDurationMinutes: Int?
     var generatedAt: Date
-    
+
     var id: UUID { playlistId }
-    
+
     enum CodingKeys: String, CodingKey {
         case playlistId = "playlist_id"
         case planId = "plan_id"
@@ -461,10 +561,10 @@ struct DBPlaylist: Codable, Identifiable, Equatable {
         case totalDurationMinutes = "total_duration_minutes"
         case generatedAt = "generated_at"
     }
-    
+
     init(
         playlistId: UUID = UUID(),
-        planId: UUID,
+        planId: UUID? = nil,
         coupleId: UUID,
         title: String? = nil,
         description: String? = nil,
@@ -487,6 +587,25 @@ struct DBPlaylist: Codable, Identifiable, Equatable {
         self.totalDurationMinutes = totalDurationMinutes
         self.generatedAt = generatedAt
     }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(playlistId, forKey: .playlistId)
+        if let p = planId {
+            try c.encode(p, forKey: .planId)
+        } else {
+            try c.encodeNil(forKey: .planId)
+        }
+        try c.encode(coupleId, forKey: .coupleId)
+        try c.encodeIfPresent(title, forKey: .title)
+        try c.encodeIfPresent(description, forKey: .description)
+        try c.encodeIfPresent(platform, forKey: .platform)
+        try c.encodeIfPresent(externalUrl, forKey: .externalUrl)
+        try c.encodeIfPresent(externalPlaylistId, forKey: .externalPlaylistId)
+        try c.encodeIfPresent(tracks, forKey: .tracks)
+        try c.encodeIfPresent(totalDurationMinutes, forKey: .totalDurationMinutes)
+        try c.encode(generatedAt, forKey: .generatedAt)
+    }
 }
 
 // MARK: - Playlist Track (JSONB)
@@ -506,5 +625,87 @@ struct PlaylistTrack: Codable, Equatable, Identifiable {
         case album
         case duration
         case whyItFits = "why_it_fits"
+    }
+}
+
+// MARK: - Partner Sessions (Plan Together cross-device)
+struct DBPartnerSession: Codable, Identifiable {
+    var id: UUID?
+    var sessionId: String
+    var inviterName: String?
+    var inviterUserId: UUID?
+    var inviterData: QuestionnaireData?
+    var partnerData: QuestionnaireData?
+    var inviterPlannedDates: [DBProposedDateTime]?
+    var notes: String?
+    var createdAt: Date
+    var updatedAt: Date
+
+    var identifier: UUID { id ?? UUID() }
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case sessionId = "session_id"
+        case inviterName = "inviter_name"
+        case inviterUserId = "inviter_user_id"
+        case inviterData = "inviter_data"
+        case partnerData = "partner_data"
+        case inviterPlannedDates = "inviter_planned_dates"
+        case notes
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+    }
+}
+
+struct DBProposedDateTime: Codable {
+    var date: Date
+    var timeLabel: String
+    enum CodingKeys: String, CodingKey {
+        case date
+        case timeLabel = "time_label"
+    }
+}
+
+struct DBPartnerSessionPlan: Codable, Identifiable {
+    let id: UUID
+    var partnerSessionId: UUID
+    var planIndex: Int
+    var planJson: DatePlan
+    var inviterRank: Int?
+    var partnerRank: Int?
+    var createdAt: Date
+
+    var identifier: UUID { id }
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case partnerSessionId = "partner_session_id"
+        case planIndex = "plan_index"
+        case planJson = "plan_json"
+        case inviterRank = "inviter_rank"
+        case partnerRank = "partner_rank"
+        case createdAt = "created_at"
+    }
+}
+
+// MARK: - iOS user-generated content (love notes, sparks, saved starters)
+struct DBUserIosSyncPayload: Codable, Equatable {
+    let userId: UUID
+    var loveNotes: [SavedLoveNote]
+    var savedConversationStarters: [SavedConversationStarter]
+    var sparkSessions: [SparkSession]
+
+    enum CodingKeys: String, CodingKey {
+        case userId = "user_id"
+        case loveNotes = "love_notes"
+        case savedConversationStarters = "saved_conversation_starters"
+        case sparkSessions = "spark_sessions"
+    }
+
+    init(userId: UUID, loveNotes: [SavedLoveNote], savedConversationStarters: [SavedConversationStarter], sparkSessions: [SparkSession]) {
+        self.userId = userId
+        self.loveNotes = loveNotes
+        self.savedConversationStarters = savedConversationStarters
+        self.sparkSessions = sparkSessions
     }
 }

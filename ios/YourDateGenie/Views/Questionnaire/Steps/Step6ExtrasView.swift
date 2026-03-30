@@ -3,6 +3,17 @@ import SwiftUI
 struct Step6ExtrasView: View {
     @Binding var data: QuestionnaireData
     var isPreferencesOnly: Bool = false
+
+    private var loveLanguageSetBinding: Binding<Set<LoveLanguage>> {
+        Binding(
+            get: {
+                Set((data.loveLanguageRaws ?? []).compactMap { LoveLanguage(rawValue: $0) })
+            },
+            set: { newVal in
+                data.loveLanguageRaws = newVal.map(\.rawValue)
+            }
+        )
+    }
     
     var body: some View {
         ScrollView(showsIndicators: false) {
@@ -47,6 +58,19 @@ struct Step6ExtrasView: View {
                     .background(Color.luxuryMaroonLight.opacity(0.6))
                     .cornerRadius(12)
                 }
+
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Your love languages")
+                        .font(Font.bodySans(14, weight: .medium))
+                        .foregroundColor(Color.luxuryGold)
+                    Text("Select all that resonate — we’ll tailor plans to what makes you feel loved")
+                        .font(Font.bodySans(12, weight: .regular))
+                        .foregroundColor(Color.luxuryMuted)
+                    LoveLanguageSelector(selectedLanguages: loveLanguageSetBinding)
+                }
+                .padding(16)
+                .background(Color.luxuryMaroonLight.opacity(0.6))
+                .cornerRadius(12)
                 
                 // Info banner
                 HStack(spacing: 12) {

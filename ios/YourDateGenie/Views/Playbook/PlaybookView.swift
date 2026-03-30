@@ -51,6 +51,7 @@ struct PlaybookView: View {
                         } label: {
                             HStack(spacing: 6) {
                                 Image(systemName: "chevron.left")
+                                    .symbolRenderingMode(.monochrome)
                                 Text("Back")
                             }
                             .font(Font.bodySans(15, weight: .medium))
@@ -74,17 +75,30 @@ struct PlaybookView: View {
     private var categoryGrid: some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: 16) {
-                VStack(spacing: 6) {
-                    Text("Date Tips")
-                        .font(Font.tangerine(32, weight: .bold))
+                Text("DATING TIPS")
+                    .font(Font.bodySans(12, weight: .semibold))
+                    .tracking(2)
+                    .foregroundColor(Color.luxuryGold)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 4)
+                HStack(alignment: .firstTextBaseline, spacing: 4) {
+                    Text("Find the tip made for ")
+                        .font(Font.header(26, weight: .regular))
+                        .foregroundColor(Color.luxuryCream)
+                    Text("you")
+                        .font(Font.tangerine(38, weight: .bold))
                         .italic()
                         .foregroundColor(Color.luxuryGold)
-                    Text("Opinionated date advice for your situation")
-                        .font(Font.bodySans(14, weight: .regular))
-                        .foregroundColor(Color.luxuryCreamMuted)
                 }
-                .frame(maxWidth: .infinity)
-                .padding(.top, 8)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 4)
+                Text("Pick a category. Personalised to your situation.")
+                    .font(Font.bodySans(14, weight: .regular))
+                    .foregroundColor(Color.luxuryCreamMuted)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 4)
+                    .padding(.top, -4)
+                    .padding(.bottom, 8)
 
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
                     ForEach(PlaybookContent.categories) { category in
@@ -94,8 +108,10 @@ struct PlaybookView: View {
                             currentTipIndex = 0
                         } label: {
                             VStack(spacing: 10) {
-                                Text(category.emoji)
-                                    .font(.system(size: 28))
+                                Image(systemName: category.sfSymbol)
+                                    .font(.system(size: 26))
+                                    .symbolRenderingMode(.monochrome)
+                                    .foregroundColor(Color.luxuryGold)
                                 Text(category.title)
                                     .font(Font.bodySans(13, weight: .semibold))
                                     .foregroundColor(Color.luxuryCream)
@@ -124,11 +140,10 @@ struct PlaybookView: View {
         VStack(alignment: .leading, spacing: 0) {
             if let cat = selectedCategory {
                 HStack {
-                    Text(cat.emoji)
-                        .font(.system(size: 24))
-                    Text(cat.title)
-                        .font(Font.header(18, weight: .semibold))
-                        .foregroundColor(Color.luxuryCream)
+                    Text("• \(cat.title.uppercased())")
+                        .font(Font.bodySans(12, weight: .semibold))
+                        .tracking(2)
+                        .foregroundColor(Color.luxuryGold)
                     Spacer()
                     Button {
                         shuffledOrder = tipsForSelectedCategory.shuffled()
@@ -136,6 +151,7 @@ struct PlaybookView: View {
                     } label: {
                         HStack(spacing: 6) {
                             Image(systemName: "shuffle")
+                                .symbolRenderingMode(.monochrome)
                             Text("Shuffle")
                         }
                         .font(Font.bodySans(13, weight: .medium))
@@ -144,13 +160,13 @@ struct PlaybookView: View {
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 12)
-                .padding(.bottom, 8)
+                .padding(.bottom, 4)
 
                 Text("Swipe left or right for next tip")
                     .font(Font.bodySans(12, weight: .regular))
                     .foregroundColor(Color.luxuryCreamMuted)
                     .padding(.horizontal, 20)
-                    .padding(.bottom, 8)
+                    .padding(.bottom, 12)
             }
 
             if !tipsToShow.isEmpty {
@@ -167,27 +183,52 @@ struct PlaybookView: View {
     }
 
     private func playbookTipCard(index: Int, tip: String, total: Int) -> some View {
-        VStack(spacing: 16) {
-            Text("Tip \(index) of \(total)")
-                .font(Font.bodySans(12, weight: .medium))
-                .foregroundColor(Color.luxuryGold)
-
-            Text(tip)
-                .font(Font.bodySans(16, weight: .regular))
-                .foregroundColor(Color.luxuryCream)
-                .multilineTextAlignment(.center)
-                .fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: .infinity)
-                .padding(.horizontal, 24)
+        let categoryLabel = selectedCategory?.title.uppercased() ?? "TIP"
+        return VStack(spacing: 0) {
+            VStack(spacing: 16) {
+                Text("Tip \(index) of \(total)")
+                    .font(Font.bodySans(11, weight: .regular))
+                    .tracking(2)
+                    .foregroundColor(Color.luxuryMuted)
+                Text("• \(categoryLabel)")
+                    .font(Font.bodySans(11, weight: .semibold))
+                    .tracking(2.5)
+                    .foregroundColor(Color.luxuryGold)
+                Text(tip)
+                    .font(Font.bodySans(16, weight: .regular))
+                    .foregroundColor(Color.luxuryCream)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity)
+                    .padding(.horizontal, 8)
+            }
+            .padding(.vertical, 20)
+            .padding(.horizontal, 16)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding(.vertical, 28)
         .background(
             RoundedRectangle(cornerRadius: 20)
-                .fill(Color.luxuryMaroonLight.opacity(0.6))
+                .fill(Color.luxuryMaroonLight.opacity(0.9))
                 .overlay(
                     RoundedRectangle(cornerRadius: 20)
-                        .stroke(Color.luxuryGold.opacity(0.25), lineWidth: 1)
+                        .stroke(Color.luxuryGold.opacity(0.35), lineWidth: 1)
+                )
+                .overlay(
+                    VStack(spacing: 0) {
+                        RoundedRectangle(cornerRadius: 19)
+                            .fill(
+                                LinearGradient(
+                                    colors: [Color.luxuryGold.opacity(0.35), Color.luxuryGold.opacity(0.08), Color.clear],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            )
+                            .frame(height: 5)
+                            .frame(maxWidth: .infinity)
+                            .padding(.top, 2)
+                        Spacer(minLength: 0)
+                    }
+                    .clipShape(RoundedRectangle(cornerRadius: 20))
                 )
         )
         .padding(.horizontal, 20)
