@@ -13,10 +13,11 @@ struct DBUser: Codable, Identifiable, Equatable {
     var birthday: Date?
     var homeAddress: String?
     var travelMode: String?
+    var phoneNumber: String?
     var createdAt: Date
-    
+
     var id: UUID { userId }
-    
+
     enum CodingKeys: String, CodingKey {
         case userId = "user_id"
         case name
@@ -26,9 +27,10 @@ struct DBUser: Codable, Identifiable, Equatable {
         case birthday
         case homeAddress = "home_address"
         case travelMode = "travel_mode"
+        case phoneNumber = "phone_number"
         case createdAt = "created_at"
     }
-    
+
     init(
         userId: UUID = UUID(),
         name: String,
@@ -38,6 +40,7 @@ struct DBUser: Codable, Identifiable, Equatable {
         birthday: Date? = nil,
         homeAddress: String? = nil,
         travelMode: String? = nil,
+        phoneNumber: String? = nil,
         createdAt: Date = Date()
     ) {
         self.userId = userId
@@ -48,6 +51,7 @@ struct DBUser: Codable, Identifiable, Equatable {
         self.birthday = birthday
         self.homeAddress = homeAddress
         self.travelMode = travelMode
+        self.phoneNumber = phoneNumber
         self.createdAt = createdAt
     }
 }
@@ -90,60 +94,124 @@ struct DBPreferences: Codable, Identifiable, Equatable {
     let preferenceId: UUID
     let userId: UUID
     var coupleId: UUID?
+    // Location / travel
     var defaultCity: String?
     var defaultStartingPoint: String?
+    var defaultNeighborhood: String?
+    var energyLevel: String?
+    var transportationMode: String?
+    var travelRadius: String?
+    // Diet / activity
     var cuisineTypes: [String]?
     var activityTypes: [String]?
     var drinkPreferences: [String]?
     var dietaryRestrictions: [String]?
     var budgetRange: String?
-    var loveLanguages: [String]?
     var foodAllergies: [String]?
     var hardNos: [String]?
     var accessibilityNeeds: [String]?
+    // Lifestyle
+    var smokingPreference: String?
+    var smokingActivities: [String]?
+    // Identity
     var gender: String?
     var partnerGender: String?
+    var loveLanguages: [String]?
+    var partnerLoveLanguages: [String]?
+    // Relationship context
+    var relationshipStage: String?
+    var conversationTopics: [String]?
+    var additionalNotes: String?
+    // Gift preferences
+    var giftRecipient: String?
+    var giftInterests: [String]?
+    var giftBudget: String?
+    var giftOccasion: String?
+    var giftNotes: String?
+    var giftRecipientIdentity: String?
+    var giftStyle: [String]?
+    var giftFavoriteBrands: String?
+    var giftSizes: String?
+
     var updatedAt: Date
-    
+
     var id: UUID { preferenceId }
-    
+
     enum CodingKeys: String, CodingKey {
         case preferenceId = "preference_id"
         case userId = "user_id"
         case coupleId = "couple_id"
         case defaultCity = "default_city"
         case defaultStartingPoint = "default_starting_point"
+        case defaultNeighborhood = "default_neighborhood"
+        case energyLevel = "energy_level"
+        case transportationMode = "transportation_mode"
+        case travelRadius = "travel_radius"
         case cuisineTypes = "cuisine_types"
         case activityTypes = "activity_types"
         case drinkPreferences = "drink_preferences"
         case dietaryRestrictions = "dietary_restrictions"
         case budgetRange = "budget_range"
-        case loveLanguages = "love_languages"
         case foodAllergies = "food_allergies"
         case hardNos = "hard_nos"
         case accessibilityNeeds = "accessibility_needs"
+        case smokingPreference = "smoking_preference"
+        case smokingActivities = "smoking_activities"
         case gender
         case partnerGender = "partner_gender"
+        case loveLanguages = "love_languages"
+        case partnerLoveLanguages = "partner_love_languages"
+        case relationshipStage = "relationship_stage"
+        case conversationTopics = "conversation_topics"
+        case additionalNotes = "additional_notes"
+        case giftRecipient = "gift_recipient"
+        case giftInterests = "gift_interests"
+        case giftBudget = "gift_budget"
+        case giftOccasion = "gift_occasion"
+        case giftNotes = "gift_notes"
+        case giftRecipientIdentity = "gift_recipient_identity"
+        case giftStyle = "gift_style"
+        case giftFavoriteBrands = "gift_favorite_brands"
+        case giftSizes = "gift_sizes"
         case updatedAt = "updated_at"
     }
-    
+
     init(
         preferenceId: UUID = UUID(),
         userId: UUID,
         coupleId: UUID? = nil,
         defaultCity: String? = nil,
         defaultStartingPoint: String? = nil,
+        defaultNeighborhood: String? = nil,
+        energyLevel: String? = nil,
+        transportationMode: String? = nil,
+        travelRadius: String? = nil,
         cuisineTypes: [String]? = nil,
         activityTypes: [String]? = nil,
         drinkPreferences: [String]? = nil,
         dietaryRestrictions: [String]? = nil,
         budgetRange: String? = nil,
         loveLanguages: [String]? = nil,
+        partnerLoveLanguages: [String]? = nil,
         foodAllergies: [String]? = nil,
         hardNos: [String]? = nil,
         accessibilityNeeds: [String]? = nil,
+        smokingPreference: String? = nil,
+        smokingActivities: [String]? = nil,
         gender: String? = nil,
         partnerGender: String? = nil,
+        relationshipStage: String? = nil,
+        conversationTopics: [String]? = nil,
+        additionalNotes: String? = nil,
+        giftRecipient: String? = nil,
+        giftInterests: [String]? = nil,
+        giftBudget: String? = nil,
+        giftOccasion: String? = nil,
+        giftNotes: String? = nil,
+        giftRecipientIdentity: String? = nil,
+        giftStyle: [String]? = nil,
+        giftFavoriteBrands: String? = nil,
+        giftSizes: String? = nil,
         updatedAt: Date = Date()
     ) {
         self.preferenceId = preferenceId
@@ -151,17 +219,36 @@ struct DBPreferences: Codable, Identifiable, Equatable {
         self.coupleId = coupleId
         self.defaultCity = defaultCity
         self.defaultStartingPoint = defaultStartingPoint
+        self.defaultNeighborhood = defaultNeighborhood
+        self.energyLevel = energyLevel
+        self.transportationMode = transportationMode
+        self.travelRadius = travelRadius
         self.cuisineTypes = cuisineTypes
         self.activityTypes = activityTypes
         self.drinkPreferences = drinkPreferences
         self.dietaryRestrictions = dietaryRestrictions
         self.budgetRange = budgetRange
         self.loveLanguages = loveLanguages
+        self.partnerLoveLanguages = partnerLoveLanguages
         self.foodAllergies = foodAllergies
         self.hardNos = hardNos
         self.accessibilityNeeds = accessibilityNeeds
+        self.smokingPreference = smokingPreference
+        self.smokingActivities = smokingActivities
         self.gender = gender
         self.partnerGender = partnerGender
+        self.relationshipStage = relationshipStage
+        self.conversationTopics = conversationTopics
+        self.additionalNotes = additionalNotes
+        self.giftRecipient = giftRecipient
+        self.giftInterests = giftInterests
+        self.giftBudget = giftBudget
+        self.giftOccasion = giftOccasion
+        self.giftNotes = giftNotes
+        self.giftRecipientIdentity = giftRecipientIdentity
+        self.giftStyle = giftStyle
+        self.giftFavoriteBrands = giftFavoriteBrands
+        self.giftSizes = giftSizes
         self.updatedAt = updatedAt
     }
 }
@@ -177,6 +264,7 @@ struct DBDatePlan: Codable, Identifiable, Equatable {
     var totalDuration: String?
     var estimatedCost: String?
     var stops: [DatePlanStop]
+    var startingPoint: StartingPoint?
     var genieSecretTouch: GenieSecretTouch?
     var packingList: [String]?
     var weatherNote: String?
@@ -189,7 +277,7 @@ struct DBDatePlan: Codable, Identifiable, Equatable {
     var ratingNotes: String?
     var createdAt: Date?
     var updatedAt: Date?
-    
+
     enum CodingKeys: String, CodingKey {
         case id
         case userId = "user_id"
@@ -200,6 +288,7 @@ struct DBDatePlan: Codable, Identifiable, Equatable {
         case totalDuration = "total_duration"
         case estimatedCost = "estimated_cost"
         case stops
+        case startingPoint = "starting_point"
         case genieSecretTouch = "genie_secret_touch"
         case packingList = "packing_list"
         case weatherNote = "weather_note"
@@ -224,6 +313,7 @@ struct DBDatePlan: Codable, Identifiable, Equatable {
         totalDuration: String? = nil,
         estimatedCost: String? = nil,
         stops: [DatePlanStop] = [],
+        startingPoint: StartingPoint? = nil,
         genieSecretTouch: GenieSecretTouch? = nil,
         packingList: [String]? = nil,
         weatherNote: String? = nil,
@@ -246,6 +336,7 @@ struct DBDatePlan: Codable, Identifiable, Equatable {
         self.totalDuration = totalDuration
         self.estimatedCost = estimatedCost
         self.stops = stops
+        self.startingPoint = startingPoint
         self.genieSecretTouch = genieSecretTouch
         self.packingList = packingList
         self.weatherNote = weatherNote
@@ -259,7 +350,7 @@ struct DBDatePlan: Codable, Identifiable, Equatable {
         self.createdAt = createdAt
         self.updatedAt = updatedAt
     }
-    
+
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = try c.decode(UUID.self, forKey: .id)
@@ -271,6 +362,7 @@ struct DBDatePlan: Codable, Identifiable, Equatable {
         totalDuration = try c.decodeIfPresent(String.self, forKey: .totalDuration)
         estimatedCost = try c.decodeIfPresent(String.self, forKey: .estimatedCost)
         stops = (try? c.decode([DatePlanStop].self, forKey: .stops)) ?? []
+        startingPoint = try? c.decode(StartingPoint.self, forKey: .startingPoint)
         if let touch = try? c.decode(GenieSecretTouch.self, forKey: .genieSecretTouch) {
             genieSecretTouch = touch
         } else if let s = try? c.decode(String.self, forKey: .genieSecretTouch),
@@ -310,6 +402,7 @@ struct DBDatePlan: Codable, Identifiable, Equatable {
         try c.encodeIfPresent(totalDuration, forKey: .totalDuration)
         try c.encodeIfPresent(estimatedCost, forKey: .estimatedCost)
         try c.encode(stops, forKey: .stops)
+        try c.encodeIfPresent(startingPoint, forKey: .startingPoint)
         try c.encodeIfPresent(genieSecretTouch, forKey: .genieSecretTouch)
         try c.encodeIfPresent(packingList, forKey: .packingList)
         try c.encodeIfPresent(weatherNote, forKey: .weatherNote)
@@ -320,6 +413,44 @@ struct DBDatePlan: Codable, Identifiable, Equatable {
         try c.encodeIfPresent(conversationStarters, forKey: .conversationStarters)
         try c.encodeIfPresent(rating, forKey: .rating)
         try c.encodeIfPresent(ratingNotes, forKey: .ratingNotes)
+        try c.encodeIfPresent(createdAt, forKey: .createdAt)
+        try c.encodeIfPresent(updatedAt, forKey: .updatedAt)
+    }
+}
+
+// MARK: - Experiences Waiting (`public.experiences_waiting` — unsaved generated plans; not `date_plans`)
+struct DBExperiencesWaitingRow: Codable, Equatable, Identifiable {
+    let id: UUID
+    let userId: UUID
+    var coupleId: UUID?
+    var plan: DatePlan
+    var createdAt: Date?
+    var updatedAt: Date?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case userId = "user_id"
+        case coupleId = "couple_id"
+        case plan
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+    }
+
+    init(id: UUID, userId: UUID, coupleId: UUID?, plan: DatePlan, createdAt: Date? = nil, updatedAt: Date? = nil) {
+        self.id = id
+        self.userId = userId
+        self.coupleId = coupleId
+        self.plan = plan
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
+        try c.encode(userId, forKey: .userId)
+        try c.encodeIfPresent(coupleId, forKey: .coupleId)
+        try c.encode(plan, forKey: .plan)
         try c.encodeIfPresent(createdAt, forKey: .createdAt)
         try c.encodeIfPresent(updatedAt, forKey: .updatedAt)
     }
@@ -469,46 +600,62 @@ struct DBDateMemory: Codable, Identifiable, Equatable {
 // MARK: - Table 6: Gift Suggestions
 struct DBGiftSuggestion: Codable, Identifiable, Equatable {
     let giftId: UUID
-    let planId: UUID
+    /// Nil for standalone Gift Finder items not tied to a specific plan.
+    var planId: UUID?
     let coupleId: UUID
+    var userId: UUID?
     var name: String?
     var priceRange: String?
     var description: String?
     var whyItFits: String?
     var whereToBuy: String?
+    var purchaseUrl: String?
+    var emoji: String?
+    var storeSearchQuery: String?
+    var imageUrl: String?
     var liked: Bool?
     var purchased: Bool
     var purchasedAt: Date?
     var purchasedForPlanId: UUID?
     var createdAt: Date
-    
+
     var id: UUID { giftId }
-    
+
     enum CodingKeys: String, CodingKey {
         case giftId = "gift_id"
         case planId = "plan_id"
         case coupleId = "couple_id"
+        case userId = "user_id"
         case name
         case priceRange = "price_range"
         case description
         case whyItFits = "why_it_fits"
         case whereToBuy = "where_to_buy"
+        case purchaseUrl = "purchase_url"
+        case emoji
+        case storeSearchQuery = "store_search_query"
+        case imageUrl = "image_url"
         case liked
         case purchased
         case purchasedAt = "purchased_at"
         case purchasedForPlanId = "purchased_for_plan_id"
         case createdAt = "created_at"
     }
-    
+
     init(
         giftId: UUID = UUID(),
-        planId: UUID,
+        planId: UUID? = nil,
         coupleId: UUID,
+        userId: UUID? = nil,
         name: String? = nil,
         priceRange: String? = nil,
         description: String? = nil,
         whyItFits: String? = nil,
         whereToBuy: String? = nil,
+        purchaseUrl: String? = nil,
+        emoji: String? = nil,
+        storeSearchQuery: String? = nil,
+        imageUrl: String? = nil,
         liked: Bool? = nil,
         purchased: Bool = false,
         purchasedAt: Date? = nil,
@@ -518,11 +665,16 @@ struct DBGiftSuggestion: Codable, Identifiable, Equatable {
         self.giftId = giftId
         self.planId = planId
         self.coupleId = coupleId
+        self.userId = userId
         self.name = name
         self.priceRange = priceRange
         self.description = description
         self.whyItFits = whyItFits
         self.whereToBuy = whereToBuy
+        self.purchaseUrl = purchaseUrl
+        self.emoji = emoji
+        self.storeSearchQuery = storeSearchQuery
+        self.imageUrl = imageUrl
         self.liked = liked
         self.purchased = purchased
         self.purchasedAt = purchasedAt

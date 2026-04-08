@@ -14,7 +14,7 @@ enum DatePlanSyncHelpers {
             totalDuration: db.totalDuration ?? "—",
             estimatedCost: db.estimatedCost ?? "—",
             stops: db.stops,
-            startingPoint: nil,
+            startingPoint: db.startingPoint,
             genieSecretTouch: db.genieSecretTouch ?? GenieSecretTouch(title: "", description: "", emoji: "✨"),
             packingList: db.packingList ?? [],
             weatherNote: db.weatherNote ?? "",
@@ -23,7 +23,7 @@ enum DatePlanSyncHelpers {
             scheduledDate: db.dateScheduled
         )
     }
-    
+
     /// Convert the app's DatePlan to a row for `public.date_plans` (same shape the web app uses).
     static func dbDatePlan(from plan: DatePlan, userId: UUID, coupleId: UUID, status: String = "planned") -> DBDatePlan {
         DBDatePlan(
@@ -36,6 +36,7 @@ enum DatePlanSyncHelpers {
             totalDuration: plan.totalDuration,
             estimatedCost: plan.estimatedCost,
             stops: plan.stops,
+            startingPoint: plan.startingPoint,
             genieSecretTouch: plan.genieSecretTouch,
             packingList: plan.packingList.isEmpty ? nil : plan.packingList,
             weatherNote: plan.weatherNote.isEmpty ? nil : plan.weatherNote,

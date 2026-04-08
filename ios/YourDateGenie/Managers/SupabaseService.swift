@@ -1,6 +1,7 @@
 import Foundation
 import Combine
 import Supabase
+import UIKit
 
 /// Unified Supabase service for database, auth, and storage operations
 /// Uses official Supabase Swift SDK for auth (more reliable networking)
@@ -29,7 +30,14 @@ final class SupabaseService: ObservableObject {
         guard let url = URL(string: baseURL.hasPrefix("http") ? baseURL : "https://\(baseURL)") else {
             fatalError("Invalid Supabase URL")
         }
-        self.supabaseClient = SupabaseClient(supabaseURL: url, supabaseKey: anonKey)
+        // Opt in to upcoming default: emit cached session first, then refresh (see supabase-swift PR #822).
+        self.supabaseClient = SupabaseClient(
+            supabaseURL: url,
+            supabaseKey: anonKey,
+            options: SupabaseClientOptions(
+                auth: SupabaseClientOptions.AuthOptions(emitLocalSessionAsInitialSession: true)
+            )
+        )
         
         let config = URLSessionConfiguration.ephemeral
         config.timeoutIntervalForRequest = 60
@@ -46,6 +54,19 @@ final class SupabaseService: ObservableObject {
         self.encoder.dateEncodingStrategy = .iso8601
         
         loadCachedSessionFromSDK()
+    }
+
+    /// `SecItemAdd` / `securityd` can block the main thread for hundreds of ms; persist session off the UI thread.
+    private func persistSessionToKeychain(_ session: SecureSession) {
+        Task.detached(priority: .utility) {
+            try? KeychainManager.shared.saveSession(session)
+        }
+    }
+
+    private func clearSessionKeychainAsync() {
+        Task.detached(priority: .utility) {
+            try? KeychainManager.shared.clearSession()
+        }
     }
     
     // MARK: - Authentication
@@ -82,7 +103,7 @@ final class SupabaseService: ObservableObject {
                 await MainActor.run {
                     accessToken = nil
                     refreshToken = nil
-                    try? keychain.clearSession()
+                    clearSessionKeychainAsync()
                     currentUser = nil
                     isAuthenticated = false
                 }
@@ -121,7 +142,7 @@ final class SupabaseService: ObservableObject {
         try await supabaseClient.auth.signOut()
         accessToken = nil
         refreshToken = nil
-        try? keychain.clearSession()
+        clearSessionKeychainAsync()
         await MainActor.run {
             self.currentUser = nil
             self.isAuthenticated = false
@@ -253,9 +274,29 @@ final class SupabaseService: ObservableObject {
                 await MainActor.run {
                     self.accessToken = nil
                     self.refreshToken = nil
-                    try? self.keychain.clearSession()
+                    self.clearSessionKeychainAsync()
                     self.currentUser = nil
                     self.isAuthenticated = false
+                }
+            }
+            return
+        }
+        // With emitLocalSessionAsInitialSession, the first session may be expired until refresh runs.
+        if session.isExpired {
+            Task {
+                do {
+                    let valid = try await supabaseClient.auth.session
+                    await MainActor.run {
+                        syncSessionFromSDK(valid)
+                    }
+                } catch {
+                    await MainActor.run {
+                        self.accessToken = nil
+                        self.refreshToken = nil
+                        self.clearSessionKeychainAsync()
+                        self.currentUser = nil
+                        self.isAuthenticated = false
+                    }
                 }
             }
             return
@@ -272,7 +313,7 @@ final class SupabaseService: ObservableObject {
             refreshToken: session.refreshToken,
             expiresAt: Date().addingTimeInterval(session.expiresIn)
         )
-        try? keychain.saveSession(secureSession)
+        persistSessionToKeychain(secureSession)
     }
     
     private func mapToSupabaseUser(_ user: User, defaultName: String?) -> SupabaseUser {
@@ -405,9 +446,31 @@ final class SupabaseService: ObservableObject {
     func updateDatePlan(_ plan: DBDatePlan) async throws -> DBDatePlan {
         return try await update(table: "date_plans", data: plan, column: "id", value: plan.id.uuidString)
     }
+
+    /// Insert or update by primary key (`id`) in one round trip — avoids races with cloud sync and duplicate-key retries.
+    func upsertDatePlan(_ plan: DBDatePlan) async throws -> DBDatePlan {
+        try await upsert(table: "date_plans", data: plan, onConflict: "id")
+    }
     
     func deleteDatePlan(planId: UUID) async throws {
         try await delete(table: "date_plans", column: "id", value: planId.uuidString)
+    }
+
+    // MARK: - Experiences Waiting (unsaved generated plans; separate from `date_plans`)
+
+    func getExperiencesWaiting(coupleId: UUID) async throws -> [DBExperiencesWaitingRow] {
+        try await select(
+            table: "experiences_waiting",
+            query: "couple_id=eq.\(coupleId.uuidString)&order=updated_at.desc"
+        )
+    }
+
+    func upsertExperiencesWaiting(_ row: DBExperiencesWaitingRow) async throws -> DBExperiencesWaitingRow {
+        try await upsert(table: "experiences_waiting", data: row, onConflict: "id")
+    }
+
+    func deleteExperiencesWaiting(planId: UUID) async throws {
+        try await delete(table: "experiences_waiting", column: "id", value: planId.uuidString)
     }
 
     // MARK: - Partner Sessions (Plan Together)
@@ -516,10 +579,10 @@ final class SupabaseService: ObservableObject {
         try await patch(table: "partner_session_plans", column: "id", value: planId.uuidString, updates: updates)
     }
 
-    /// Supabase Storage bucket for `date_memories.image_url` paths.
+    /// Legacy Supabase **Storage** bucket (lowercase) for `object path` values in `date_memories.image_url`. Postgres table is always `date_memories`.
     static let dateMemoriesStorageBucket = "date-memories"
     
-    // Date Memories
+    // Date Memories — Postgres table `public.date_memories` (not the Storage bucket name `Memories`).
     func createMemory(_ memory: DBDateMemory) async throws -> DBDateMemory {
         return try await insert(table: "date_memories", data: memory)
     }
@@ -591,6 +654,27 @@ final class SupabaseService: ObservableObject {
         )
     }
     
+    // MARK: - Standalone Gift Finder rows (plan_id = NULL, owned by user)
+
+    /// Upsert a Gift Finder gift (no plan context) using `gift_id` as the conflict key.
+    @discardableResult
+    func upsertStandaloneGift(_ gift: DBGiftSuggestion) async throws -> DBGiftSuggestion {
+        return try await upsert(table: "gift_suggestions", data: gift, onConflict: "gift_id")
+    }
+
+    /// Fetch all standalone Gift Finder gifts for a user (plan_id IS NULL).
+    func getStandaloneGifts(userId: UUID) async throws -> [DBGiftSuggestion] {
+        return try await select(
+            table: "gift_suggestions",
+            query: "user_id=eq.\(userId.uuidString)&plan_id=is.null&order=created_at.desc"
+        )
+    }
+
+    /// Delete a gift row by gift_id.
+    func deleteGiftSuggestion(giftId: UUID) async throws {
+        try await delete(table: "gift_suggestions", column: "gift_id", value: giftId.uuidString)
+    }
+
     // MARK: - Generate More Gifts (Edge Function)
     /// Calls the generate-more-gifts edge function for personalized, unique gift suggestions.
     func generateMoreGifts(
@@ -758,6 +842,11 @@ final class SupabaseService: ObservableObject {
     func createPlaylist(_ playlist: DBPlaylist) async throws -> DBPlaylist {
         return try await insert(table: "playlists", data: playlist)
     }
+
+    /// Single round-trip insert or update by `playlist_id` (preferred for saves so the client does not rely on insert-then-fail).
+    func upsertPlaylist(_ playlist: DBPlaylist) async throws -> DBPlaylist {
+        try await upsert(table: "playlists", data: playlist, onConflict: "playlist_id")
+    }
     
     func getPlaylist(planId: UUID) async throws -> DBPlaylist? {
         return try await selectSingle(table: "playlists", column: "plan_id", value: planId.uuidString)
@@ -780,40 +869,164 @@ final class SupabaseService: ObservableObject {
     
     // MARK: - Storage Operations
     
+    /// Supabase **Storage** bucket for iOS `uploadMemoryImage` uploads (case-sensitive). Stored URL is written to Postgres table `date_memories` via `createMemory`.
+    static let memoriesStorageBucket = "Memories"
+
+    /// Parses `/storage/v1/object/public/<bucket>/<objectPath>` from a public storage URL so we can delete the object when the user removes a memory.
+    static func memoryStorageDeletionTarget(publicImageURL: String?) -> (bucket: String, path: String)? {
+        guard let s = publicImageURL?.trimmingCharacters(in: .whitespacesAndNewlines), !s.isEmpty,
+              let url = URL(string: s) else { return nil }
+        let p = url.path
+        guard let range = p.range(of: "/object/public/") else { return nil }
+        let after = String(p[range.upperBound...])
+        guard let slash = after.firstIndex(of: "/") else { return nil }
+        let bucket = String(after[..<slash])
+        let objectPath = String(after[after.index(after: slash)...])
+        guard !bucket.isEmpty, !objectPath.isEmpty else { return nil }
+        return (bucket, objectPath)
+    }
+    
+    /// Compresses JPEG (starting at 0.6 quality), then scales down if needed, until data is ≤ 5MB.
+    private static func prepareMemoryImageDataUnder5MB(_ data: Data) throws -> Data {
+        let maxBytes = 5 * 1024 * 1024
+        guard var image = UIImage(data: data) else {
+            throw SupabaseError.uploadFailed
+        }
+        func encodeUnderLimit(_ img: UIImage) -> Data? {
+            var q: CGFloat = 0.6
+            var result = img.jpegData(compressionQuality: q)
+            while let d = result, d.count > maxBytes, q > 0.1 {
+                q -= 0.05
+                result = img.jpegData(compressionQuality: q)
+            }
+            if let d = result, d.count <= maxBytes { return d }
+            return nil
+        }
+        if let d = encodeUnderLimit(image) { return d }
+        var scale: CGFloat = 0.85
+        while scale > 0.2 {
+            let w = image.size.width * scale
+            let h = image.size.height * scale
+            let size = CGSize(width: w, height: h)
+            let renderer = UIGraphicsImageRenderer(size: size)
+            let scaled = renderer.image { _ in
+                image.draw(in: CGRect(origin: .zero, size: size))
+            }
+            image = scaled
+            if let d = encodeUnderLimit(image) { return d }
+            scale -= 0.1
+        }
+        throw SupabaseError.uploadFailed
+    }
+    
+    /// Uploads a memory photo to the `Memories` bucket and returns the **public** object URL string.
+    func uploadMemoryImage(data: Data, userId: String) async throws -> String {
+        print("🚀 Upload function called — userId=\(userId) rawBytes=\(data.count)")
+        print("🔧 Supabase URL: \(baseURL)")
+        print("🔧 Bucket: \(Self.memoriesStorageBucket)")
+        do {
+            let prepared = try Self.prepareMemoryImageDataUnder5MB(data)
+            print("📦 Image size after compression: \(prepared.count) bytes")
+            let filename = "\(UUID().uuidString).jpg"
+            let path = "\(userId)/\(filename)"
+            let bucket = Self.memoriesStorageBucket
+            print("🚀 Upload started — path: \(bucket)/\(path)")
+            _ = try await uploadImage(data: prepared, bucket: bucket, path: path)
+            let publicURL = getPublicURL(bucket: bucket, path: path)
+            print("✅ Upload success — url: \(publicURL.absoluteString)")
+            return publicURL.absoluteString
+        } catch {
+            print("❌ Upload error (uploadMemoryImage):", error)
+            throw error
+        }
+    }
+    
+    // MARK: - Debug Test Upload (remove before release)
+
+    /// Call this from a button or onAppear to isolate storage vs integration issues.
+    /// Creates a 1×1 red JPEG and uploads it to `Memories/debug/test.jpg`.
+    func debugTestStorageUpload() {
+        Task {
+            print("🧪 debugTestStorageUpload: start")
+            print("🔧 Supabase URL: \(baseURL)")
+            // Build a 1×1 red pixel JPEG
+            let renderer = UIGraphicsImageRenderer(size: CGSize(width: 1, height: 1))
+            let img = renderer.image { ctx in
+                UIColor.red.setFill()
+                ctx.fill(CGRect(x: 0, y: 0, width: 1, height: 1))
+            }
+            guard let data = img.jpegData(compressionQuality: 1.0) else {
+                print("❌ debugTestStorageUpload: could not create test image data")
+                return
+            }
+            print("📦 debugTestStorageUpload: test image size=\(data.count) bytes")
+            do {
+                let url = try await uploadMemoryImage(data: data, userId: "debug")
+                print("✅ debugTestStorageUpload: SUCCESS — url=\(url)")
+            } catch {
+                print("❌ debugTestStorageUpload: FAILED —", error)
+            }
+        }
+    }
+
     /// Upload an image to Supabase Storage
     func uploadImage(data: Data, bucket: String = "memories", path: String) async throws -> String {
-        try await refreshRestAuthFromSDK()
-        guard let token = accessToken else {
-            throw SupabaseError.unauthorized
-        }
-        
+        // Pull a fresh token directly from the Supabase SDK (auto-refreshes if expired).
+        // Avoids the race in syncSessionFromSDK where it fires a background Task and returns
+        // early without setting `accessToken`, causing the guard below to throw .unauthorized.
+        let sdkSession = try await supabaseClient.auth.session
+        let token = sdkSession.accessToken
+        // Keep cached property in sync for other callers
+        await MainActor.run { self.accessToken = token }
+        print("🔑 uploadImage: accessToken obtained (prefix: \(token.prefix(12))…)")
+
         let url = URL(string: "\(baseURL)/storage/v1/object/\(bucket)/\(path)")!
-        
+        print("🌐 uploadImage: POST \(url.absoluteString)")
+
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.addValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.addValue(anonKey, forHTTPHeaderField: "apikey")
         request.addValue("image/jpeg", forHTTPHeaderField: "Content-Type")
         request.httpBody = data
-        
-        let (_, response) = try await session.data(for: request)
-        
+
+        let (postBody, response) = try await session.data(for: request)
+
         guard let httpResponse = response as? HTTPURLResponse else {
+            print("❌ uploadImage: response is not HTTPURLResponse")
             throw SupabaseError.invalidResponse
         }
-        
+
+        print("📡 uploadImage: POST status=\(httpResponse.statusCode)")
+
+        if (200...299).contains(httpResponse.statusCode) {
+            return path
+        }
+
+        // Supabase returns 400 when the object already exists — retry with PUT (upsert)
         if httpResponse.statusCode == 400 {
+            let bodyStr = String(data: postBody, encoding: .utf8) ?? "<non-utf8>"
+            print("⚠️ uploadImage: POST 400 — body: \(bodyStr)")
+            print("⚠️ uploadImage: retrying as PUT")
             request.httpMethod = "PUT"
-            let (_, updateResponse) = try await session.data(for: request)
-            guard let updateHttpResponse = updateResponse as? HTTPURLResponse,
-                  (200...299).contains(updateHttpResponse.statusCode) else {
+            let (putBody, updateResponse) = try await session.data(for: request)
+            guard let updateHttpResponse = updateResponse as? HTTPURLResponse else {
+                print("❌ uploadImage: PUT response is not HTTPURLResponse")
                 throw SupabaseError.uploadFailed
             }
-        } else if !(200...299).contains(httpResponse.statusCode) {
+            print("📡 uploadImage: PUT status=\(updateHttpResponse.statusCode)")
+            if (200...299).contains(updateHttpResponse.statusCode) {
+                return path
+            }
+            let putBodyStr = String(data: putBody, encoding: .utf8) ?? "<non-utf8>"
+            print("❌ uploadImage: PUT failed — status=\(updateHttpResponse.statusCode) body: \(putBodyStr)")
             throw SupabaseError.uploadFailed
         }
-        
-        return path
+
+        // Any other non-2xx — log the body so we can see what Supabase said
+        let errorBodyStr = String(data: postBody, encoding: .utf8) ?? "<non-utf8>"
+        print("❌ uploadImage: POST failed — status=\(httpResponse.statusCode) body: \(errorBodyStr)")
+        throw SupabaseError.uploadFailed
     }
     
     /// Generate a public URL for an image
@@ -1129,7 +1342,7 @@ final class SupabaseService: ObservableObject {
                 refreshToken: refresh,
                 expiresAt: Date().addingTimeInterval(TimeInterval(expiresIn))
             )
-            try? keychain.saveSession(session)
+            persistSessionToKeychain(session)
         }
     }
     
@@ -1155,7 +1368,7 @@ final class SupabaseService: ObservableObject {
                     } else {
                         // Never mark authenticated without a session we can run through `syncSessionFromSDK`
                         // (email confirmation and other invariants live there).
-                        try? keychain.clearSession()
+                        clearSessionKeychainAsync()
                         await MainActor.run {
                             accessToken = nil
                             refreshToken = nil
@@ -1165,7 +1378,7 @@ final class SupabaseService: ObservableObject {
                     }
                 } catch {
                     print("Failed to load cached session: \(error)")
-                    try? keychain.clearSession()
+                    clearSessionKeychainAsync()
                     await MainActor.run {
                         accessToken = nil
                         refreshToken = nil

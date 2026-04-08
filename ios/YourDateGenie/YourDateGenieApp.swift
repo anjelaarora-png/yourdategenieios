@@ -13,18 +13,35 @@ struct YourDateGenieApp: App {
                 .environmentObject(coordinator)
                 .environmentObject(memoryManager)
                 .environmentObject(supabase)
+                .environmentObject(PurchaseManager.shared)
+                .environmentObject(AccessManager.shared)
                 .onAppear {
+                    PurchaseManager.shared.checkSubscriptionOnAppLaunch()
                     notificationManager.requestAuthorization()
                     validateConfiguration()
                 }
                 .onOpenURL { url in
                     handleDeepLink(url)
                 }
-                .onReceive(NotificationCenter.default.publisher(for: .openMemoryGallery)) { notification in
-                    coordinator.showMemoryGallery = true
+                .onReceive(NotificationCenter.default.publisher(for: .openMemoryGallery)) { _ in
+                    let access = AccessManager.shared
+                    if access.canAccess(.memory) {
+                        coordinator.showMemoryGallery = true
+                    } else {
+                        access.require(.memory) {
+                            coordinator.showMemoryGallery = true
+                        }
+                    }
                 }
-                .onReceive(NotificationCenter.default.publisher(for: .openMemoryCapture)) { notification in
-                    coordinator.isShowingMemoryCapture = true
+                .onReceive(NotificationCenter.default.publisher(for: .openMemoryCapture)) { _ in
+                    let access = AccessManager.shared
+                    if access.canAccess(.memory) {
+                        coordinator.isShowingMemoryCapture = true
+                    } else {
+                        access.require(.memory) {
+                            coordinator.isShowingMemoryCapture = true
+                        }
+                    }
                 }
         }
     }

@@ -2,6 +2,43 @@ import Foundation
 
 /// Pull/push love notes, saved conversation starters, and spark sessions for the logged-in user (survives reinstall after migration `user_ios_sync_payload`).
 enum UserIosContentSync {
+
+    /// Coalesces rapid `schedulePushIfLoggedIn()` calls (e.g. every keystroke path) and runs at most one network upsert at a time.
+    fileprivate actor PushCoordinator {
+        static let shared = PushCoordinator()
+
+        private var debounceTask: Task<Void, Never>?
+        private var inFlight = false
+        private var rerunUserId: UUID?
+
+        func scheduleDebouncedPush(userId: UUID) {
+            debounceTask?.cancel()
+            debounceTask = Task {
+                guard !Task.isCancelled else { return }
+                await runSerializedPush(userId: userId)
+            }
+        }
+
+        func runImmediatePush(userId: UUID) async {
+            debounceTask?.cancel()
+            await runSerializedPush(userId: userId)
+        }
+
+        private func runSerializedPush(userId: UUID) async {
+            if inFlight {
+                rerunUserId = userId
+                return
+            }
+            inFlight = true
+            await executePushAll(userId: userId)
+            inFlight = false
+            if let again = rerunUserId {
+                rerunUserId = nil
+                await runSerializedPush(userId: again)
+            }
+        }
+    }
+
     static func syncFromSupabase(userId: UUID) async {
         do {
             if let remote = try await SupabaseService.shared.getUserIosSync(userId: userId) {
@@ -25,17 +62,20 @@ enum UserIosContentSync {
                     )
                     SparkSessionStorageManager.shared.replaceFromCloud(mergedSessions)
                 }
-                await pushAll(userId: userId)
+                await PushCoordinator.shared.runImmediatePush(userId: userId)
                 return
             }
-            await pushAll(userId: userId)
+            await PushCoordinator.shared.runImmediatePush(userId: userId)
         } catch {
-            await pushAll(userId: userId)
+            await PushCoordinator.shared.runImmediatePush(userId: userId)
         }
     }
 
     static func pushAll(userId: UUID) async {
-        print("[UserIosContentSync] pushAll called userId=\(userId)")
+        await PushCoordinator.shared.runImmediatePush(userId: userId)
+    }
+
+    private static func executePushAll(userId: UUID) async {
         let payload = await MainActor.run {
             DBUserIosSyncPayload(
                 userId: userId,
@@ -45,9 +85,7 @@ enum UserIosContentSync {
             )
         }
         do {
-            print("[UserIosContentSync] before upsertUserIosSync")
             _ = try await SupabaseService.shared.upsertUserIosSync(payload)
-            print("[UserIosContentSync] upsertUserIosSync success")
         } catch {
             print("[UserIosContentSync] upsertUserIosSync error: \(error)")
         }
@@ -55,23 +93,22 @@ enum UserIosContentSync {
 
     static func schedulePushIfLoggedIn() {
         Task { @MainActor in
+            let userId: UUID
             if let uid = UserProfileManager.shared.userId {
-                Task { await pushAll(userId: uid) }
-                return
-            }
-            Task {
+                userId = uid
+            } else {
                 do {
                     let uid = try await SupabaseService.shared.syncAuthSessionAndReturnUserId()
-                    await MainActor.run {
-                        if UserProfileManager.shared.userId == nil {
-                            UserProfileManager.shared.userId = uid
-                        }
+                    if UserProfileManager.shared.userId == nil {
+                        UserProfileManager.shared.userId = uid
                     }
-                    await pushAll(userId: uid)
+                    userId = uid
                 } catch {
                     print("[UserIosContentSync] schedulePushIfLoggedIn skip: \(error)")
+                    return
                 }
             }
+            await PushCoordinator.shared.scheduleDebouncedPush(userId: userId)
         }
     }
 

@@ -49,6 +49,9 @@ struct MemoryGalleryView: View {
                 withAnimation(.easeOut(duration: 0.5)) {
                     hasAppeared = true
                 }
+                #if DEBUG
+                SupabaseService.shared.debugTestStorageUpload()
+                #endif
             }
         }
     }
@@ -824,25 +827,14 @@ private struct MemoryPhotoView: View {
     
     var body: some View {
         Group {
-            if let uiImage = memory.uiImage {
+            if let url = memory.httpImageURL {
+                asyncImageView(url: url)
+            } else if let uiImage = memory.uiImage {
                 Image(uiImage: uiImage)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
-            } else if let url = resolvedImageURL ?? memory.imageURL {
-                AsyncImage(url: url) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                    case .failure:
-                        placeholder
-                    case .empty:
-                        placeholder
-                    @unknown default:
-                        placeholder
-                    }
-                }
+            } else if let url = resolvedImageURL {
+                asyncImageView(url: url)
             } else {
                 placeholder
             }
@@ -852,14 +844,32 @@ private struct MemoryPhotoView: View {
         }
     }
     
-    /// Private bucket: `image_url` is a storage path (`userId/file.jpg`). Legacy rows may store a full URL.
+    @ViewBuilder
+    private func asyncImageView(url: URL) -> some View {
+        AsyncImage(url: url) { phase in
+            switch phase {
+            case .success(let image):
+                image
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+            case .failure:
+                placeholder
+            case .empty:
+                placeholder
+            @unknown default:
+                placeholder
+            }
+        }
+    }
+    
+    /// Legacy: `image_url` may be a storage path (`userId/file.jpg`) for the `date-memories` bucket — use signed URL.
     private func resolveCloudImageURLIfNeeded() async {
         guard let raw = memory.imageUrl?.trimmingCharacters(in: .whitespacesAndNewlines), !raw.isEmpty else {
             await MainActor.run { resolvedImageURL = nil }
             return
         }
         if raw.lowercased().hasPrefix("http") {
-            await MainActor.run { resolvedImageURL = URL(string: raw) }
+            await MainActor.run { resolvedImageURL = nil }
             return
         }
         let bucket = SupabaseService.dateMemoriesStorageBucket

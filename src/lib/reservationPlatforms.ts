@@ -68,18 +68,46 @@ export const PRIMARY_PLATFORMS_BY_REGION: Record<Region, [string, string]> = {
   other: ["opentable", "quandoo"],
 };
 
+/** Middle comma segments between street and city: neighborhood / borough / area. */
+function areaSegmentsFromAddress(addr?: string): string[] {
+  if (!addr) return [];
+  const parts = addr.split(",").map((p) => p.trim()).filter(Boolean);
+  if (parts.length < 4) return [];
+  return parts.slice(1, parts.length - 2);
+}
+
+function extractStateOrRegion(lastSegment: string): string | undefined {
+  const first = lastSegment.trim().split(/\s+/)[0];
+  if (first && first.length === 2 && /^[A-Za-z]{2}$/.test(first)) {
+    return first.toUpperCase();
+  }
+  return undefined;
+}
+
 /**
- * Build search string to send to reservation platforms: restaurant name plus city when available.
- * Use this so the platform pre-fills the search with the right venue (we usually don't have a direct booking URL).
+ * Search string for booking platforms: name + area (when present) + city + region code when parseable.
  */
 export function restaurantSearchTerm(venueName: string, address?: string): string {
   const name = (venueName || "").trim();
   const effectiveName = name || "Restaurant";
   if (!address) return effectiveName;
   const parts = address.split(",").map((p) => p.trim()).filter(Boolean);
-  const city = parts.length >= 2 ? parts[parts.length - 2] : "";
-  if (!city) return effectiveName;
-  return `${effectiveName} ${city}`;
+  if (parts.length < 2) return effectiveName;
+  const locationParts: string[] = [];
+  locationParts.push(...areaSegmentsFromAddress(address));
+  const city = parts[parts.length - 2];
+  if (city) locationParts.push(city);
+  const region = extractStateOrRegion(parts[parts.length - 1] ?? "");
+  if (region) locationParts.push(region);
+  const location = locationParts.join(" ").trim();
+  if (!location) return effectiveName;
+  return `${effectiveName} ${location}`;
+}
+
+function openTableNeighborhoodHint(address?: string): string | undefined {
+  const areas = areaSegmentsFromAddress(address);
+  if (areas.length === 0) return undefined;
+  return areas.join(" ");
 }
 
 function getCitySlugFromAddress(addr?: string): string {
@@ -124,7 +152,6 @@ function getChopeCitySlug(addr?: string): string {
   const map: Record<string, string> = {
     singapore: "singapore",
     "hong kong": "hong-kong",
-    hong kong: "hong-kong",
     bangkok: "bangkok",
     phuket: "phuket",
     bali: "bali",
@@ -175,10 +202,11 @@ export const RESERVATION_PLATFORMS: ReservationPlatformConfig[] = [
     getUrl: ({ venueName, date, time, partySize, address }) => {
       const term = restaurantSearchTerm(venueName, address);
       const searchQuery = encodeURIComponent(term);
-      const locationQuery = address
-        ? encodeURIComponent(address.split(",")[0]?.trim() || "")
+      const neighborhood = openTableNeighborhoodHint(address);
+      const neighborhoodQuery = neighborhood
+        ? `&neighborhood=${encodeURIComponent(neighborhood)}`
         : "";
-      return `https://www.opentable.com/s?covers=${partySize}&dateTime=${date}T${time}&term=${searchQuery}${locationQuery ? `&metroId=&regionId=&neighborhood=${locationQuery}` : ""}`;
+      return `https://www.opentable.com/s?covers=${partySize}&dateTime=${date}T${time}&term=${searchQuery}${neighborhoodQuery}`;
     },
   },
   {

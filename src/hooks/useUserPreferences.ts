@@ -14,6 +14,8 @@ export interface UserPreferences {
   // Location fields
   default_city: string | null;
   default_neighborhood: string | null;
+  /** Full address / "where I'm leaving from"; synced with questionnaire `startingAddress` and iOS `defaultStartingPoint`. */
+  default_starting_point: string | null;
   transportation_mode: string | null;
   travel_radius: string | null;
   activity_preferences: string[] | null;
@@ -23,6 +25,15 @@ export interface UserPreferences {
   accessibility_needs: string[] | null;
   smoking_preference: string | null;
   smoking_activities: string[] | null;
+  // Identity
+  gender: string | null;
+  partner_gender: string | null;
+  love_languages: string[] | null;
+  partner_love_languages: string[] | null;
+  // Relationship context
+  relationship_stage: string | null;
+  conversation_topics: string[] | null;
+  additional_notes: string | null;
   // Gift preferences
   gift_recipient: string | null;
   gift_interests: string[] | null;
@@ -33,8 +44,6 @@ export interface UserPreferences {
   gift_style: string[] | null;
   gift_favorite_brands: string | null;
   gift_sizes: string | null;
-  gender: string | null;
-  partner_gender: string | null;
 }
 
 export interface GiftPreferences {
@@ -91,6 +100,7 @@ export function useUserPreferences() {
       // Location
       default_city: questionnaireData.city || null,
       default_neighborhood: questionnaireData.neighborhood || null,
+      default_starting_point: questionnaireData.startingAddress?.trim() || null,
       preferred_location: `${questionnaireData.city}${questionnaireData.neighborhood ? `, ${questionnaireData.neighborhood}` : ""}`,
       // Transportation
       transportation_mode: questionnaireData.transportationMode || null,
@@ -109,13 +119,21 @@ export function useUserPreferences() {
       accessibility_needs: questionnaireData.accessibilityNeeds?.filter(a => a !== "none") || [],
       smoking_preference: questionnaireData.smokingPreference || null,
       smoking_activities: questionnaireData.smokingActivities?.filter(s => s !== "none") || [],
-      // Gift preferences (from questionnaire Step 6)
+      // Identity & relationship context (Step 6)
+      gender: questionnaireData.userIdentity || null,
+      partner_gender: questionnaireData.partnerIdentity || null,
+      love_languages: questionnaireData.userLoveLanguages?.length ? questionnaireData.userLoveLanguages : null,
+      partner_love_languages: questionnaireData.partnerLoveLanguages?.length ? questionnaireData.partnerLoveLanguages : null,
+      relationship_stage: questionnaireData.relationshipStage || null,
+      conversation_topics: questionnaireData.conversationTopics?.length ? questionnaireData.conversationTopics : null,
+      additional_notes: questionnaireData.additionalNotes || null,
+      // Gift preferences (Step 6)
       gift_recipient: questionnaireData.giftRecipient || null,
       gift_interests: questionnaireData.partnerInterests || [],
       gift_budget: questionnaireData.giftBudget || null,
       gift_occasion: questionnaireData.occasion || null,
       gift_notes: questionnaireData.giftRecipientNotes || null,
-      gift_recipient_identity: questionnaireData.partnerIdentity || null,
+      gift_recipient_identity: (questionnaireData.recipientIdentity ?? questionnaireData.partnerIdentity) || null,
       gift_style: questionnaireData.giftStyle?.length ? questionnaireData.giftStyle : null,
       gift_favorite_brands: questionnaireData.favoriteBrandsOrStores || null,
       gift_sizes: questionnaireData.recipientSizes || null,
@@ -146,7 +164,6 @@ export function useUserPreferences() {
           description: "Your preferences will pre-fill future questionnaires.",
         });
       }
-      // Refetch to get updated data
       fetchPreferences();
     } catch (error) {
       console.error("Error saving preferences:", error);
@@ -167,6 +184,7 @@ export function useUserPreferences() {
       // Location (user can update per date)
       city: preferences.default_city || "",
       neighborhood: preferences.default_neighborhood || "",
+      startingAddress: preferences.default_starting_point || "",
       // Transportation
       transportationMode: preferences.transportation_mode || "",
       travelRadius: preferences.travel_radius || "",
@@ -175,27 +193,36 @@ export function useUserPreferences() {
       activityPreferences: preferences.activity_preferences || [],
       // Food & Drinks
       cuisinePreferences: preferences.food_preferences || [],
-      dietaryRestrictions: preferences.dietary_restrictions?.length 
-        ? preferences.dietary_restrictions 
+      dietaryRestrictions: preferences.dietary_restrictions?.length
+        ? preferences.dietary_restrictions
         : [],
       drinkPreferences: preferences.drink_preferences || [],
       budgetRange: preferences.budget_range || "",
       // Deal Breakers
-      allergies: preferences.allergies?.length 
-        ? preferences.allergies 
+      allergies: preferences.allergies?.length
+        ? preferences.allergies
         : [],
       hardNos: preferences.deal_breakers || [],
-      accessibilityNeeds: preferences.accessibility_needs?.length 
-        ? preferences.accessibility_needs 
+      accessibilityNeeds: preferences.accessibility_needs?.length
+        ? preferences.accessibility_needs
         : [],
       smokingPreference: preferences.smoking_preference || "",
       smokingActivities: preferences.smoking_activities || [],
+      // Identity & relationship context
+      userIdentity: preferences.gender || "",
+      partnerIdentity: preferences.partner_gender || "",
+      userLoveLanguages: preferences.love_languages || [],
+      partnerLoveLanguages: preferences.partner_love_languages || [],
+      relationshipStage: preferences.relationship_stage || "",
+      conversationTopics: preferences.conversation_topics || [],
+      additionalNotes: preferences.additional_notes || "",
       // Gift preferences (Step 6) – carried to Gifts tab and next questionnaire
       giftRecipient: preferences.gift_recipient || "",
       partnerInterests: preferences.gift_interests || [],
       giftBudget: preferences.gift_budget || "",
+      occasion: preferences.gift_occasion || "",
       giftRecipientNotes: preferences.gift_notes || "",
-      partnerIdentity: preferences.gift_recipient_identity || "",
+      recipientIdentity: preferences.gift_recipient_identity || "",
       giftStyle: preferences.gift_style || [],
       favoriteBrandsOrStores: preferences.gift_favorite_brands || "",
       recipientSizes: preferences.gift_sizes || "",
@@ -251,8 +278,7 @@ export function useUserPreferences() {
 
         if (error) throw error;
       }
-      
-      // Refetch to get updated data
+
       fetchPreferences();
     } catch (error) {
       console.error("Error saving gift preferences:", error);

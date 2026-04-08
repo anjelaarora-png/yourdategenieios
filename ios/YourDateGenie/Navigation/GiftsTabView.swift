@@ -103,7 +103,7 @@ struct GiftsTabView: View {
                 .padding(.horizontal, 20)
             
             if giftStore.savedOnly.isEmpty {
-                emptyStateCard(
+                GiftListEmptyState(
                     icon: "heart.circle.fill",
                     title: "No saved gifts yet",
                     subtitle: "Save ideas from the Gift Finder to see them here"
@@ -111,9 +111,8 @@ struct GiftsTabView: View {
             } else {
                 VStack(spacing: 10) {
                     ForEach(giftStore.savedOnly) { stored in
-                        StoredGiftRow(
+                        StoredGiftRowView(
                             stored: stored,
-                            location: "",
                             onShop: { openShop(stored: stored) },
                             onNewLink: { openSearchLink(name: stored.name) },
                             onMarkBought: { giftStore.markAsBought(toGiftSuggestion(stored)) }
@@ -134,7 +133,7 @@ struct GiftsTabView: View {
                 .padding(.horizontal, 20)
             
             if giftStore.boughtOnly.isEmpty {
-                emptyStateCard(
+                GiftListEmptyState(
                     icon: "checkmark.circle.fill",
                     title: "No bought gifts yet",
                     subtitle: "Mark gifts as bought in the finder so we don't suggest them again"
@@ -142,9 +141,8 @@ struct GiftsTabView: View {
             } else {
                 VStack(spacing: 10) {
                     ForEach(giftStore.boughtOnly) { stored in
-                        StoredGiftRow(
+                        StoredGiftRowView(
                             stored: stored,
-                            location: "",
                             onShop: { openShop(stored: stored) },
                             onNewLink: { openSearchLink(name: stored.name) },
                             onMarkBought: nil
@@ -184,116 +182,6 @@ struct GiftsTabView: View {
             emoji: stored.emoji,
             storeSearchQuery: stored.storeSearchQuery,
             imageUrl: stored.imageUrl
-        )
-    }
-    
-    private func emptyStateCard(icon: String, title: String, subtitle: String) -> some View {
-        VStack(spacing: 12) {
-            Image(systemName: icon)
-                .font(.system(size: 32))
-                .foregroundColor(Color.luxuryGold)
-            Text(title)
-                .font(Font.tangerine(22, weight: .bold))
-                .foregroundColor(Color.luxuryGold)
-            Text(subtitle)
-                .font(Font.inter(13, weight: .regular))
-                .foregroundColor(Color.luxuryMuted)
-                .multilineTextAlignment(.center)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 28)
-        .padding(.horizontal, 20)
-        .background(Color.luxuryMaroonLight.opacity(0.6))
-        .cornerRadius(14)
-        .overlay(
-            RoundedRectangle(cornerRadius: 14)
-                .stroke(Color.luxuryGold.opacity(0.2), lineWidth: 1)
-        )
-        .padding(.horizontal, 20)
-    }
-}
-
-// MARK: - Stored Gift Row (compact card for Saved/Bought lists)
-private struct StoredGiftRow: View {
-    let stored: StoredGift
-    let location: String
-    let onShop: () -> Void
-    let onNewLink: () -> Void
-    var onMarkBought: (() -> Void)?
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .top, spacing: 12) {
-                Text(stored.emoji)
-                    .font(.system(size: 28))
-                    .frame(width: 44, height: 44)
-                    .background(Color.luxuryMaroonLight)
-                    .cornerRadius(10)
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(stored.name)
-                        .font(Font.bodySans(15, weight: .semibold))
-                        .foregroundColor(Color.luxuryCream)
-                    Text(stored.priceRange)
-                        .font(Font.inter(12, weight: .medium))
-                        .foregroundColor(Color.luxuryGold)
-                }
-                Spacer()
-            }
-            HStack(spacing: 8) {
-                Button(action: onShop) {
-                    HStack(spacing: 5) {
-                        Image(systemName: "cart.fill")
-                            .font(.system(size: 11))
-                        Text("Shop")
-                            .font(Font.inter(12, weight: .semibold))
-                    }
-                    .foregroundColor(Color.luxuryMaroon)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 10)
-                    .background(LinearGradient.goldShimmer)
-                    .cornerRadius(8)
-                }
-                Button(action: onNewLink) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "link")
-                            .font(.system(size: 10))
-                            .foregroundColor(Color.luxuryGold)
-                        Text("New link")
-                            .font(Font.inter(11, weight: .semibold))
-                    }
-                    .foregroundColor(Color.luxuryGold)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 10)
-                    .background(Color.clear)
-                    .cornerRadius(8)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(Color.luxuryGold.opacity(0.5), lineWidth: 1)
-                    )
-                }
-                if let onMarkBought = onMarkBought {
-                    Button(action: onMarkBought) {
-                        HStack(spacing: 4) {
-                            Image(systemName: "checkmark.circle.fill")
-                                .font(.system(size: 11))
-                            Text("Bought")
-                                .font(Font.inter(11, weight: .semibold))
-                        }
-                        .foregroundColor(Color.luxuryMaroon)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 10)
-                        .background(Color.luxuryCream.opacity(0.9))
-                        .cornerRadius(8)
-                    }
-                }
-            }
-        }
-        .padding(14)
-        .background(Color.luxuryMaroonLight)
-        .cornerRadius(14)
-        .overlay(
-            RoundedRectangle(cornerRadius: 14)
-                .stroke(Color.luxuryGold.opacity(0.25), lineWidth: 1)
         )
     }
 }

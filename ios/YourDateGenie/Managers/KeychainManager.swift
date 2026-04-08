@@ -209,11 +209,14 @@ extension KeychainManager {
     }
 
     /// Mark that user has signed in at least once (survives reinstall so we can show sign-in directly).
+    /// Keychain IPC must not run on the main thread or it blocks UI (securityd / mach messaging).
     func setHasEverLoggedIn(_ value: Bool) {
-        if value {
-            try? save("1", forKey: .hasEverLoggedIn)
-        } else {
-            try? delete(forKey: .hasEverLoggedIn)
+        Task.detached(priority: .utility) { [service = self] in
+            if value {
+                try? service.save("1", forKey: .hasEverLoggedIn)
+            } else {
+                try? service.delete(forKey: .hasEverLoggedIn)
+            }
         }
     }
 

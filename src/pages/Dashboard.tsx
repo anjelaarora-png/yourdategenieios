@@ -361,7 +361,7 @@ const Dashboard = () => {
       <PhotoPrompt
         open={photoPromptOpen}
         onOpenChange={setPhotoPromptOpen}
-        onUpload={uploadMemory}
+        onUpload={(file, caption) => uploadMemory(file, undefined, caption)}
       />
 
       {/* Save the Date Dialog - shows after saving a plan */}

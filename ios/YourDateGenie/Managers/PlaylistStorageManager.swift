@@ -22,33 +22,19 @@ final class PlaylistStorageManager: ObservableObject {
         playlists = decoded
     }
     
-    /// Persist to UserDefaults and optionally sync to Supabase (skip when loading from cloud).
-    private func save(skipSupabase: Bool = false) {
+    /// Persist to UserDefaults and upsert **one** playlist to Supabase immediately when logged in (`skipSupabase` when merging from cloud).
+    private func save(skipSupabase: Bool = false, syncPlaylistId: String? = nil) {
         guard let data = try? JSONEncoder().encode(playlists) else { return }
         UserDefaults.standard.set(data, forKey: key)
-        if !skipSupabase {
-            persistToSupabaseIfNeeded()
-        }
-    }
-    
-    /// When logged in, sync current playlists to Supabase so they survive reinstall.
-    private func persistToSupabaseIfNeeded() {
+        guard !skipSupabase, let pid = syncPlaylistId,
+              let playlist = playlists.first(where: { $0.id == pid }) else { return }
         Task {
-            print("[PlaylistStorage] persistToSupabaseIfNeeded called")
-            do {
-                let coupleId = try await SupabaseService.shared.resolveCoupleIdForCurrentUser()
-                let list = await MainActor.run { self.playlists }
-                for playlist in list {
-                    persistOnePlaylistToSupabase(playlist, coupleId: coupleId)
-                }
-            } catch {
-                print("[PlaylistStorage] persistToSupabaseIfNeeded failed: \(error)")
-            }
+            await syncOnePlaylistToSupabase(playlist)
         }
     }
-    
-    private func persistOnePlaylistToSupabase(_ playlist: SavedPlaylist, coupleId: UUID) {
-        guard let playlistId = UUID(uuidString: playlist.id) else { return }
+
+    private func dbPlaylist(from playlist: SavedPlaylist, coupleId: UUID) -> DBPlaylist? {
+        guard let playlistId = UUID(uuidString: playlist.id) else { return nil }
         let tracks = playlist.songs.enumerated().map { index, s in
             PlaylistTrack(
                 trackNumber: index + 1,
@@ -64,7 +50,7 @@ final class PlaylistStorageManager: ObservableObject {
             formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
             return formatter.date(from: playlist.createdAt) ?? formatter.date(from: String(playlist.createdAt.prefix(19)) + "Z") ?? Date()
         }()
-        let db = DBPlaylist(
+        return DBPlaylist(
             playlistId: playlistId,
             planId: nil,
             coupleId: coupleId,
@@ -74,14 +60,16 @@ final class PlaylistStorageManager: ObservableObject {
             totalDurationMinutes: max(1, playlist.songs.count * 4),
             generatedAt: generatedAt
         )
-        Task {
-            do {
-                _ = try await SupabaseService.shared.createPlaylist(db)
-                print("[PlaylistStorage] createPlaylist success playlist_id=\(db.playlistId)")
-            } catch {
-                print("[PlaylistStorage] createPlaylist error: \(error); trying update")
-                _ = try? await SupabaseService.shared.updatePlaylist(db)
-            }
+    }
+
+    private func syncOnePlaylistToSupabase(_ playlist: SavedPlaylist) async {
+        do {
+            let coupleId = try await SupabaseService.shared.resolveCoupleIdForCurrentUser()
+            guard let db = dbPlaylist(from: playlist, coupleId: coupleId) else { return }
+            _ = try await SupabaseService.shared.upsertPlaylist(db)
+            print("[PlaylistStorage] upsertPlaylist success playlist_id=\(db.playlistId)")
+        } catch {
+            print("[PlaylistStorage] upsertPlaylist failed: \(error)")
         }
     }
     
@@ -119,7 +107,7 @@ final class PlaylistStorageManager: ObservableObject {
             mood: mood
         )
         playlists.insert(playlist, at: 0)
-        save()
+        save(syncPlaylistId: playlist.id)
         return playlist
     }
     
@@ -128,7 +116,7 @@ final class PlaylistStorageManager: ObservableObject {
         var updated = playlist
         updated.updatedAt = ISO8601DateFormatter().string(from: Date())
         playlists[idx] = updated
-        save()
+        save(syncPlaylistId: playlist.id)
         objectWillChange.send()
     }
     
@@ -138,14 +126,14 @@ final class PlaylistStorageManager: ObservableObject {
         updated.songs = songs
         updated.updatedAt = ISO8601DateFormatter().string(from: Date())
         playlists[idx] = updated
-        save()
+        save(syncPlaylistId: playlistId)
         objectWillChange.send()
     }
     
     func deletePlaylist(id: String) {
         deletePlaylistFromSupabase(id: id)
         playlists.removeAll { $0.id == id }
-        save()
+        save(skipSupabase: true)
     }
     
     func addSong(playlistId: String, title: String, artist: String, isCustom: Bool = true) {
@@ -154,7 +142,7 @@ final class PlaylistStorageManager: ObservableObject {
         pl.songs.append(SavedPlaylistSong(title: title, artist: artist, isCustom: isCustom))
         pl.updatedAt = ISO8601DateFormatter().string(from: Date())
         playlists[idx] = pl
-        save()
+        save(syncPlaylistId: playlistId)
         objectWillChange.send()
     }
     
@@ -164,7 +152,7 @@ final class PlaylistStorageManager: ObservableObject {
         pl.songs.removeAll { $0.id == songId }
         pl.updatedAt = ISO8601DateFormatter().string(from: Date())
         playlists[idx] = pl
-        save()
+        save(syncPlaylistId: playlistId)
         objectWillChange.send()
     }
     
@@ -180,7 +168,7 @@ final class PlaylistStorageManager: ObservableObject {
         )
         pl.updatedAt = ISO8601DateFormatter().string(from: Date())
         playlists[idx] = pl
-        save()
+        save(syncPlaylistId: playlistId)
         objectWillChange.send()
     }
     
@@ -190,15 +178,18 @@ final class PlaylistStorageManager: ObservableObject {
     
     /// Call after login to restore playlists from Supabase and push any local-only playlists to the cloud.
     func syncFromSupabaseWhenLoggedIn(coupleId: UUID) {
-        Task {
-            guard let list = try? await SupabaseService.shared.getPlaylists(coupleId: coupleId) else { return }
-            await MainActor.run {
-                mergeFromSupabase(dbPlaylists: list)
-                let cloudIds = Set(list.map { $0.playlistId.uuidString })
-                for p in playlists where !cloudIds.contains(p.id) {
-                    persistOnePlaylistToSupabase(p, coupleId: coupleId)
-                }
-            }
+        Task { await syncFromSupabaseWhenLoggedInAsync(coupleId: coupleId) }
+    }
+
+    func syncFromSupabaseWhenLoggedInAsync(coupleId: UUID) async {
+        guard let list = try? await SupabaseService.shared.getPlaylists(coupleId: coupleId) else { return }
+        await MainActor.run {
+            mergeFromSupabase(dbPlaylists: list)
+        }
+        let cloudIds = Set(list.map { $0.playlistId.uuidString })
+        let locals = await MainActor.run { playlists.filter { !cloudIds.contains($0.id) } }
+        for p in locals {
+            await syncOnePlaylistToSupabase(p)
         }
     }
     

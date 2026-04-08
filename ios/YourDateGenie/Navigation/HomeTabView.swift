@@ -11,6 +11,7 @@ private struct IdentifiablePlan: Identifiable {
 struct LuxuryHomeTabView: View {
     @EnvironmentObject var coordinator: NavigationCoordinator
     @EnvironmentObject var userProfileManager: UserProfileManager
+    @EnvironmentObject private var access: AccessManager
     @Environment(\.scenePhase) private var scenePhase
     @StateObject private var notificationManager = NotificationManager.shared
     @StateObject private var memoryManager = MemoryManager.shared
@@ -82,12 +83,12 @@ struct LuxuryHomeTabView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    HStack(spacing: 6) {
-                        Image("Logo")
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                            .frame(width: 36, height: 36)
-                    }
+                    // Match UIBarButtonItem host width (~80pt) to avoid Auto Layout conflict with SwiftUI’s width <= ~68.
+                    Image("Logo")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 36, height: 36)
+                        .frame(minWidth: 80, minHeight: 44, alignment: .leading)
                 }
                 
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -152,11 +153,13 @@ struct LuxuryHomeTabView: View {
         
         return VStack(spacing: 16) {
             Button {
-                if hasPlanTonight, let plan = planForTonight {
-                    coordinator.currentDatePlan = plan
-                    coordinator.activeSheet = .datePlanResult
-                } else {
-                    coordinator.startDatePlanning(mode: .fresh)
+                access.require(.datePlan) {
+                    if hasPlanTonight, let plan = planForTonight {
+                        coordinator.currentDatePlan = plan
+                        coordinator.activeSheet = .datePlanResult
+                    } else {
+                        coordinator.startDatePlanning(mode: .fresh)
+                    }
                 }
             } label: {
                 HStack(spacing: 8) {
@@ -173,10 +176,21 @@ struct LuxuryHomeTabView: View {
                 .shadow(color: Color.luxuryGold.opacity(0.35), radius: 12, y: 4)
             }
             .buttonStyle(.plain)
+            .opacity(access.canAccess(.datePlan) ? 1 : 0.5)
+            .overlay(alignment: .topTrailing) {
+                if !access.canAccess(.datePlan) {
+                    Image(systemName: "lock.fill")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(Color.luxuryMaroon.opacity(0.6))
+                        .padding(10)
+                }
+            }
             
             if showUseLast && !hasPlanTonight {
                 Button {
-                    coordinator.startDatePlanning(mode: .useLast)
+                    access.require(.datePlan) {
+                        coordinator.startDatePlanning(mode: .useLast)
+                    }
                 } label: {
                     Text("Reuse Last Plan")
                         .font(Font.bodySans(14, weight: .semibold))
@@ -189,11 +203,14 @@ struct LuxuryHomeTabView: View {
                         )
                 }
                 .buttonStyle(.plain)
+                .opacity(access.canAccess(.datePlan) ? 1 : 0.5)
             }
             
             if showResume && !hasPlanTonight {
                 Button {
-                    coordinator.startDatePlanning(mode: .resume)
+                    access.require(.datePlan) {
+                        coordinator.startDatePlanning(mode: .resume)
+                    }
                 } label: {
                     Text("Pick up where you left off")
                         .font(Font.bodySans(14, weight: .semibold))
@@ -206,6 +223,7 @@ struct LuxuryHomeTabView: View {
                         )
                 }
                 .buttonStyle(.plain)
+                .opacity(access.canAccess(.datePlan) ? 1 : 0.5)
             }
         }
         .padding(.horizontal, 20)
@@ -362,6 +380,22 @@ struct LuxuryHomeTabView: View {
                     .foregroundColor(Color.luxuryCreamMuted)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 24)
+                Button {
+                    coordinator.activeSheet = .settings
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "gearshape.fill")
+                            .font(.system(size: 13))
+                        Text("Open Settings")
+                            .font(Font.bodySans(13, weight: .semibold))
+                    }
+                    .foregroundColor(Color.luxuryMaroon)
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 10)
+                    .background(LinearGradient.goldShimmer)
+                    .cornerRadius(12)
+                }
+                .buttonStyle(.plain)
             } else {
                 Text("Highly rated restaurants and things to do will appear here. Pull down to refresh or tap below for more.")
                     .font(Font.bodySans(14, weight: .medium))
@@ -475,13 +509,18 @@ struct LuxuryHomeTabView: View {
                                 time: plan.stops.first?.timeSlot ?? "—",
                                 price: plan.estimatedCost,
                                 actionTitle: "View Plan",
+                                isPremiumLocked: !access.canAccess(.datePlan),
                                 action: {
-                                    coordinator.currentDatePlan = plan
-                                    coordinator.activeSheet = .datePlanResult
+                                    access.require(.datePlan) {
+                                        coordinator.currentDatePlan = plan
+                                        coordinator.activeSheet = .datePlanResult
+                                    }
                                 },
                                 onAddToCalendar: {
-                                    planForCalendar = plan
-                                    calendarDate = plan.scheduledDate ?? Date()
+                                    access.require(.datePlan) {
+                                        planForCalendar = plan
+                                        calendarDate = plan.scheduledDate ?? Date()
+                                    }
                                 }
                             )
                             .contextMenu {
@@ -544,9 +583,12 @@ struct LuxuryHomeTabView: View {
                                         time: plan.stops.first?.timeSlot ?? "—",
                                         price: plan.estimatedCost,
                                         actionTitle: "View Plan",
+                                        isPremiumLocked: !access.canAccess(.datePlan),
                                         action: {
-                                            coordinator.currentDatePlan = plan
-                                            coordinator.activeSheet = .datePlanResult
+                                            access.require(.datePlan) {
+                                                coordinator.currentDatePlan = plan
+                                                coordinator.activeSheet = .datePlanResult
+                                            }
                                         }
                                     )
                                     .contextMenu {
@@ -567,10 +609,13 @@ struct LuxuryHomeTabView: View {
                                         time: plan.stops.first?.timeSlot ?? "—",
                                         price: plan.estimatedCost,
                                         actionTitle: "Choose",
+                                        isPremiumLocked: !access.canAccess(.datePlan),
                                         action: {
-                                            coordinator.generatedPlansSelectedIndex = index
-                                            coordinator.currentDatePlan = plan
-                                            coordinator.activeSheet = .datePlanOptions
+                                            access.require(.datePlan) {
+                                                coordinator.generatedPlansSelectedIndex = index
+                                                coordinator.currentDatePlan = plan
+                                                coordinator.activeSheet = .datePlanOptions
+                                            }
                                         }
                                     )
                                 }
@@ -600,27 +645,37 @@ struct LuxuryHomeTabView: View {
             .frame(maxWidth: .infinity)
             
             HStack(spacing: 8) {
-                LuxuryQuickTile(icon: "gift", title: "Gift Finder", color: Color.luxuryGold) {
-                    coordinator.showGiftFinder(
-                        datePlan: coordinator.currentDatePlan,
-                        dateLocation: coordinator.currentDatePlan?.stops.first?.address
-                    )
+                LuxuryQuickTile(icon: "gift", title: "Gift Finder", color: Color.luxuryGold, isLocked: !access.canAccess(.gifting)) {
+                    access.require(.gifting) {
+                        coordinator.showGiftFinder(
+                            datePlan: coordinator.currentDatePlan,
+                            dateLocation: coordinator.currentDatePlan?.stops.first?.address
+                        )
+                    }
                 }
                 .frame(maxWidth: .infinity)
-                LuxuryQuickTile(icon: "music.note.list", title: "Date Playlist", color: Color.luxuryGoldLight) {
-                    coordinator.showPlaylist(for: coordinator.currentDatePlan?.title ?? "Date Night", planId: coordinator.currentDatePlan?.id)
+                LuxuryQuickTile(icon: "music.note.list", title: "Date Playlist", color: Color.luxuryGoldLight, isLocked: !access.canAccess(.playlist)) {
+                    access.require(.playlist) {
+                        coordinator.showPlaylist(for: coordinator.currentDatePlan?.title ?? "Date Night", planId: coordinator.currentDatePlan?.id)
+                    }
                 }
                 .frame(maxWidth: .infinity)
-                LuxuryQuickTile(icon: "bubble.left.and.bubble.right", title: "Conversation Starters", color: Color.luxuryGold) {
-                    coordinator.showConversationStarters()
+                LuxuryQuickTile(icon: "bubble.left.and.bubble.right", title: "Conversation Starters", color: Color.luxuryGold, isLocked: !access.canAccess(.conversation)) {
+                    access.require(.conversation) {
+                        coordinator.showConversationStarters()
+                    }
                 }
                 .frame(maxWidth: .infinity)
-                LuxuryQuickTile(icon: "person.2.fill", title: "Plan Together", color: Color.luxuryGold) {
-                    coordinator.showPartnerPlanning()
+                LuxuryQuickTile(icon: "person.2.fill", title: "Plan Together", color: Color.luxuryGold, isLocked: !access.canAccess(.datePlan)) {
+                    access.require(.datePlan) {
+                        coordinator.showPartnerPlanning()
+                    }
                 }
                 .frame(maxWidth: .infinity)
-                LuxuryQuickTile(icon: "clock", title: "Past Dates", color: Color.luxuryGoldLight) {
-                    coordinator.showPastMagic()
+                LuxuryQuickTile(icon: "clock", title: "Past Dates", color: Color.luxuryGoldLight, isLocked: !access.canAccess(.datePlan)) {
+                    access.require(.datePlan) {
+                        coordinator.showPastMagic()
+                    }
                 }
                 .frame(maxWidth: .infinity)
             }
@@ -644,26 +699,34 @@ struct LuxuryHomeTabView: View {
             
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 14) {
-                    LuxuryQuickTile(icon: "map", title: "Journey Map", color: Color.luxuryGoldLight) {
-                        let allPastStops = coordinator.pastPlans.flatMap { $0.stops }
-                        if !allPastStops.isEmpty {
-                            coordinator.activeSheet = .routeMap(stops: allPastStops, startingPoint: nil, showRouteLine: false)
-                        } else if let plan = coordinator.currentDatePlan, !plan.stops.isEmpty {
-                            coordinator.activeSheet = .routeMap(stops: plan.stops, startingPoint: plan.startingPoint)
-                        } else {
-                            coordinator.activeSheet = .routeMap(stops: [], startingPoint: nil, showRouteLine: false)
+                    LuxuryQuickTile(icon: "map", title: "Journey Map", color: Color.luxuryGoldLight, isLocked: !access.canAccess(.datePlan)) {
+                        access.require(.datePlan) {
+                            let allPastStops = coordinator.pastPlans.flatMap { $0.stops }
+                            if !allPastStops.isEmpty {
+                                coordinator.activeSheet = .routeMap(stops: allPastStops, startingPoint: nil, showRouteLine: false)
+                            } else if let plan = coordinator.currentDatePlan, !plan.stops.isEmpty {
+                                coordinator.activeSheet = .routeMap(stops: plan.stops, startingPoint: plan.startingPoint)
+                            } else {
+                                coordinator.activeSheet = .routeMap(stops: [], startingPoint: nil, showRouteLine: false)
+                            }
                         }
                     }
-                    LuxuryQuickTile(icon: "music.note", title: "Mood Music", color: Color.luxuryGold) {
-                        coordinator.showPlaylist(for: coordinator.currentDatePlan?.title ?? "Date Night", planId: coordinator.currentDatePlan?.id)
-                    }
-                    LuxuryQuickTile(icon: "heart", title: "Share Joy", color: Color.luxuryGoldLight) {
-                        if let plan = coordinator.currentDatePlan {
-                            coordinator.activeSheet = .partnerShare(plan: plan)
+                    LuxuryQuickTile(icon: "music.note", title: "Mood Music", color: Color.luxuryGold, isLocked: !access.canAccess(.playlist)) {
+                        access.require(.playlist) {
+                            coordinator.showPlaylist(for: coordinator.currentDatePlan?.title ?? "Date Night", planId: coordinator.currentDatePlan?.id)
                         }
                     }
-                    LuxuryQuickTile(icon: "book.closed", title: "Date Tips", color: Color.luxuryGold) {
-                        coordinator.showPlaybook()
+                    LuxuryQuickTile(icon: "heart", title: "Share Joy", color: Color.luxuryGoldLight, isLocked: !access.canAccess(.datePlan)) {
+                        access.require(.datePlan) {
+                            if let plan = coordinator.currentDatePlan {
+                                coordinator.activeSheet = .partnerShare(plan: plan)
+                            }
+                        }
+                    }
+                    LuxuryQuickTile(icon: "book.closed", title: "Date Tips", color: Color.luxuryGold, isLocked: !access.canAccess(.datingTips)) {
+                        access.require(.datingTips) {
+                            coordinator.showPlaybook()
+                        }
                     }
                 }
                 .padding(.horizontal, 20)
@@ -709,7 +772,9 @@ struct LuxuryHomeTabView: View {
                 )
                 
                 Button {
-                    coordinator.currentTab = .memories
+                    access.require(.memory) {
+                        coordinator.currentTab = .memories
+                    }
                 } label: {
                     VStack(spacing: 6) {
                         Text("\(memoryManager.totalMemoriesCount)")
@@ -731,6 +796,15 @@ struct LuxuryHomeTabView: View {
                             )
                             .shadow(color: Color.luxuryGold.opacity(0.15), radius: 12, y: 4)
                     )
+                    .opacity(access.canAccess(.memory) ? 1 : 0.5)
+                    .overlay(alignment: .topTrailing) {
+                        if !access.canAccess(.memory) {
+                            Image(systemName: "lock.fill")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundColor(Color.luxuryGold.opacity(0.9))
+                                .padding(8)
+                        }
+                    }
                 }
                 .buttonStyle(.plain)
             }
@@ -781,6 +855,7 @@ private struct LuxuryUnifiedDateCard: View {
     let time: String
     let price: String
     let actionTitle: String
+    var isPremiumLocked: Bool = false
     let action: () -> Void
     var onAddToCalendar: (() -> Void)? = nil
     
@@ -809,6 +884,15 @@ private struct LuxuryUnifiedDateCard: View {
                     )
                 )
                 .clipShape(RoundedRectangle(cornerRadius: 24))
+                .overlay(alignment: .topTrailing) {
+                    if isPremiumLocked {
+                        Image(systemName: "lock.fill")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(Color.luxuryGold)
+                            .padding(8)
+                            .shadow(color: .black.opacity(0.4), radius: 2, y: 1)
+                    }
+                }
                 
                 VStack(alignment: .leading, spacing: 8) {
                     Text(title)
@@ -865,6 +949,7 @@ private struct LuxuryUnifiedDateCard: View {
                 .padding(14)
             }
             .frame(width: 200)
+            .opacity(isPremiumLocked ? 0.5 : 1)
             .background(
                 RoundedRectangle(cornerRadius: 24)
                     .fill(Color.luxuryMaroonLight.opacity(0.7))
@@ -883,7 +968,8 @@ private struct LuxuryUnifiedDateCard: View {
 // MARK: - Floating Particles View
 struct FloatingParticlesView: View {
     @State private var particles: [Particle] = []
-    
+    @State private var particleTimer: Timer?
+
     struct Particle: Identifiable {
         let id = UUID()
         var x: CGFloat
@@ -905,8 +991,16 @@ struct FloatingParticlesView: View {
                 }
             }
             .onAppear {
-                createParticles(in: geometry.size)
-                animateParticles(in: geometry.size)
+                if particles.isEmpty {
+                    createParticles(in: geometry.size)
+                }
+                if particleTimer == nil {
+                    startAnimating(in: geometry.size)
+                }
+            }
+            .onDisappear {
+                particleTimer?.invalidate()
+                particleTimer = nil
             }
         }
     }
@@ -923,8 +1017,8 @@ struct FloatingParticlesView: View {
         }
     }
     
-    private func animateParticles(in size: CGSize) {
-        Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { _ in
+    private func startAnimating(in size: CGSize) {
+        particleTimer = Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { _ in
             withAnimation(.easeInOut(duration: 3)) {
                 for i in particles.indices {
                     particles[i].y -= CGFloat(particles[i].speed)

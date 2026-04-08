@@ -5,6 +5,7 @@ struct LuxuryQuickTile: View {
     let icon: String
     let title: String
     let color: Color
+    var isLocked: Bool = false
     let action: () -> Void
     
     var body: some View {
@@ -29,6 +30,15 @@ struct LuxuryQuickTile: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             .frame(maxWidth: .infinity)
+            .opacity(isLocked ? 0.5 : 1)
+            .overlay(alignment: .topTrailing) {
+                if isLocked {
+                    Image(systemName: "lock.fill")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(Color.luxuryGold.opacity(0.9))
+                        .padding(4)
+                }
+            }
         }
         .buttonStyle(.plain)
     }

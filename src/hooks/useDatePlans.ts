@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { DatePlan, GiftSuggestion, ConversationStarter } from "@/types/datePlan";
+import { DatePlan, GiftSuggestion, ConversationStarter, StartingPoint } from "@/types/datePlan";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "./useAuth";
 import { Json } from "@/integrations/supabase/types";
@@ -15,6 +15,7 @@ export interface SavedDatePlan {
   genie_secret_touch: DatePlan["genieSecretTouch"] | null;
   packing_list: string[] | null;
   weather_note: string | null;
+  starting_point: StartingPoint | null;
   status: string;
   date_scheduled: string | null;
   created_at: string;
@@ -75,17 +76,20 @@ export function useDatePlans() {
       // Transform data to match our interface with safe fallbacks
       const transformedData: SavedDatePlan[] = (data || []).map((plan) => ({
         ...plan,
-        stops: Array.isArray(plan.stops) 
-          ? (plan.stops as unknown as DatePlan["stops"]) 
+        stops: Array.isArray(plan.stops)
+          ? (plan.stops as unknown as DatePlan["stops"])
           : [],
-        genie_secret_touch: plan.genie_secret_touch 
-          ? (plan.genie_secret_touch as unknown as DatePlan["genieSecretTouch"]) 
+        genie_secret_touch: plan.genie_secret_touch
+          ? (plan.genie_secret_touch as unknown as DatePlan["genieSecretTouch"])
           : null,
-        gift_suggestions: Array.isArray(plan.gift_suggestions) 
-          ? (plan.gift_suggestions as unknown as GiftSuggestion[]) 
+        starting_point: plan.starting_point
+          ? (plan.starting_point as unknown as StartingPoint)
           : null,
-        conversation_starters: Array.isArray(plan.conversation_starters) 
-          ? (plan.conversation_starters as unknown as ConversationStarter[]) 
+        gift_suggestions: Array.isArray(plan.gift_suggestions)
+          ? (plan.gift_suggestions as unknown as GiftSuggestion[])
+          : null,
+        conversation_starters: Array.isArray(plan.conversation_starters)
+          ? (plan.conversation_starters as unknown as ConversationStarter[])
           : null,
         rating: typeof plan.rating === 'number' ? plan.rating : null,
         rating_notes: plan.rating_notes || null,
@@ -148,6 +152,7 @@ export function useDatePlans() {
           genie_secret_touch: plan.genieSecretTouch as unknown as Json,
           packing_list: plan.packingList,
           weather_note: plan.weatherNote,
+          starting_point: plan.startingPoint ? (plan.startingPoint as unknown as Json) : null,
           status: "generated",
           gift_suggestions: (plan.giftSuggestions || []) as unknown as Json,
           conversation_starters: (plan.conversationStarters || []) as unknown as Json,
@@ -161,6 +166,7 @@ export function useDatePlans() {
         ...data,
         stops: data.stops as unknown as DatePlan["stops"],
         genie_secret_touch: data.genie_secret_touch as unknown as DatePlan["genieSecretTouch"],
+        starting_point: data.starting_point ? (data.starting_point as unknown as StartingPoint) : null,
         gift_suggestions: (data.gift_suggestions as unknown as GiftSuggestion[]) || null,
         conversation_starters: (data.conversation_starters as unknown as ConversationStarter[]) || null,
         rating: data.rating || null,

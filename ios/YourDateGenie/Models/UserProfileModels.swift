@@ -5,14 +5,15 @@ import CommonCrypto
 // MARK: - User Profile Model
 struct UserProfile: Codable, Equatable {
     var id: UUID = UUID()
-    
+
     var firstName: String = ""
     var lastName: String = ""
     var email: String = ""
+    /// Phone number — synced to `public.users.phone_number`.
     var phoneNumber: String = ""
     var dateOfBirth: Date?
     var location: String = ""
-    
+
     var preferences: DatePreferences = DatePreferences()
     
     var createdAt: Date = Date()
@@ -40,24 +41,44 @@ struct UserProfile: Codable, Equatable {
 
 // MARK: - Date Preferences Model
 struct DatePreferences: Codable, Equatable {
+    // Identity
     var gender: Gender = .preferNotToSay
     var partnerGender: Gender = .preferNotToSay
     var loveLanguages: [LoveLanguage] = [.qualityTime]
-    
+    var partnerLoveLanguages: [LoveLanguage] = []
+    // Location / travel
     var defaultStartingPoint: String = ""
     var defaultCity: String = ""
-    
+    var defaultNeighborhood: String = ""
+    var energyLevel: String = ""
+    var transportationMode: String = ""
+    var travelRadius: String = ""
+    // Activity / food
     var favoriteActivities: [String] = []
-    
     var favoriteCuisines: [String] = []
     var dietaryRestrictions: [String] = []
     var allergies: [String] = []
     var beveragePreferences: [String] = []
-    
+    // Lifestyle
+    var smokingPreference: String = ""
+    var smokingActivities: [String] = []
     var accessibilityNeeds: [String] = []
     var hardNos: [String] = []
-    
     var defaultBudget: String = ""
+    // Relationship context
+    var relationshipStage: String = ""
+    var conversationTopics: [String] = []
+    var additionalNotes: String = ""
+    // Gift preferences
+    var giftRecipient: String = ""
+    var giftInterests: [String] = []
+    var giftBudget: String = ""
+    var giftOccasion: String = ""
+    var giftNotes: String = ""
+    var giftRecipientIdentity: String = ""
+    var giftStyle: [String] = []
+    var giftFavoriteBrands: String = ""
+    var giftSizes: String = ""
 }
 
 // MARK: - Gender Enum
@@ -172,6 +193,9 @@ class UserProfileManager: ObservableObject {
     
     private let supabase = SupabaseService.shared
     private let keychain = KeychainManager.shared
+    
+    /// Latest `public.preferences.updated_at` from a row we know is current (saves + fresh fetches). Used to ignore stale parallel profile loads that would overwrite a just-saved starting point.
+    private var lastServerPreferencesUpdatedAt: Date?
     
     private let userProfileKey = "userProfile"
     private let preferencesCompleteKey = "hasCompletedPreferences"
@@ -321,6 +345,7 @@ class UserProfileManager: ObservableObject {
             if let prefs = preferences {
                 profile.preferences = self.convertToDatePreferences(prefs)
                 self.hasCompletedPreferences = true
+                self.lastServerPreferencesUpdatedAt = prefs.updatedAt
             }
             self.currentUser = profile
             self.userId = supabaseUser.id
@@ -330,15 +355,7 @@ class UserProfileManager: ObservableObject {
             UserDefaults.standard.set(self.hasCompletedPreferences, forKey: self.preferencesCompleteKey)
             self.keychain.setHasEverLoggedIn(true)
         }
-        if let cid = couple?.coupleId {
-            NavigationCoordinator.shared.syncDatePlansFromCloud(coupleId: cid)
-            PlaylistStorageManager.shared.syncFromSupabaseWhenLoggedIn(coupleId: cid)
-            PartnerSessionManager.shared.restoreFromSupabaseIfNeeded(userId: supabaseUser.id)
-        }
-        MemoryManager.shared.syncMemoriesFromCloud(userId: supabaseUser.id)
-        Task {
-            await UserIosContentSync.syncFromSupabase(userId: supabaseUser.id)
-        }
+        await PostLoginCloudSync.run(coupleId: couple?.coupleId, userId: supabaseUser.id)
     }
     
     func signOut() {
@@ -349,10 +366,15 @@ class UserProfileManager: ObservableObject {
         isLoggedIn = false
         userId = nil
         coupleId = nil
+        hasCompletedPreferences = false
+        currentUser = nil
+        lastServerPreferencesUpdatedAt = nil
         pendingEmailConfirmation = false
         pendingConfirmationEmail = nil
         persistPendingEmailConfirmationToDisk()
         UserDefaults.standard.set(false, forKey: loggedInKey)
+        UserDefaults.standard.set(false, forKey: preferencesCompleteKey)
+        UserDefaults.standard.removeObject(forKey: userProfileKey)
         PartnerSessionManager.shared.clearSession()
     }
     
@@ -384,83 +406,108 @@ class UserProfileManager: ObservableObject {
     
     // MARK: - Profile Operations
     
+    private struct FetchedRemoteProfile {
+        let dbUser: DBUser
+        let preferences: DBPreferences?
+        let couple: DBCouple?
+    }
+    
+    /// Loads remote profile after auth. Network + parsing run off the main thread; only `@Published` updates use the main actor.
     private func loadProfileFromDatabase() {
         guard let uid = userId else { return }
-        
-        Task {
-            do {
-                var dbUser = try await supabase.getUser(userId: uid)
-                if dbUser == nil {
-                    let context = await MainActor.run { () -> (email: String, name: String) in
-                        let em = self.currentUser?.email ?? self.supabase.currentUser?.email ?? ""
-                        let fromProfile = self.currentUser?.fullName.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-                        if !fromProfile.isEmpty { return (em, fromProfile) }
-                        if let n = self.supabase.currentUser?.name?.trimmingCharacters(in: .whitespacesAndNewlines), !n.isEmpty {
-                            return (em, n)
-                        }
-                        let fallback: String
-                        if !em.isEmpty {
-                            fallback = em.split(separator: "@").first.map { String($0) } ?? "User"
-                        } else {
-                            fallback = "User"
-                        }
-                        return (em, fallback)
-                    }
-                    do {
-                        try await supabase.ensureUserAndCoupleIfMissing(
-                            userId: uid,
-                            email: context.email.lowercased(),
-                            name: context.name
-                        )
-                    } catch {
-                        print("ensureUserAndCoupleIfMissing in loadProfileFromDatabase: \(error)")
-                    }
-                    dbUser = try await supabase.getUser(userId: uid)
+        Task.detached(priority: .userInitiated) { [weak self] in
+            guard let self = self else { return }
+            await self.performLoadProfileFromDatabase(userId: uid)
+        }
+    }
+    
+    /// Fetches `users` / `preferences` / `couples` rows (and ensures user row if missing). No UI work.
+    private func fetchRemoteProfile(for userId: UUID) async throws -> FetchedRemoteProfile? {
+        var dbUser = try await supabase.getUser(userId: userId)
+        if dbUser == nil {
+            let context = await MainActor.run { () -> (email: String, name: String) in
+                let em = self.currentUser?.email ?? self.supabase.currentUser?.email ?? ""
+                let fromProfile = self.currentUser?.fullName.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                if !fromProfile.isEmpty { return (em, fromProfile) }
+                if let n = self.supabase.currentUser?.name?.trimmingCharacters(in: .whitespacesAndNewlines), !n.isEmpty {
+                    return (em, n)
                 }
-                
-                guard let dbUser = dbUser else {
-                    print("loadProfileFromDatabase: no public.users row for \(uid) after ensure")
-                    await MainActor.run { self.loadLocalProfile() }
-                    return
+                let fallback: String
+                if !em.isEmpty {
+                    fallback = em.split(separator: "@").first.map { String($0) } ?? "User"
+                } else {
+                    fallback = "User"
                 }
-                
-                let preferences = try await supabase.getPreferences(userId: uid)
-                let couple = try await supabase.getCoupleForUser(userId: uid)
-                
-                await MainActor.run {
-                    var profile = UserProfile()
-                    let nameParts = dbUser.name.components(separatedBy: " ")
-                    profile.firstName = nameParts.first ?? ""
-                    profile.lastName = nameParts.count > 1 ? nameParts.dropFirst().joined(separator: " ") : ""
-                    profile.email = dbUser.email
-                    profile.dateOfBirth = dbUser.birthday
-                    profile.location = dbUser.homeAddress ?? ""
-                    if let existing = self.currentUser, !existing.phoneNumber.isEmpty {
-                        profile.phoneNumber = existing.phoneNumber
-                    }
-                    
-                    if let prefs = preferences {
-                        profile.preferences = self.convertToDatePreferences(prefs)
-                        self.hasCompletedPreferences = true
-                    }
-                    
-                    self.currentUser = profile
-                    self.coupleId = couple?.coupleId
-                    if let cid = couple?.coupleId {
-                        NavigationCoordinator.shared.syncDatePlansFromCloud(coupleId: cid)
-                        PlaylistStorageManager.shared.syncFromSupabaseWhenLoggedIn(coupleId: cid)
-                        if let uid = self.userId {
-                            PartnerSessionManager.shared.restoreFromSupabaseIfNeeded(userId: uid)
-                        }
-                    }
-                    MemoryManager.shared.syncMemoriesFromCloud(userId: uid)
-                    self.isProfileComplete = !profile.firstName.isEmpty
-                }
-                await UserIosContentSync.syncFromSupabase(userId: uid)
-            } catch {
-                print("Failed to load profile from database: \(error)")
-                await MainActor.run { self.loadLocalProfile() }
+                return (em, fallback)
             }
+            do {
+                try await supabase.ensureUserAndCoupleIfMissing(
+                    userId: userId,
+                    email: context.email.lowercased(),
+                    name: context.name
+                )
+            } catch {
+                print("ensureUserAndCoupleIfMissing in loadProfileFromDatabase: \(error)")
+            }
+            dbUser = try await supabase.getUser(userId: userId)
+        }
+        
+        guard let dbUser = dbUser else {
+            print("loadProfileFromDatabase: no public.users row for \(userId) after ensure")
+            return nil
+        }
+        
+        let preferences = try await supabase.getPreferences(userId: userId)
+        let couple = try await supabase.getCoupleForUser(userId: userId)
+        return FetchedRemoteProfile(dbUser: dbUser, preferences: preferences, couple: couple)
+    }
+    
+    /// Applies fetched data to `ObservableObject` state only.
+    @MainActor
+    private func updateUI(with fetched: FetchedRemoteProfile) {
+        var profile = UserProfile()
+        let nameParts = fetched.dbUser.name.components(separatedBy: " ")
+        profile.firstName = nameParts.first ?? ""
+        profile.lastName = nameParts.count > 1 ? nameParts.dropFirst().joined(separator: " ") : ""
+        profile.email = fetched.dbUser.email
+        profile.dateOfBirth = fetched.dbUser.birthday
+        profile.location = fetched.dbUser.homeAddress ?? ""
+        if let existing = currentUser, !existing.phoneNumber.isEmpty {
+            profile.phoneNumber = existing.phoneNumber
+        }
+        
+        if let prefs = fetched.preferences {
+            let remoteNewerOrEqual = lastServerPreferencesUpdatedAt.map { prefs.updatedAt >= $0 } ?? true
+            if !remoteNewerOrEqual, let existing = currentUser {
+                profile.preferences = existing.preferences
+            } else {
+                profile.preferences = convertToDatePreferences(prefs)
+                lastServerPreferencesUpdatedAt = prefs.updatedAt
+            }
+            hasCompletedPreferences = true
+        } else if let existing = currentUser {
+            profile.preferences = existing.preferences
+            if !existing.preferences.defaultCity.isEmpty || !existing.preferences.defaultStartingPoint.isEmpty {
+                hasCompletedPreferences = true
+            }
+        }
+        
+        currentUser = profile
+        coupleId = fetched.couple?.coupleId
+        isProfileComplete = !profile.firstName.isEmpty
+    }
+    
+    private func performLoadProfileFromDatabase(userId: UUID) async {
+        do {
+            guard let fetched = try await fetchRemoteProfile(for: userId) else {
+                await MainActor.run { self.loadLocalProfile() }
+                return
+            }
+            await updateUI(with: fetched)
+            await PostLoginCloudSync.run(coupleId: fetched.couple?.coupleId, userId: userId)
+        } catch {
+            print("Failed to load profile from database: \(error)")
+            await MainActor.run { self.loadLocalProfile() }
         }
     }
     
@@ -514,8 +561,14 @@ class UserProfileManager: ObservableObject {
                     existingPreferenceId: existingPrefs?.preferenceId
                 )
                 print("[updatePreferences] before savePreferences (upsert)")
-                _ = try await supabase.savePreferences(dbPrefs)
+                let saved = try await supabase.savePreferences(dbPrefs)
                 print("[updatePreferences] savePreferences success user_id=\(uid)")
+                await MainActor.run {
+                    self.lastServerPreferencesUpdatedAt = saved.updatedAt
+                    guard var p = self.currentUser else { return }
+                    p.preferences = self.convertToDatePreferences(saved)
+                    self.currentUser = p
+                }
             } catch {
                 print("[updatePreferences] error: \(error)")
             }
@@ -526,20 +579,36 @@ class UserProfileManager: ObservableObject {
     func savePreferencesFromQuestionnaire(_ data: QuestionnaireData) {
         guard var profile = currentUser else { return }
         var prefs = profile.preferences
+        // Identity
         prefs.gender = Gender(rawValue: data.userGender) ?? .preferNotToSay
         prefs.partnerGender = Gender(rawValue: data.partnerGender) ?? .preferNotToSay
+        let langs = (data.loveLanguageRaws ?? []).compactMap { LoveLanguage(rawValue: $0) }
+        prefs.loveLanguages = langs.isEmpty ? [.qualityTime] : langs
+        // Location
         prefs.defaultCity = data.city
+        prefs.defaultNeighborhood = data.neighborhood
         prefs.defaultStartingPoint = data.startingAddress
+        prefs.energyLevel = data.energyLevel
+        prefs.transportationMode = data.transportationMode
+        prefs.travelRadius = data.travelRadius
+        // Activity / food
         prefs.favoriteActivities = data.activityPreferences
         prefs.favoriteCuisines = data.cuisinePreferences
         prefs.beveragePreferences = data.drinkPreferences
         prefs.defaultBudget = data.budgetRange
+        prefs.dietaryRestrictions = data.dietaryRestrictions
         prefs.allergies = data.allergies
         prefs.hardNos = data.hardNos
         prefs.accessibilityNeeds = data.accessibilityNeeds
-        prefs.dietaryRestrictions = data.dietaryRestrictions
-        let langs = (data.loveLanguageRaws ?? []).compactMap { LoveLanguage(rawValue: $0) }
-        prefs.loveLanguages = langs.isEmpty ? [.qualityTime] : langs
+        prefs.smokingPreference = data.smokingPreference
+        prefs.additionalNotes = data.additionalNotes
+        // Relationship context
+        prefs.relationshipStage = data.relationshipStage
+        prefs.conversationTopics = data.conversationTopics
+        // Gift preferences
+        prefs.giftRecipient = data.giftRecipient
+        prefs.giftInterests = data.partnerInterests
+        prefs.giftBudget = data.giftBudget
         updatePreferences(prefs)
     }
     
@@ -571,14 +640,15 @@ class UserProfileManager: ObservableObject {
                     gender: nil,
                     birthday: dateOfBirth,
                     homeAddress: location.isEmpty ? nil : location,
-                    travelMode: nil
+                    travelMode: nil,
+                    phoneNumber: phoneNumber.isEmpty ? nil : phoneNumber
                 )
                 try? await supabase.updateUser(dbUser)
             }
         }
     }
 
-    /// Update account display info (name, email, phone). Name and email sync to Supabase; phone is local-only.
+    /// Update account display info (name, email, phone). Synced to `public.users`.
     func updateAccountInfo(firstName: String, lastName: String, email: String, phoneNumber: String) {
         guard var profile = currentUser else { return }
         profile.firstName = firstName
@@ -601,6 +671,7 @@ class UserProfileManager: ObservableObject {
                         birthday: existing.birthday,
                         homeAddress: existing.homeAddress,
                         travelMode: existing.travelMode,
+                        phoneNumber: phoneNumber.isEmpty ? nil : phoneNumber,
                         createdAt: existing.createdAt
                     )
                     try await supabase.updateUser(dbUser)
@@ -617,6 +688,7 @@ class UserProfileManager: ObservableObject {
         isLoggedIn = false
         userId = nil
         coupleId = nil
+        lastServerPreferencesUpdatedAt = nil
         
         UserDefaults.standard.removeObject(forKey: userProfileKey)
         UserDefaults.standard.set(false, forKey: preferencesCompleteKey)
@@ -695,24 +767,47 @@ class UserProfileManager: ObservableObject {
             coupleId: explicitCoupleId ?? coupleId,
             defaultCity: prefs.defaultCity.isEmpty ? nil : prefs.defaultCity,
             defaultStartingPoint: prefs.defaultStartingPoint.isEmpty ? nil : prefs.defaultStartingPoint,
+            defaultNeighborhood: prefs.defaultNeighborhood.isEmpty ? nil : prefs.defaultNeighborhood,
+            energyLevel: prefs.energyLevel.isEmpty ? nil : prefs.energyLevel,
+            transportationMode: prefs.transportationMode.isEmpty ? nil : prefs.transportationMode,
+            travelRadius: prefs.travelRadius.isEmpty ? nil : prefs.travelRadius,
             cuisineTypes: prefs.favoriteCuisines.isEmpty ? nil : prefs.favoriteCuisines,
             activityTypes: prefs.favoriteActivities.isEmpty ? nil : prefs.favoriteActivities,
             drinkPreferences: prefs.beveragePreferences.isEmpty ? nil : prefs.beveragePreferences,
             dietaryRestrictions: prefs.dietaryRestrictions.isEmpty ? nil : prefs.dietaryRestrictions,
             budgetRange: prefs.defaultBudget.isEmpty ? nil : prefs.defaultBudget,
-            loveLanguages: prefs.loveLanguages.map { $0.rawValue },
+            loveLanguages: prefs.loveLanguages.isEmpty ? nil : prefs.loveLanguages.map { $0.rawValue },
+            partnerLoveLanguages: prefs.partnerLoveLanguages.isEmpty ? nil : prefs.partnerLoveLanguages.map { $0.rawValue },
             foodAllergies: prefs.allergies.isEmpty ? nil : prefs.allergies,
             hardNos: prefs.hardNos.isEmpty ? nil : prefs.hardNos,
             accessibilityNeeds: prefs.accessibilityNeeds.isEmpty ? nil : prefs.accessibilityNeeds,
+            smokingPreference: prefs.smokingPreference.isEmpty ? nil : prefs.smokingPreference,
+            smokingActivities: prefs.smokingActivities.isEmpty ? nil : prefs.smokingActivities,
             gender: prefs.gender.rawValue,
-            partnerGender: prefs.partnerGender.rawValue
+            partnerGender: prefs.partnerGender.rawValue,
+            relationshipStage: prefs.relationshipStage.isEmpty ? nil : prefs.relationshipStage,
+            conversationTopics: prefs.conversationTopics.isEmpty ? nil : prefs.conversationTopics,
+            additionalNotes: prefs.additionalNotes.isEmpty ? nil : prefs.additionalNotes,
+            giftRecipient: prefs.giftRecipient.isEmpty ? nil : prefs.giftRecipient,
+            giftInterests: prefs.giftInterests.isEmpty ? nil : prefs.giftInterests,
+            giftBudget: prefs.giftBudget.isEmpty ? nil : prefs.giftBudget,
+            giftOccasion: prefs.giftOccasion.isEmpty ? nil : prefs.giftOccasion,
+            giftNotes: prefs.giftNotes.isEmpty ? nil : prefs.giftNotes,
+            giftRecipientIdentity: prefs.giftRecipientIdentity.isEmpty ? nil : prefs.giftRecipientIdentity,
+            giftStyle: prefs.giftStyle.isEmpty ? nil : prefs.giftStyle,
+            giftFavoriteBrands: prefs.giftFavoriteBrands.isEmpty ? nil : prefs.giftFavoriteBrands,
+            giftSizes: prefs.giftSizes.isEmpty ? nil : prefs.giftSizes
         )
     }
-    
+
     private func convertToDatePreferences(_ dbPrefs: DBPreferences) -> DatePreferences {
         var prefs = DatePreferences()
         prefs.defaultCity = dbPrefs.defaultCity ?? ""
         prefs.defaultStartingPoint = dbPrefs.defaultStartingPoint ?? ""
+        prefs.defaultNeighborhood = dbPrefs.defaultNeighborhood ?? ""
+        prefs.energyLevel = dbPrefs.energyLevel ?? ""
+        prefs.transportationMode = dbPrefs.transportationMode ?? ""
+        prefs.travelRadius = dbPrefs.travelRadius ?? ""
         prefs.favoriteCuisines = dbPrefs.cuisineTypes ?? []
         prefs.favoriteActivities = dbPrefs.activityTypes ?? []
         prefs.beveragePreferences = dbPrefs.drinkPreferences ?? []
@@ -720,11 +815,26 @@ class UserProfileManager: ObservableObject {
         prefs.defaultBudget = dbPrefs.budgetRange ?? ""
         prefs.loveLanguages = (dbPrefs.loveLanguages ?? []).compactMap { LoveLanguage(rawValue: $0) }
         if prefs.loveLanguages.isEmpty { prefs.loveLanguages = [.qualityTime] }
+        prefs.partnerLoveLanguages = (dbPrefs.partnerLoveLanguages ?? []).compactMap { LoveLanguage(rawValue: $0) }
         prefs.allergies = dbPrefs.foodAllergies ?? []
         prefs.hardNos = dbPrefs.hardNos ?? []
         prefs.accessibilityNeeds = dbPrefs.accessibilityNeeds ?? []
+        prefs.smokingPreference = dbPrefs.smokingPreference ?? ""
+        prefs.smokingActivities = dbPrefs.smokingActivities ?? []
         prefs.gender = Gender(rawValue: dbPrefs.gender ?? "") ?? .preferNotToSay
         prefs.partnerGender = Gender(rawValue: dbPrefs.partnerGender ?? "") ?? .preferNotToSay
+        prefs.relationshipStage = dbPrefs.relationshipStage ?? ""
+        prefs.conversationTopics = dbPrefs.conversationTopics ?? []
+        prefs.additionalNotes = dbPrefs.additionalNotes ?? ""
+        prefs.giftRecipient = dbPrefs.giftRecipient ?? ""
+        prefs.giftInterests = dbPrefs.giftInterests ?? []
+        prefs.giftBudget = dbPrefs.giftBudget ?? ""
+        prefs.giftOccasion = dbPrefs.giftOccasion ?? ""
+        prefs.giftNotes = dbPrefs.giftNotes ?? ""
+        prefs.giftRecipientIdentity = dbPrefs.giftRecipientIdentity ?? ""
+        prefs.giftStyle = dbPrefs.giftStyle ?? []
+        prefs.giftFavoriteBrands = dbPrefs.giftFavoriteBrands ?? ""
+        prefs.giftSizes = dbPrefs.giftSizes ?? ""
         return prefs
     }
     
@@ -733,40 +843,36 @@ class UserProfileManager: ObservableObject {
     func prePopulateQuestionnaireData(_ data: inout QuestionnaireData) {
         guard let profile = currentUser else { return }
         let prefs = profile.preferences
-        
-        if !prefs.defaultCity.isEmpty {
-            data.city = prefs.defaultCity
-        }
-        if !prefs.defaultStartingPoint.isEmpty {
-            data.startingAddress = prefs.defaultStartingPoint
-        }
-        if !prefs.favoriteActivities.isEmpty {
-            data.activityPreferences = prefs.favoriteActivities
-        }
-        if !prefs.favoriteCuisines.isEmpty {
-            data.cuisinePreferences = prefs.favoriteCuisines
-        }
-        if !prefs.dietaryRestrictions.isEmpty {
-            data.dietaryRestrictions = prefs.dietaryRestrictions
-        }
-        if !prefs.allergies.isEmpty {
-            data.allergies = prefs.allergies
-        }
-        if !prefs.beveragePreferences.isEmpty {
-            data.drinkPreferences = prefs.beveragePreferences
-        }
-        if !prefs.accessibilityNeeds.isEmpty {
-            data.accessibilityNeeds = prefs.accessibilityNeeds
-        }
-        if !prefs.hardNos.isEmpty {
-            data.hardNos = prefs.hardNos
-        }
-        if !prefs.defaultBudget.isEmpty {
-            data.budgetRange = prefs.defaultBudget
-        }
+        // Location
+        data.city = prefs.defaultCity
+        data.neighborhood = prefs.defaultNeighborhood
+        data.startingAddress = prefs.defaultStartingPoint
+        if !prefs.energyLevel.isEmpty { data.energyLevel = prefs.energyLevel }
+        if !prefs.transportationMode.isEmpty { data.transportationMode = prefs.transportationMode }
+        if !prefs.travelRadius.isEmpty { data.travelRadius = prefs.travelRadius }
+        // Activity / food
+        if !prefs.favoriteActivities.isEmpty { data.activityPreferences = prefs.favoriteActivities }
+        if !prefs.favoriteCuisines.isEmpty { data.cuisinePreferences = prefs.favoriteCuisines }
+        if !prefs.dietaryRestrictions.isEmpty { data.dietaryRestrictions = prefs.dietaryRestrictions }
+        if !prefs.allergies.isEmpty { data.allergies = prefs.allergies }
+        if !prefs.beveragePreferences.isEmpty { data.drinkPreferences = prefs.beveragePreferences }
+        if !prefs.defaultBudget.isEmpty { data.budgetRange = prefs.defaultBudget }
+        // Lifestyle
+        if !prefs.smokingPreference.isEmpty { data.smokingPreference = prefs.smokingPreference }
+        if !prefs.accessibilityNeeds.isEmpty { data.accessibilityNeeds = prefs.accessibilityNeeds }
+        if !prefs.hardNos.isEmpty { data.hardNos = prefs.hardNos }
+        if !prefs.additionalNotes.isEmpty { data.additionalNotes = prefs.additionalNotes }
+        // Identity
         data.userGender = prefs.gender.rawValue
         data.partnerGender = prefs.partnerGender.rawValue
         data.loveLanguageRaws = prefs.loveLanguages.map(\.rawValue)
+        // Relationship context
+        if !prefs.relationshipStage.isEmpty { data.relationshipStage = prefs.relationshipStage }
+        if !prefs.conversationTopics.isEmpty { data.conversationTopics = prefs.conversationTopics }
+        // Gift preferences
+        if !prefs.giftRecipient.isEmpty { data.giftRecipient = prefs.giftRecipient }
+        if !prefs.giftInterests.isEmpty { data.partnerInterests = prefs.giftInterests }
+        if !prefs.giftBudget.isEmpty { data.giftBudget = prefs.giftBudget }
     }
 
     /// Applies saved profile preferences into questionnaire data (alias intent: single entry point for planning pre-fill).

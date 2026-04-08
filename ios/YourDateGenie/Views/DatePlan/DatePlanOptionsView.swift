@@ -9,6 +9,7 @@ struct DatePlanOptionsView: View {
     
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var coordinator: NavigationCoordinator
+    @EnvironmentObject private var access: AccessManager
     @State private var selectedPlanIndex = 0
     @State private var showPartnerShare = false
     @State private var showExport = false
@@ -705,7 +706,9 @@ struct DatePlanOptionsView: View {
                     Spacer()
                     
                     Button {
-                        coordinator.showGiftFinder(datePlan: plan, dateLocation: plan.stops.first?.address)
+                        access.require(.gifting) {
+                            coordinator.showGiftFinder(datePlan: plan, dateLocation: plan.stops.first?.address)
+                        }
                     } label: {
                         HStack(spacing: 6) {
                             Image(systemName: "sparkles")
@@ -718,6 +721,7 @@ struct DatePlanOptionsView: View {
                         .padding(.vertical, 8)
                         .background(Color.luxuryCream)
                         .cornerRadius(20)
+                        .opacity(access.canAccess(.gifting) ? 1 : 0.5)
                     }
                 }
                 

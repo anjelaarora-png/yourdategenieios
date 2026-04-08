@@ -67,15 +67,40 @@ private func topTwoPlatforms(for region: ReservationRegion) -> [ReservationPlatf
     }
 }
 
-/// Search string sent to reservation platforms: restaurant name plus city when address is available.
+/// Middle comma segments between street and city (neighborhood / borough / area), e.g. "East Village", "Soho".
+private func areaSegmentsFromAddress(_ address: String?) -> [String] {
+    guard let address = address, !address.isEmpty else { return [] }
+    let parts = address.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+    guard parts.count >= 4 else { return [] }
+    return (1..<(parts.count - 2)).map { String(parts[$0]) }
+}
+
+/// First token of the last segment when it is a 2-letter region code (US state, CA province, etc.).
+private func extractStateOrRegion(from lastAddressSegment: String) -> String? {
+    let trimmed = lastAddressSegment.trimmingCharacters(in: .whitespaces)
+    let tokens = trimmed.split(separator: " ").map(String.init)
+    guard let first = tokens.first, first.count == 2, first.allSatisfy({ $0.isLetter }) else { return nil }
+    return first.uppercased()
+}
+
+/// Search string for booking platforms: **name + area (when known) + city + region** so results match the right venue.
 private func restaurantSearchTerm(venueName: String, address: String?) -> String {
     let name = venueName.trimmingCharacters(in: .whitespaces)
     let effectiveName = name.isEmpty ? "Restaurant" : name
     guard let address = address, !address.isEmpty else { return effectiveName }
     let parts = address.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
     guard parts.count >= 2 else { return effectiveName }
+    
+    var locationParts: [String] = []
+    locationParts.append(contentsOf: areaSegmentsFromAddress(address))
     let city = String(parts[parts.count - 2])
-    return "\(effectiveName) \(city)"
+    locationParts.append(city)
+    if let region = extractStateOrRegion(from: String(parts[parts.count - 1])) {
+        locationParts.append(region)
+    }
+    let location = locationParts.joined(separator: " ").trimmingCharacters(in: .whitespaces)
+    guard !location.isEmpty else { return effectiveName }
+    return "\(effectiveName) \(location)"
 }
 
 private func regionDisplayName(_ region: ReservationRegion) -> String {
@@ -227,7 +252,8 @@ struct ReservationWidgetView: View {
                 .padding(.top, 12)
                 
                 // Direct reservation link – primary CTA when we have OpenTable/Resy booking URL
-                if let urlString = effectiveReservationUrl, let url = URL(string: urlString) {
+                if let urlString = effectiveReservationUrl,
+                   let url = urlToOpenForReservationPlatform(urlString) {
                     Button {
                         UIApplication.shared.open(url)
                     } label: {
@@ -521,10 +547,15 @@ struct ReservationWidgetView: View {
         return formatter.string(from: selectedDate)
     }
     
+    private var reservationRegion: ReservationRegion {
+        detectReservationRegion(from: address)
+    }
+    
     /// Reservation URL for the primary CTA: bookingUrl, or websiteUrl when it's OpenTable/Resy.
+    /// Map URLs are never used as booking links — they would open Maps instead of a platform.
     private var effectiveReservationUrl: String? {
-        if let b = bookingUrl, !b.isEmpty { return b }
-        if let w = websiteUrl, !w.isEmpty, isOpenTableOrResy(w) { return w }
+        if let b = bookingUrl, !b.isEmpty, !isMapsURLString(b) { return b }
+        if let w = websiteUrl, !w.isEmpty, !isMapsURLString(w), isOpenTableOrResy(w) { return w }
         return nil
     }
     
@@ -534,21 +565,169 @@ struct ReservationWidgetView: View {
     }
     
     /// Platform id for effectiveReservationUrl when it's a known booking platform (opentable / resy).
+    /// Host-based only so URLs like maps.apple.com/?...opentable.com... are not mistaken for OpenTable.
     private var effectiveReservationPlatformId: String? {
         guard let urlString = effectiveReservationUrl else { return nil }
-        let lower = urlString.lowercased()
-        if lower.contains("opentable.com") { return "opentable" }
-        if lower.contains("resy.com") { return "resy" }
-        return nil
+        return reservationBookingPlatformId(for: urlString)
     }
     
-    /// URL to open for a platform: use restaurant's actual booking page when we have it for this platform, else search URL.
+    /// URL to open for a platform: prefer stored booking URLs, else venue pages (OpenTable `/slug`, Resy `/cities/.../venues/slug`), then search.
     private func reservationUrl(for platformId: String) -> URL? {
+        if platformId == "opentable" {
+            if let directId = effectiveReservationPlatformId, directId == "opentable",
+               let urlString = effectiveReservationUrl {
+                return openTableURLAppendingIOSReferrer(urlString)
+            }
+            if let venue = openTableVenuePageUrl { return venue }
+            return openTableSearchUrl
+        }
+        if platformId == "resy" {
+            if let directId = effectiveReservationPlatformId, directId == "resy",
+               let urlString = effectiveReservationUrl {
+                return resyURLAppendingBookingContext(urlString)
+            }
+            if let venue = resyVenuePageUrl { return venue }
+            return resySearchUrl
+        }
         if let directId = effectiveReservationPlatformId, directId == platformId,
            let urlString = effectiveReservationUrl, let url = URL(string: urlString) {
             return url
         }
         return searchUrl(forPlatformId: platformId)
+    }
+    
+    /// OpenTable public restaurant pages use a path slug and `shareReferrer=ios-share` for iOS (e.g. opentable.com/il-cantinori?shareReferrer=ios-share).
+    private func openTableRestaurantSlug(from name: String) -> String {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return "" }
+        let folded = trimmed.folding(options: .diacriticInsensitive, locale: Locale(identifier: "en_US_POSIX"))
+        let lower = folded.lowercased()
+        var parts: [String] = []
+        var buf = ""
+        for ch in lower {
+            if ch.isLetter || ch.isNumber {
+                buf.append(ch)
+            } else if !buf.isEmpty {
+                parts.append(buf)
+                buf = ""
+            }
+        }
+        if !buf.isEmpty { parts.append(buf) }
+        return parts.joined(separator: "-")
+    }
+    
+    private func openTableURLAppendingIOSReferrer(_ urlString: String) -> URL? {
+        guard var comp = URLComponents(string: urlString),
+              let host = comp.host?.lowercased(), host.contains("opentable.") else {
+            return URL(string: urlString)
+        }
+        var items = comp.queryItems ?? []
+        if !items.contains(where: { $0.name == "shareReferrer" }) {
+            items.append(URLQueryItem(name: "shareReferrer", value: "ios-share"))
+        }
+        comp.queryItems = items
+        return comp.url ?? URL(string: urlString)
+    }
+    
+    private func urlToOpenForReservationPlatform(_ urlString: String) -> URL? {
+        switch reservationBookingPlatformId(for: urlString) {
+        case "opentable": return openTableURLAppendingIOSReferrer(urlString)
+        case "resy": return resyURLAppendingBookingContext(urlString)
+        default: return URL(string: urlString)
+        }
+    }
+    
+    /// Resy venue pages: `resy.com/cities/{city-state}/venues/{slug}?date=&seats=` (same slug rules as OpenTable path).
+    private func resyCityPathForVenueURL(from address: String?) -> String {
+        if let parsed = resyCityPathParsedFromAddress(address) {
+            return parsed
+        }
+        let short = resyCitySlugFromAddress(address)
+        let fallback: [String: String] = [
+            "ny": "new-york-ny",
+            "la": "los-angeles-ca",
+            "sf": "san-francisco-ca",
+            "chi": "chicago-il",
+            "mia": "miami-fl",
+            "atx": "austin-tx",
+            "den": "denver-co",
+            "sea": "seattle-wa",
+            "bos": "boston-ma",
+            "dc": "washington-dc",
+            "atl": "atlanta-ga",
+            "nash": "nashville-tn",
+            "hou": "houston-tx",
+            "dal": "dallas-tx",
+            "phl": "philadelphia-pa",
+            "pdx": "portland-or",
+            "sd": "san-diego-ca",
+            "toronto": "toronto-on",
+            "vancouver": "vancouver-bc",
+            "montreal": "montreal-qc",
+            "calgary": "calgary-ab",
+            "ottawa": "ottawa-on",
+        ]
+        return fallback[short] ?? "new-york-ny"
+    }
+    
+    /// Parses "..., City Name, ST 12345" → `city-name-st` for Resy `/cities/` paths.
+    private func resyCityPathParsedFromAddress(_ address: String?) -> String? {
+        guard let address = address, !address.isEmpty else { return nil }
+        let parts = address.split(separator: ",").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+        guard parts.count >= 2 else { return nil }
+        let cityPart: String
+        let lastSegment: String
+        if parts.count >= 3 {
+            cityPart = String(parts[parts.count - 2])
+            lastSegment = String(parts[parts.count - 1])
+        } else {
+            cityPart = String(parts[0])
+            lastSegment = String(parts[1])
+        }
+        guard let range = lastSegment.range(of: #"\b([A-Za-z]{2})\b"#, options: .regularExpression) else { return nil }
+        let state = String(lastSegment[range]).lowercased()
+        let citySlug = openTableRestaurantSlug(from: cityPart)
+        guard !citySlug.isEmpty else { return nil }
+        return "\(citySlug)-\(state)"
+    }
+    
+    /// Adds selected date & party size to Resy links when missing (matches venue-page query pattern).
+    private func resyURLAppendingBookingContext(_ urlString: String) -> URL? {
+        guard var comp = URLComponents(string: urlString),
+              let host = comp.host?.lowercased(), host.contains("resy.com") else {
+            return URL(string: urlString)
+        }
+        var items = comp.queryItems ?? []
+        if !items.contains(where: { $0.name == "date" }) {
+            items.append(URLQueryItem(name: "date", value: isoDateString))
+        }
+        if !items.contains(where: { $0.name == "seats" }) {
+            items.append(URLQueryItem(name: "seats", value: "\(partySize)"))
+        }
+        comp.queryItems = items
+        return comp.url ?? URL(string: urlString)
+    }
+    
+    private var resyVenuePageUrl: URL? {
+        let venueSlug = openTableRestaurantSlug(from: venueName)
+        guard !venueSlug.isEmpty else { return nil }
+        let cityPath = resyCityPathForVenueURL(from: address)
+        guard var comp = URLComponents(string: "https://resy.com/cities/\(cityPath)/venues/\(venueSlug)") else { return nil }
+        comp.queryItems = [
+            URLQueryItem(name: "date", value: isoDateString),
+            URLQueryItem(name: "seats", value: "\(partySize)"),
+        ]
+        return comp.url
+    }
+    
+    /// Venue landing page on OpenTable when we don't have a stored booking URL (slug from venue name).
+    private var openTableVenuePageUrl: URL? {
+        let slug = openTableRestaurantSlug(from: venueName)
+        guard !slug.isEmpty else { return nil }
+        let base = openTableBaseURL(for: reservationRegion)
+        guard var comp = URLComponents(string: "\(base)/\(slug)") else { return nil }
+        comp.queryItems = [URLQueryItem(name: "shareReferrer", value: "ios-share")]
+        return comp.url
     }
     
     private var isoDateString: String {
@@ -567,55 +746,78 @@ struct ReservationWidgetView: View {
         return out.string(from: date)
     }
     
-    /// OpenTable search URL: send restaurant name + city so the platform can pre-fill search.
+    /// OpenTable locale matches where the restaurant is (better match → venue booking page).
+    private func openTableBaseURL(for region: ReservationRegion) -> String {
+        switch region {
+        case .uk: return "https://www.opentable.co.uk"
+        case .au: return "https://www.opentable.com.au"
+        default: return "https://www.opentable.com"
+        }
+    }
+    
+    /// OpenTable `neighborhood` param: true area (not street) — first middle segment when address has neighborhood + city + region.
+    private func openTableNeighborhoodHint(from address: String?) -> String? {
+        let areas = areaSegmentsFromAddress(address)
+        guard let first = areas.first, !first.isEmpty else { return nil }
+        return areas.count > 1 ? areas.joined(separator: " ") : first
+    }
+    
+    /// OpenTable: region-specific site + rich location term, party, time, optional neighborhood (area).
     private var openTableSearchUrl: URL? {
         let termRaw = restaurantSearchTerm(venueName: venueName, address: address)
-        let term = termRaw.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? venueName
-        let neighborhood = address?.split(separator: ",").first.map(String.init)?.trimmingCharacters(in: .whitespaces).addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
-        var comp = URLComponents(string: "https://www.opentable.com/s")!
-        comp.queryItems = [
+        let base = openTableBaseURL(for: reservationRegion)
+        var comp = URLComponents(string: "\(base)/s/")!
+        var items: [URLQueryItem] = [
+            URLQueryItem(name: "term", value: termRaw),
             URLQueryItem(name: "covers", value: "\(partySize)"),
             URLQueryItem(name: "dateTime", value: "\(isoDateString)T\(isoTimeString)"),
-            URLQueryItem(name: "term", value: term),
+            URLQueryItem(name: "shareReferrer", value: "ios-share"),
         ]
-        if !neighborhood.isEmpty {
-            comp.queryItems?.append(URLQueryItem(name: "neighborhood", value: neighborhood))
+        if let neighborhood = openTableNeighborhoodHint(from: address) {
+            items.append(URLQueryItem(name: "neighborhood", value: neighborhood))
         }
+        comp.queryItems = items
         return comp.url
     }
     
-    /// Resy search URL: send restaurant name + city so the platform can pre-fill search.
-    private var resySearchUrl: URL? {
-        let termRaw = restaurantSearchTerm(venueName: venueName, address: address)
-        let query = termRaw.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? venueName
-        let citySlug = resyCitySlugFromAddress(address)
-        var comp = URLComponents(string: "https://resy.com/cities/\(citySlug)")!
-        comp.queryItems = [
-            URLQueryItem(name: "query", value: query),
-            URLQueryItem(name: "date", value: isoDateString),
-            URLQueryItem(name: "seats", value: "\(partySize)"),
-        ]
-        return comp.url
-    }
-    
+    /// Resy city path scopes search so results map to local venues (US/CA markets).
     private func resyCitySlugFromAddress(_ addr: String?) -> String {
         guard let addr = addr, !addr.isEmpty else { return "ny" }
+        let lower = addr.lowercased()
+        if lower.contains("toronto") { return "toronto" }
+        if lower.contains("vancouver") { return "vancouver" }
+        if lower.contains("montreal") || lower.contains("montréal") { return "montreal" }
+        if lower.contains("calgary") { return "calgary" }
+        if lower.contains("ottawa") { return "ottawa" }
         let parts = addr.split(separator: ",")
         guard parts.count >= 2 else { return "ny" }
         let city = parts[parts.count - 2].trimmingCharacters(in: .whitespaces).lowercased()
         let map: [String: String] = [
-            "new york": "ny", "nyc": "ny", "manhattan": "ny", "brooklyn": "ny",
+            "new york": "ny", "nyc": "ny", "manhattan": "ny", "brooklyn": "ny", "queens": "ny",
             "los angeles": "la", "la": "la",
             "san francisco": "sf", "sf": "sf",
             "chicago": "chi", "miami": "mia", "austin": "atx", "denver": "den",
             "seattle": "sea", "boston": "bos", "washington": "dc", "dc": "dc",
             "atlanta": "atl", "nashville": "nash", "houston": "hou", "dallas": "dal",
-            "philadelphia": "phl",
+            "philadelphia": "phl", "portland": "pdx", "san diego": "sd",
         ]
         for (key, value) in map {
             if city.contains(key) { return value }
         }
         return "ny"
+    }
+    
+    /// Resy: city-scoped search URL (query + date + party) toward the venue booking flow.
+    private var resySearchUrl: URL? {
+        let termRaw = restaurantSearchTerm(venueName: venueName, address: address)
+        let citySlug = resyCitySlugFromAddress(address)
+        var comp = URLComponents(string: "https://resy.com/cities/\(citySlug)")!
+        comp.queryItems = [
+            URLQueryItem(name: "query", value: termRaw),
+            URLQueryItem(name: "date", value: isoDateString),
+            URLQueryItem(name: "seats", value: "\(partySize)"),
+        ]
+        return comp.url
     }
     
     private func chopeCitySlugFromAddress(_ addr: String?) -> String {
@@ -652,17 +854,16 @@ struct ReservationWidgetView: View {
         return "sg/singapore"
     }
     
-    /// Build search URL for a platform id; sends restaurant name + city so the platform can pre-fill search.
+    /// Build search URL for a platform id; sends restaurant name + city so results skew to the right venue booking page.
     private func searchUrl(forPlatformId id: String) -> URL? {
         let searchTerm = restaurantSearchTerm(venueName: venueName, address: address)
-        let term = searchTerm.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? venueName
         switch id {
         case "opentable": return openTableSearchUrl
         case "resy": return resySearchUrl
         case "thefork":
             var c = URLComponents(string: "https://www.thefork.com/search")!
             c.queryItems = [
-                URLQueryItem(name: "queryText", value: term),
+                URLQueryItem(name: "queryText", value: searchTerm),
                 URLQueryItem(name: "date", value: isoDateString),
                 URLQueryItem(name: "time", value: isoTimeString),
                 URLQueryItem(name: "partySize", value: "\(partySize)"),
@@ -671,7 +872,7 @@ struct ReservationWidgetView: View {
         case "quandoo":
             var c = URLComponents(string: "https://www.quandoo.com/en/search")!
             c.queryItems = [
-                URLQueryItem(name: "query", value: term),
+                URLQueryItem(name: "query", value: searchTerm),
                 URLQueryItem(name: "date", value: isoDateString),
                 URLQueryItem(name: "time", value: isoTimeString),
                 URLQueryItem(name: "pax", value: "\(partySize)"),
@@ -680,7 +881,7 @@ struct ReservationWidgetView: View {
         case "tablecheck":
             var c = URLComponents(string: "https://www.tablecheck.com/en/search")!
             c.queryItems = [
-                URLQueryItem(name: "query", value: term),
+                URLQueryItem(name: "query", value: searchTerm),
                 URLQueryItem(name: "date", value: isoDateString),
                 URLQueryItem(name: "time", value: isoTimeString),
                 URLQueryItem(name: "pax", value: "\(partySize)"),
@@ -688,31 +889,38 @@ struct ReservationWidgetView: View {
             return c.url
         case "eatapp":
             var c = URLComponents(string: "https://eat.app/search")!
-            c.queryItems = [URLQueryItem(name: "q", value: term)]
+            c.queryItems = [URLQueryItem(name: "q", value: searchTerm)]
             return c.url
         case "chope":
             let slug = chopeCitySlugFromAddress(address)
             var c = URLComponents(string: "https://www.chope.co/\(slug)-restaurants")!
-            c.queryItems = [URLQueryItem(name: "query", value: term)]
+            c.queryItems = [URLQueryItem(name: "query", value: searchTerm)]
             return c.url
         case "tabelog":
             let area = tabelogAreaSlugFromAddress(address)
-            return URL(string: "https://tabelog.com/en/\(area)/rstLst/?vs=1&sk=\(term)")
+            var c = URLComponents(string: "https://tabelog.com/en/\(area)/rstLst/")!
+            c.queryItems = [
+                URLQueryItem(name: "vs", value: "1"),
+                URLQueryItem(name: "sk", value: searchTerm),
+            ]
+            return c.url
         case "swiggy":
             var c = URLComponents(string: "https://www.swiggy.com/dineout")!
-            c.queryItems = [URLQueryItem(name: "query", value: term)]
+            c.queryItems = [URLQueryItem(name: "query", value: searchTerm)]
             return c.url
         case "district":
             var c = URLComponents(string: "https://www.district.in/dine")!
-            c.queryItems = [URLQueryItem(name: "q", value: term)]
+            c.queryItems = [URLQueryItem(name: "q", value: searchTerm)]
             return c.url
         case "thechefz":
             var c = URLComponents(string: "https://thechefz.co/en/search")!
-            c.queryItems = [URLQueryItem(name: "q", value: term)]
+            c.queryItems = [URLQueryItem(name: "q", value: searchTerm)]
             return c.url
         case "eatigo":
             let path = eatigoPathFromAddress(address)
-            return URL(string: "https://eatigo.com/\(path)/en?search=\(term)")
+            var c = URLComponents(string: "https://eatigo.com/\(path)/en")!
+            c.queryItems = [URLQueryItem(name: "search", value: searchTerm)]
+            return c.url
         case "tripadvisor":
             var c = URLComponents(string: "https://www.tripadvisor.com/Search")!
             c.queryItems = [URLQueryItem(name: "q", value: "\(searchTerm) restaurant")]
@@ -721,27 +929,43 @@ struct ReservationWidgetView: View {
             let isNz = address.map { let l = $0.lowercased(); return l.contains("zealand") || l.contains("auckland") || l.contains("wellington") } ?? true
             let base = isNz ? "https://www.firsttable.co.nz" : "https://www.firsttable.com.au"
             var c = URLComponents(string: "\(base)/search")!
-            c.queryItems = [URLQueryItem(name: "q", value: term)]
+            c.queryItems = [URLQueryItem(name: "q", value: searchTerm)]
             return c.url
         case "zomato":
             let city = address?.split(separator: ",").dropLast().last.map(String.init)?.trimmingCharacters(in: .whitespaces).lowercased().replacingOccurrences(of: " ", with: "-") ?? "mumbai"
             var c = URLComponents(string: "https://www.zomato.com/\(city)/restaurants")!
-            c.queryItems = [URLQueryItem(name: "q", value: term)]
+            c.queryItems = [URLQueryItem(name: "q", value: searchTerm)]
             return c.url
         default: return nil
         }
     }
     
-    private func isOpenTableOrResy(_ urlString: String) -> Bool {
+    private func isMapsURLString(_ urlString: String) -> Bool {
         let lower = urlString.lowercased()
-        return lower.contains("opentable.com") || lower.contains("resy.com")
+        if lower.contains("maps.apple.com") { return true }
+        if lower.contains("maps.google.") { return true }
+        if lower.contains("google.com/maps") { return true }
+        if lower.contains("goo.gl/maps") { return true }
+        return false
+    }
+    
+    private func reservationBookingPlatformId(for urlString: String) -> String? {
+        guard let url = URL(string: urlString), let host = url.host?.lowercased() else { return nil }
+        if host.contains("opentable.") { return "opentable" }
+        if host.contains("resy.com") { return "resy" }
+        return nil
+    }
+    
+    private func isOpenTableOrResy(_ urlString: String) -> Bool {
+        reservationBookingPlatformId(for: urlString) != nil
     }
     
     private func reservationPlatformLabel(_ urlString: String) -> String {
-        let lower = urlString.lowercased()
-        if lower.contains("opentable.com") { return "Reserve on OpenTable" }
-        if lower.contains("resy.com") { return "Reserve on Resy" }
-        return "Make reservation"
+        switch reservationBookingPlatformId(for: urlString) {
+        case "opentable": return "Reserve on OpenTable"
+        case "resy": return "Reserve on Resy"
+        default: return "Make reservation"
+        }
     }
     
     private func submitReservation() {

@@ -7,6 +7,7 @@ struct PartnerJoinView: View {
     var inviterName: String?
 
     @EnvironmentObject var coordinator: NavigationCoordinator
+    @EnvironmentObject private var access: AccessManager
     @StateObject private var userProfileManager = UserProfileManager.shared
 
     @State private var partnerNote = ""
@@ -134,11 +135,13 @@ struct PartnerJoinView: View {
                 .foregroundColor(Color.luxuryCreamMuted)
 
             Button {
-                coordinator.partnerJoinSessionId = sessionId
-                coordinator.dismissSheet()
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-                    coordinator.planIntent = .fresh
-                    coordinator.activeSheet = .questionnaire
+                access.require(.datePlan) {
+                    coordinator.partnerJoinSessionId = sessionId
+                    coordinator.dismissSheet()
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                        coordinator.planIntent = .fresh
+                        coordinator.activeSheet = .questionnaire
+                    }
                 }
             } label: {
                 HStack(spacing: 8) {

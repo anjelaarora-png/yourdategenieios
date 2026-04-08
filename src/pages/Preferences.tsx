@@ -41,6 +41,8 @@ interface EditablePreferences {
   partner_gender: string;
   default_city: string;
   default_neighborhood: string;
+  /** Matches questionnaire “where I’m leaving from” / DB `default_starting_point`. */
+  default_starting_point: string;
   transportation_mode: string;
   travel_radius: string;
   energy_level: string;
@@ -67,6 +69,7 @@ const Preferences = () => {
     partner_gender: "",
     default_city: "",
     default_neighborhood: "",
+    default_starting_point: "",
     transportation_mode: "",
     travel_radius: "",
     energy_level: "",
@@ -88,6 +91,19 @@ const Preferences = () => {
   const [confirmNewPassword, setConfirmNewPassword] = useState("");
   const [changingPassword, setChangingPassword] = useState(false);
   const [passwordChanged, setPasswordChanged] = useState(false);
+
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>({
+    gender: true,
+    location: true,
+    transport: false,
+    energy: false,
+    food: false,
+    avoid: false,
+    accessibility: false,
+    smoke: false,
+    password: false,
+  });
+  const toggleSection = (key: string) => setOpenSections((p) => ({ ...p, [key]: !p[key] }));
 
   const handleChangePassword = async () => {
     if (newPassword !== confirmNewPassword) {
@@ -153,6 +169,7 @@ const Preferences = () => {
         partner_gender: preferences.partner_gender || "",
         default_city: preferences.default_city || "",
         default_neighborhood: preferences.default_neighborhood || "",
+        default_starting_point: preferences.default_starting_point || "",
         transportation_mode: preferences.transportation_mode || "",
         travel_radius: preferences.travel_radius || "",
         energy_level: preferences.energy_level || "",
@@ -198,6 +215,7 @@ const Preferences = () => {
         partner_gender: edited.partner_gender || null,
         default_city: edited.default_city || null,
         default_neighborhood: edited.default_neighborhood || null,
+        default_starting_point: edited.default_starting_point?.trim() || null,
         preferred_location: `${edited.default_city}${edited.default_neighborhood ? `, ${edited.default_neighborhood}` : ""}`,
         transportation_mode: edited.transportation_mode || null,
         travel_radius: edited.travel_radius || null,
@@ -230,7 +248,7 @@ const Preferences = () => {
       }
 
       toast({ title: "Preferences saved." });
-      refetch();
+      await refetch();
     } catch (error) {
       console.error("Error saving preferences:", error);
       toast({
@@ -257,19 +275,6 @@ const Preferences = () => {
       </div>
     );
   }
-
-  const [openSections, setOpenSections] = useState<Record<string, boolean>>({
-    gender: true,
-    location: true,
-    transport: false,
-    energy: false,
-    food: false,
-    avoid: false,
-    accessibility: false,
-    smoke: false,
-    password: false,
-  });
-  const toggleSection = (key: string) => setOpenSections((p) => ({ ...p, [key]: !p[key] }));
 
   return (
     <div className="min-h-screen bg-background">
@@ -372,6 +377,20 @@ const Preferences = () => {
                   mode="city"
                 />
               </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Where you usually leave from (optional)</Label>
+              <p className="text-xs text-muted-foreground">
+                Used for routes and “where I’m leaving from” in your next date plan. You can change it per date in the questionnaire.
+              </p>
+              <PlacesAutocompleteInput
+                key={`start-${preferences?.updated_at ?? ""}`}
+                value={edited.default_starting_point}
+                onChange={(v) => setEdited(prev => ({ ...prev, default_starting_point: v }))}
+                placeholder="Street address or place"
+                mode="address"
+                addressOnly
+              />
             </div>
           </CardContent>
             </CollapsibleContent>

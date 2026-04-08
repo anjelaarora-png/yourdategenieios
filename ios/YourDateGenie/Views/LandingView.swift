@@ -2,6 +2,7 @@ import SwiftUI
 
 struct LandingView: View {
     @EnvironmentObject var coordinator: NavigationCoordinator
+    @EnvironmentObject private var access: AccessManager
     
     var body: some View {
         NavigationStack {
@@ -93,7 +94,9 @@ struct LandingView: View {
                 
                 // CTA Button
                 Button {
-                    coordinator.startDatePlanning()
+                    access.require(.datePlan) {
+                        coordinator.startDatePlanning()
+                    }
                 } label: {
                     HStack(spacing: 10) {
                         Text("Begin Your Journey")
@@ -277,7 +280,9 @@ struct LandingView: View {
                 .foregroundColor(Color.luxuryCreamMuted)
             
             Button {
-                coordinator.startDatePlanning()
+                access.require(.datePlan) {
+                    coordinator.startDatePlanning()
+                }
             } label: {
                 Text("Start Planning Free")
             }
@@ -371,4 +376,5 @@ struct LuxuryFeatureCard: View {
 #Preview {
     LandingView()
         .environmentObject(NavigationCoordinator.shared)
+        .environmentObject(AccessManager.shared)
 }

@@ -1,5 +1,13 @@
 import Foundation
 
+// MARK: - Reservation platform picker (OpenTable / Resy / Call)
+
+struct ReservationPlatformPickerPayload: Equatable, Identifiable {
+    var id: String { "\(venueName)|\(phoneNumber ?? "")" }
+    let venueName: String
+    let phoneNumber: String?
+}
+
 // MARK: - Date Plan Stop
 struct DatePlanStop: Identifiable, Hashable, Codable {
     let id: UUID

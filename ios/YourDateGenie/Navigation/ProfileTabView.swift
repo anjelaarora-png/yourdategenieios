@@ -3,8 +3,10 @@ import SwiftUI
 // MARK: - Luxury Profile Tab View
 struct LuxuryProfileTabView: View {
     @EnvironmentObject var coordinator: NavigationCoordinator
+    @EnvironmentObject private var access: AccessManager
     @ObservedObject private var profileManager = UserProfileManager.shared
     @StateObject private var notificationManager = NotificationManager.shared
+    @StateObject private var memoryManager = MemoryManager.shared
     @State private var showSignOutAlert = false
     
     private var userProfile: UserProfile? {
@@ -56,13 +58,13 @@ struct LuxuryProfileTabView: View {
                                 .fill(Color.luxuryGold.opacity(0.3))
                                 .frame(width: 1, height: 40)
                             
-                            LuxuryStatItem(value: "0", label: "Completed")
+                            LuxuryStatItem(value: "\(coordinator.pastPlans.count)", label: "Completed")
                             
                             Rectangle()
                                 .fill(Color.luxuryGold.opacity(0.3))
                                 .frame(width: 1, height: 40)
                             
-                            LuxuryStatItem(value: "0", label: "Memories")
+                            LuxuryStatItem(value: "\(memoryManager.totalMemoriesCount)", label: "Memories")
                         }
                         .padding(.vertical, 16)
                         .luxuryCard()
@@ -76,11 +78,15 @@ struct LuxuryProfileTabView: View {
                         }
                         
                         VStack(spacing: 2) {
-                            LuxuryProfileMenuItem(icon: "bookmark.fill", title: "Saved Plans") {
-                                coordinator.activeSheet = .savedPlansList
+                            LuxuryProfileMenuItem(icon: "bookmark.fill", title: "Saved Plans", isLocked: !access.canAccess(.datePlan)) {
+                                access.require(.datePlan) {
+                                    coordinator.activeSheet = .savedPlansList
+                                }
                             }
-                            LuxuryProfileMenuItem(icon: "clock.fill", title: "Date History") {
-                                coordinator.activeSheet = .pastMagic
+                            LuxuryProfileMenuItem(icon: "clock.fill", title: "Date History", isLocked: !access.canAccess(.datePlan)) {
+                                access.require(.datePlan) {
+                                    coordinator.activeSheet = .pastMagic
+                                }
                             }
                             LuxuryProfileMenuItem(icon: "heart.fill", title: "Preferences") {
                                 coordinator.startEditPreferencesOnly()
@@ -99,22 +105,11 @@ struct LuxuryProfileTabView: View {
                             showSignOutAlert = true
                         } label: {
                             HStack(spacing: 10) {
-                                AsyncImage(url: URL(string: "https://images.unsplash.com/photo-1516534775068-ba3e7458af70?w=40&h=40&fit=crop")) { phase in
-                                    if let image = phase.image {
-                                        image
-                                            .resizable()
-                                            .aspectRatio(contentMode: .fill)
-                                    } else {
-                                        Circle().fill(Color.luxuryError.opacity(0.3))
-                                    }
-                                }
-                                .frame(width: 24, height: 24)
-                                .clipShape(Circle())
-                                .overlay(
-                                    Circle()
-                                        .stroke(Color.luxuryError.opacity(0.5), lineWidth: 1)
-                                )
-                                
+                                Image(systemName: "arrow.left.square.fill")
+                                    .font(.system(size: 20))
+                                    .foregroundColor(Color.luxuryError)
+                                    .frame(width: 24, height: 24)
+
                                 Text("Sign Out")
                             }
                             .font(Font.bodySans(14, weight: .medium))
@@ -184,18 +179,9 @@ struct PreferencesSummaryCard: View {
                     onEdit?()
                 } label: {
                     HStack(spacing: 6) {
-                        AsyncImage(url: URL(string: "https://images.unsplash.com/photo-1455390582262-044cdead277a?w=40&h=40&fit=crop")) { phase in
-                            if let image = phase.image {
-                                image
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fill)
-                            } else {
-                                Circle().fill(Color.luxuryGold.opacity(0.3))
-                            }
-                        }
-                        .frame(width: 20, height: 20)
-                        .clipShape(Circle())
-                        
+                        Image(systemName: "pencil")
+                            .font(.system(size: 13))
+                            .foregroundColor(Color.luxuryGold)
                         Text("Edit")
                     }
                     .font(Font.bodySans(13, weight: .medium))
@@ -204,6 +190,12 @@ struct PreferencesSummaryCard: View {
             }
             
             VStack(alignment: .leading, spacing: 14) {
+                // Starting point — used for routes, walk times, and nearby recommendations
+                PreferenceStartingPointSection(
+                    address: preferences.defaultStartingPoint,
+                    onEdit: onEdit
+                )
+
                 // Your gender & partner's gender
                 PreferenceChipsSection(
                     icon: "person.fill",
@@ -271,6 +263,45 @@ struct PreferencesSummaryCard: View {
         }
         .padding(18)
         .luxuryCard()
+    }
+}
+
+// MARK: - Starting point (address) in preferences summary
+private struct PreferenceStartingPointSection: View {
+    let address: String
+    var onEdit: (() -> Void)?
+
+    private var trimmed: String {
+        address.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .firstTextBaseline) {
+                HStack(spacing: 8) {
+                    Image(systemName: "mappin.and.ellipse")
+                        .font(.system(size: 14))
+                        .foregroundColor(Color.luxuryGold.opacity(0.9))
+                    Text("Starting point")
+                        .font(Font.bodySans(13, weight: .semibold))
+                        .foregroundColor(Color.luxuryCream)
+                }
+                Spacer()
+                Button {
+                    onEdit?()
+                } label: {
+                    Text("Change")
+                        .font(Font.bodySans(12, weight: .semibold))
+                        .foregroundColor(Color.luxuryGold)
+                }
+                .buttonStyle(.plain)
+            }
+            Text(trimmed.isEmpty ? "Not set — add an address for routes and nearby picks." : trimmed)
+                .font(Font.bodySans(13, weight: .regular))
+                .foregroundColor(trimmed.isEmpty ? Color.luxuryMuted : Color.luxuryCream)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
     }
 }
 
@@ -380,50 +411,36 @@ struct LuxuryStatItem: View {
 struct LuxuryProfileMenuItem: View {
     let icon: String
     let title: String
+    var isLocked: Bool = false
     var action: (() -> Void)? = nil
-
-    private var imageUrl: String {
-        switch icon {
-        case "bookmark.fill": return "https://images.unsplash.com/photo-1529333166437-7750a6dd5a70?w=80&h=80&fit=crop"
-        case "clock.fill": return "https://images.unsplash.com/photo-1501139083538-0139583c060f?w=80&h=80&fit=crop"
-        case "heart.fill": return "https://images.unsplash.com/photo-1518199266791-5375a83190b7?w=80&h=80&fit=crop"
-        case "bell.fill": return "https://images.unsplash.com/photo-1577563908411-5077b6dc7624?w=80&h=80&fit=crop"
-        case "gearshape.fill": return "https://images.unsplash.com/photo-1461749280684-dccba630e2f6?w=80&h=80&fit=crop"
-        default: return "https://images.unsplash.com/photo-1529333166437-7750a6dd5a70?w=80&h=80&fit=crop"
-        }
-    }
     
     var body: some View {
         Button {
             action?()
         } label: {
             HStack(spacing: 16) {
-                AsyncImage(url: URL(string: imageUrl)) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                    case .empty, .failure:
-                        Image(systemName: icon)
-                            .font(.system(size: 18))
-                            .foregroundColor(Color.luxuryGold)
-                    @unknown default:
-                        EmptyView()
-                    }
-                }
-                .frame(width: 32, height: 32)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(Color.luxuryGold.opacity(0.3), lineWidth: 1)
-                )
+                Image(systemName: icon)
+                    .font(.system(size: 18))
+                    .foregroundColor(Color.luxuryGold)
+                    .frame(width: 32, height: 32)
+                    .background(Color.luxuryGold.opacity(0.12))
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(Color.luxuryGold.opacity(0.3), lineWidth: 1)
+                    )
                 
                 Text(title)
                     .font(Font.bodySans(16, weight: .regular))
                     .foregroundColor(Color.luxuryCream)
                 
                 Spacer()
+
+                if isLocked {
+                    Image(systemName: "lock.fill")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(Color.luxuryGold.opacity(0.85))
+                }
                 
                 Image(systemName: "chevron.right")
                     .font(.system(size: 14))
@@ -431,6 +448,7 @@ struct LuxuryProfileMenuItem: View {
             }
             .padding(.horizontal, 18)
             .padding(.vertical, 16)
+            .opacity(isLocked ? 0.5 : 1)
         }
     }
 }

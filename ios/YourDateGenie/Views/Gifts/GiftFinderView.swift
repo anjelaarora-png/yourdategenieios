@@ -1,11 +1,18 @@
 import SwiftUI
 import CoreLocation
 
+private enum GiftFinderTab: String, CaseIterable {
+    case find = "Find a Gift"
+    case saved = "Saved"
+    case bought = "Bought"
+}
+
 struct GiftFinderView: View {
     var datePlan: DatePlan?
     var dateLocation: String?
     
     @Environment(\.dismiss) private var dismiss
+    @State private var selectedTab: GiftFinderTab = .find
     @State private var selectedBudget: String = ""
     @State private var selectedOccasion: String = ""
     @State private var interests: String = ""
@@ -116,13 +123,24 @@ struct GiftFinderView: View {
                     }
                 } else {
                     ScrollView(showsIndicators: false) {
-                        VStack(spacing: 24) {
+                        VStack(spacing: 0) {
                             headerSection
+                                .padding(.bottom, 20)
                             
-                            if !showResults {
-                                inputFormSection
-                            } else {
-                                resultsSection
+                            giftFinderTabBar
+                                .padding(.bottom, 24)
+                            
+                            switch selectedTab {
+                            case .find:
+                                if !showResults {
+                                    inputFormSection
+                                } else {
+                                    resultsSection
+                                }
+                            case .saved:
+                                savedTabContent
+                            case .bought:
+                                boughtTabContent
                             }
                         }
                         .padding(.bottom, 40)
@@ -150,6 +168,38 @@ struct GiftFinderView: View {
                 prefillFromProfile()
             }
         }
+    }
+    
+    // MARK: - Tab Bar
+    private var giftFinderTabBar: some View {
+        HStack(spacing: 0) {
+            ForEach(GiftFinderTab.allCases, id: \.self) { tab in
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        selectedTab = tab
+                    }
+                } label: {
+                    VStack(spacing: 6) {
+                        Text(tab.rawValue)
+                            .font(Font.inter(14, weight: selectedTab == tab ? .semibold : .regular))
+                            .foregroundColor(selectedTab == tab ? Color.luxuryGold : Color.luxuryCreamMuted)
+                        
+                        Rectangle()
+                            .fill(selectedTab == tab ? Color.luxuryGold : Color.clear)
+                            .frame(height: 2)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 20)
+        .overlay(
+            Rectangle()
+                .fill(Color.luxuryGold.opacity(0.15))
+                .frame(height: 1),
+            alignment: .bottom
+        )
     }
     
     /// Pre-fill budget and interests from UserProfileManager when opening finder (only once, when form is empty).
@@ -214,6 +264,89 @@ struct GiftFinderView: View {
             }
         }
         .padding(.top, 20)
+    }
+    
+    // MARK: - Saved Tab Content
+    private var savedTabContent: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if giftStore.savedOnly.isEmpty {
+                GiftListEmptyState(
+                    icon: "heart.circle.fill",
+                    title: "No saved gifts yet",
+                    subtitle: "Save ideas from your search results to keep them here"
+                )
+                .padding(.top, 40)
+            } else {
+                VStack(spacing: 10) {
+                    ForEach(giftStore.savedOnly) { stored in
+                        StoredGiftRowView(
+                            stored: stored,
+                            onShop: { openStoredShop(stored: stored) },
+                            onNewLink: { openStoredSearch(name: stored.name) },
+                            onMarkBought: { giftStore.markAsBought(storedToGiftSuggestion(stored)) }
+                        )
+                    }
+                }
+                .padding(.horizontal, 20)
+            }
+        }
+    }
+    
+    // MARK: - Bought Tab Content
+    private var boughtTabContent: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if giftStore.boughtOnly.isEmpty {
+                GiftListEmptyState(
+                    icon: "checkmark.circle.fill",
+                    title: "No bought gifts yet",
+                    subtitle: "Mark an idea as bought so we won't suggest it again"
+                )
+                .padding(.top, 40)
+            } else {
+                VStack(spacing: 10) {
+                    ForEach(giftStore.boughtOnly) { stored in
+                        StoredGiftRowView(
+                            stored: stored,
+                            onShop: { openStoredShop(stored: stored) },
+                            onNewLink: { openStoredSearch(name: stored.name) },
+                            onMarkBought: nil
+                        )
+                    }
+                }
+                .padding(.horizontal, 20)
+            }
+        }
+    }
+    
+    private func openStoredShop(stored: StoredGift) {
+        if let s = stored.purchaseUrl, !s.isEmpty,
+           let url = URL(string: s),
+           url.scheme == "http" || url.scheme == "https" {
+            UIApplication.shared.open(url)
+        } else {
+            openStoredSearch(name: stored.name)
+        }
+    }
+    
+    private func openStoredSearch(name: String) {
+        let query = name.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? name
+        if let url = URL(string: "https://www.google.com/search?tbm=shop&q=\(query)") {
+            UIApplication.shared.open(url)
+        }
+    }
+    
+    private func storedToGiftSuggestion(_ stored: StoredGift) -> GiftSuggestion {
+        GiftSuggestion(
+            name: stored.name,
+            description: stored.description,
+            priceRange: stored.priceRange,
+            whereToBuy: stored.whereToBuy,
+            purchaseUrl: stored.purchaseUrl,
+            whyItFits: stored.whyItFits,
+            emoji: stored.emoji,
+            storeSearchQuery: stored.storeSearchQuery,
+            imageUrl: stored.imageUrl
+        )
     }
     
     private func dateContextBadge(plan: DatePlan) -> some View {

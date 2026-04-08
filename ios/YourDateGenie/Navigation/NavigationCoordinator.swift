@@ -1,6 +1,25 @@
 import SwiftUI
 import Combine
 
+/// Runs `experiences_waiting` sync **serially**: at most one network pass in flight, plus **one** trailing rerun if another sync was requested while the first was running (avoids unbounded parallel requests while preserving freshness).
+private actor ExperiencesWaitingSyncQueue {
+    private var isRunning = false
+    private var needsFollowUp = false
+
+    func schedule(_ work: @escaping () async -> Void) async {
+        if isRunning {
+            needsFollowUp = true
+            return
+        }
+        isRunning = true
+        repeat {
+            needsFollowUp = false
+            await work()
+        } while needsFollowUp
+        isRunning = false
+    }
+}
+
 // MARK: - App Destination Enum
 enum AppDestination: Hashable {
     case landing
@@ -34,7 +53,21 @@ enum AppDestination: Hashable {
     }
     
     static func == (lhs: AppDestination, rhs: AppDestination) -> Bool {
-        lhs.hashValue == rhs.hashValue
+        switch (lhs, rhs) {
+        case (.landing, .landing): return true
+        case (.onboarding, .onboarding): return true
+        case (.questionnaire, .questionnaire): return true
+        case (.datePlanResult(let a), .datePlanResult(let b)): return a.id == b.id
+        case (.giftFinder(let a, let al), .giftFinder(let b, let bl)): return a?.id == b?.id && al == bl
+        case (.routeMap, .routeMap): return true
+        case (.memoryGallery, .memoryGallery): return true
+        case (.playlist(let a, let ai), .playlist(let b, let bi)): return a == b && ai == bi
+        case (.reservation(let a, _, _, _), .reservation(let b, _, _, _)): return a == b
+        case (.partnerShare(let a), .partnerShare(let b)): return a.id == b.id
+        case (.savedPlans, .savedPlans): return true
+        case (.settings, .settings): return true
+        default: return false
+        }
     }
 }
 
@@ -62,6 +95,9 @@ class NavigationCoordinator: ObservableObject {
     @Published var authRequiredForIntent: PlanIntent?
 
     @Published var activeSheet: ActiveSheet?
+
+    /// When set, `LuxuryMainAppView` shows a platform picker (OpenTable / Resy / Call) for this venue.
+    @Published var reservationPlatformPickerPayload: ReservationPlatformPickerPayload?
 
     /// Dates that have already taken place (moved from saved when user marks as done).
     @Published var pastPlans: [DatePlan] = []
@@ -100,6 +136,9 @@ class NavigationCoordinator: ObservableObject {
     @Published var hasDeferredInitialPreferences: Bool = false
     
     private var cancellables = Set<AnyCancellable>()
+    /// When false, a cloud merge is in flight — we still upsert unsaved plans, but skip orphan deletes on `experiences_waiting`.
+    private var experiencesCloudPullCompleted = true
+    private let experiencesWaitingSyncQueue = ExperiencesWaitingSyncQueue()
     
     enum Tab: String, CaseIterable {
         case home = "Home"
@@ -207,6 +246,7 @@ class NavigationCoordinator: ObservableObject {
                     partnerSessionPlanRowIds = planRowIds
                     isRegeneratingFromOptions = false
                     activeSheet = .datePlanOptions
+                    scheduleSyncAllUnsavedExperiencesToCloud()
                 }
             } catch {
                 await MainActor.run {
@@ -230,6 +270,7 @@ class NavigationCoordinator: ObservableObject {
                     currentPlanPartnerNames = (inviterName ?? "You", "Partner")
                     partnerSessionPlanRowIds = planRows.map(\.id)
                     activeSheet = .datePlanOptions
+                    scheduleSyncAllUnsavedExperiencesToCloud()
                 }
             } catch { }
         }
@@ -250,6 +291,9 @@ class NavigationCoordinator: ObservableObject {
                 if self.isLoggedIn != isLoggedIn {
                     self.isLoggedIn = isLoggedIn
                     if isLoggedIn { self.hasCompletedSignUp = true }
+                    if !isLoggedIn {
+                        self.experiencesCloudPullCompleted = true
+                    }
                     self.saveState()
                 }
             }
@@ -277,6 +321,12 @@ class NavigationCoordinator: ObservableObject {
                 self?.mergeGeneratedPlans(from: newPlans)
             }
             .store(in: &cancellables)
+
+        Publishers.CombineLatest($generatedPlans, $experiencesWaiting)
+            .sink { [weak self] _, _ in
+                self?.scheduleSyncAllUnsavedExperiencesToCloud()
+            }
+            .store(in: &cancellables)
     }
     
     /// Merge in verified plans from the generator. Match by index so verified B/C (new structs with new ids) replace the originals.
@@ -292,6 +342,7 @@ class NavigationCoordinator: ObservableObject {
         }
         if updated != generatedPlans {
             generatedPlans = updated
+            scheduleSyncAllUnsavedExperiencesToCloud()
         }
     }
     
@@ -367,6 +418,7 @@ class NavigationCoordinator: ObservableObject {
             } else {
                 self.activeSheet = .datePlanResult
             }
+            self.scheduleSyncAllUnsavedExperiencesToCloud()
         }
     }
     
@@ -379,7 +431,7 @@ class NavigationCoordinator: ObservableObject {
     }
     
     func showReservation(venueName: String, venueType: String, address: String?, phone: String?, bookingUrl: String? = nil, websiteUrl: String? = nil, openingHours: [String]? = nil) {
-        activeSheet = .reservation(venueName: venueName, venueType: venueType, address: address, phone: phone, bookingUrl: bookingUrl, websiteUrl: websiteUrl, openingHours: openingHours)
+        reservationPlatformPickerPayload = ReservationPlatformPickerPayload(venueName: venueName, phoneNumber: phone)
     }
     
     func showPartnerShare(for plan: DatePlan) {
@@ -443,6 +495,7 @@ class NavigationCoordinator: ObservableObject {
         if let date = lastQuestionnaireScheduledDate {
             planToSave.scheduledDate = date
         }
+        let isNewSave = !savedPlans.contains(where: { $0.id == plan.id })
         if let idx = savedPlans.firstIndex(where: { $0.id == plan.id }) {
             savedPlans[idx] = planToSave
         } else {
@@ -451,6 +504,15 @@ class NavigationCoordinator: ObservableObject {
         saveState()
         // Always sync to Supabase (retries first-time failures; RLS/JWT must succeed on each save).
         Task { await uploadPlanToCloud(planToSave, status: "planned") }
+        // Notify inbox that a new plan was saved
+        if isNewSave {
+            NotificationManager.shared.addNotification(AppNotification(
+                type: .datePlanReady,
+                title: "Date plan saved!",
+                message: "\"\(planToSave.title)\" is saved to your upcoming dates.",
+                timestamp: Date()
+            ))
+        }
         // Do not remove from generatedPlans here — keeps the options sheet on the same plan and avoids showing sample (e.g. NYC) when all three are saved. Cleared on sheet dismiss.
     }
     
@@ -499,6 +561,7 @@ class NavigationCoordinator: ObservableObject {
                     currentDatePlan = generator.generatedPlans.first
                     activeSheet = .datePlanOptions
                     isRegeneratingFromOptions = false
+                    scheduleSyncAllUnsavedExperiencesToCloud()
                 }
             } catch {
                 await MainActor.run {
@@ -583,11 +646,21 @@ class NavigationCoordinator: ObservableObject {
         if UserProfileManager.shared.hasCompletedPreferences {
             hasCompletedPreferences = true
         }
-        if authRequiredForIntent != nil {
+        saveState()
+
+        if let intent = authRequiredForIntent {
             authRequiredForIntent = nil
             activeSheet = nil
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { [weak self] in
+                guard let self = self else { return }
+                self.planIntent = intent
+                self.questionnairePreferencesOnly = false
+                if intent == .fresh {
+                    self.lastQuestionnaireScheduledDate = nil
+                }
+                self.activeSheet = .questionnaire
+            }
         }
-        saveState()
     }
     
     func completePreferences() {
@@ -626,29 +699,20 @@ class NavigationCoordinator: ObservableObject {
         hasCompletedSignUp = false
         hasCompletedPreferences = false
         hasDeferredInitialPreferences = false
+        hasSkippedLogin = false
+        questionnairePreferencesOnly = false
+        authRequiredForIntent = nil
         currentDatePlan = nil
         savedPlans = []
         generatedPlans = []
         pastPlans = []
+        experiencesWaiting = []
+        experiencesCloudPullCompleted = true
         currentTab = .home
         navigationPath = NavigationPath()
-        saveState()
-    }
-
-    /// Force-auth gate on next launch while preserving onboarding completion.
-    /// Used when product requires returning to login after app is closed and reopened.
-    func requireLoginOnLaunch() {
-        UserProfileManager.shared.signOut()
-        isLoggedIn = false
-        hasCompletedSignUp = false
-        hasCompletedPreferences = false
-        hasSkippedLogin = false
-        hasDeferredInitialPreferences = false
-        presentHeroBeforeInitialPreferences = false
-        isPresentingInitialPreferencesFlow = false
         activeSheet = nil
-        currentTab = .home
-        navigationPath = NavigationPath()
+        // Explicitly clear hasSkippedLogin from UserDefaults so it doesn't persist to the next session
+        UserDefaults.standard.removeObject(forKey: "hasSkippedLogin")
         saveState()
     }
     
@@ -754,23 +818,75 @@ class NavigationCoordinator: ObservableObject {
     // MARK: - Cloud sync (restore history after reinstall / login)
     
     /// Call after login when coupleId is available to restore saved and past plans from Supabase.
+    /// Merges with local state: rows that exist only locally (e.g. just saved, upload still in flight) are kept.
+    /// Replacing wholesale would drop those plans when sync wins the race against `uploadPlanToCloud`.
     func syncDatePlansFromCloud(coupleId: UUID) {
-        Task {
-            do {
-                let dbPlans = try await SupabaseService.shared.getDatePlans(coupleId: coupleId)
-                let planned = dbPlans.filter { $0.status == "planned" }
-                let completed = dbPlans.filter { $0.status == "completed" }
-                let saved: [DatePlan] = planned.map { DatePlanSyncHelpers.datePlan(from: $0) }
-                let past: [DatePlan] = completed.map { DatePlanSyncHelpers.datePlan(from: $0) }
-                await MainActor.run {
-                    if !saved.isEmpty || !past.isEmpty {
-                        savedPlans = saved
-                        pastPlans = past
-                        saveState()
-                    }
-                }
-            } catch {
-                // User may be offline or table may not exist yet
+        Task { await syncDatePlansFromCloudAsync(coupleId: coupleId) }
+    }
+
+    func syncDatePlansFromCloudAsync(coupleId: UUID) async {
+        do {
+            let dbPlans = try await SupabaseService.shared.getDatePlans(coupleId: coupleId)
+            let planned = dbPlans.filter { $0.status == "planned" }
+            let completed = dbPlans.filter { $0.status == "completed" }
+            let remoteSaved: [DatePlan] = planned.map { DatePlanSyncHelpers.datePlan(from: $0) }
+            let remotePast: [DatePlan] = completed.map { DatePlanSyncHelpers.datePlan(from: $0) }
+            await MainActor.run {
+                let remoteIds = Set(remoteSaved.map(\.id)).union(Set(remotePast.map(\.id)))
+                let unsyncedSaved = savedPlans.filter { !remoteIds.contains($0.id) }
+                let unsyncedPast = pastPlans.filter { !remoteIds.contains($0.id) }
+                savedPlans = remoteSaved + unsyncedSaved
+                pastPlans = remotePast + unsyncedPast
+                saveState()
+            }
+            await uploadAllLocalDatePlansToCloud()
+        } catch {
+            await uploadAllLocalDatePlansToCloud()
+        }
+    }
+
+    /// Upserts every saved and past plan so offline-only or failed uploads reach `date_plans` after login.
+    private func uploadAllLocalDatePlansToCloud() async {
+        let isLoggedIn = await MainActor.run { UserProfileManager.shared.isLoggedIn }
+        guard isLoggedIn else { return }
+        let sampleIds: Set<UUID> = [DatePlan.sample.id, DatePlan.sampleOptionB.id, DatePlan.sampleOptionC.id]
+        let snapshot = await MainActor.run { () -> [(DatePlan, String)] in
+            savedPlans.map { ($0, "planned") } + pastPlans.map { ($0, "completed") }
+        }
+        for (plan, status) in snapshot where !sampleIds.contains(plan.id) {
+            await uploadPlanToCloud(plan, status: status)
+        }
+    }
+
+    /// Call when logged in but there is no `couple_id` so `syncExperiencesWaitingFromCloud` never runs — unblocks cloud upload.
+    func markExperiencesWaitingCloudPullFinished() {
+        experiencesCloudPullCompleted = true
+        scheduleSyncAllUnsavedExperiencesToCloud()
+    }
+
+    /// Restore Experiences Waiting from `public.experiences_waiting` (not mixed with `date_plans`).
+    /// Merges with local rows that are not on the server yet (upload in flight).
+    func syncExperiencesWaitingFromCloud(coupleId: UUID) {
+        Task { await syncExperiencesWaitingFromCloudAsync(coupleId: coupleId) }
+    }
+
+    func syncExperiencesWaitingFromCloudAsync(coupleId: UUID) async {
+        await MainActor.run { self.experiencesCloudPullCompleted = false }
+        do {
+            let rows = try await SupabaseService.shared.getExperiencesWaiting(coupleId: coupleId)
+            let remote = rows.map(\.plan)
+            let remoteIds = Set(remote.map(\.id))
+            await MainActor.run {
+                let unsynced = experiencesWaiting.filter { !remoteIds.contains($0.id) }
+                experiencesWaiting = remote + unsynced
+                saveState()
+                self.experiencesCloudPullCompleted = true
+                self.scheduleSyncAllUnsavedExperiencesToCloud()
+            }
+        } catch {
+            await MainActor.run {
+                self.experiencesCloudPullCompleted = true
+                self.scheduleSyncAllUnsavedExperiencesToCloud()
             }
         }
     }
@@ -825,22 +941,67 @@ class NavigationCoordinator: ObservableObject {
             }
             print("[uploadPlanToCloud] before upsert date_plans user_id=\(userId) couple_id=\(coupleId)")
             let dbPlan = DatePlanSyncHelpers.dbDatePlan(from: plan, userId: userId, coupleId: coupleId, status: status)
-            let existingPlan = try? await SupabaseService.shared.getDatePlan(planId: plan.id)
-            if existingPlan != nil {
-                _ = try await SupabaseService.shared.updateDatePlan(dbPlan)
-                print("[uploadPlanToCloud] updateDatePlan success planId=\(plan.id)")
-            } else {
-                do {
-                    _ = try await SupabaseService.shared.createDatePlan(dbPlan)
-                    print("[uploadPlanToCloud] createDatePlan success planId=\(plan.id)")
-                } catch {
-                    print("[uploadPlanToCloud] createDatePlan failed, trying update: \(error)")
-                    _ = try await SupabaseService.shared.updateDatePlan(dbPlan)
-                    print("[uploadPlanToCloud] updateDatePlan success after failed create planId=\(plan.id)")
-                }
-            }
+            _ = try await SupabaseService.shared.upsertDatePlan(dbPlan)
+            print("[uploadPlanToCloud] upsertDatePlan success planId=\(plan.id)")
         } catch {
             print("[uploadPlanToCloud] error: \(error)")
+        }
+    }
+
+    /// Enqueues a full sync (latest state after any in-flight pass completes). Bounded work: no parallel duplicate full syncs.
+    private func scheduleSyncAllUnsavedExperiencesToCloud() {
+        Task { [weak self] in
+            guard let self = self else { return }
+            await self.experiencesWaitingSyncQueue.schedule { [weak self] in
+                await self?.performSyncAllUnsavedExperiencesToCloud()
+            }
+        }
+    }
+
+    private func performSyncAllUnsavedExperiencesToCloud() async {
+        let isLoggedIn = await MainActor.run { UserProfileManager.shared.isLoggedIn }
+        guard isLoggedIn else { return }
+
+        let snapshot = await MainActor.run { () -> (generated: [DatePlan], waiting: [DatePlan], savedIds: Set<UUID>, pastIds: Set<UUID>, pullDone: Bool) in
+            (generatedPlans, experiencesWaiting, Set(savedPlans.map(\.id)), Set(pastPlans.map(\.id)), experiencesCloudPullCompleted)
+        }
+
+        let savedOrPast = snapshot.savedIds.union(snapshot.pastIds)
+        let sampleIds: Set<UUID> = [DatePlan.sample.id, DatePlan.sampleOptionB.id, DatePlan.sampleOptionC.id]
+
+        var combined: [DatePlan] = []
+        var seen = Set<UUID>()
+        for p in snapshot.generated + snapshot.waiting {
+            guard !savedOrPast.contains(p.id), !sampleIds.contains(p.id), seen.insert(p.id).inserted else { continue }
+            combined.append(p)
+        }
+        let localIds = Set(combined.map(\.id))
+        guard !combined.isEmpty else { return }
+
+        do {
+            let userId = try await SupabaseService.shared.syncAuthSessionAndReturnUserId()
+            await MainActor.run {
+                if UserProfileManager.shared.userId == nil {
+                    UserProfileManager.shared.userId = userId
+                }
+            }
+            let coupleId = try await SupabaseService.shared.resolveCoupleIdForCurrentUser()
+
+            for plan in combined {
+                let row = DBExperiencesWaitingRow(id: plan.id, userId: userId, coupleId: coupleId, plan: plan)
+                _ = try await SupabaseService.shared.upsertExperiencesWaiting(row)
+            }
+
+            let remoteRows = try await SupabaseService.shared.getExperiencesWaiting(coupleId: coupleId)
+            // Only trim server rows after the initial merge finished — avoids deleting remote data while pull is in flight.
+            if snapshot.pullDone && !localIds.isEmpty {
+                for row in remoteRows where !localIds.contains(row.id) {
+                    try await SupabaseService.shared.deleteExperiencesWaiting(planId: row.id)
+                }
+            }
+            print("[syncExperiences] upserted \(combined.count) unsaved plans (generated + waiting)")
+        } catch {
+            print("[syncExperiences] error: \(error)")
         }
     }
     
@@ -862,12 +1023,17 @@ class NavigationCoordinator: ObservableObject {
         }
         generatedPlans = []
         generatedPlansSelectedIndex = 0
+        scheduleSyncAllUnsavedExperiencesToCloud()
     }
     
-    /// Remove a plan from Experiences Waiting (e.g. after user saves it).
+    /// Remove a plan from Experiences Waiting (e.g. after user saves it or dismisses from list).
     func removeFromExperiencesWaiting(planId: UUID) {
         experiencesWaiting.removeAll { $0.id == planId }
         saveState()
+        Task {
+            try? await SupabaseService.shared.deleteExperiencesWaiting(planId: planId)
+        }
+        scheduleSyncAllUnsavedExperiencesToCloud()
     }
 }
 
@@ -875,7 +1041,9 @@ class NavigationCoordinator: ObservableObject {
 struct RootNavigationView: View {
     @StateObject private var coordinator = NavigationCoordinator.shared
     @StateObject private var userProfileManager = UserProfileManager.shared
+    @EnvironmentObject private var accessManager: AccessManager
     @State private var showSplash = true
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         ZStack {
@@ -914,14 +1082,22 @@ struct RootNavigationView: View {
         .onAppear {
             DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
                 coordinator.syncOnboardingFromUserDefaults()
-                // Always return to auth after app relaunch once onboarding is completed.
-                if coordinator.hasCompletedOnboarding {
-                    coordinator.requireLoginOnLaunch()
-                }
                 withAnimation {
                     showSplash = false
                 }
             }
+        }
+        .onChange(of: scenePhase) { _, newPhase in
+            if newPhase == .active {
+                Task { await PurchaseManager.shared.refreshEntitlements() }
+            }
+        }
+        .sheet(isPresented: $accessManager.isPaywallPresented, onDismiss: {
+            accessManager.paywallSheetDismissed()
+        }) {
+            PaywallView(onSubscribed: {
+                accessManager.handleSubscriptionResolved()
+            }, showsNotNowButton: true)
         }
     }
 }
@@ -929,4 +1105,5 @@ struct RootNavigationView: View {
 // MARK: - Preview
 #Preview {
     RootNavigationView()
+        .environmentObject(AccessManager.shared)
 }

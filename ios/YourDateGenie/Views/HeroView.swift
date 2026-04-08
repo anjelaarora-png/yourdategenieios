@@ -2,6 +2,7 @@ import SwiftUI
 
 struct HeroView: View {
     @EnvironmentObject var coordinator: NavigationCoordinator
+    @EnvironmentObject private var access: AccessManager
     @State private var glowPulse = false
     /// When set (e.g. post–email-confirm gate), overrides default `startDatePlanning()` CTA.
     var onBeginJourney: (() -> Void)? = nil
@@ -89,7 +90,9 @@ struct HeroView: View {
                     if let onBeginJourney {
                         onBeginJourney()
                     } else {
-                        coordinator.startDatePlanning()
+                        access.require(.datePlan) {
+                            coordinator.startDatePlanning()
+                        }
                     }
                 } label: {
                     HStack(spacing: 12) {
@@ -153,4 +156,5 @@ struct ScaleButtonStyle: ButtonStyle {
 #Preview {
     HeroView()
         .environmentObject(NavigationCoordinator.shared)
+        .environmentObject(AccessManager.shared)
 }

@@ -20,6 +20,8 @@ struct PlaylistWidgetView: View {
     @State private var savedMessage = false
     @State private var moreVibesExpanded = false
     @State private var playlistGenerationError: String?
+    /// Stable row id for `playlists.playlist_id` when `planId` is nil (upserts must not mint a new UUID each save).
+    @State private var widgetPlaylistRowId = UUID()
     @StateObject private var storage = PlaylistStorageManager.shared
     @StateObject private var previewPlayer = PreviewPlayerManager()
     
@@ -676,12 +678,13 @@ struct PlaylistWidgetView: View {
                 whyItFits: nil
             )
         }
-        let pid = planId
+        let playlistRowId = planId ?? widgetPlaylistRowId
         Task {
             do {
                 let coupleId = try await SupabaseService.shared.resolveCoupleIdForCurrentUser()
                 let dbPlaylist = DBPlaylist(
-                    planId: pid,
+                    playlistId: playlistRowId,
+                    planId: planId,
                     coupleId: coupleId,
                     title: datePlaylist.name,
                     description: datePlaylist.mood,
@@ -689,13 +692,8 @@ struct PlaylistWidgetView: View {
                     totalDurationMinutes: max(1, datePlaylist.songs.count * 4),
                     generatedAt: Date()
                 )
-                do {
-                    _ = try await SupabaseService.shared.createPlaylist(dbPlaylist)
-                    print("[PlaylistWidget] createPlaylist success playlist_id=\(dbPlaylist.playlistId)")
-                } catch {
-                    print("[PlaylistWidget] createPlaylist error: \(error); trying update")
-                    _ = try? await SupabaseService.shared.updatePlaylist(dbPlaylist)
-                }
+                _ = try await SupabaseService.shared.upsertPlaylist(dbPlaylist)
+                print("[PlaylistWidget] upsertPlaylist success playlist_id=\(dbPlaylist.playlistId)")
             } catch {
                 print("[PlaylistWidget] persistPlaylistToSupabaseIfNeeded failed (no session or couple): \(error)")
             }

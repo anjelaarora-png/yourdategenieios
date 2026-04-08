@@ -13,6 +13,7 @@ import Preferences from "./pages/Preferences";
 import Admin from "./pages/Admin";
 import Mobile from "./pages/Mobile";
 import NotFound from "./pages/NotFound";
+import { AuthProvider } from "@/hooks/useAuth";
 
 // Optimized QueryClient configuration for reliability and iOS WebView stability
 const queryClient = new QueryClient({
@@ -47,6 +48,7 @@ const queryClient = new QueryClient({
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
+    <AuthProvider>
     <TooltipProvider>
       <Toaster />
       <Sonner />
@@ -66,6 +68,7 @@ const App = () => (
         </Routes>
       </BrowserRouter>
     </TooltipProvider>
+    </AuthProvider>
   </QueryClientProvider>
 );
 

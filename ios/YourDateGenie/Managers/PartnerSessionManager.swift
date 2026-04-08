@@ -212,6 +212,13 @@ final class PartnerSessionManager: ObservableObject {
         updateSessionState(.partnerFilled)
         markBothFilled()
         saveState()
+        let partnerName = inviteInfo?.partnerName.trimmingCharacters(in: .whitespaces) ?? inviterName ?? "Your partner"
+        NotificationManager.shared.addNotification(AppNotification(
+            type: .partnerSubmitted,
+            title: "Partner ready!",
+            message: "\(partnerName) added their preferences. Tap to generate your date plan.",
+            timestamp: Date()
+        ))
     }
 
     /// Partner (on their device) submits their data for a session they joined via link. Posts to backend when available.
@@ -367,33 +374,38 @@ final class PartnerSessionManager: ObservableObject {
     
     /// Call after login to restore the most recent partner session so Pending/Plan Together state is visible again.
     func restoreFromSupabaseIfNeeded(userId: UUID) {
-        Task {
-            guard let list = try? await SupabaseService.shared.listPartnerSessions(inviterUserId: userId),
-                  let session = list.first else { return }
-            await MainActor.run {
-                let state: PartnerState
-                if session.inviterData != nil && session.partnerData != nil {
-                    state = .bothFilled
-                } else if session.partnerData != nil {
-                    state = .partnerFilled
-                } else if session.inviterData != nil {
-                    state = .inviterFilled
-                } else {
-                    state = .inviteSent
-                }
-                sessionId = session.sessionId
-                inviterName = session.inviterName
-                partnerState = state
-                if let data = session.inviterData, let encoded = try? JSONEncoder().encode(data) {
-                    UserDefaults.standard.set(encoded, forKey: Self.inviterDataKey)
-                }
-                if let data = session.partnerData, let encoded = try? JSONEncoder().encode(data) {
-                    UserDefaults.standard.set(encoded, forKey: Self.partnerDataKey)
-                }
-                let sessionInfo = SessionInfo(sessionId: session.sessionId, state: state, inviterName: session.inviterName)
-                saveSession(sessionInfo)
-                objectWillChange.send()
+        Task { await restoreFromSupabaseIfNeededAsync(userId: userId) }
+    }
+
+    func restoreFromSupabaseIfNeededAsync(userId: UUID) async {
+        guard let list = try? await SupabaseService.shared.listPartnerSessions(inviterUserId: userId),
+              !list.isEmpty else { return }
+        // Prefer the most recent session that is still in-progress (partner hasn't filled yet,
+        // or inviter hasn't filled yet). Fall back to the first session if all are complete.
+        let session = list.first(where: { $0.inviterData == nil || $0.partnerData == nil }) ?? list[0]
+        await MainActor.run {
+            let state: PartnerState
+            if session.inviterData != nil && session.partnerData != nil {
+                state = .bothFilled
+            } else if session.partnerData != nil {
+                state = .partnerFilled
+            } else if session.inviterData != nil {
+                state = .inviterFilled
+            } else {
+                state = .inviteSent
             }
+            sessionId = session.sessionId
+            inviterName = session.inviterName
+            partnerState = state
+            if let data = session.inviterData, let encoded = try? JSONEncoder().encode(data) {
+                UserDefaults.standard.set(encoded, forKey: Self.inviterDataKey)
+            }
+            if let data = session.partnerData, let encoded = try? JSONEncoder().encode(data) {
+                UserDefaults.standard.set(encoded, forKey: Self.partnerDataKey)
+            }
+            let sessionInfo = SessionInfo(sessionId: session.sessionId, state: state, inviterName: session.inviterName)
+            saveSession(sessionInfo)
+            objectWillChange.send()
         }
     }
 }

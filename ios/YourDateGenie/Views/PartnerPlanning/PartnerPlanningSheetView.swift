@@ -5,6 +5,7 @@ import SwiftUI
 struct PartnerPlanningSheetView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var coordinator: NavigationCoordinator
+    @EnvironmentObject private var access: AccessManager
     @StateObject private var partnerManager = PartnerSessionManager.shared
     @StateObject private var userProfileManager = UserProfileManager.shared
     
@@ -1134,10 +1135,12 @@ struct PartnerPlanningSheetView: View {
             }
             
             Button {
-                coordinator.isPartnerPlanningInviter = true
-                coordinator.dismissSheet()
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-                    coordinator.startDatePlanning(mode: .fresh)
+                access.require(.datePlan) {
+                    coordinator.isPartnerPlanningInviter = true
+                    coordinator.dismissSheet()
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                        coordinator.startDatePlanning(mode: .fresh)
+                    }
                 }
             } label: {
                 Text("Fill my preferences")

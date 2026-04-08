@@ -10,11 +10,11 @@ struct DatePlanResultView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var showDeleteConfirmation = false
     @EnvironmentObject var coordinator: NavigationCoordinator
+    @EnvironmentObject private var access: AccessManager
     @State private var showPlaylist = false
     @State private var showMap = false
     @State private var showPartnerShare = false
     @State private var showGiftFinder = false
-    @State private var selectedVenue: DatePlanStop?
     @State private var isSaved = false
     @State private var showAddToCalendar = false
     @State private var calendarDate = Date()
@@ -24,6 +24,7 @@ struct DatePlanResultView: View {
     @State private var showNoReservableAlert = false
     @State private var showReserveVenuePicker = false
     @State private var reservableStopsForPicker: [DatePlanStop] = []
+    @State private var platformPickerPayload: ReservationPlatformPickerPayload?
     
     var body: some View {
         NavigationStack {
@@ -93,11 +94,14 @@ struct DatePlanResultView: View {
                         }
                         
                         Button {
-                            showPartnerShare = true
+                            access.require(.datePlan) {
+                                showPartnerShare = true
+                            }
                         } label: {
                             Image(systemName: "square.and.arrow.up")
                                 .font(.system(size: 15))
                                 .foregroundColor(Color.luxuryGold)
+                                .opacity(access.canAccess(.datePlan) ? 1 : 0.45)
                         }
                         
                         if isSaved {
@@ -113,7 +117,11 @@ struct DatePlanResultView: View {
             .safeAreaInset(edge: .bottom) {
                 bottomActionBar
             }
+            .onAppear {
+                isSaved = coordinator.savedPlans.contains(where: { $0.id == plan.id })
+            }
         }
+        .tint(Color.luxuryGold)
         .sheet(isPresented: $showPlaylist) {
             PlaylistWidgetView(
                 planTitle: plan.title,
@@ -140,55 +148,42 @@ struct DatePlanResultView: View {
         .sheet(isPresented: $showGiftFinder) {
             GiftFinderView(datePlan: plan, dateLocation: plan.stops.first?.address)
         }
-        .sheet(item: $selectedVenue) { venue in
-            ReservationWidgetView(
-                venueName: venue.name,
-                venueType: venue.venueType,
-                address: venue.address,
-                phoneNumber: venue.phoneNumber,
-                bookingUrl: venue.bookingUrl,
-                websiteUrl: venue.websiteUrl,
-                openingHours: venue.openingHours
-            )
-        }
         .sheet(isPresented: $showAddToCalendar) {
             addToCalendarSheet
         }
         .sheet(isPresented: $showReserveVenuePicker) {
             NavigationStack {
-                List {
-                    ForEach(Array(reservableStopsForPicker.enumerated()), id: \.offset) { _, stop in
-                        Button {
-                            selectedVenue = stop
-                            showReserveVenuePicker = false
-                        } label: {
-                            HStack {
-                                Text(stop.name)
-                                    .foregroundColor(.primary)
-                                Spacer()
-                                if let url = stop.bookingUrl?.lowercased() {
-                                    if url.contains("opentable") {
-                                        Text("OpenTable")
-                                            .font(.caption)
-                                            .foregroundColor(.secondary)
-                                    } else if url.contains("resy") {
-                                        Text("Resy")
-                                            .font(.caption)
-                                            .foregroundColor(.secondary)
-                                    }
-                                }
-                            }
+                ZStack {
+                    Color.luxuryMaroon.ignoresSafeArea()
+                    List {
+                        ForEach(reservableStopsForPicker) { stop in
+                            ReservationPlatformActionRow(
+                                venueName: stop.name,
+                                phoneNumber: stop.phoneNumber,
+                                onAction: { showReserveVenuePicker = false }
+                            )
+                            .padding(.vertical, 4)
+                            .listRowBackground(Color.luxuryMaroonLight.opacity(0.5))
+                            .listRowSeparatorTint(Color.luxuryGold.opacity(0.28))
                         }
                     }
+                    .listStyle(.plain)
+                    .scrollContentBackground(.hidden)
                 }
-                .navigationTitle("Choose a venue to reserve")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
+                    ToolbarItem(placement: .principal) {
+                        Text("Reserve")
+                            .font(Font.tangerine(22, weight: .bold))
+                            .foregroundColor(Color.luxuryGold)
+                    }
                     ToolbarItem(placement: .navigationBarTrailing) {
                         Button("Cancel") { showReserveVenuePicker = false }
                             .foregroundColor(Color.luxuryGold)
                     }
                 }
+                .toolbarBackground(Color.luxuryMaroon, for: .navigationBar)
+                .toolbarBackground(.visible, for: .navigationBar)
             }
         }
         .alert("Calendar", isPresented: $showCalendarAlert) {
@@ -214,6 +209,11 @@ struct DatePlanResultView: View {
                 isSaved = true
             }
             mainPlanCardAppeared = true
+        }
+        .sheet(item: $platformPickerPayload) { payload in
+            ReservationPlatformPickerSheet(payload: payload) {
+                platformPickerPayload = nil
+            }
         }
     }
     
@@ -456,7 +456,7 @@ struct DatePlanResultView: View {
                     useDarkStyle: true,
                     onTap: {
                         if isReservable(stop) {
-                            selectedVenue = stop
+                            platformPickerPayload = ReservationPlatformPickerPayload(venueName: stop.name, phoneNumber: stop.phoneNumber)
                         }
                     }
                 )
@@ -649,36 +649,49 @@ struct DatePlanResultView: View {
         VStack(spacing: 12) {
             // Quick Actions
             HStack(spacing: 12) {
-                QuickActionButton(icon: "map.fill", label: "Route") {
-                    showMap = true
-                }
-                
-                QuickActionButton(icon: "calendar.badge.plus", label: "Calendar") {
-                    showAddToCalendar = true
-                }
-                
-                QuickActionButton(icon: "music.note", label: "Playlist") {
-                    showPlaylist = true
-                }
-                
-                QuickActionButton(icon: "gift.fill", label: "Gifts") {
-                    showGiftFinder = true
-                }
-                
-                QuickActionButton(icon: "fork.knife.circle", label: "Reserve") {
-                    let reservable = plan.stops.filter { isReservable($0) }
-                    if reservable.isEmpty {
-                        showNoReservableAlert = true
-                    } else if reservable.count == 1 {
-                        selectedVenue = reservable[0]
-                    } else {
-                        reservableStopsForPicker = reservable
-                        showReserveVenuePicker = true
+                QuickActionButton(icon: "map.fill", label: "Route", isLocked: !access.canAccess(.datePlan)) {
+                    access.require(.datePlan) {
+                        showMap = true
                     }
                 }
                 
-                QuickActionButton(icon: "camera.fill", label: "Photo") {
-                    coordinator.currentTab = .memories
+                QuickActionButton(icon: "calendar.badge.plus", label: "Calendar", isLocked: !access.canAccess(.datePlan)) {
+                    access.require(.datePlan) {
+                        showAddToCalendar = true
+                    }
+                }
+                
+                QuickActionButton(icon: "music.note", label: "Playlist", isLocked: !access.canAccess(.playlist)) {
+                    access.require(.playlist) {
+                        showPlaylist = true
+                    }
+                }
+                
+                QuickActionButton(icon: "gift.fill", label: "Gifts", isLocked: !access.canAccess(.gifting)) {
+                    access.require(.gifting) {
+                        showGiftFinder = true
+                    }
+                }
+                
+                QuickActionButton(icon: "fork.knife.circle", label: "Reserve", isLocked: !access.canAccess(.datePlan)) {
+                    access.require(.datePlan) {
+                        let reservable = plan.stops.filter { isReservable($0) }
+                        if reservable.isEmpty {
+                            showNoReservableAlert = true
+                        } else if reservable.count == 1 {
+                            let stop = reservable[0]
+                            platformPickerPayload = ReservationPlatformPickerPayload(venueName: stop.name, phoneNumber: stop.phoneNumber)
+                        } else {
+                            reservableStopsForPicker = reservable
+                            showReserveVenuePicker = true
+                        }
+                    }
+                }
+                
+                QuickActionButton(icon: "camera.fill", label: "Photo", isLocked: !access.canAccess(.memory)) {
+                    access.require(.memory) {
+                        coordinator.currentTab = .memories
+                    }
                 }
             }
             
@@ -982,26 +995,36 @@ struct VerifiedBadge: View {
 struct QuickActionButton: View {
     let icon: String
     let label: String
+    var isLocked: Bool = false
     let action: () -> Void
     
     var body: some View {
         Button(action: action) {
             VStack(spacing: 6) {
-                Image(systemName: icon)
-                    .font(.system(size: 18))
-                    .foregroundColor(Color.luxuryGold)
-                    .frame(width: 44, height: 44)
-                    .background(Color.luxuryMaroonLight)
-                    .cornerRadius(12)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(Color.luxuryGold.opacity(0.3), lineWidth: 1)
-                    )
+                ZStack(alignment: .topTrailing) {
+                    Image(systemName: icon)
+                        .font(.system(size: 18))
+                        .foregroundColor(Color.luxuryGold)
+                        .frame(width: 44, height: 44)
+                        .background(Color.luxuryMaroonLight)
+                        .cornerRadius(12)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(Color.luxuryGold.opacity(0.3), lineWidth: 1)
+                        )
+                    if isLocked {
+                        Image(systemName: "lock.fill")
+                            .font(.system(size: 8, weight: .bold))
+                            .foregroundColor(Color.luxuryGold)
+                            .offset(x: 4, y: -4)
+                    }
+                }
                 
                 Text(label)
                     .font(Font.inter(10, weight: .medium))
                     .foregroundColor(Color.luxuryMuted)
             }
+            .opacity(isLocked ? 0.5 : 1)
         }
         .frame(maxWidth: .infinity)
     }
@@ -1156,4 +1179,5 @@ struct LuxuryConversationCard: View {
         onRegenerate: { }
     )
     .environmentObject(NavigationCoordinator.shared)
+    .environmentObject(AccessManager.shared)
 }

@@ -54,9 +54,10 @@ class GooglePlacesService {
     // MARK: - Booking URL from website
     
     /// If the venue's website is a known booking platform (OpenTable, Resy), use it as the reservation link.
+    /// Matches any OpenTable TLD (e.g. opentable.co.uk, opentable.com.au) so we keep the venue's real booking page.
     private static func bookingUrlFromWebsite(_ website: String?) -> String? {
         guard let w = website?.lowercased(), !w.isEmpty else { return nil }
-        if w.contains("opentable.com") || w.contains("resy.com") { return website }
+        if w.contains("opentable.") || w.contains("resy.com") { return website }
         return nil
     }
     

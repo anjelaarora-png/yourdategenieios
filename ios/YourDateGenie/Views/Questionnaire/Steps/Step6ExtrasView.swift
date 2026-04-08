@@ -217,7 +217,7 @@ struct Step6ExtrasView: View {
                         Text("✨ Ready to create your plan!")
                             .font(.system(size: 16, weight: .semibold))
                             .foregroundColor(Color.luxuryGold)
-                        Text("Tap 'Create Plan' below and we'll generate a personalized date itinerary based on everything you've told us.")
+                        Text("Tap 'Generate Date Plan' below and we'll create a personalized date itinerary based on everything you've told us.")
                             .font(.system(size: 14))
                             .foregroundColor(Color.luxuryMuted)
                     }

@@ -3,6 +3,7 @@ import SwiftUI
 // MARK: - Luxury Main App View (Tab-based)
 struct LuxuryMainAppView: View {
     @EnvironmentObject var coordinator: NavigationCoordinator
+    @EnvironmentObject private var access: AccessManager
     @ObservedObject private var planGenerator = DatePlanGeneratorService.shared
     
     var body: some View {
@@ -13,23 +14,53 @@ struct LuxuryMainAppView: View {
                 }
                 .tag(NavigationCoordinator.Tab.home)
             
-            LoveNoteGeneratorView()
-                .tabItem {
-                    Label(NavigationCoordinator.Tab.loveNote.tabBarTitle, systemImage: NavigationCoordinator.Tab.loveNote.icon)
+            Group {
+                if access.canAccess(.loveNotes) {
+                    LoveNoteGeneratorView()
+                } else {
+                    LockedPremiumTabPlaceholder(
+                        feature: .loveNotes,
+                        title: "Love Notes",
+                        subtitle: "Write heartfelt notes and AI-enhanced messages for your partner."
+                    )
                 }
-                .tag(NavigationCoordinator.Tab.loveNote)
+            }
+            .tabItem {
+                Label(NavigationCoordinator.Tab.loveNote.tabBarTitle, systemImage: NavigationCoordinator.Tab.loveNote.icon)
+            }
+            .tag(NavigationCoordinator.Tab.loveNote)
             
-            GiftsTabView()
-                .tabItem {
-                    Label(NavigationCoordinator.Tab.gifts.tabBarTitle, systemImage: NavigationCoordinator.Tab.gifts.icon)
+            Group {
+                if access.canAccess(.gifting) {
+                    GiftsTabView()
+                } else {
+                    LockedPremiumTabPlaceholder(
+                        feature: .gifting,
+                        title: "Gifts",
+                        subtitle: "Discover thoughtful gift ideas tailored to your dates."
+                    )
                 }
-                .tag(NavigationCoordinator.Tab.gifts)
+            }
+            .tabItem {
+                Label(NavigationCoordinator.Tab.gifts.tabBarTitle, systemImage: NavigationCoordinator.Tab.gifts.icon)
+            }
+            .tag(NavigationCoordinator.Tab.gifts)
             
-            MemoriesTabView()
-                .tabItem {
-                    Label(NavigationCoordinator.Tab.memories.tabBarTitle, systemImage: NavigationCoordinator.Tab.memories.icon)
+            Group {
+                if access.canAccess(.memory) {
+                    MemoriesTabView()
+                } else {
+                    LockedPremiumTabPlaceholder(
+                        feature: .memory,
+                        title: "Memories",
+                        subtitle: "Save photos and moments from your dates in one place."
+                    )
                 }
-                .tag(NavigationCoordinator.Tab.memories)
+            }
+            .tabItem {
+                Label(NavigationCoordinator.Tab.memories.tabBarTitle, systemImage: NavigationCoordinator.Tab.memories.icon)
+            }
+            .tag(NavigationCoordinator.Tab.memories)
             
             LuxuryProfileTabView()
                 .tabItem {
@@ -46,7 +77,7 @@ struct LuxuryMainAppView: View {
             let paragraphStyle = NSMutableParagraphStyle()
             paragraphStyle.lineBreakMode = .byTruncatingTail
             paragraphStyle.alignment = .center
-            let font = UIFont.systemFont(ofSize: 9, weight: .medium)
+            let font = UIFont.systemFont(ofSize: 10, weight: .medium)
             let normalAttrs: [NSAttributedString.Key: Any] = [
                 .foregroundColor: UIColor(Color.luxuryMuted),
                 .paragraphStyle: paragraphStyle,
@@ -84,6 +115,27 @@ struct LuxuryMainAppView: View {
                     .ignoresSafeArea()
             }
         }
+        .sheet(item: $coordinator.reservationPlatformPickerPayload) { payload in
+            ReservationPlatformPickerSheet(payload: payload) {
+                coordinator.reservationPlatformPickerPayload = nil
+            }
+        }
+        .onChange(of: coordinator.showMemoryGallery) { _, show in
+            if show && !access.canAccess(.memory) {
+                coordinator.showMemoryGallery = false
+                access.require(.memory) {
+                    coordinator.showMemoryGallery = true
+                }
+            }
+        }
+        .onChange(of: coordinator.isShowingMemoryCapture) { _, show in
+            if show && !access.canAccess(.memory) {
+                coordinator.isShowingMemoryCapture = false
+                access.require(.memory) {
+                    coordinator.isShowingMemoryCapture = true
+                }
+            }
+        }
     }
     
     @ViewBuilder
@@ -94,6 +146,7 @@ struct LuxuryMainAppView: View {
                 coordinator.completeQuestionnaire(with: data)
             }
             .environmentObject(coordinator)
+            .environmentObject(access)
         case .datePlanOptions:
             DatePlanOptionsView(
                 plans: coordinator.generatedPlans,
@@ -103,6 +156,7 @@ struct LuxuryMainAppView: View {
                 onRegenerate: { coordinator.requestRegenerateFromOptions() }
             )
             .environmentObject(coordinator)
+            .environmentObject(access)
         case .datePlanResult:
             if let plan = coordinator.currentDatePlan {
                 DatePlanResultView(
@@ -115,21 +169,21 @@ struct LuxuryMainAppView: View {
                     }
                 )
                 .environmentObject(coordinator)
+                .environmentObject(access)
             }
         case .giftFinder(let datePlan, let dateLocation):
             GiftFinderView(datePlan: datePlan, dateLocation: dateLocation)
         case .playlist(let title, let planId):
             PlaylistWidgetView(planTitle: title, planId: planId)
-        case .reservation(let name, let type, let address, let phone, let bookingUrl, let websiteUrl, let openingHours):
-            ReservationWidgetView(
-                venueName: name,
-                venueType: type,
-                address: address,
-                phoneNumber: phone,
-                bookingUrl: bookingUrl,
-                websiteUrl: websiteUrl,
-                openingHours: openingHours
-            )
+        case .reservation(let name, _, _, let phone, _, _, _):
+            // Redirect: set the platform picker payload directly and dismiss so the
+            // dedicated reservationPlatformPickerPayload sheet handles presentation
+            // without a flicker-prone relay.
+            EmptyView()
+                .onAppear {
+                    coordinator.reservationPlatformPickerPayload = ReservationPlatformPickerPayload(venueName: name, phoneNumber: phone)
+                    coordinator.dismissSheet()
+                }
         case .partnerShare(let plan):
             PartnerShareView(plan: plan)
         case .routeMap(let stops, let startingPoint, let showRouteLine):
@@ -139,26 +193,10 @@ struct LuxuryMainAppView: View {
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar {
                         ToolbarItem(placement: .navigationBarTrailing) {
-                            Button {
+                            Button("Done") {
                                 coordinator.dismissSheet()
-                            } label: {
-                                HStack(spacing: 8) {
-                                    AsyncImage(url: URL(string: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=40&h=40&fit=crop")) { phase in
-                                        if let image = phase.image {
-                                            image
-                                                .resizable()
-                                                .aspectRatio(contentMode: .fill)
-                                        } else {
-                                            Circle().fill(Color.luxuryGold.opacity(0.3))
-                                        }
-                                    }
-                                    .frame(width: 24, height: 24)
-                                    .clipShape(Circle())
-                                    
-                                    Text("Done")
-                                }
-                                .foregroundColor(Color.luxuryGold)
                             }
+                            .foregroundColor(Color.luxuryGold)
                         }
                     }
             }
@@ -167,21 +205,27 @@ struct LuxuryMainAppView: View {
         case .conversationStarters:
             ConversationStartersView()
                 .environmentObject(coordinator)
+                .environmentObject(access)
         case .pastMagic:
             PastMagicView()
                 .environmentObject(coordinator)
+                .environmentObject(access)
         case .savedPlansList:
             SavedPlansListSheetView()
                 .environmentObject(coordinator)
+                .environmentObject(access)
         case .settings:
             SettingsSheetView()
                 .environmentObject(coordinator)
+                .environmentObject(access)
         case .playbook:
             PlaybookView()
                 .environmentObject(coordinator)
+                .environmentObject(access)
         case .explore:
             NavigationStack {
                 LuxuryExploreTabView()
+                    .environmentObject(coordinator)
                     .navigationTitle("Explore")
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar {
@@ -197,10 +241,12 @@ struct LuxuryMainAppView: View {
             NavigationStack {
                 PartnerPlanningSheetView()
                     .environmentObject(coordinator)
+                    .environmentObject(access)
             }
         case .partnerJoin(let sessionId, let inviterName):
             PartnerJoinView(sessionId: sessionId, inviterName: inviterName)
                 .environmentObject(coordinator)
+                .environmentObject(access)
         case .authRequired:
             AuthenticationView(onDismiss: { coordinator.dismissAuthRequiredSheet() }, allowSkipToExplore: false)
                 .environmentObject(coordinator)

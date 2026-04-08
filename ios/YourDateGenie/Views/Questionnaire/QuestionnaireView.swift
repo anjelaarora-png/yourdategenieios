@@ -4,6 +4,7 @@ import Combine
 struct QuestionnaireView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var coordinator: NavigationCoordinator
+    @EnvironmentObject private var access: AccessManager
     @StateObject private var viewModel = QuestionnaireViewModel()
     @StateObject private var generator = DatePlanGeneratorService.shared
     @State private var isGenerating = false
@@ -11,6 +12,9 @@ struct QuestionnaireView: View {
     @State private var errorTitle = "Generation Error"
     @State private var errorMessage = ""
     @State private var showRetryOption = true
+    @State private var showPremiumPaywall = false
+    /// True while editing preferences from Profile — avoids stale `LastQuestionnaireStore` and resume-store noise.
+    @State private var sessionIsPreferencesOnlyEdit = false
     
     var onComplete: ((QuestionnaireData) -> Void)?
     
@@ -81,10 +85,19 @@ struct QuestionnaireView: View {
             }
             .toolbarBackground(Color.luxuryMaroon, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
+            .sheet(isPresented: $showPremiumPaywall) {
+                PremiumDatePlanPaywallView {
+                    // Dismiss paywall, then continue generation on the same main-actor turn as the successful purchase/restore.
+                    Task { @MainActor in
+                        showPremiumPaywall = false
+                        generateDatePlan()
+                    }
+                }
+            }
             .alert(errorTitle, isPresented: $showError) {
                 if showRetryOption {
                     Button("Try Again") {
-                        generateDatePlan()
+                        requestGenerateDatePlan()
                     }
                 }
                 Button("Cancel", role: .cancel) {
@@ -116,11 +129,20 @@ struct QuestionnaireView: View {
                     UserProfileManager.shared.applySavedPreferences(to: &viewModel.data)
                     viewModel.currentStep = 1
                 case .useLast:
-                    if let last = LastQuestionnaireStore.load() {
-                        viewModel.data = last
+                    if coordinator.questionnairePreferencesOnly {
+                        sessionIsPreferencesOnlyEdit = true
+                        // Profile → Edit: must use saved account preferences, not LastQuestionnaireStore (stale draft).
+                        QuestionnaireProgressStore.clear()
+                        viewModel.data = QuestionnaireData()
+                        UserProfileManager.shared.applySavedPreferences(to: &viewModel.data)
                         viewModel.currentStep = 1
+                    } else {
+                        sessionIsPreferencesOnlyEdit = false
+                        if let last = LastQuestionnaireStore.load() {
+                            viewModel.data = last
+                            viewModel.currentStep = 1
+                        }
                     }
-                    // ViewModel init already prefills from UserProfileManager; last data takes precedence
                 case .resume:
                     if let loaded = QuestionnaireProgressStore.load() {
                         viewModel.data = loaded.data
@@ -129,12 +151,16 @@ struct QuestionnaireView: View {
                 }
             }
             .onChange(of: viewModel.currentStep) { _, _ in
-                if coordinator.planIntent != .fresh {
+                if coordinator.planIntent != .fresh && !sessionIsPreferencesOnlyEdit {
                     QuestionnaireProgressStore.save(data: viewModel.data, step: viewModel.currentStep)
                 }
             }
             .onDisappear {
-                if coordinator.planIntent != .fresh && !isGenerating {
+                let prefsOnly = sessionIsPreferencesOnlyEdit
+                if prefsOnly {
+                    sessionIsPreferencesOnlyEdit = false
+                }
+                if coordinator.planIntent != .fresh && !isGenerating && !prefsOnly {
                     QuestionnaireProgressStore.save(data: viewModel.data, step: viewModel.currentStep)
                 }
                 if !coordinator.isPresentingInitialPreferencesFlow {
@@ -189,11 +215,11 @@ struct QuestionnaireView: View {
                 .buttonStyle(LuxuryOutlineButtonStyle(isSmall: true))
 
                 Button {
-                    generateDatePlan()
+                    requestGenerateDatePlan()
                 } label: {
                     HStack(spacing: 8) {
                         Image(systemName: "sparkles")
-                        Text("Create Plan")
+                        Text("Generate Date Plan")
                     }
                 }
                 .buttonStyle(LuxuryGoldButtonStyle(isSmall: true))
@@ -207,7 +233,7 @@ struct QuestionnaireView: View {
                         } else if coordinator.questionnairePreferencesOnly {
                             savePreferencesOnly()
                         } else {
-                            generateDatePlan()
+                            requestGenerateDatePlan()
                         }
                     } else {
                         withAnimation {
@@ -225,7 +251,7 @@ struct QuestionnaireView: View {
                                 Text("Save preferences")
                             } else {
                                 Image(systemName: "sparkles")
-                                Text("Create Plan")
+                                Text("Generate Date Plan")
                             }
                         } else {
                             Text("Next")
@@ -285,6 +311,15 @@ struct QuestionnaireView: View {
         dismiss()
     }
     
+    /// Presents the premium paywall when needed, then runs generation.
+    private func requestGenerateDatePlan() {
+        guard access.canAccess(.datePlan) else {
+            showPremiumPaywall = true
+            return
+        }
+        generateDatePlan()
+    }
+
     private func generateDatePlan() {
         LastQuestionnaireStore.save(viewModel.data)
         QuestionnaireProgressStore.clear()
@@ -474,4 +509,5 @@ class QuestionnaireViewModel: ObservableObject {
 #Preview {
     QuestionnaireView()
         .environmentObject(NavigationCoordinator.shared)
+        .environmentObject(AccessManager.shared)
 }

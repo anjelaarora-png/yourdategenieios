@@ -12,9 +12,11 @@ struct InitialPreferencesGateView: View {
                     coordinator.transitionFromHeroToInitialPreferences()
                 })
                 .environmentObject(coordinator)
+                .environmentObject(AccessManager.shared)
             } else {
                 QuestionnaireView(onComplete: { _ in })
                     .environmentObject(coordinator)
+                    .environmentObject(AccessManager.shared)
                     .onAppear {
                         if !didConfigureQuestionnaire {
                             didConfigureQuestionnaire = true

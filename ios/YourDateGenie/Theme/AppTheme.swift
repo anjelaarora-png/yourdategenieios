@@ -204,6 +204,31 @@ struct LuxuryMaroonButtonStyle: ButtonStyle {
     }
 }
 
+/// Compact OpenTable / Resy / Call controls on dark maroon lists (high contrast gold border + label).
+struct LuxuryReservationPlatformButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(Font.inter(12, weight: .semibold))
+            .foregroundColor(Color.luxuryGold)
+            .lineLimit(1)
+            .minimumScaleFactor(0.8)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(Color.luxuryMaroonLight.opacity(configuration.isPressed ? 0.85 : 0.65))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .stroke(Color.luxuryGold.opacity(0.95), lineWidth: 1.5)
+            )
+            .shadow(color: Color.luxuryGold.opacity(0.12), radius: configuration.isPressed ? 2 : 4, y: 1)
+            .scaleEffect(configuration.isPressed ? 0.97 : 1)
+            .opacity(configuration.isPressed ? 0.92 : 1)
+            .animation(.easeInOut(duration: 0.15), value: configuration.isPressed)
+    }
+}
+
 // Legacy button styles
 struct GoldButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {

@@ -8,10 +8,13 @@
 
 /* Begin PBXBuildFile section */
 		930787CA2F61D37800B42816 /* GooglePlaces in Frameworks */ = {isa = PBXBuildFile; productRef = A100000B000000000000000A /* GooglePlaces */; };
+		93786F292F7F15D600D8A04E /* Algorithms in Frameworks */ = {isa = PBXBuildFile; productRef = 93786F282F7F15D600D8A04E /* Algorithms */; };
+		93786F362F84563D00D8A04E /* StoreKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 93786F352F84563C00D8A04E /* StoreKit.framework */; };
 		A1000015000000000000000A /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = A1000014000000000000000A /* Supabase */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		93786F352F84563C00D8A04E /* StoreKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = StoreKit.framework; path = System/Library/Frameworks/StoreKit.framework; sourceTree = SDKROOT; };
 		A1000001000000000000000A /* YourDateGenie.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = YourDateGenie.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A1000012000000000000000A /* Secrets.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Secrets.xcconfig; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -25,8 +28,10 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				93786F292F7F15D600D8A04E /* Algorithms in Frameworks */,
 				930787CA2F61D37800B42816 /* GooglePlaces in Frameworks */,
 				A1000015000000000000000A /* Supabase in Frameworks */,
+				93786F362F84563D00D8A04E /* StoreKit.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -41,12 +46,21 @@
 			name = "Recovered References";
 			sourceTree = "<group>";
 		};
+		93786F342F84563C00D8A04E /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				93786F352F84563C00D8A04E /* StoreKit.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 		A1000004000000000000000A = {
 			isa = PBXGroup;
 			children = (
 				A1000002000000000000000A /* YourDateGenie */,
 				A1000005000000000000000A /* Products */,
 				93078AB32F61D5C500B42816 /* Recovered References */,
+				93786F342F84563C00D8A04E /* Frameworks */,
 			);
 			sourceTree = "<group>";
 		};
@@ -80,6 +94,7 @@
 			packageProductDependencies = (
 				A100000B000000000000000A /* GooglePlaces */,
 				A1000014000000000000000A /* Supabase */,
+				93786F282F7F15D600D8A04E /* Algorithms */,
 			);
 			productName = YourDateGenie;
 			productReference = A1000001000000000000000A /* YourDateGenie.app */;
@@ -112,6 +127,7 @@
 			packageReferences = (
 				A100000D000000000000000A /* XCRemoteSwiftPackageReference "ios-places-sdk" */,
 				A1000013000000000000000A /* XCRemoteSwiftPackageReference "supabase-swift" */,
+				93786F272F7F15D600D8A04E /* XCRemoteSwiftPackageReference "swift-algorithms" */,
 			);
 			productRefGroup = A1000005000000000000000A /* Products */;
 			projectDirPath = "";
@@ -275,6 +291,7 @@
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Your Date Genie";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.lifestyle";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -306,6 +323,7 @@
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Your Date Genie";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.lifestyle";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -348,6 +366,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		93786F272F7F15D600D8A04E /* XCRemoteSwiftPackageReference "swift-algorithms" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/apple/swift-algorithms.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.2.1;
+			};
+		};
 		A100000D000000000000000A /* XCRemoteSwiftPackageReference "ios-places-sdk" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/googlemaps/ios-places-sdk";
@@ -367,6 +393,11 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		93786F282F7F15D600D8A04E /* Algorithms */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 93786F272F7F15D600D8A04E /* XCRemoteSwiftPackageReference "swift-algorithms" */;
+			productName = Algorithms;
+		};
 		A100000B000000000000000A /* GooglePlaces */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = A100000D000000000000000A /* XCRemoteSwiftPackageReference "ios-places-sdk" */;

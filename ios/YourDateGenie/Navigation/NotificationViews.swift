@@ -57,42 +57,8 @@ class NotificationManager: ObservableObject {
     }
     
     private init() {
-        loadSampleNotifications()
-    }
-    
-    private func loadSampleNotifications() {
-        notifications = [
-            AppNotification(
-                type: .weekendSuggestion,
-                title: "Weekend Magic Awaits!",
-                message: "The weather looks perfect for a rooftop dinner. Want us to plan something special?",
-                timestamp: Date(),
-                imageUrl: "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=100&h=100&fit=crop"
-            ),
-            AppNotification(
-                type: .newInspiration,
-                title: "New Experience Unlocked",
-                message: "A hidden speakeasy just opened nearby - perfect for your next adventure!",
-                timestamp: Date().addingTimeInterval(-3600),
-                imageUrl: "https://images.unsplash.com/photo-1470337458703-46ad1756a187?w=100&h=100&fit=crop"
-            ),
-            AppNotification(
-                type: .datePlanReady,
-                title: "Your Genie Has Ideas!",
-                message: "Based on your preferences, we've crafted 3 magical evening plans for you.",
-                timestamp: Date().addingTimeInterval(-7200),
-                isRead: true,
-                imageUrl: "https://images.unsplash.com/photo-1529333166437-7750a6dd5a70?w=100&h=100&fit=crop"
-            ),
-            AppNotification(
-                type: .giftIdea,
-                title: "Thoughtful Gesture Alert",
-                message: "We found the perfect surprise to make your next date unforgettable.",
-                timestamp: Date().addingTimeInterval(-86400),
-                isRead: true,
-                imageUrl: "https://images.unsplash.com/photo-1549465220-1a8b9238cd48?w=100&h=100&fit=crop"
-            )
-        ]
+        // Inbox starts empty — notifications are added by real app events
+        // (plan saved, partner submitted, etc.) via addNotification(_:)
     }
     
     func markAsRead(_ notification: AppNotification) {
@@ -151,6 +117,7 @@ struct NotificationBellButton: View {
                 }
             }
             .frame(width: 48, height: 44)
+            .frame(minWidth: 80, minHeight: 44, alignment: .trailing)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

@@ -128,6 +128,7 @@ export type Database = {
           rating: number | null
           rating_notes: string | null
           selected_option: string | null
+          starting_point: Json | null
           status: string
           stops: Json
           tagline: string | null
@@ -151,6 +152,7 @@ export type Database = {
           rating?: number | null
           rating_notes?: string | null
           selected_option?: string | null
+          starting_point?: Json | null
           status?: string
           stops?: Json
           tagline?: string | null
@@ -174,6 +176,7 @@ export type Database = {
           rating?: number | null
           rating_notes?: string | null
           selected_option?: string | null
+          starting_point?: Json | null
           status?: string
           stops?: Json
           tagline?: string | null
@@ -216,83 +219,119 @@ export type Database = {
         Row: {
           accessibility_needs: string[] | null
           activity_preferences: string[] | null
+          additional_notes: string | null
           allergies: string[] | null
           budget_range: string | null
+          conversation_topics: string[] | null
           created_at: string
           deal_breakers: string[] | null
           default_city: string | null
           default_neighborhood: string | null
+          default_starting_point: string | null
           dietary_restrictions: string[] | null
           drink_preferences: string[] | null
           energy_level: string | null
           food_preferences: string[] | null
           gift_budget: string | null
+          gift_favorite_brands: string | null
           gift_interests: string[] | null
           gift_notes: string | null
           gift_occasion: string | null
           gift_recipient: string | null
+          gift_recipient_identity: string | null
+          gift_sizes: string | null
+          gift_style: string[] | null
           id: string
+          love_languages: string[] | null
+          partner_gender: string | null
+          partner_love_languages: string[] | null
           preferred_location: string | null
+          relationship_stage: string | null
           smoking_activities: string[] | null
           smoking_preference: string | null
           transportation_mode: string | null
           travel_radius: string | null
           updated_at: string
           user_id: string
+          gender: string | null
         }
         Insert: {
           accessibility_needs?: string[] | null
           activity_preferences?: string[] | null
+          additional_notes?: string | null
           allergies?: string[] | null
           budget_range?: string | null
+          conversation_topics?: string[] | null
           created_at?: string
           deal_breakers?: string[] | null
           default_city?: string | null
           default_neighborhood?: string | null
+          default_starting_point?: string | null
           dietary_restrictions?: string[] | null
           drink_preferences?: string[] | null
           energy_level?: string | null
           food_preferences?: string[] | null
           gift_budget?: string | null
+          gift_favorite_brands?: string | null
           gift_interests?: string[] | null
           gift_notes?: string | null
           gift_occasion?: string | null
           gift_recipient?: string | null
+          gift_recipient_identity?: string | null
+          gift_sizes?: string | null
+          gift_style?: string[] | null
           id?: string
+          love_languages?: string[] | null
+          partner_gender?: string | null
+          partner_love_languages?: string[] | null
           preferred_location?: string | null
+          relationship_stage?: string | null
           smoking_activities?: string[] | null
           smoking_preference?: string | null
           transportation_mode?: string | null
           travel_radius?: string | null
           updated_at?: string
           user_id: string
+          gender?: string | null
         }
         Update: {
           accessibility_needs?: string[] | null
           activity_preferences?: string[] | null
+          additional_notes?: string | null
           allergies?: string[] | null
           budget_range?: string | null
+          conversation_topics?: string[] | null
           created_at?: string
           deal_breakers?: string[] | null
           default_city?: string | null
           default_neighborhood?: string | null
+          default_starting_point?: string | null
           dietary_restrictions?: string[] | null
           drink_preferences?: string[] | null
           energy_level?: string | null
           food_preferences?: string[] | null
           gift_budget?: string | null
+          gift_favorite_brands?: string | null
           gift_interests?: string[] | null
           gift_notes?: string | null
           gift_occasion?: string | null
           gift_recipient?: string | null
+          gift_recipient_identity?: string | null
+          gift_sizes?: string | null
+          gift_style?: string[] | null
           id?: string
+          love_languages?: string[] | null
+          partner_gender?: string | null
+          partner_love_languages?: string[] | null
           preferred_location?: string | null
+          relationship_stage?: string | null
           smoking_activities?: string[] | null
           smoking_preference?: string | null
           transportation_mode?: string | null
           travel_radius?: string | null
           updated_at?: string
           user_id?: string
+          gender?: string | null
         }
         Relationships: []
       }
