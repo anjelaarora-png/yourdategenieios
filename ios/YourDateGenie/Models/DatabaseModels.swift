@@ -688,15 +688,26 @@ struct DBPlaylist: Codable, Identifiable, Equatable {
     let playlistId: UUID
     /// Optional when playlist is a standalone soundtrack not tied to a date plan.
     let planId: UUID?
-    let coupleId: UUID
+    /// Nullable after migration – web users without a couple can still have rows.
+    var coupleId: UUID?
+    /// Added in web-sync migration; used for user_id-scoped RLS and fetching without a couple.
+    var userId: UUID?
     var title: String?
     var description: String?
     var platform: String?
+    /// Music genre / vibe (e.g. "romantic", "chill"). Added in web-sync migration.
+    var vibe: String?
+    /// Title of the date plan this playlist was generated for. Added in web-sync migration.
+    var datePlanTitle: String?
+    /// Date-plan stops stored for regeneration. Added in web-sync migration.
+    var stops: [PlaylistStop]?
     var externalUrl: String?
     var externalPlaylistId: String?
     var tracks: [PlaylistTrack]?
     var totalDurationMinutes: Int?
     var generatedAt: Date
+    /// Last-modified timestamp. Added in web-sync migration.
+    var updatedAt: Date?
 
     var id: UUID { playlistId }
 
@@ -704,59 +715,75 @@ struct DBPlaylist: Codable, Identifiable, Equatable {
         case playlistId = "playlist_id"
         case planId = "plan_id"
         case coupleId = "couple_id"
+        case userId = "user_id"
         case title
         case description
         case platform
+        case vibe
+        case datePlanTitle = "date_plan_title"
+        case stops
         case externalUrl = "external_url"
         case externalPlaylistId = "external_playlist_id"
         case tracks
         case totalDurationMinutes = "total_duration_minutes"
         case generatedAt = "generated_at"
+        case updatedAt = "updated_at"
     }
 
     init(
         playlistId: UUID = UUID(),
         planId: UUID? = nil,
-        coupleId: UUID,
+        coupleId: UUID? = nil,
+        userId: UUID? = nil,
         title: String? = nil,
         description: String? = nil,
         platform: String? = nil,
+        vibe: String? = nil,
+        datePlanTitle: String? = nil,
+        stops: [PlaylistStop]? = nil,
         externalUrl: String? = nil,
         externalPlaylistId: String? = nil,
         tracks: [PlaylistTrack]? = nil,
         totalDurationMinutes: Int? = nil,
-        generatedAt: Date = Date()
+        generatedAt: Date = Date(),
+        updatedAt: Date? = nil
     ) {
         self.playlistId = playlistId
         self.planId = planId
         self.coupleId = coupleId
+        self.userId = userId
         self.title = title
         self.description = description
         self.platform = platform
+        self.vibe = vibe
+        self.datePlanTitle = datePlanTitle
+        self.stops = stops
         self.externalUrl = externalUrl
         self.externalPlaylistId = externalPlaylistId
         self.tracks = tracks
         self.totalDurationMinutes = totalDurationMinutes
         self.generatedAt = generatedAt
+        self.updatedAt = updatedAt
     }
 
     func encode(to encoder: Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
         try c.encode(playlistId, forKey: .playlistId)
-        if let p = planId {
-            try c.encode(p, forKey: .planId)
-        } else {
-            try c.encodeNil(forKey: .planId)
-        }
-        try c.encode(coupleId, forKey: .coupleId)
+        try c.encodeNil(forKey: .planId)
+        try c.encodeIfPresent(coupleId, forKey: .coupleId)
+        try c.encodeIfPresent(userId, forKey: .userId)
         try c.encodeIfPresent(title, forKey: .title)
         try c.encodeIfPresent(description, forKey: .description)
         try c.encodeIfPresent(platform, forKey: .platform)
+        try c.encodeIfPresent(vibe, forKey: .vibe)
+        try c.encodeIfPresent(datePlanTitle, forKey: .datePlanTitle)
+        try c.encodeIfPresent(stops, forKey: .stops)
         try c.encodeIfPresent(externalUrl, forKey: .externalUrl)
         try c.encodeIfPresent(externalPlaylistId, forKey: .externalPlaylistId)
         try c.encodeIfPresent(tracks, forKey: .tracks)
         try c.encodeIfPresent(totalDurationMinutes, forKey: .totalDurationMinutes)
         try c.encode(generatedAt, forKey: .generatedAt)
+        try c.encodeIfPresent(updatedAt, forKey: .updatedAt)
     }
 }
 

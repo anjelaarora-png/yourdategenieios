@@ -433,20 +433,25 @@ class GooglePlacesService {
         return TrendingPlacesPage(places: sorted, nextPageToken: nextToken)
     }
     
-    /// Fetch recommended mix: highly rated restaurants + things to do (arts, outdoor, romantic) for "Recommended in your area" and Explore tab.
-    /// Merges results, sorts by rating then review count, returns top `limit` (default 6).
+    /// Fetch recommended mix of all date-worthy spot types near a starting point or city.
+    /// Covers restaurants, bars, outdoor spots, arts & culture, live music, and romantic venues.
+    /// Sorts by rating then review count and enforces a 4.0★ minimum; falls back to full sorted
+    /// list only when fewer than `limit` four-star results exist.
     func fetchRecommendedInCity(city: String, limit: Int = 6) async throws -> [PlaceSearchResult] {
         let trimmed = city.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, Config.isGooglePlacesConfigured else { return [] }
         
         let restaurants = (try? await fetchTrendingPlacesInCity(city: trimmed, categoryId: "restaurants", limit: 8)) ?? []
-        let arts = (try? await fetchTrendingPlacesInCity(city: trimmed, categoryId: "arts", limit: 4)) ?? []
-        let outdoor = (try? await fetchTrendingPlacesInCity(city: trimmed, categoryId: "outdoor", limit: 4)) ?? []
-        let romantic = (try? await fetchTrendingPlacesInCity(city: trimmed, categoryId: "romantic", limit: 4)) ?? []
+        let arts       = (try? await fetchTrendingPlacesInCity(city: trimmed, categoryId: "arts",        limit: 4)) ?? []
+        let outdoor    = (try? await fetchTrendingPlacesInCity(city: trimmed, categoryId: "outdoor",     limit: 4)) ?? []
+        let romantic   = (try? await fetchTrendingPlacesInCity(city: trimmed, categoryId: "romantic",    limit: 4)) ?? []
+        let bars       = (try? await fetchTrendingPlacesInCity(city: trimmed, categoryId: "bars",        limit: 4)) ?? []
+        let liveMusic  = (try? await fetchTrendingPlacesInCity(city: trimmed, categoryId: "live_music",  limit: 3)) ?? []
+        let activities = (try? await fetchTrendingPlacesInCity(city: trimmed, categoryId: "date_night",  limit: 3)) ?? []
         
         var combined = restaurants
         var seen = Set(combined.map(\.placeId))
-        for place in arts + outdoor + romantic {
+        for place in arts + outdoor + romantic + bars + liveMusic + activities {
             if seen.insert(place.placeId).inserted { combined.append(place) }
         }
         
@@ -456,21 +461,27 @@ class GooglePlacesService {
             if ratingA != ratingB { return ratingA > ratingB }
             return (a.userRatingsTotal ?? 0) > (b.userRatingsTotal ?? 0)
         }
-        return Array(sorted.prefix(limit))
+        // Prefer spots with 4.0+ Google rating; fall back to full list only when too few qualify
+        let fourPlusStar = sorted.filter { ($0.rating ?? 0) >= 4.0 }
+        let result = fourPlusStar.count >= limit ? fourPlusStar : sorted
+        return Array(result.prefix(limit))
     }
     
-    /// "All" category: mix of restaurants + things to do, 4–5 star, trending. Returns at least 10 when possible (no pagination).
+    /// "All" category: broad date-worthy mix (restaurants, bars, outdoor, arts, live music, romantic),
+    /// 4★+ Google-rated, trending. Returns at least `minCount` when possible (no pagination).
     func fetchTrendingPlacesAllCategory(city: String, minCount: Int = 10) async throws -> TrendingPlacesPage {
         let trimmed = city.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, Config.isGooglePlacesConfigured else { return TrendingPlacesPage(places: [], nextPageToken: nil) }
-        // Fetch more from each category so we have a strong mix of 4+ star places
         let restaurants = (try? await fetchTrendingPlacesInCity(city: trimmed, categoryId: "restaurants", limit: 10)) ?? []
-        let arts = (try? await fetchTrendingPlacesInCity(city: trimmed, categoryId: "arts", limit: 6)) ?? []
-        let outdoor = (try? await fetchTrendingPlacesInCity(city: trimmed, categoryId: "outdoor", limit: 6)) ?? []
-        let romantic = (try? await fetchTrendingPlacesInCity(city: trimmed, categoryId: "romantic", limit: 6)) ?? []
+        let arts       = (try? await fetchTrendingPlacesInCity(city: trimmed, categoryId: "arts",        limit: 6)) ?? []
+        let outdoor    = (try? await fetchTrendingPlacesInCity(city: trimmed, categoryId: "outdoor",     limit: 6)) ?? []
+        let romantic   = (try? await fetchTrendingPlacesInCity(city: trimmed, categoryId: "romantic",    limit: 6)) ?? []
+        let bars       = (try? await fetchTrendingPlacesInCity(city: trimmed, categoryId: "bars",        limit: 5)) ?? []
+        let liveMusic  = (try? await fetchTrendingPlacesInCity(city: trimmed, categoryId: "live_music",  limit: 4)) ?? []
+        let activities = (try? await fetchTrendingPlacesInCity(city: trimmed, categoryId: "date_night",  limit: 4)) ?? []
         var combined = restaurants
         var seen = Set(combined.map(\.placeId))
-        for place in arts + outdoor + romantic {
+        for place in arts + outdoor + romantic + bars + liveMusic + activities {
             if seen.insert(place.placeId).inserted { combined.append(place) }
         }
         let sorted = combined.sorted { a, b in

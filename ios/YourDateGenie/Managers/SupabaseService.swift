@@ -858,6 +858,14 @@ final class SupabaseService: ObservableObject {
             query: "couple_id=eq.\(coupleId.uuidString)&order=generated_at.desc"
         )
     }
+
+    /// Fetch playlists by user_id (for users who don't yet have a couple record).
+    func getPlaylists(userId: UUID) async throws -> [DBPlaylist] {
+        return try await select(
+            table: "playlists",
+            query: "user_id=eq.\(userId.uuidString)&order=generated_at.desc"
+        )
+    }
     
     func updatePlaylist(_ playlist: DBPlaylist) async throws -> DBPlaylist {
         return try await update(table: "playlists", data: playlist, column: "playlist_id", value: playlist.playlistId.uuidString)

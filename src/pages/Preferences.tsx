@@ -29,9 +29,11 @@ import {
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { supabase } from "@/integrations/supabase/client";
 
+// Values match IDENTITY_OPTIONS in questionnaire/types.ts so the same DB
+// row is written/read consistently regardless of which surface the user edits.
 const GENDER_OPTIONS = [
-  { value: "male", label: "Male", emoji: "👨" },
-  { value: "female", label: "Female", emoji: "👩" },
+  { value: "man", label: "Man", emoji: "👨" },
+  { value: "woman", label: "Woman", emoji: "👩" },
   { value: "non-binary", label: "Non-binary", emoji: "🧑" },
   { value: "prefer-not-to-say", label: "Prefer not to say", emoji: "🙂" },
 ] as const;
@@ -216,7 +218,10 @@ const Preferences = () => {
         default_city: edited.default_city || null,
         default_neighborhood: edited.default_neighborhood || null,
         default_starting_point: edited.default_starting_point?.trim() || null,
-        preferred_location: `${edited.default_city}${edited.default_neighborhood ? `, ${edited.default_neighborhood}` : ""}`,
+        preferred_location: [edited.default_city, edited.default_neighborhood]
+          .map(s => s?.trim())
+          .filter(Boolean)
+          .join(", ") || null,
         transportation_mode: edited.transportation_mode || null,
         travel_radius: edited.travel_radius || null,
         energy_level: edited.energy_level || null,

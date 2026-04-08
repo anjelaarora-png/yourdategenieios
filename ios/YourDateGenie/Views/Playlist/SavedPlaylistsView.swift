@@ -61,12 +61,17 @@ struct SavedPlaylistsView: View {
                 )
             }
             .onAppear {
-                guard let coupleId = UserProfileManager.shared.coupleId else { return }
                 Task {
-                    if let list = try? await SupabaseService.shared.getPlaylists(coupleId: coupleId), !list.isEmpty {
-                        await MainActor.run {
-                            storage.mergeFromSupabase(dbPlaylists: list)
-                        }
+                    let list: [DBPlaylist]?
+                    if let coupleId = UserProfileManager.shared.coupleId {
+                        list = try? await SupabaseService.shared.getPlaylists(coupleId: coupleId)
+                    } else if let userId = UserProfileManager.shared.userId {
+                        list = try? await SupabaseService.shared.getPlaylists(userId: userId)
+                    } else {
+                        list = nil
+                    }
+                    if let list, !list.isEmpty {
+                        await MainActor.run { storage.mergeFromSupabase(dbPlaylists: list) }
                     }
                 }
             }

@@ -22,6 +22,7 @@ struct LuxuryHomeTabView: View {
     @State private var showCalendarAlert = false
     @State private var trendingPlaces: [GooglePlacesService.PlaceSearchResult] = []
     @State private var trendingPlacesLoading = false
+    @State private var lastLoadedLocationKey: String = ""
     
     private var planForTonight: DatePlan? {
         let calendar = Calendar.current
@@ -58,13 +59,13 @@ struct LuxuryHomeTabView: View {
             }
             .onAppear {
                 coordinator.refreshPreferencesState()
-                Task { await loadTrendingPlacesIfNeeded() }
+                Task { await loadTrendingPlaces() }
             }
             .onChange(of: trendingLocationKey) { _, _ in
-                Task { await loadTrendingPlacesIfNeeded() }
+                Task { await loadTrendingPlaces(force: true) }
             }
             .refreshable {
-                await loadTrendingPlacesIfNeeded()
+                await loadTrendingPlaces(force: true)
             }
             .onChange(of: scenePhase) { _, newPhase in
                 if newPhase == .active { Task { await loadTrendingPlacesIfNeeded() } }
@@ -237,19 +238,44 @@ struct LuxuryHomeTabView: View {
         return start.isEmpty ? city : start
     }
     
-    // MARK: - Trending in your area (Google Places; refetches when location loads, on pull-to-refresh, and when app becomes active)
+    // MARK: - Recommended in your area (Google Places; refetches when location loads, on pull-to-refresh, and when app becomes active)
+
+    /// Fetch only when not already loading for this location key. Used by onAppear and scene-active.
     private func loadTrendingPlacesIfNeeded() async {
-        let prefs = userProfileManager.currentUser?.preferences
-        let location = prefs.map { $0.defaultStartingPoint.trimmingCharacters(in: .whitespacesAndNewlines) }.flatMap { $0.isEmpty ? nil : $0 }
-            ?? prefs.map { $0.defaultCity.trimmingCharacters(in: .whitespacesAndNewlines) }.flatMap { $0.isEmpty ? nil : $0 }
-            ?? ""
-        guard !location.isEmpty else { return }
-        await MainActor.run { if trendingPlacesLoading { return }; trendingPlacesLoading = true }
+        let key = trendingLocationKey
+        guard !key.isEmpty else { return }
+        let skip = await MainActor.run { () -> Bool in
+            if trendingPlacesLoading || key == lastLoadedLocationKey { return true }
+            trendingPlacesLoading = true
+            return false
+        }
+        if skip { return }
+        await performTrendingFetch(location: key)
+    }
+
+    /// Force a fresh fetch regardless of loading state. Used by pull-to-refresh and location changes.
+    private func loadTrendingPlaces(force: Bool = false) async {
+        let key = trendingLocationKey
+        guard !key.isEmpty else { return }
+        if !force {
+            await loadTrendingPlacesIfNeeded()
+            return
+        }
+        await MainActor.run {
+            trendingPlaces = []
+            trendingPlacesLoading = true
+            lastLoadedLocationKey = ""
+        }
+        await performTrendingFetch(location: key)
+    }
+
+    private func performTrendingFetch(location: String) async {
         do {
             let places = try await GooglePlacesService.shared.fetchRecommendedInCity(city: location, limit: 6)
             await MainActor.run {
                 trendingPlaces = places
                 trendingPlacesLoading = false
+                lastLoadedLocationKey = location
             }
         } catch {
             await MainActor.run {
@@ -312,7 +338,7 @@ struct LuxuryHomeTabView: View {
                     }
                     .buttonStyle(.plain)
                 }
-                Text("Highly rated restaurants & things to do")
+                Text("4★+ restaurants, bars, activities & outdoor spots")
                     .font(Font.bodySans(12, weight: .medium))
                     .foregroundColor(Color.luxuryCreamMuted)
             }

@@ -68,7 +68,7 @@ struct LuxuryExploreTabView: View {
                                     .lineLimit(2)
                                     .minimumScaleFactor(0.6)
                                     .frame(maxWidth: geo.size.width - 40)
-                                Text("Highly rated restaurants & things to do")
+                                Text("4★+ restaurants, bars, activities & outdoor spots")
                                     .font(Font.bodySans(12, weight: .medium))
                                     .foregroundColor(Color.luxuryCreamMuted)
                             }
@@ -155,6 +155,37 @@ struct LuxuryExploreTabView: View {
                                     .padding(.horizontal, 24)
                                     .padding(.vertical, 40)
                             } else {
+                                // Results header: spot count + quick-access refresh button
+                                HStack {
+                                    Text("\(explorePlaces.count) spots found")
+                                        .font(Font.bodySans(13, weight: .medium))
+                                        .foregroundColor(Color.luxuryCreamMuted)
+                                    Spacer()
+                                    Button {
+                                        Task { await loadExplorePlaces() }
+                                    } label: {
+                                        HStack(spacing: 5) {
+                                            Image(systemName: "arrow.clockwise")
+                                                .font(.system(size: 13, weight: .semibold))
+                                            Text("Refresh")
+                                                .font(Font.bodySans(13, weight: .semibold))
+                                        }
+                                        .foregroundColor(Color.luxuryGold)
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 7)
+                                        .background(Color.luxuryMaroonLight.opacity(0.8))
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 20)
+                                                .stroke(Color.luxuryGold.opacity(0.5), lineWidth: 1)
+                                        )
+                                        .clipShape(RoundedRectangle(cornerRadius: 20))
+                                    }
+                                    .buttonStyle(.plain)
+                                    .disabled(explorePlacesLoading)
+                                }
+                                .padding(.horizontal, 20)
+                                .padding(.top, 4)
+
                                 LazyVStack(spacing: 14) {
                                     ForEach(explorePlaces, id: \.placeId) { place in
                                         ExplorePlaceCard(place: place, preferredCity: preferredCity) {
@@ -162,61 +193,37 @@ struct LuxuryExploreTabView: View {
                                         }
                                         .buttonStyle(.plain)
                                     }
-                                    // Regenerate — always show when there are results; fetches fresh list for current category
-                                    if !explorePlaces.isEmpty {
-                                        Button {
-                                            Task { await loadExplorePlaces() }
-                                        } label: {
-                                            HStack(spacing: 8) {
-                                                Image(systemName: "arrow.clockwise")
+                                    // Generate more options — appends more spots (uses pagination token when
+                                    // available, otherwise fetches a fresh set and adds only new results)
+                                    Button {
+                                        Task { await loadMoreExplorePlaces() }
+                                    } label: {
+                                        HStack(spacing: 8) {
+                                            if exploreLoadMoreLoading {
+                                                ProgressView()
+                                                    .tint(Color.luxuryMaroon)
+                                            } else {
+                                                Image(systemName: "sparkles")
                                                     .font(.system(size: 18, weight: .medium))
-                                                Text("Regenerate")
+                                                Text("Generate more options")
                                                     .font(Font.bodySans(16, weight: .semibold))
                                             }
-                                            .foregroundColor(Color.luxuryMaroon)
-                                            .padding(.horizontal, 24)
-                                            .padding(.vertical, 16)
-                                            .frame(maxWidth: .infinity)
-                                            .background(LinearGradient.goldShimmer)
-                                            .clipShape(RoundedRectangle(cornerRadius: 16))
                                         }
-                                        .buttonStyle(.plain)
-                                        .disabled(explorePlacesLoading)
-                                        .padding(.top, 16)
-                                        .padding(.horizontal, 20)
+                                        .foregroundColor(Color.luxuryMaroon)
+                                        .padding(.horizontal, 24)
+                                        .padding(.vertical, 16)
+                                        .frame(maxWidth: .infinity)
+                                        .background(Color.luxuryMaroonLight.opacity(0.9))
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 16)
+                                                .stroke(Color.luxuryGold.opacity(0.6), lineWidth: 1)
+                                        )
+                                        .clipShape(RoundedRectangle(cornerRadius: 16))
                                     }
-                                    // Generate more — next page (only when API returned a next-page token)
-                                    if !explorePlaces.isEmpty, exploreNextPageToken != nil {
-                                        Button {
-                                            Task { await loadMoreExplorePlaces() }
-                                        } label: {
-                                            HStack(spacing: 8) {
-                                                if exploreLoadMoreLoading {
-                                                    ProgressView()
-                                                        .tint(Color.luxuryMaroon)
-                                                } else {
-                                                    Image(systemName: "sparkles")
-                                                        .font(.system(size: 18, weight: .medium))
-                                                    Text("Generate more")
-                                                        .font(Font.bodySans(16, weight: .semibold))
-                                                }
-                                            }
-                                            .foregroundColor(Color.luxuryMaroon)
-                                            .padding(.horizontal, 24)
-                                            .padding(.vertical, 16)
-                                            .frame(maxWidth: .infinity)
-                                            .background(Color.luxuryMaroonLight.opacity(0.9))
-                                            .overlay(
-                                                RoundedRectangle(cornerRadius: 16)
-                                                    .stroke(Color.luxuryGold.opacity(0.6), lineWidth: 1)
-                                            )
-                                            .clipShape(RoundedRectangle(cornerRadius: 16))
-                                        }
-                                        .buttonStyle(.plain)
-                                        .disabled(exploreLoadMoreLoading)
-                                        .padding(.top, 10)
-                                        .padding(.horizontal, 20)
-                                    }
+                                    .buttonStyle(.plain)
+                                    .disabled(exploreLoadMoreLoading || explorePlacesLoading)
+                                    .padding(.top, 10)
+                                    .padding(.horizontal, 20)
                                 }
                                 .frame(maxWidth: .infinity)
                                 .padding(.horizontal, 20)
@@ -335,17 +342,37 @@ struct LuxuryExploreTabView: View {
         }
     }
     
-    /// Append next page of results. Uses stored nextPageToken; Google recommends a short delay before token is valid.
+    /// Append more spots to the current list.
+    /// Uses the pagination token when Google returned one; otherwise fetches a fresh set for the
+    /// same category/location and appends only results not already shown.
     private func loadMoreExplorePlaces() async {
         let city = preferredCity
-        guard city != "your area", !city.isEmpty,
-              let token = exploreNextPageToken, !token.isEmpty else { return }
-        await MainActor.run { if exploreLoadMoreLoading { return }; exploreLoadMoreLoading = true }
-        // Token from previous response can take a couple seconds to become valid.
-        try? await Task.sleep(nanoseconds: 2_000_000_000)
+        guard city != "your area", !city.isEmpty else { return }
+        let skip = await MainActor.run { () -> Bool in
+            if exploreLoadMoreLoading { return true }
+            exploreLoadMoreLoading = true
+            return false
+        }
+        if skip { return }
+
         let categoryId = selectedExploreCategory?.id
+        let token = await MainActor.run { exploreNextPageToken }
+
         do {
-            let page = try await GooglePlacesService.shared.fetchTrendingPlacesPage(city: city, categoryId: categoryId, pageToken: token)
+            let page: GooglePlacesService.TrendingPlacesPage
+            if let token, !token.isEmpty {
+                // Pagination token available — brief delay for Google's token to activate
+                try? await Task.sleep(nanoseconds: 2_000_000_000)
+                page = try await GooglePlacesService.shared.fetchTrendingPlacesPage(city: city, categoryId: categoryId, pageToken: token)
+            } else {
+                // No token — fetch a fresh set and append genuinely new spots
+                let isAll = categoryId == nil
+                if isAll {
+                    page = try await GooglePlacesService.shared.fetchTrendingPlacesAllCategory(city: city, minCount: 10)
+                } else {
+                    page = try await GooglePlacesService.shared.fetchTrendingPlacesPage(city: city, categoryId: categoryId, pageToken: nil)
+                }
+            }
             await MainActor.run {
                 var seen = Set(explorePlaces.map(\.placeId))
                 let newPlaces = page.places.filter { seen.insert($0.placeId).inserted }

@@ -45,20 +45,26 @@ final class PlaylistStorageManager: ObservableObject {
                 whyItFits: nil
             )
         }
-        let generatedAt: Date = {
-            let formatter = ISO8601DateFormatter()
-            formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-            return formatter.date(from: playlist.createdAt) ?? formatter.date(from: String(playlist.createdAt.prefix(19)) + "Z") ?? Date()
-        }()
+        let iso = ISO8601DateFormatter()
+        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let generatedAt = iso.date(from: playlist.createdAt)
+            ?? iso.date(from: String(playlist.createdAt.prefix(19)) + "Z")
+            ?? Date()
+        let updatedAt = iso.date(from: playlist.updatedAt)
+            ?? iso.date(from: String(playlist.updatedAt.prefix(19)) + "Z")
         return DBPlaylist(
             playlistId: playlistId,
             planId: nil,
             coupleId: coupleId,
             title: playlist.name,
             description: [playlist.datePlanTitle, playlist.vibe].filter { !$0.isEmpty }.joined(separator: " • "),
+            vibe: playlist.vibe,
+            datePlanTitle: playlist.datePlanTitle,
+            stops: playlist.stops,
             tracks: tracks,
             totalDurationMinutes: max(1, playlist.songs.count * 4),
-            generatedAt: generatedAt
+            generatedAt: generatedAt,
+            updatedAt: updatedAt
         )
     }
 
@@ -192,10 +198,25 @@ final class PlaylistStorageManager: ObservableObject {
             await syncOnePlaylistToSupabase(p)
         }
     }
+
+    /// Fallback sync path for users who don't yet have a couple record.
+    /// Uses the user_id-scoped RLS policies added in the web-sync migration.
+    func syncFromSupabaseWhenLoggedInByUserIdAsync(userId: UUID) async {
+        guard let list = try? await SupabaseService.shared.getPlaylists(userId: userId) else { return }
+        await MainActor.run {
+            mergeFromSupabase(dbPlaylists: list)
+        }
+        let cloudIds = Set(list.map { $0.playlistId.uuidString })
+        let locals = await MainActor.run { playlists.filter { !cloudIds.contains($0.id) } }
+        for p in locals {
+            await syncOnePlaylistToSupabase(p)
+        }
+    }
     
     /// Merge playlists from Supabase (account) into local list; skips ones already present by id.
     func mergeFromSupabase(dbPlaylists: [DBPlaylist]) {
         var existingIds = Set(playlists.map(\.id))
+        let iso = ISO8601DateFormatter()
         for db in dbPlaylists {
             let id = db.playlistId.uuidString
             guard !existingIds.contains(id) else { continue }
@@ -205,15 +226,15 @@ final class PlaylistStorageManager: ObservableObject {
             let saved = SavedPlaylist(
                 id: id,
                 name: db.title ?? "Playlist",
-                datePlanTitle: db.title ?? "Date Night",
-                vibe: "other",
+                datePlanTitle: db.datePlanTitle ?? db.title ?? "Date Night",
+                vibe: db.vibe ?? "other",
                 songs: songs,
-                stops: nil,
+                stops: db.stops,
                 energy: nil,
                 era: nil,
                 mood: nil,
-                createdAt: ISO8601DateFormatter().string(from: db.generatedAt),
-                updatedAt: ISO8601DateFormatter().string(from: db.generatedAt)
+                createdAt: iso.string(from: db.generatedAt),
+                updatedAt: iso.string(from: db.updatedAt ?? db.generatedAt)
             )
             playlists.insert(saved, at: 0)
             existingIds.insert(id)

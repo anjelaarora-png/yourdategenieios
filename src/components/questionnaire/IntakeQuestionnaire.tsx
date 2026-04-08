@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, ArrowRight, Sparkles, RefreshCw, Zap, RotateCcw } from "lucide-react";
 import {
@@ -56,6 +56,10 @@ const IntakeQuestionnaire = ({
   const [showWelcomePrompt, setShowWelcomePrompt] = useState(false);
   const [showExistingPrompt, setShowExistingPrompt] = useState(false);
   const [showResumePrompt, setShowResumePrompt] = useState(false);
+  // Track whether we've already initialized for the current open session so that
+  // a reactive update to `existingData` (from the shared context) doesn't reset
+  // the questionnaire mid-session.
+  const sessionInitializedRef = useRef(false);
   const [showQuickDetails, setShowQuickDetails] = useState(false);
   const [quickData, setQuickData] = useState<Partial<QuestionnaireData>>({});
   const [storedProgress, setStoredProgress] = useState<StoredProgress | null>(null);
@@ -96,26 +100,38 @@ const IntakeQuestionnaire = ({
 
   useEffect(() => {
     if (open) {
+      // Only run initialization once per open session.
+      // Without this guard a reactive update to `existingData` (triggered by the
+      // shared UserPreferencesProvider re-fetching in the background) would
+      // interrupt the user mid-questionnaire by resetting state.
+      if (sessionInitializedRef.current) return;
+      sessionInitializedRef.current = true;
+
       const progress = loadStoredProgress();
       setStoredProgress(progress);
-      
+
       if (existingData) {
-        // User has saved preferences
+        // Seed localStorage with the fresh DB data so any stale draft from a
+        // previous session can never silently win over saved preferences.
+        saveProgress(existingData, 1);
         setShowExistingPrompt(true);
         setShowWelcomePrompt(false);
       } else if (progress && progress.step > 1) {
-        // User has in-progress questionnaire
+        // Resume an in-progress questionnaire (no saved DB preferences yet)
         setShowResumePrompt(true);
         setShowWelcomePrompt(false);
       } else if (!existingData && !progress) {
-        // First-time user - show welcome
+        // First-time user
         setShowWelcomePrompt(true);
       } else {
         setData(initialQuestionnaireData);
         setStep(1);
       }
+    } else {
+      // Dialog closed — reset the session flag so the next open re-initializes.
+      sessionInitializedRef.current = false;
     }
-  }, [open, existingData, loadStoredProgress]);
+  }, [open, existingData, loadStoredProgress, saveProgress]);
 
   // Save progress whenever data or step changes
   useEffect(() => {

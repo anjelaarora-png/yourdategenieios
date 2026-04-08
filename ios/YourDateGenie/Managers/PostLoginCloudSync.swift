@@ -18,6 +18,9 @@ enum PostLoginCloudSync {
             await MainActor.run {
                 NavigationCoordinator.shared.markExperiencesWaitingCloudPullFinished()
             }
+            // Still sync playlists even without a couple — the user_id-scoped RLS added in the
+            // web-sync migration allows access without couple_id.
+            await PlaylistStorageManager.shared.syncFromSupabaseWhenLoggedInByUserIdAsync(userId: userId)
         }
         await MemoryManager.shared.syncMemoriesFromCloudAsync(userId: userId)
         await UserIosContentSync.syncFromSupabase(userId: userId)
