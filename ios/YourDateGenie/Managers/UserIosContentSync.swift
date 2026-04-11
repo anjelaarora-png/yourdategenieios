@@ -61,6 +61,13 @@ enum UserIosContentSync {
                         timestamp: \.createdAt
                     )
                     SparkSessionStorageManager.shared.replaceFromCloud(mergedSessions)
+                    // Restore draft only when remote has content and local is empty.
+                    if let remoteDraft = remote.loveNoteDraft, !remoteDraft.isEmpty {
+                        let localDraft = LoveNoteStorageManager.shared.loadDraft()
+                        if localDraft == nil || localDraft!.isEmpty {
+                            LoveNoteStorageManager.shared.saveDraft(remoteDraft)
+                        }
+                    }
                 }
                 await PushCoordinator.shared.runImmediatePush(userId: userId)
                 return
@@ -81,7 +88,8 @@ enum UserIosContentSync {
                 userId: userId,
                 loveNotes: LoveNoteStorageManager.shared.exportNotes(),
                 savedConversationStarters: ConversationStarterStorageManager.shared.exportStarters(),
-                sparkSessions: SparkSessionStorageManager.shared.exportSessions()
+                sparkSessions: SparkSessionStorageManager.shared.exportSessions(),
+                loveNoteDraft: LoveNoteStorageManager.shared.loadDraft()
             )
         }
         do {

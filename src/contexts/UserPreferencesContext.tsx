@@ -125,6 +125,7 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
 
     const prefsToSave = {
       user_id: user.id,
+      updated_at: new Date().toISOString(),
       // Location — use structured fields; derive preferred_location safely
       default_city: questionnaireData.city || null,
       default_neighborhood: questionnaireData.neighborhood || null,

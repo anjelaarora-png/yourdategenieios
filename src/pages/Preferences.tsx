@@ -213,6 +213,7 @@ const Preferences = () => {
     setSaving(true);
     try {
       const payload = {
+        updated_at: new Date().toISOString(),
         gender: edited.gender || null,
         partner_gender: edited.partner_gender || null,
         default_city: edited.default_city || null,

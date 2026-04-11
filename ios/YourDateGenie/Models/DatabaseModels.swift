@@ -769,7 +769,7 @@ struct DBPlaylist: Codable, Identifiable, Equatable {
     func encode(to encoder: Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
         try c.encode(playlistId, forKey: .playlistId)
-        try c.encodeNil(forKey: .planId)
+        try c.encodeIfPresent(planId, forKey: .planId)
         try c.encodeIfPresent(coupleId, forKey: .coupleId)
         try c.encodeIfPresent(userId, forKey: .userId)
         try c.encodeIfPresent(title, forKey: .title)
@@ -867,24 +867,34 @@ struct DBPartnerSessionPlan: Codable, Identifiable {
     }
 }
 
-// MARK: - iOS user-generated content (love notes, sparks, saved starters)
+// MARK: - iOS user-generated content (love notes, sparks, saved starters, draft)
 struct DBUserIosSyncPayload: Codable, Equatable {
     let userId: UUID
     var loveNotes: [SavedLoveNote]
     var savedConversationStarters: [SavedConversationStarter]
     var sparkSessions: [SparkSession]
+    /// In-progress love note draft — survives reinstall and roams across devices.
+    var loveNoteDraft: LoveNoteDraft?
 
     enum CodingKeys: String, CodingKey {
         case userId = "user_id"
         case loveNotes = "love_notes"
         case savedConversationStarters = "saved_conversation_starters"
         case sparkSessions = "spark_sessions"
+        case loveNoteDraft = "love_note_draft"
     }
 
-    init(userId: UUID, loveNotes: [SavedLoveNote], savedConversationStarters: [SavedConversationStarter], sparkSessions: [SparkSession]) {
+    init(
+        userId: UUID,
+        loveNotes: [SavedLoveNote],
+        savedConversationStarters: [SavedConversationStarter],
+        sparkSessions: [SparkSession],
+        loveNoteDraft: LoveNoteDraft? = nil
+    ) {
         self.userId = userId
         self.loveNotes = loveNotes
         self.savedConversationStarters = savedConversationStarters
         self.sparkSessions = sparkSessions
+        self.loveNoteDraft = loveNoteDraft
     }
 }

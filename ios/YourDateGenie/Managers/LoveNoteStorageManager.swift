@@ -111,6 +111,7 @@ final class LoveNoteStorageManager: ObservableObject {
     func saveDraft(_ draft: LoveNoteDraft) {
         guard let data = try? JSONEncoder().encode(draft) else { return }
         UserDefaults.standard.set(data, forKey: draftKey)
+        UserIosContentSync.schedulePushIfLoggedIn()
     }
 
     func loadDraft() -> LoveNoteDraft? {
@@ -123,5 +124,6 @@ final class LoveNoteStorageManager: ObservableObject {
 
     func clearDraft() {
         UserDefaults.standard.removeObject(forKey: draftKey)
+        UserIosContentSync.schedulePushIfLoggedIn()
     }
 }

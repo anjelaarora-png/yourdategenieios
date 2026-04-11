@@ -472,7 +472,12 @@ class UserProfileManager: ObservableObject {
         profile.email = fetched.dbUser.email
         profile.dateOfBirth = fetched.dbUser.birthday
         profile.location = fetched.dbUser.homeAddress ?? ""
-        if let existing = currentUser, !existing.phoneNumber.isEmpty {
+        // Prefer the DB value so phone number survives reinstalls; fall back to
+        // whatever is in memory (e.g. typed during sign-up before the DB row exists).
+        let dbPhone = fetched.dbUser.phoneNumber ?? ""
+        if !dbPhone.isEmpty {
+            profile.phoneNumber = dbPhone
+        } else if let existing = currentUser, !existing.phoneNumber.isEmpty {
             profile.phoneNumber = existing.phoneNumber
         }
         
@@ -554,8 +559,47 @@ class UserProfileManager: ObservableObject {
                 await MainActor.run {
                     if let cid = cid { self.coupleId = cid }
                 }
+
+                // Guard against overwriting a more recent web-side location edit.
+                //
+                // Problem: iOS always sends the full preferences struct with
+                // updatedAt = Date() (current device time). If the web app updated
+                // the location after the last iOS sync, the iOS upsert would clobber
+                // it with whatever city is still in local UserDefaults.
+                //
+                // Fix: check whether the server row is newer than what iOS last
+                // acknowledged. If so, the web made changes since our last sync —
+                // keep the server's location fields and only overwrite everything
+                // else with the fresh iOS values.
+                var prefsToSave = preferences
+                if let serverPrefs = existingPrefs {
+                    let lastKnown = await MainActor.run { self.lastServerPreferencesUpdatedAt }
+                    // serverIsNewer is true when:
+                    //   • we have a watermark and the server row is more recent (web edited location), OR
+                    //   • we have no watermark at all (no prior sync this session → trust server).
+                    let serverIsNewer = lastKnown.map { serverPrefs.updatedAt > $0 } ?? true
+                    if serverIsNewer {
+                        // Preserve server location fields so a stale iOS local cache
+                        // (e.g., "Michigan") doesn't overwrite a newer web edit ("New York").
+                        prefsToSave.defaultCity          = serverPrefs.defaultCity          ?? preferences.defaultCity
+                        prefsToSave.defaultNeighborhood  = serverPrefs.defaultNeighborhood  ?? preferences.defaultNeighborhood
+                        prefsToSave.defaultStartingPoint = serverPrefs.defaultStartingPoint ?? preferences.defaultStartingPoint
+                        // Advance the watermark so subsequent iOS saves in this session
+                        // don't keep treating the same server row as "newer".
+                        await MainActor.run {
+                            self.lastServerPreferencesUpdatedAt = serverPrefs.updatedAt
+                            if var p = self.currentUser {
+                                p.preferences.defaultCity          = prefsToSave.defaultCity
+                                p.preferences.defaultNeighborhood  = prefsToSave.defaultNeighborhood
+                                p.preferences.defaultStartingPoint = prefsToSave.defaultStartingPoint
+                                self.currentUser = p
+                            }
+                        }
+                    }
+                }
+
                 let dbPrefs = convertToDBPreferences(
-                    preferences,
+                    prefsToSave,
                     userId: uid,
                     coupleId: cid,
                     existingPreferenceId: existingPrefs?.preferenceId
