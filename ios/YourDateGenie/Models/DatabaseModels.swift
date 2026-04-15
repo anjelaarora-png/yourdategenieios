@@ -296,7 +296,7 @@ struct DBDatePlan: Codable, Identifiable, Equatable {
         case selectedOption = "selected_option"
         case planOptions = "plan_options"
         case giftSuggestions = "gift_suggestions"
-        case conversationStarters = "conversation_starters"
+        case conversationStarters = "conversation_starters_jsonb"
         case rating
         case ratingNotes = "rating_notes"
         case createdAt = "created_at"
@@ -357,7 +357,7 @@ struct DBDatePlan: Codable, Identifiable, Equatable {
         userId = try c.decode(UUID.self, forKey: .userId)
         coupleId = try c.decodeIfPresent(UUID.self, forKey: .coupleId)
         dateScheduled = try c.decodeIfPresent(Date.self, forKey: .dateScheduled)
-        title = try c.decode(String.self, forKey: .title)
+        title = (try? c.decode(String.self, forKey: .title)) ?? "Untitled Plan"
         tagline = try c.decodeIfPresent(String.self, forKey: .tagline)
         totalDuration = try c.decodeIfPresent(String.self, forKey: .totalDuration)
         estimatedCost = try c.decodeIfPresent(String.self, forKey: .estimatedCost)
@@ -531,7 +531,9 @@ struct DBDateMemory: Codable, Identifiable, Equatable {
     var venueId: UUID?
     /// Object path inside `date-memories` bucket (e.g. `userId/file.jpg`) or legacy public URL string.
     var imageUrl: String
+    var title: String?
     var caption: String?
+    var location: String?
     var takenAt: Date
     var isPublic: Bool
     var createdAt: Date?
@@ -542,7 +544,9 @@ struct DBDateMemory: Codable, Identifiable, Equatable {
         case datePlanId = "date_plan_id"
         case venueId = "venue_id"
         case imageUrl = "image_url"
+        case title
         case caption
+        case location
         case takenAt = "taken_at"
         case isPublic = "is_public"
         case createdAt = "created_at"
@@ -554,7 +558,9 @@ struct DBDateMemory: Codable, Identifiable, Equatable {
         datePlanId: UUID? = nil,
         venueId: UUID? = nil,
         imageUrl: String,
+        title: String? = nil,
         caption: String? = nil,
+        location: String? = nil,
         takenAt: Date,
         isPublic: Bool = false,
         createdAt: Date? = nil
@@ -564,7 +570,9 @@ struct DBDateMemory: Codable, Identifiable, Equatable {
         self.datePlanId = datePlanId
         self.venueId = venueId
         self.imageUrl = imageUrl
+        self.title = title
         self.caption = caption
+        self.location = location
         self.takenAt = takenAt
         self.isPublic = isPublic
         self.createdAt = createdAt
@@ -577,7 +585,9 @@ struct DBDateMemory: Codable, Identifiable, Equatable {
         datePlanId = try c.decodeIfPresent(UUID.self, forKey: .datePlanId)
         venueId = try c.decodeIfPresent(UUID.self, forKey: .venueId)
         imageUrl = try c.decode(String.self, forKey: .imageUrl)
+        title = try c.decodeIfPresent(String.self, forKey: .title)
         caption = try c.decodeIfPresent(String.self, forKey: .caption)
+        location = try c.decodeIfPresent(String.self, forKey: .location)
         takenAt = try c.decodeIfPresent(Date.self, forKey: .takenAt) ?? Date()
         isPublic = try c.decodeIfPresent(Bool.self, forKey: .isPublic) ?? false
         createdAt = try c.decodeIfPresent(Date.self, forKey: .createdAt)
@@ -590,7 +600,9 @@ struct DBDateMemory: Codable, Identifiable, Equatable {
         try c.encodeIfPresent(datePlanId, forKey: .datePlanId)
         try c.encodeIfPresent(venueId, forKey: .venueId)
         try c.encode(imageUrl, forKey: .imageUrl)
+        try c.encodeIfPresent(title, forKey: .title)
         try c.encodeIfPresent(caption, forKey: .caption)
+        try c.encodeIfPresent(location, forKey: .location)
         try c.encode(takenAt, forKey: .takenAt)
         try c.encode(isPublic, forKey: .isPublic)
         try c.encodeIfPresent(createdAt, forKey: .createdAt)
@@ -808,31 +820,179 @@ struct PlaylistTrack: Codable, Equatable, Identifiable {
 }
 
 // MARK: - Partner Sessions (Plan Together cross-device)
+
+/// Server-authoritative phase for a Plan Together session.
+enum PlanPhase: String, Codable, CaseIterable {
+    case preferencesPending    = "preferences_pending"
+    case preferencesComplete   = "preferences_complete"
+    case generatingDateOptions = "generating_date_options"
+    case optionsReadyForRanking = "options_ready_for_ranking"
+    case waitingForPartnerRanking = "waiting_for_partner_ranking"
+    case rankingsComplete      = "rankings_complete"
+    case finalOptionSelected   = "final_option_selected"
+    case finalized             = "finalized"
+    case declined              = "declined"
+    case expired               = "expired"
+    case cancelled             = "cancelled"
+
+    /// Whether the session is still active (not ended).
+    var isActive: Bool {
+        switch self {
+        case .preferencesPending, .preferencesComplete, .generatingDateOptions,
+             .optionsReadyForRanking, .waitingForPartnerRanking, .rankingsComplete,
+             .finalOptionSelected, .finalized:
+            return true
+        case .declined, .expired, .cancelled:
+            return false
+        }
+    }
+
+    /// Whether the app should poll for remote changes in this phase.
+    var requiresPolling: Bool {
+        switch self {
+        case .preferencesPending, .preferencesComplete,
+             .optionsReadyForRanking, .waitingForPartnerRanking, .rankingsComplete:
+            return true
+        default:
+            return false
+        }
+    }
+
+    var displayLabel: String {
+        switch self {
+        case .preferencesPending:        return "Waiting for partner"
+        case .preferencesComplete:       return "Preferences received"
+        case .generatingDateOptions:     return "Generating your options…"
+        case .optionsReadyForRanking:    return "Ready to rank!"
+        case .waitingForPartnerRanking:  return "Waiting for partner to rank"
+        case .rankingsComplete:          return "Finding your best match…"
+        case .finalOptionSelected:       return "Final plan ready!"
+        case .finalized:                 return "Plan confirmed"
+        case .declined:                  return "Declined"
+        case .expired:                   return "Expired"
+        case .cancelled:                 return "Cancelled"
+        }
+    }
+}
+
+/// Which side of a partner session the current device represents.
+enum PartnerRole: String, Codable {
+    case inviter
+    case partner
+}
+
+/// One entry in a user's private ranking list.
+struct RankEntry: Codable, Equatable {
+    var planIndex: Int       // 1-based plan position
+    var rankPosition: Int    // 1 = top choice
+    enum CodingKeys: String, CodingKey {
+        case planIndex    = "plan_index"
+        case rankPosition = "rank_position"
+    }
+}
+
 struct DBPartnerSession: Codable, Identifiable {
     var id: UUID?
     var sessionId: String
     var inviterName: String?
     var inviterUserId: UUID?
+    var partnerUserId: UUID?
+    var partnerName: String?
     var inviterData: QuestionnaireData?
     var partnerData: QuestionnaireData?
     var inviterPlannedDates: [DBProposedDateTime]?
     var notes: String?
+    /// Server-authoritative phase string — decode as PlanPhase.
+    var phase: String?
     var createdAt: Date
     var updatedAt: Date
 
     var identifier: UUID { id ?? UUID() }
 
+    var planPhase: PlanPhase {
+        PlanPhase(rawValue: phase ?? "preferences_pending") ?? .preferencesPending
+    }
+
     enum CodingKeys: String, CodingKey {
         case id
-        case sessionId = "session_id"
-        case inviterName = "inviter_name"
-        case inviterUserId = "inviter_user_id"
-        case inviterData = "inviter_data"
-        case partnerData = "partner_data"
+        case sessionId        = "session_id"
+        case inviterName      = "inviter_name"
+        case inviterUserId    = "inviter_user_id"
+        case partnerUserId    = "partner_user_id"
+        case partnerName      = "partner_name"
+        case inviterData      = "inviter_data"
+        case partnerData      = "partner_data"
         case inviterPlannedDates = "inviter_planned_dates"
         case notes
-        case createdAt = "created_at"
-        case updatedAt = "updated_at"
+        case phase
+        case createdAt        = "created_at"
+        case updatedAt        = "updated_at"
+    }
+}
+
+// MARK: - Option Rankings
+
+struct DBOptionRanking: Codable, Identifiable {
+    var id: UUID
+    var partnerSessionId: UUID
+    var userId: UUID?
+    var role: String
+    var rankings: [RankEntry]
+    var submittedAt: Date
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case partnerSessionId = "partner_session_id"
+        case userId           = "user_id"
+        case role
+        case rankings
+        case submittedAt      = "submitted_at"
+    }
+}
+
+// MARK: - Final Option Selection
+
+struct DBFinalOptionSelection: Codable, Identifiable {
+    var id: UUID?
+    var partnerSessionId: UUID
+    var winningPlanIndex: Int
+    var runnerUpPlanIndex: Int?
+    var selectionReason: String?
+    var scoringPayload: [String: Int]?
+    var selectedAt: Date
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case partnerSessionId  = "partner_session_id"
+        case winningPlanIndex  = "winning_plan_index"
+        case runnerUpPlanIndex = "runner_up_plan_index"
+        case selectionReason   = "selection_reason"
+        case scoringPayload    = "scoring_payload"
+        case selectedAt        = "selected_at"
+    }
+}
+
+// MARK: - Notification Events
+
+struct DBNotificationEvent: Codable, Identifiable {
+    var id: UUID
+    var userId: UUID?
+    var partnerSessionId: UUID?
+    var type: String
+    var title: String
+    var body: String
+    var readAt: Date?
+    var createdAt: Date
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case userId            = "user_id"
+        case partnerSessionId  = "partner_session_id"
+        case type
+        case title
+        case body
+        case readAt            = "read_at"
+        case createdAt         = "created_at"
     }
 }
 

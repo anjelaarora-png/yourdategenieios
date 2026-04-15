@@ -189,9 +189,9 @@ class MemoryManager: ObservableObject {
             let converted: [DateMemory] = dbMemories.map { db in
                 DateMemory(
                     id: db.id,
-                    title: db.caption ?? "Memory",
+                    title: db.title ?? db.caption ?? "Memory",
                     date: db.takenAt,
-                    location: "",
+                    location: db.location ?? "",
                     photoData: nil,
                     imageUrl: db.imageUrl,
                     caption: db.caption,
@@ -295,7 +295,9 @@ class MemoryManager: ObservableObject {
                 datePlanId: memory.datePlanId,
                 venueId: nil,
                 imageUrl: publicUrlString,
+                title: memory.title.isEmpty ? nil : memory.title,
                 caption: memory.caption ?? memory.title,
+                location: memory.location.isEmpty ? nil : memory.location,
                 takenAt: memory.date,
                 isPublic: false,
                 createdAt: nil

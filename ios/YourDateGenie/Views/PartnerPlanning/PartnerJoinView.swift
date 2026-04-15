@@ -172,7 +172,8 @@ struct PartnerJoinView: View {
         PartnerSessionManager.shared.submitPartnerData(sessionId: sessionId, data: data)
         coordinator.pendingPartnerJoinSessionId = nil
         coordinator.pendingPartnerJoinInviterName = nil
-        coordinator.dismissSheet()
+        // Route partner to the generating/waiting screen instead of just dismissing
+        coordinator.activeSheet = .planGenerating(sessionId: sessionId, role: .partner)
     }
 }
 

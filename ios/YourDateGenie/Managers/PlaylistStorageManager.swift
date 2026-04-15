@@ -33,7 +33,7 @@ final class PlaylistStorageManager: ObservableObject {
         }
     }
 
-    private func dbPlaylist(from playlist: SavedPlaylist, coupleId: UUID) -> DBPlaylist? {
+    private func dbPlaylist(from playlist: SavedPlaylist, coupleId: UUID, userId: UUID? = nil) -> DBPlaylist? {
         guard let playlistId = UUID(uuidString: playlist.id) else { return nil }
         let tracks = playlist.songs.enumerated().map { index, s in
             PlaylistTrack(
@@ -56,6 +56,7 @@ final class PlaylistStorageManager: ObservableObject {
             playlistId: playlistId,
             planId: nil,
             coupleId: coupleId,
+            userId: userId,
             title: playlist.name,
             description: [playlist.datePlanTitle, playlist.vibe].filter { !$0.isEmpty }.joined(separator: " • "),
             vibe: playlist.vibe,
@@ -70,8 +71,9 @@ final class PlaylistStorageManager: ObservableObject {
 
     private func syncOnePlaylistToSupabase(_ playlist: SavedPlaylist) async {
         do {
+            let userId = await MainActor.run { UserProfileManager.shared.userId }
             let coupleId = try await SupabaseService.shared.resolveCoupleIdForCurrentUser()
-            guard let db = dbPlaylist(from: playlist, coupleId: coupleId) else { return }
+            guard let db = dbPlaylist(from: playlist, coupleId: coupleId, userId: userId) else { return }
             _ = try await SupabaseService.shared.upsertPlaylist(db)
             print("[PlaylistStorage] upsertPlaylist success playlist_id=\(db.playlistId)")
         } catch {

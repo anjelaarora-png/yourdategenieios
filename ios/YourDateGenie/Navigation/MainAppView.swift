@@ -247,6 +247,22 @@ struct LuxuryMainAppView: View {
             PartnerJoinView(sessionId: sessionId, inviterName: inviterName)
                 .environmentObject(coordinator)
                 .environmentObject(access)
+        case .planGenerating(let sessionId, let role):
+            PlanGeneratingView(sessionId: sessionId, role: role)
+                .environmentObject(coordinator)
+                .environmentObject(access)
+        case .partnerRanking:
+            NavigationStack {
+                PartnerRankingView()
+                    .environmentObject(coordinator)
+                    .environmentObject(access)
+            }
+        case .finalDateReveal:
+            NavigationStack {
+                FinalDateRevealView()
+                    .environmentObject(coordinator)
+                    .environmentObject(access)
+            }
         case .authRequired:
             AuthenticationView(onDismiss: { coordinator.dismissAuthRequiredSheet() }, allowSkipToExplore: false)
                 .environmentObject(coordinator)

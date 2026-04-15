@@ -11,36 +11,65 @@ struct AppNotification: Identifiable, Equatable {
     var imageUrl: String?
     
     enum NotificationType: String {
-        case datePlanReady = "plan_ready"
-        case dateReminder = "reminder"
-        case newInspiration = "inspiration"
-        case giftIdea = "gift"
-        case specialOccasion = "occasion"
+        // General
+        case datePlanReady    = "plan_ready"
+        case dateReminder     = "reminder"
+        case newInspiration   = "inspiration"
+        case giftIdea         = "gift"
+        case specialOccasion  = "occasion"
         case weekendSuggestion = "weekend"
-        case partnerSubmitted = "partner_submitted"
+        // Partner planning — one type per phase event
+        case partnerSubmitted       = "partner_submitted"       // legacy
+        case partnerPreferencesIn   = "partner_preferences_in"
+        case optionsReadyToRank     = "options_ready_to_rank"
+        case rankingSubmitted       = "ranking_submitted"
+        case waitingForPartnerRank  = "waiting_for_partner_rank"
+        case bothRankingsIn         = "both_rankings_in"
+        case finalOptionSelected    = "final_option_selected"
+        case planConfirmed          = "plan_confirmed"
+        case partnerJoined          = "partner_joined"
+        case partnerDeclined        = "partner_declined"
     }
 
     var icon: String {
         switch type {
-        case .datePlanReady: return "sparkles"
-        case .dateReminder: return "calendar.badge.clock"
-        case .newInspiration: return "lightbulb.fill"
-        case .giftIdea: return "gift.fill"
-        case .specialOccasion: return "star.fill"
-        case .weekendSuggestion: return "sun.max.fill"
-        case .partnerSubmitted: return "person.2.fill"
+        case .datePlanReady:          return "sparkles"
+        case .dateReminder:           return "calendar.badge.clock"
+        case .newInspiration:         return "lightbulb.fill"
+        case .giftIdea:               return "gift.fill"
+        case .specialOccasion:        return "star.fill"
+        case .weekendSuggestion:      return "sun.max.fill"
+        case .partnerSubmitted,
+             .partnerPreferencesIn:   return "person.2.fill"
+        case .optionsReadyToRank:     return "list.number"
+        case .rankingSubmitted,
+             .waitingForPartnerRank:  return "clock.badge.checkmark"
+        case .bothRankingsIn:         return "checkmark.circle.fill"
+        case .finalOptionSelected:    return "star.circle.fill"
+        case .planConfirmed:          return "heart.circle.fill"
+        case .partnerJoined:          return "person.badge.plus"
+        case .partnerDeclined:        return "person.badge.minus"
         }
     }
 
     var accentColor: Color {
         switch type {
-        case .datePlanReady: return Color.luxuryGold
-        case .dateReminder: return Color.luxuryGoldLight
-        case .newInspiration: return Color(hex: "FFD700")
-        case .giftIdea: return Color(hex: "FF69B4")
-        case .specialOccasion: return Color(hex: "FFB347")
-        case .weekendSuggestion: return Color(hex: "87CEEB")
-        case .partnerSubmitted: return Color.luxuryGold
+        case .datePlanReady:          return Color.luxuryGold
+        case .dateReminder:           return Color.luxuryGoldLight
+        case .newInspiration:         return Color(hex: "FFD700")
+        case .giftIdea:               return Color(hex: "FF69B4")
+        case .specialOccasion:        return Color(hex: "FFB347")
+        case .weekendSuggestion:      return Color(hex: "87CEEB")
+        case .partnerSubmitted,
+             .partnerPreferencesIn,
+             .partnerJoined:          return Color.luxuryGold
+        case .optionsReadyToRank:     return Color.luxuryGoldLight
+        case .rankingSubmitted,
+             .waitingForPartnerRank:  return Color.luxuryGold
+        case .bothRankingsIn,
+             .finalOptionSelected,
+             .planConfirmed:          return Color.luxuryGold
+        case .partnerDeclined:        return Color.luxuryMuted
         }
     }
 }

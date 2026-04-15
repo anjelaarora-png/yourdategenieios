@@ -55,6 +55,12 @@ struct PartnerPlanningSheetView: View {
         }
     }
 
+    /// Whether the current phase warrants showing a phase-progress banner in the hub.
+    private var showPhaseBanner: Bool {
+        guard partnerManager.sessionId != nil else { return false }
+        return partnerManager.currentPhase != .preferencesPending
+    }
+
     var body: some View {
         ZStack {
             Color.luxuryMaroon
@@ -183,21 +189,8 @@ struct PartnerPlanningSheetView: View {
         .onReceive(Timer.publish(every: 60, on: .main, in: .common).autoconnect()) { _ in
             updateReminderCountdown()
         }
-        .task(id: "\(isWaitingForPartner)-\(partnerManager.sessionId ?? "")") {
-            guard isWaitingForPartner, let sid = partnerManager.sessionId else { return }
-            while isWaitingForPartner {
-                try? await Task.sleep(nanoseconds: 5_000_000_000)
-                guard isWaitingForPartner else { break }
-                if let session = try? await SupabaseService.shared.getPartnerSession(sessionId: sid),
-                   let partnerData = session.partnerData {
-                    await MainActor.run {
-                        partnerManager.setPartnerDataFromBackend(partnerData)
-                        coordinator.partnerDataReceivedMergeAndGenerate()
-                    }
-                    break
-                }
-            }
-        }
+        // Phase polling is managed by PartnerSessionManager; generation is triggered by
+        // coordinator.handlePartnerPhaseChange → partnerDataReceivedMergeAndGenerate.
     }
     
     private func updateReminderCountdown() {
@@ -285,6 +278,7 @@ struct PartnerPlanningSheetView: View {
             }
             .buttonStyle(ScaleButtonStyle())
 
+            if showPhaseBanner { phaseBanner }
             hubPendingSection
             hubPastDatesSection
         }
@@ -476,6 +470,79 @@ struct PartnerPlanningSheetView: View {
         formatter.dateStyle = .medium
         formatter.timeStyle = .none
         return formatter.string(from: date)
+    }
+
+    // MARK: - Phase status banner
+
+    private var phaseBanner: some View {
+        let phase = partnerManager.currentPhase
+        return HStack(spacing: 10) {
+            Image(systemName: phaseBannerIcon(phase))
+                .font(.system(size: 14))
+                .foregroundColor(Color.luxuryGold)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(phase.displayLabel)
+                    .font(Font.bodySans(13, weight: .semibold))
+                    .foregroundColor(Color.luxuryCream)
+                Text(phaseBannerSubtitle(phase))
+                    .font(Font.bodySans(12, weight: .regular))
+                    .foregroundColor(Color.luxuryCreamMuted)
+            }
+            Spacer()
+            if phase == .optionsReadyForRanking || phase == .finalOptionSelected {
+                Button {
+                    if phase == .optionsReadyForRanking {
+                        coordinator.activeSheet = .partnerRanking
+                    } else {
+                        coordinator.loadFinalOptionAndShowRevealPublic()
+                    }
+                } label: {
+                    Text(phase == .finalOptionSelected ? "Reveal" : "Rank")
+                        .font(Font.bodySans(12, weight: .bold))
+                        .foregroundColor(Color.luxuryMaroon)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(LinearGradient.goldShimmer)
+                        .cornerRadius(8)
+                }
+                .buttonStyle(.plain)
+            } else if phase.requiresPolling {
+                WaitingRingView()
+                    .frame(width: 20, height: 20)
+            }
+        }
+        .padding(14)
+        .background(Color.luxuryMaroonLight.opacity(0.7))
+        .cornerRadius(14)
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.luxuryGold.opacity(0.3), lineWidth: 1))
+    }
+
+    private func phaseBannerIcon(_ phase: PlanPhase) -> String {
+        switch phase {
+        case .preferencesPending:              return "clock.badge.questionmark"
+        case .preferencesComplete:             return "person.2.fill"
+        case .generatingDateOptions:           return "sparkles"
+        case .optionsReadyForRanking:          return "list.number"
+        case .waitingForPartnerRanking:        return "clock.badge.checkmark"
+        case .rankingsComplete:                return "checkmark.circle.fill"
+        case .finalOptionSelected:             return "star.circle.fill"
+        case .finalized:                       return "heart.circle.fill"
+        default:                               return "circle"
+        }
+    }
+
+    private func phaseBannerSubtitle(_ phase: PlanPhase) -> String {
+        switch phase {
+        case .preferencesPending:       return "Invite sent — waiting for partner"
+        case .preferencesComplete:      return "Both preferences in — generating options"
+        case .generatingDateOptions:    return "This takes just a moment"
+        case .optionsReadyForRanking:   return "Tap to privately rank your favorites"
+        case .waitingForPartnerRanking: return "Your rankings are in"
+        case .rankingsComplete:         return "Computing your best match"
+        case .finalOptionSelected:      return "Tap to reveal your winning date plan"
+        case .finalized:                return "Plan confirmed — enjoy your date!"
+        default:                        return ""
+        }
     }
 
     // MARK: - Invited success (confetti + Done)
@@ -1019,6 +1086,32 @@ struct PartnerPlanningSheetView: View {
 
     // MARK: - Helpers
 
+    private func waitingTitleForPhase(_ partnerName: String) -> String {
+        switch partnerManager.currentPhase {
+        case .preferencesPending:        return "We're holding a seat for \(partnerName)."
+        case .preferencesComplete:       return "Both preferences are in!"
+        case .generatingDateOptions:     return "Crafting your date options…"
+        case .optionsReadyForRanking:    return "Your options are ready to rank."
+        case .waitingForPartnerRanking:  return "Your rankings are submitted."
+        case .rankingsComplete:          return "Both rankings are in!"
+        case .finalOptionSelected:       return "Your final date plan is ready."
+        default:                         return "We're holding a seat for \(partnerName)."
+        }
+    }
+
+    private var waitingSubtitleForPhase: String {
+        switch partnerManager.currentPhase {
+        case .preferencesPending:        return "No rush — we'll tell you the moment they're in."
+        case .preferencesComplete:       return "Generating your personalized options now."
+        case .generatingDateOptions:     return "This takes just a moment — great things take a little time."
+        case .optionsReadyForRanking:    return "Tap "Rank" to privately rank your favorites."
+        case .waitingForPartnerRanking:  return "Waiting for your partner to rank their options."
+        case .rankingsComplete:          return "Computing your best match based on both rankings."
+        case .finalOptionSelected:       return "Tap "Reveal" to see your winning plan."
+        default:                         return "No rush — we'll tell you the moment they're in."
+        }
+    }
+
     private var preferencesGlanceLine: String {
         guard let prefs = userProfileManager.currentUser?.preferences else { return "" }
         var parts: [String] = []
@@ -1092,12 +1185,12 @@ struct PartnerPlanningSheetView: View {
                 let name = (partnerManager.inviteInfo?.partnerName ?? "").trimmingCharacters(in: .whitespaces)
                 return name.isEmpty ? "your partner" : name
             }()
-            Text("We're holding a seat for \(partnerDisplayName).")
-                .font(Font.tangerine(22, weight: .bold))
+            Text(waitingTitleForPhase(partnerDisplayName))
+                .font(Font.tangerine(24, weight: .bold))
                 .italic()
                 .foregroundColor(Color.luxuryGold)
                 .multilineTextAlignment(.center)
-            Text("No rush — we'll tell you the moment they're in.")
+            Text(waitingSubtitleForPhase)
                 .font(Font.bodySans(13, weight: .regular))
                 .foregroundColor(Color.luxuryCreamMuted)
                 .multilineTextAlignment(.center)

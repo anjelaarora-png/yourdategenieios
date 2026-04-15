@@ -118,11 +118,14 @@ class NavigationCoordinator: ObservableObject {
     @Published var pendingPartnerJoinSessionId: String?
     @Published var pendingPartnerJoinInviterName: String?
 
-    /// After partner merge generation, the backend row ids of the 3 plans (for submitting inviter rank).
+    /// After partner merge generation, the backend row ids of the plans (for submitting rank).
     @Published var partnerSessionPlanRowIds: [UUID]?
 
     /// When questionnaire is opened from PartnerJoinView (partner has no prefs), on complete we submit to this session and dismiss.
     @Published var partnerJoinSessionId: String?
+
+    /// The computed winner for the active partner session — populated before showing FinalDateRevealView.
+    @Published var finalOptionSelection: DBFinalOptionSelection?
 
     /// After onboarding, open auth on Sign Up tab once (then cleared).
     @Published var preferSignUpTabOnNextAuth: Bool = false
@@ -187,6 +190,9 @@ class NavigationCoordinator: ObservableObject {
         case playbook
         case partnerPlanning
         case partnerJoin(sessionId: String, inviterName: String?)
+        case planGenerating(sessionId: String, role: PartnerRole)
+        case partnerRanking
+        case finalDateReveal
         case authRequired(PlanIntent)
 
         var id: String {
@@ -208,6 +214,9 @@ class NavigationCoordinator: ObservableObject {
             case .playbook: return "playbook"
             case .partnerPlanning: return "partnerPlanning"
             case .partnerJoin(let sessionId, _): return "partnerJoin-\(sessionId)"
+            case .planGenerating(let sessionId, _): return "planGenerating-\(sessionId)"
+            case .partnerRanking: return "partnerRanking"
+            case .finalDateReveal: return "finalDateReveal"
             case .authRequired(let intent): return "authRequired-\(intent)"
             }
         }
@@ -218,42 +227,6 @@ class NavigationCoordinator: ObservableObject {
         pendingPartnerJoinSessionId = sessionId
         pendingPartnerJoinInviterName = inviterName
         activeSheet = .partnerJoin(sessionId: sessionId, inviterName: inviterName)
-    }
-
-    /// When polling detects partner_data: merge, generate 3 plans, save to backend, then present DatePlanOptions (no interstitial).
-    func partnerDataReceivedMergeAndGenerate() {
-        guard let merged = PartnerSessionManager.shared.mergedQuestionnaireData(),
-              let sessionId = PartnerSessionManager.shared.sessionId else { return }
-        let inviterName = PartnerSessionManager.shared.inviteInfo?.partnerName.trimmingCharacters(in: .whitespaces)
-            ?? PartnerSessionManager.shared.inviterName ?? "You"
-        isRegeneratingFromOptions = true
-        activeSheet = nil
-        Task {
-            do {
-                let generator = DatePlanGeneratorService.shared
-                let plans = try await generator.generateDatePlan(from: merged)
-                let session = try await SupabaseService.shared.getPartnerSession(sessionId: sessionId)
-                var planRowIds: [UUID]?
-                if let rowId = session?.id {
-                    let saved = try await SupabaseService.shared.savePartnerSessionPlans(partnerSessionId: rowId, plans: plans)
-                    planRowIds = saved.map(\.id)
-                }
-                await MainActor.run {
-                    generatedPlans = plans
-                    generatedPlansSelectedIndex = 0
-                    currentDatePlan = plans.first
-                    currentPlanPartnerNames = (inviterName, "Partner")
-                    partnerSessionPlanRowIds = planRowIds
-                    isRegeneratingFromOptions = false
-                    activeSheet = .datePlanOptions
-                    scheduleSyncAllUnsavedExperiencesToCloud()
-                }
-            } catch {
-                await MainActor.run {
-                    isRegeneratingFromOptions = false
-                }
-            }
-        }
     }
 
     /// Open a past Plan Together session: load saved plans and present DatePlanOptionsView (e.g. from Plan Together → Past list).
@@ -280,8 +253,144 @@ class NavigationCoordinator: ObservableObject {
         loadSavedState()
         setupGeneratorSubscription()
         setupAuthStateSubscription()
+        setupPartnerPhaseObservation()
     }
     
+    // MARK: - Partner Phase Observation
+
+    /// Observes PartnerSessionManager's phase and routes to the correct screen automatically.
+    private func setupPartnerPhaseObservation() {
+        PartnerSessionManager.shared.$currentPhase
+            .dropFirst()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] phase in self?.handlePartnerPhaseChange(phase) }
+            .store(in: &cancellables)
+    }
+
+    private func handlePartnerPhaseChange(_ phase: PlanPhase) {
+        switch phase {
+        case .preferencesComplete:
+            // Inviter device triggers generation when both preferences are in
+            guard PartnerSessionManager.shared.currentRole == .inviter,
+                  PartnerSessionManager.shared.mergedQuestionnaireData() != nil else { return }
+            partnerDataReceivedMergeAndGenerate()
+        case .generatingDateOptions:
+            // Show generating screen if not already in partner-plan flow
+            guard let sid = PartnerSessionManager.shared.sessionId else { return }
+            let role = PartnerSessionManager.shared.currentRole ?? .inviter
+            if activeSheet != .planGenerating(sessionId: sid, role: role) {
+                activeSheet = .planGenerating(sessionId: sid, role: role)
+            }
+        case .optionsReadyForRanking:
+            // For the partner device: fetch plans from DB, then show ranking
+            let role = PartnerSessionManager.shared.currentRole ?? .inviter
+            if role == .partner {
+                loadPartnerPlansAndShowRanking()
+            } else {
+                // Inviter already has plans in generatedPlans — just route
+                if !generatedPlans.isEmpty {
+                    activeSheet = .partnerRanking
+                }
+            }
+        case .waitingForPartnerRanking:
+            // Stay on ranking screen if still showing; the view handles this state
+            break
+        case .finalOptionSelected:
+            loadFinalOptionAndShowReveal()
+        default:
+            break
+        }
+    }
+
+    private func loadPartnerPlansAndShowRanking() {
+        guard let rowId = PartnerSessionManager.shared.activeSessionRowId else { return }
+        Task {
+            do {
+                let planRows = try await SupabaseService.shared.getPartnerSessionPlans(partnerSessionId: rowId)
+                let plans = planRows.map(\.planJson)
+                await MainActor.run {
+                    generatedPlans = plans
+                    generatedPlansSelectedIndex = 0
+                    currentDatePlan = plans.first
+                    partnerSessionPlanRowIds = planRows.map(\.id)
+                    activeSheet = .partnerRanking
+                }
+            } catch { }
+        }
+    }
+
+    private func loadFinalOptionAndShowReveal() {
+        guard let rowId = PartnerSessionManager.shared.activeSessionRowId else { return }
+        Task {
+            do {
+                if let selection = try await SupabaseService.shared.getFinalOptionSelection(partnerSessionId: rowId) {
+                    await MainActor.run {
+                        finalOptionSelection = selection
+                        activeSheet = .finalDateReveal
+                    }
+                }
+            } catch { }
+        }
+    }
+
+    // MARK: - Phase-aware generation
+
+    /// Updated generation entry-point: sets phase correctly and routes to ranking instead of options view.
+    func partnerDataReceivedMergeAndGenerate() {
+        guard let merged = PartnerSessionManager.shared.mergedQuestionnaireData(),
+              let sessionId = PartnerSessionManager.shared.sessionId else { return }
+        let inviterDisplayName = PartnerSessionManager.shared.inviteInfo?.partnerName.trimmingCharacters(in: .whitespaces)
+            ?? PartnerSessionManager.shared.inviterName ?? "You"
+
+        // Transition to generating phase and show loading screen
+        PartnerSessionManager.shared.transitionPhase(to: .generatingDateOptions, triggeredBy: "inviter")
+
+        isRegeneratingFromOptions = true
+        activeSheet = .planGenerating(sessionId: sessionId, role: .inviter)
+
+        Task {
+            do {
+                let generator = DatePlanGeneratorService.shared
+                let plans = try await generator.generateDatePlan(from: merged)
+                let session = try await SupabaseService.shared.getPartnerSession(sessionId: sessionId)
+                var planRowIds: [UUID]?
+                if let rowId = session?.id {
+                    let saved = try await SupabaseService.shared.savePartnerSessionPlansV2(partnerSessionId: rowId, plans: plans)
+                    planRowIds = saved.map(\.id)
+                }
+                await MainActor.run {
+                    generatedPlans = plans
+                    generatedPlansSelectedIndex = 0
+                    currentDatePlan = plans.first
+                    currentPlanPartnerNames = (inviterDisplayName, "Partner")
+                    partnerSessionPlanRowIds = planRowIds
+                    isRegeneratingFromOptions = false
+                    // Transition phase → options ready (triggers routing in handlePartnerPhaseChange)
+                    PartnerSessionManager.shared.transitionPhase(to: .optionsReadyForRanking, triggeredBy: "system")
+                }
+                // Notify inviter in-app
+                NotificationManager.shared.addNotification(AppNotification(
+                    type: .optionsReadyToRank,
+                    title: "Your date options are ready.",
+                    message: "Rank your favorites to reveal your perfect match.",
+                    timestamp: Date()
+                ))
+                // Notify partner via notification_events
+                if let rowId = session?.id, let partnerUserId = session?.partnerUserId {
+                    try? await SupabaseService.shared.writeNotificationEvent(
+                        userId: partnerUserId,
+                        partnerSessionId: rowId,
+                        type: PlanPhaseNotification.optionsReady.rawValue,
+                        title: "Your date options are ready.",
+                        body: "Rank your favorites to reveal your perfect match."
+                    )
+                }
+            } catch {
+                await MainActor.run { isRegeneratingFromOptions = false }
+            }
+        }
+    }
+
     /// When session is restored asynchronously (e.g. from keychain), coordinator must reflect auth state so we don't show login.
     private func setupAuthStateSubscription() {
         UserProfileManager.shared.$isLoggedIn
@@ -827,22 +936,37 @@ class NavigationCoordinator: ObservableObject {
     func syncDatePlansFromCloudAsync(coupleId: UUID) async {
         do {
             let dbPlans = try await SupabaseService.shared.getDatePlans(coupleId: coupleId)
-            let planned = dbPlans.filter { $0.status == "planned" }
-            let completed = dbPlans.filter { $0.status == "completed" }
-            let remoteSaved: [DatePlan] = planned.map { DatePlanSyncHelpers.datePlan(from: $0) }
-            let remotePast: [DatePlan] = completed.map { DatePlanSyncHelpers.datePlan(from: $0) }
-            await MainActor.run {
-                let remoteIds = Set(remoteSaved.map(\.id)).union(Set(remotePast.map(\.id)))
-                let unsyncedSaved = savedPlans.filter { !remoteIds.contains($0.id) }
-                let unsyncedPast = pastPlans.filter { !remoteIds.contains($0.id) }
-                savedPlans = remoteSaved + unsyncedSaved
-                pastPlans = remotePast + unsyncedPast
-                saveState()
-            }
-            await uploadAllLocalDatePlansToCloud()
+            await applyRemoteDatePlans(dbPlans)
         } catch {
             await uploadAllLocalDatePlansToCloud()
         }
+    }
+
+    /// Solo-user (no couple) variant — pulls date_plans scoped by user_id only.
+    func syncDatePlansFromCloudAsync(userId: UUID) async {
+        do {
+            let dbPlans = try await SupabaseService.shared.getDatePlans(userId: userId)
+            await applyRemoteDatePlans(dbPlans)
+        } catch {
+            await uploadAllLocalDatePlansToCloud()
+        }
+    }
+
+    /// Shared merge + upload logic for both couple and solo date plan pull paths.
+    private func applyRemoteDatePlans(_ dbPlans: [DBDatePlan]) async {
+        let planned = dbPlans.filter { $0.status == "planned" }
+        let completed = dbPlans.filter { $0.status == "completed" }
+        let remoteSaved: [DatePlan] = planned.map { DatePlanSyncHelpers.datePlan(from: $0) }
+        let remotePast: [DatePlan] = completed.map { DatePlanSyncHelpers.datePlan(from: $0) }
+        await MainActor.run {
+            let remoteIds = Set(remoteSaved.map(\.id)).union(Set(remotePast.map(\.id)))
+            let unsyncedSaved = savedPlans.filter { !remoteIds.contains($0.id) }
+            let unsyncedPast = pastPlans.filter { !remoteIds.contains($0.id) }
+            savedPlans = remoteSaved + unsyncedSaved
+            pastPlans = remotePast + unsyncedPast
+            saveState()
+        }
+        await uploadAllLocalDatePlansToCloud()
     }
 
     /// Upserts every saved and past plan so offline-only or failed uploads reach `date_plans` after login.
@@ -874,6 +998,28 @@ class NavigationCoordinator: ObservableObject {
         await MainActor.run { self.experiencesCloudPullCompleted = false }
         do {
             let rows = try await SupabaseService.shared.getExperiencesWaiting(coupleId: coupleId)
+            let remote = rows.map(\.plan)
+            let remoteIds = Set(remote.map(\.id))
+            await MainActor.run {
+                let unsynced = experiencesWaiting.filter { !remoteIds.contains($0.id) }
+                experiencesWaiting = remote + unsynced
+                saveState()
+                self.experiencesCloudPullCompleted = true
+                self.scheduleSyncAllUnsavedExperiencesToCloud()
+            }
+        } catch {
+            await MainActor.run {
+                self.experiencesCloudPullCompleted = true
+                self.scheduleSyncAllUnsavedExperiencesToCloud()
+            }
+        }
+    }
+
+    /// Solo-user (no couple) variant — pulls experiences_waiting scoped by user_id only.
+    func syncExperiencesWaitingFromCloudAsync(userId: UUID) async {
+        await MainActor.run { self.experiencesCloudPullCompleted = false }
+        do {
+            let rows = try await SupabaseService.shared.getExperiencesWaiting(userId: userId)
             let remote = rows.map(\.plan)
             let remoteIds = Set(remote.map(\.id))
             await MainActor.run {

@@ -442,6 +442,14 @@ final class SupabaseService: ObservableObject {
             query: "couple_id=eq.\(coupleId.uuidString)&status=eq.\(status)&order=created_at.desc"
         )
     }
+
+    /// Fetch all plans for a solo user (no couple) scoped by user_id only.
+    func getDatePlans(userId: UUID) async throws -> [DBDatePlan] {
+        return try await select(
+            table: "date_plans",
+            query: "user_id=eq.\(userId.uuidString)&order=created_at.desc"
+        )
+    }
     
     func updateDatePlan(_ plan: DBDatePlan) async throws -> DBDatePlan {
         return try await update(table: "date_plans", data: plan, column: "id", value: plan.id.uuidString)
@@ -462,6 +470,13 @@ final class SupabaseService: ObservableObject {
         try await select(
             table: "experiences_waiting",
             query: "couple_id=eq.\(coupleId.uuidString)&order=updated_at.desc"
+        )
+    }
+
+    func getExperiencesWaiting(userId: UUID) async throws -> [DBExperiencesWaitingRow] {
+        try await select(
+            table: "experiences_waiting",
+            query: "user_id=eq.\(userId.uuidString)&order=updated_at.desc"
         )
     }
 
@@ -577,6 +592,141 @@ final class SupabaseService: ObservableObject {
         if let r = partnerRank { updates["partner_rank"] = r }
         guard !updates.isEmpty else { return }
         try await patch(table: "partner_session_plans", column: "id", value: planId.uuidString, updates: updates)
+    }
+
+    // MARK: - Phase Management
+
+    /// Updates the `phase` column on `partner_sessions` and writes a history row.
+    func updatePartnerSessionPhase(sessionId: String, phase: PlanPhase, triggeredBy: String? = nil) async throws {
+        let updates: [String: Any] = ["phase": phase.rawValue, "updated_at": ISO8601DateFormatter().string(from: Date())]
+        try await patch(table: "partner_sessions", column: "session_id", value: sessionId, updates: updates)
+        // Also append to audit log if we have a rowId
+        if let session = try? await getPartnerSession(sessionId: sessionId), let rowId = session.id {
+            let historyRow: [String: Any] = [
+                "id": UUID().uuidString,
+                "partner_session_id": rowId.uuidString,
+                "phase": phase.rawValue,
+                "triggered_by": triggeredBy ?? "system",
+                "created_at": ISO8601DateFormatter().string(from: Date())
+            ]
+            _ = try? await rawInsert(table: "plan_phase_history", body: historyRow)
+        }
+    }
+
+    /// Updates partner_user_id and partner_name when a partner joins.
+    func updatePartnerSessionPartnerIdentity(sessionId: String, partnerUserId: UUID?, partnerName: String?) async throws {
+        var updates: [String: Any] = ["updated_at": ISO8601DateFormatter().string(from: Date())]
+        if let uid = partnerUserId { updates["partner_user_id"] = uid.uuidString }
+        if let name = partnerName { updates["partner_name"] = name }
+        guard !updates.isEmpty else { return }
+        try await patch(table: "partner_sessions", column: "session_id", value: sessionId, updates: updates)
+    }
+
+    // MARK: - Option Rankings
+
+    /// Upserts a user's private ranking list for a session (one row per role per session).
+    func upsertOptionRanking(partnerSessionId: UUID, role: PartnerRole, rankings: [RankEntry], userId: UUID?) async throws -> DBOptionRanking {
+        let row = DBOptionRanking(
+            id: UUID(),
+            partnerSessionId: partnerSessionId,
+            userId: userId,
+            role: role.rawValue,
+            rankings: rankings,
+            submittedAt: Date()
+        )
+        return try await upsert(table: "option_rankings", data: row, onConflict: "partner_session_id,role")
+    }
+
+    /// Returns all ranking rows for a session (0, 1, or 2 rows).
+    func getOptionRankings(partnerSessionId: UUID) async throws -> [DBOptionRanking] {
+        let list: [DBOptionRanking] = try await select(
+            table: "option_rankings",
+            query: "partner_session_id=eq.\(partnerSessionId.uuidString)"
+        )
+        return list
+    }
+
+    // MARK: - Final Option Selection
+
+    /// Inserts or updates the winner record for a session.
+    func saveFinalOptionSelection(_ selection: DBFinalOptionSelection) async throws -> DBFinalOptionSelection {
+        return try await upsert(table: "final_option_selection", data: selection, onConflict: "partner_session_id")
+    }
+
+    func getFinalOptionSelection(partnerSessionId: UUID) async throws -> DBFinalOptionSelection? {
+        return try await selectSingle(
+            table: "final_option_selection",
+            column: "partner_session_id",
+            value: partnerSessionId.uuidString
+        )
+    }
+
+    // MARK: - Notification Events
+
+    /// Writes a notification event row for a user.
+    func writeNotificationEvent(userId: UUID?, partnerSessionId: UUID?, type: String, title: String, body: String) async throws {
+        let row = DBNotificationEvent(
+            id: UUID(),
+            userId: userId,
+            partnerSessionId: partnerSessionId,
+            type: type,
+            title: title,
+            body: body,
+            readAt: nil,
+            createdAt: Date()
+        )
+        _ = try await insert(table: "notification_events", data: row) as DBNotificationEvent
+    }
+
+    func getUnreadNotificationEvents(userId: UUID) async throws -> [DBNotificationEvent] {
+        let list: [DBNotificationEvent] = try await select(
+            table: "notification_events",
+            query: "user_id=eq.\(userId.uuidString)&read_at=is.null&order=created_at.desc"
+        )
+        return list
+    }
+
+    func markNotificationEventRead(id: UUID) async throws {
+        let updates: [String: Any] = ["read_at": ISO8601DateFormatter().string(from: Date())]
+        try await patch(table: "notification_events", column: "id", value: id.uuidString, updates: updates)
+    }
+
+    // MARK: - Save partner session plans (up to 5)
+
+    /// Saves up to 5 generated plans and returns the created rows (for ranking later).
+    func savePartnerSessionPlansV2(partnerSessionId: UUID, plans: [DatePlan]) async throws -> [DBPartnerSessionPlan] {
+        var result: [DBPartnerSessionPlan] = []
+        for (index, plan) in plans.prefix(5).enumerated() {
+            let row = DBPartnerSessionPlan(
+                id: UUID(),
+                partnerSessionId: partnerSessionId,
+                planIndex: index + 1,
+                planJson: plan,
+                inviterRank: nil,
+                partnerRank: nil,
+                createdAt: Date()
+            )
+            let inserted: DBPartnerSessionPlan = try await insert(table: "partner_session_plans", data: row)
+            result.append(inserted)
+        }
+        return result.sorted(by: { $0.planIndex < $1.planIndex })
+    }
+
+    // MARK: - Raw insert helper (for ad-hoc JSON payloads like phase history)
+
+    @discardableResult
+    private func rawInsert(table: String, body: [String: Any]) async throws -> Data {
+        let url = URL(string: "\(baseURL)/rest/v1/\(table)")!
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue("application/json", forHTTPHeaderField: "Accept")
+        req.setValue("return=minimal", forHTTPHeaderField: "Prefer")
+        req.setValue(anonKey, forHTTPHeaderField: "apikey")
+        if let token = accessToken { req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
+        req.httpBody = try JSONSerialization.data(withJSONObject: body)
+        let (data, _) = try await session.data(for: req)
+        return data
     }
 
     /// Legacy Supabase **Storage** bucket (lowercase) for `object path` values in `date_memories.image_url`. Postgres table is always `date_memories`.

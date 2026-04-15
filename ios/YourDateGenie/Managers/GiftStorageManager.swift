@@ -148,8 +148,8 @@ final class GiftStorageManager: ObservableObject {
         Task { await pushToCloud() }
     }
 
-    /// Called on login to pull cloud state and merge with local.
-    func syncFromSupabaseWhenLoggedIn(coupleId: UUID, userId: UUID) {
+    /// Called on login to pull cloud state and merge with local. coupleId is optional — pull works via user_id alone.
+    func syncFromSupabaseWhenLoggedIn(coupleId: UUID?, userId: UUID) {
         Task { await syncFromCloud(coupleId: coupleId, userId: userId) }
     }
 
@@ -168,7 +168,7 @@ final class GiftStorageManager: ObservableObject {
         }
     }
 
-    private func syncFromCloud(coupleId: UUID, userId: UUID) async {
+    private func syncFromCloud(coupleId: UUID?, userId: UUID) async {
         do {
             let remote = try await SupabaseService.shared.getStandaloneGifts(userId: userId)
             await MainActor.run {

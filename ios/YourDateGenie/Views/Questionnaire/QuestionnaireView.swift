@@ -307,8 +307,9 @@ struct QuestionnaireView: View {
         QuestionnaireProgressStore.clear()
         PartnerSessionManager.shared.submitPartnerData(sessionId: sessionId, data: viewModel.data)
         coordinator.partnerJoinSessionId = nil
-        coordinator.dismissSheet()
         dismiss()
+        // Route partner to generating screen so they can track progress
+        coordinator.activeSheet = .planGenerating(sessionId: sessionId, role: .partner)
     }
     
     /// Presents the premium paywall when needed, then runs generation.
