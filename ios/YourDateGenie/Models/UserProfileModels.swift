@@ -394,11 +394,10 @@ class UserProfileManager: ObservableObject {
     }
     
     func deleteAccount(password: String) async throws {
-        guard let uid = userId else { return }
-        
-        try await supabase.deleteUser(userId: uid)
-        try await supabase.signOut()
-        
+        // Call the delete-account Edge Function which uses the service role to remove
+        // the auth.users entry — all user data cascades via FK ON DELETE CASCADE.
+        try await supabase.deleteAccountViaEdgeFunction()
+        try? await supabase.signOut()
         await MainActor.run {
             clearProfile()
         }

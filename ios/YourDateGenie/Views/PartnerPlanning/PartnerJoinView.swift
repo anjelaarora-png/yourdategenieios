@@ -33,14 +33,19 @@ struct PartnerJoinView: View {
                 .ignoresSafeArea()
                 .opacity(0.6)
 
-            ScrollView(.vertical, showsIndicators: false) {
-                VStack(spacing: 28) {
-                    headerSection
-                    contentSection
+            if !userProfileManager.isLoggedIn {
+                // Partner must be signed in before they can contribute preferences
+                signInRequiredSection
+            } else {
+                ScrollView(.vertical, showsIndicators: false) {
+                    VStack(spacing: 28) {
+                        headerSection
+                        contentSection
+                    }
+                    .padding(.horizontal, 24)
+                    .padding(.top, 24)
+                    .padding(.bottom, 48)
                 }
-                .padding(.horizontal, 24)
-                .padding(.top, 24)
-                .padding(.bottom, 48)
             }
         }
         .navigationBarTitleDisplayMode(.inline)
@@ -59,6 +64,46 @@ struct PartnerJoinView: View {
         }
         .toolbarBackground(Color.luxuryMaroon, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
+    }
+
+    private var signInRequiredSection: some View {
+        VStack(spacing: 24) {
+            Image(systemName: "lock.circle.fill")
+                .font(.system(size: 52))
+                .foregroundColor(Color.luxuryGold)
+
+            VStack(spacing: 8) {
+                Text("Sign in to join")
+                    .font(Font.tangerine(36, weight: .bold))
+                    .italic()
+                    .foregroundColor(Color.luxuryGold)
+                Text("You need an account to contribute your preferences to this date plan.")
+                    .font(Font.bodySans(14, weight: .regular))
+                    .foregroundColor(Color.luxuryCreamMuted)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 8)
+            }
+
+            Button {
+                coordinator.dismissSheet()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                    coordinator.activeSheet = .authRequired(.fresh)
+                }
+            } label: {
+                Text("Sign In / Create Account")
+                    .font(Font.bodySans(16, weight: .semibold))
+                    .foregroundColor(Color.luxuryMaroon)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 16)
+                    .background(LinearGradient.goldShimmer)
+                    .cornerRadius(16)
+                    .shadow(color: Color.luxuryGold.opacity(0.35), radius: 12, y: 4)
+            }
+            .buttonStyle(.plain)
+            .padding(.horizontal, 24)
+        }
+        .padding(.top, 60)
+        .padding(.horizontal, 24)
     }
 
     private var headerSection: some View {

@@ -3,18 +3,13 @@ import SwiftUI
 // MARK: - Shared row (style 2: gold chips on dark maroon)
 
 /// OpenTable / Resy / Call chips — shared by the single-venue sheet and the multi-venue reserve list.
+/// Call is always shown: dials directly when a phone number is available, otherwise opens a
+/// Google search for the venue's number so the chip is never missing.
 struct ReservationPlatformActionRow: View {
     let venueName: String
     let phoneNumber: String?
     /// Called after OpenTable, Resy, or Call (e.g. dismiss sheet).
     var onAction: () -> Void = {}
-
-    /// Dismissing the reservation sheet in the same run loop as `present(SFSafariViewController)` cancels the in-app Safari presentation.
-    private func dismissAfterOpeningPlatformLink() {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
-            onAction()
-        }
-    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -25,27 +20,39 @@ struct ReservationPlatformActionRow: View {
             HStack(alignment: .center, spacing: 8) {
                 Button {
                     OpenTableReservationSafari.openSearch(venueName: venueName)
-                    dismissAfterOpeningPlatformLink()
+                    onAction()
                 } label: {
                     Text("OpenTable")
                 }
                 .buttonStyle(LuxuryReservationPlatformButtonStyle())
+
                 Button {
                     OpenTableReservationSafari.openResySearch(venueName: venueName)
-                    dismissAfterOpeningPlatformLink()
+                    onAction()
                 } label: {
                     Text("Resy")
                 }
                 .buttonStyle(LuxuryReservationPlatformButtonStyle())
-                if OpenTableReservationSafari.sanitizedPhoneForTel(phoneNumber) != nil {
-                    Button {
-                        OpenTableReservationSafari.openPhoneCall(phoneNumber: phoneNumber ?? "")
-                        dismissAfterOpeningPlatformLink()
-                    } label: {
-                        Text("Call")
+
+                // Always show Call: dial directly when we have a number, otherwise search Google
+                // for the restaurant's phone so the chip is never absent.
+                Button {
+                    if let tel = OpenTableReservationSafari.sanitizedPhoneForTel(phoneNumber) {
+                        if let url = URL(string: "tel:\(tel)") {
+                            UIApplication.shared.open(url)
+                        }
+                    } else {
+                        let query = "\(venueName) phone number"
+                            .addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
+                        if let url = URL(string: "https://www.google.com/search?q=\(query)") {
+                            UIApplication.shared.open(url)
+                        }
                     }
-                    .buttonStyle(LuxuryReservationPlatformButtonStyle())
+                    onAction()
+                } label: {
+                    Text("Call")
                 }
+                .buttonStyle(LuxuryReservationPlatformButtonStyle())
             }
         }
     }
@@ -58,20 +65,13 @@ struct ReservationPlatformPickerSheet: View {
     let payload: ReservationPlatformPickerPayload
     var onDismiss: () -> Void
 
-    private var helperText: String {
-        if OpenTableReservationSafari.sanitizedPhoneForTel(payload.phoneNumber) != nil {
-            return "Search on OpenTable or Resy, or call the restaurant."
-        }
-        return "Search for a table on OpenTable or Resy."
-    }
-
     var body: some View {
         NavigationStack {
             ZStack {
                 Color.luxuryMaroon.ignoresSafeArea()
                 ScrollView {
                     VStack(alignment: .leading, spacing: 20) {
-                        Text(helperText)
+                        Text("Search on OpenTable or Resy, or call the restaurant.")
                             .font(Font.inter(14, weight: .medium))
                             .foregroundColor(Color.luxuryCreamMuted)
                             .fixedSize(horizontal: false, vertical: true)
@@ -98,7 +98,7 @@ struct ReservationPlatformPickerSheet: View {
             .toolbar {
                 ToolbarItem(placement: .principal) {
                     Text("Reserve")
-                        .font(Font.tangerine(22, weight: .bold))
+                        .font(Font.tangerine(36, weight: .bold))
                         .foregroundColor(Color.luxuryGold)
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {

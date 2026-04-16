@@ -150,6 +150,10 @@ struct NotificationBellButton: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(notificationManager.unreadCount > 0
+            ? "Notifications, \(notificationManager.unreadCount) unread"
+            : "Notifications")
+        .accessibilityHint("Opens notifications panel")
         .onAppear {
             if notificationManager.unreadCount > 0 {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1) {

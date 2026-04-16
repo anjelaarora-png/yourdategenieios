@@ -40,9 +40,19 @@ struct Config {
     static let venueVerificationTimeout: TimeInterval = 10.0
     
     // MARK: - Supabase
-    // Use hardcoded values to avoid xcconfig/Info.plist loading issues (hostname resolution)
-    static let supabaseURL = "https://jhpwacmsocjmzhimtbxj.supabase.co"
-    static let supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpocHdhY21zb2NqbXpoaW10YnhqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMwNzY5OTMsImV4cCI6MjA4ODY1Mjk5M30.-CN9vCUtTl3M8nkrYmcWtQguMQgH7qmL9lqrf7q_UJQ"
+    // Reads from Info.plist (populated by Secrets.xcconfig at build time).
+    // Falls back to the compile-time literals so the app still runs if the xcconfig
+    // hasn't been wired up in Xcode yet (Project → Info → Configurations).
+    static let supabaseURL: String = {
+        let fromPlist = resolvedPlistString(key: "SUPABASE_URL", placeholderSuffix: ".supabase.co")
+        if !fromPlist.isEmpty && fromPlist.hasPrefix("https://") { return fromPlist }
+        return "https://jhpwacmsocjmzhimtbxj.supabase.co"
+    }()
+    static let supabaseAnonKey: String = {
+        let fromPlist = resolvedPlistString(key: "SUPABASE_ANON_KEY")
+        if !fromPlist.isEmpty { return fromPlist }
+        return "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpocHdhY21zb2NqbXpoaW10YnhqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMwNzY5OTMsImV4cCI6MjA4ODY1Mjk5M30.-CN9vCUtTl3M8nkrYmcWtQguMQgH7qmL9lqrf7q_UJQ"
+    }()
     
     // MARK: - Configuration Validation
     static var isOpenAIConfigured: Bool {

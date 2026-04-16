@@ -322,6 +322,13 @@ struct QuestionnaireView: View {
     }
 
     private func generateDatePlan() {
+        guard NetworkMonitor.shared.isConnected else {
+            errorTitle = "No Internet Connection"
+            errorMessage = "Please check your connection and try again."
+            showRetryOption = true
+            showError = true
+            return
+        }
         LastQuestionnaireStore.save(viewModel.data)
         QuestionnaireProgressStore.clear()
         withAnimation {

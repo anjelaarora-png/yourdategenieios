@@ -583,6 +583,7 @@ struct LuxurySlideGetStarted: View {
     let showContent: Bool
     @State private var benefitChecks = [false, false, false]
     @State private var counterValue = 0
+    @State private var counterTimer: Timer?
     
     private let userImages = [
         "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=80&h=80&fit=crop&crop=faces",
@@ -751,14 +752,20 @@ struct LuxurySlideGetStarted: View {
                 
                 // Animate counter
                 counterValue = 0
-                Timer.scheduledTimer(withTimeInterval: 0.015, repeats: true) { timer in
+                counterTimer?.invalidate()
+                counterTimer = Timer.scheduledTimer(withTimeInterval: 0.015, repeats: true) { [self] timer in
                     if counterValue < 500 {
                         counterValue += 8
                     } else {
                         timer.invalidate()
+                        counterTimer = nil
                     }
                 }
             }
+        }
+        .onDisappear {
+            counterTimer?.invalidate()
+            counterTimer = nil
         }
     }
 }

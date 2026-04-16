@@ -117,9 +117,6 @@ struct DatePlanResultView: View {
             .safeAreaInset(edge: .bottom) {
                 bottomActionBar
             }
-            .onAppear {
-                isSaved = coordinator.savedPlans.contains(where: { $0.id == plan.id })
-            }
         }
         .tint(Color.luxuryGold)
         .sheet(isPresented: $showPlaylist) {
@@ -477,20 +474,15 @@ struct DatePlanResultView: View {
                     .font(Font.inter(13, weight: .medium))
                     .foregroundColor(Color(hex: "3D2C2C"))
             }
-            Text("·")
-                .foregroundColor(Color(hex: "6B5344"))
-                .padding(.horizontal, 12)
-            Text(plan.estimatedCost)
-                .font(Font.inter(13, weight: .medium))
-                .foregroundColor(Color(hex: "3D2C2C"))
-            Spacer()
-            HStack(spacing: 4) {
-                Image(systemName: "figure.roll")
-                    .font(.system(size: 11))
-                Text("Accessible")
-                    .font(Font.inter(11, weight: .medium))
+            if !plan.estimatedCost.isEmpty {
+                Text("·")
+                    .foregroundColor(Color(hex: "6B5344"))
+                    .padding(.horizontal, 12)
+                Text(plan.estimatedCost)
+                    .font(Font.inter(13, weight: .medium))
+                    .foregroundColor(Color(hex: "3D2C2C"))
             }
-            .foregroundColor(Color.luxuryGoldDark)
+            Spacer()
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 14)
@@ -508,7 +500,7 @@ struct DatePlanResultView: View {
                     Text(plan.weatherNote)
                         .font(Font.inter(13, weight: .regular))
                         .foregroundColor(Color(hex: "5C4A3D"))
-                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 .padding(14)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -537,7 +529,7 @@ struct DatePlanResultView: View {
                         Text("\"\(starter.question)\"")
                             .font(Font.playfairItalic(14))
                             .foregroundColor(Color(hex: "5C4A3D"))
-                            .lineLimit(4)
+                            .fixedSize(horizontal: false, vertical: true)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
@@ -580,7 +572,7 @@ struct DatePlanResultView: View {
                             Text(gift.description)
                                 .font(Font.inter(12, weight: .regular))
                                 .foregroundColor(Color(hex: "5C4A3D"))
-                                .lineLimit(2)
+                                .fixedSize(horizontal: false, vertical: true)
                             if !gift.whereToBuy.isEmpty {
                                 Text("Where: \(gift.whereToBuy)")
                                     .font(Font.inter(11, weight: .regular))
@@ -626,7 +618,7 @@ struct DatePlanResultView: View {
         .padding(.vertical, 12)
     }
     
-    // MARK: - Page Dots
+    // MARK: - Decorative bottom ornament (visual flourish only, not pagination)
     private var pageDots: some View {
         HStack(spacing: 6) {
             Circle()
@@ -642,6 +634,7 @@ struct DatePlanResultView: View {
                 .frame(width: 6, height: 6)
         }
         .padding(.vertical, 16)
+        .accessibilityHidden(true)
     }
     
     // MARK: - Bottom Action Bar
@@ -863,7 +856,7 @@ struct CompactStopRow: View {
                     Text(stop.formattedAddress)
                         .font(Font.inter(12, weight: .regular))
                         .foregroundColor(secondaryText)
-                        .lineLimit(1)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 
                 if let hours = stop.openingHours, !hours.isEmpty {
@@ -918,12 +911,13 @@ struct CompactStopRow: View {
                     .padding(.top, 2)
                 }
                 
-                HStack(spacing: 4) {
+                HStack(alignment: .top, spacing: 4) {
                     Image(systemName: noteIcon)
                         .font(.system(size: 10))
+                        .padding(.top, 1)
                     Text(stop.romanticTip)
                         .font(Font.inter(11, weight: .medium))
-                        .lineLimit(1)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 .foregroundColor(accentColor)
                 .padding(.top, 2)

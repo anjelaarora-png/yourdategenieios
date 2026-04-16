@@ -49,9 +49,6 @@ struct MemoryGalleryView: View {
                 withAnimation(.easeOut(duration: 0.5)) {
                     hasAppeared = true
                 }
-                #if DEBUG
-                SupabaseService.shared.debugTestStorageUpload()
-                #endif
             }
         }
     }

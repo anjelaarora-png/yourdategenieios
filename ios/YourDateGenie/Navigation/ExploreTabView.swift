@@ -127,7 +127,6 @@ struct LuxuryExploreTabView: View {
                                     .padding(.vertical, 4)
                                 }
                                 .scrollBounceBehavior(.automatic)
-                                .frame(height: 56)
                                 .frame(maxWidth: .infinity)
                                 .background(Color.luxuryMaroon)
                             }
@@ -146,14 +145,36 @@ struct LuxuryExploreTabView: View {
                                 }
                                 .frame(maxWidth: .infinity).padding(.vertical, 40)
                             } else if explorePlaces.isEmpty {
-                                Text("Pick a category above to see more spots")
-                                    .font(Font.bodySans(15, weight: .medium))
-                                    .foregroundColor(Color.luxuryCreamMuted)
-                                    .multilineTextAlignment(.center)
-                                    .lineLimit(3)
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.horizontal, 24)
-                                    .padding(.vertical, 40)
+                                VStack(spacing: 10) {
+                                    Text(selectedExploreCategory == nil
+                                         ? "Pick a category above to see more spots"
+                                         : "No spots found for this category — try a different one or pull to refresh.")
+                                        .font(Font.bodySans(15, weight: .medium))
+                                        .foregroundColor(Color.luxuryCreamMuted)
+                                        .multilineTextAlignment(.center)
+                                        .lineLimit(4)
+                                        .frame(maxWidth: .infinity)
+                                        .padding(.horizontal, 24)
+                                    if selectedExploreCategory != nil {
+                                        Button {
+                                            Task { await loadExplorePlaces() }
+                                        } label: {
+                                            HStack(spacing: 6) {
+                                                Image(systemName: "arrow.clockwise")
+                                                    .font(.system(size: 13, weight: .semibold))
+                                                Text("Retry")
+                                                    .font(Font.bodySans(13, weight: .semibold))
+                                            }
+                                            .foregroundColor(Color.luxuryMaroon)
+                                            .padding(.horizontal, 20)
+                                            .padding(.vertical, 10)
+                                            .background(LinearGradient.goldShimmer)
+                                            .cornerRadius(12)
+                                        }
+                                        .buttonStyle(.plain)
+                                    }
+                                }
+                                .padding(.vertical, 40)
                             } else {
                                 // Results header: spot count + quick-access refresh button
                                 HStack {

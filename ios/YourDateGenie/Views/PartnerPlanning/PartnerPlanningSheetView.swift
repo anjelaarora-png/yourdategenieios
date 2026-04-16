@@ -421,7 +421,13 @@ struct PartnerPlanningSheetView: View {
                 .foregroundColor(Color.luxuryGold)
                 .padding(.top, 16)
             if sessionsLoading && pastSessions.isEmpty {
-                EmptyView()
+                HStack {
+                    Spacer()
+                    ProgressView()
+                        .tint(Color.luxuryGold)
+                    Spacer()
+                }
+                .padding(.vertical, 16)
             } else if pastSessions.isEmpty {
                 Text("Plans you created together will appear here.")
                     .font(Font.bodySans(14, weight: .regular))
@@ -494,7 +500,7 @@ struct PartnerPlanningSheetView: View {
                     if phase == .optionsReadyForRanking {
                         coordinator.activeSheet = .partnerRanking
                     } else {
-                        coordinator.loadFinalOptionAndShowRevealPublic()
+                        coordinator.loadFinalOptionAndShowReveal()
                     }
                 } label: {
                     Text(phase == .finalOptionSelected ? "Reveal" : "Rank")
@@ -1104,10 +1110,10 @@ struct PartnerPlanningSheetView: View {
         case .preferencesPending:        return "No rush — we'll tell you the moment they're in."
         case .preferencesComplete:       return "Generating your personalized options now."
         case .generatingDateOptions:     return "This takes just a moment — great things take a little time."
-        case .optionsReadyForRanking:    return "Tap "Rank" to privately rank your favorites."
+        case .optionsReadyForRanking:    return "Tap \u{201C}Rank\u{201D} to privately rank your favorites."
         case .waitingForPartnerRanking:  return "Waiting for your partner to rank their options."
         case .rankingsComplete:          return "Computing your best match based on both rankings."
-        case .finalOptionSelected:       return "Tap "Reveal" to see your winning plan."
+        case .finalOptionSelected:       return "Tap \u{201C}Reveal\u{201D} to see your winning plan."
         default:                         return "No rush — we'll tell you the moment they're in."
         }
     }
@@ -1321,6 +1327,7 @@ private struct InvitedSuccessCelebrationView: View {
         Color.luxuryGoldDark
     ]
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var confettiPieces: [InvitedConfettiPiece] = []
     @State private var hasAnimated = false
 
@@ -1328,13 +1335,16 @@ private struct InvitedSuccessCelebrationView: View {
         GeometryReader { geo in
             let size = geo.size
             ZStack {
-                ForEach(confettiPieces) { piece in
-                    RoundedRectangle(cornerRadius: 1)
-                        .fill(piece.color)
-                        .frame(width: piece.w, height: piece.h)
-                        .rotationEffect(.degrees(piece.rotation))
-                        .position(x: piece.x, y: piece.y)
-                        .opacity(piece.opacity)
+                if !reduceMotion {
+                    ForEach(confettiPieces) { piece in
+                        RoundedRectangle(cornerRadius: 1)
+                            .fill(piece.color)
+                            .frame(width: piece.w, height: piece.h)
+                            .rotationEffect(.degrees(piece.rotation))
+                            .position(x: piece.x, y: piece.y)
+                            .opacity(piece.opacity)
+                    }
+                    .accessibilityHidden(true)
                 }
 
                 VStack(spacing: 24) {
@@ -1369,6 +1379,7 @@ private struct InvitedSuccessCelebrationView: View {
             .onAppear {
                 guard !hasAnimated else { return }
                 hasAnimated = true
+                guard !reduceMotion else { return }
                 spawnConfetti(in: size)
                 animateConfetti(in: size)
             }
@@ -1458,6 +1469,7 @@ private struct PartnerInviteTextField: View {
 // MARK: - Spinning ring animation
 
 struct WaitingRingView: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var rotation: Double = 0
     var body: some View {
         Circle()
@@ -1465,7 +1477,9 @@ struct WaitingRingView: View {
             .stroke(Color.luxuryGold, style: StrokeStyle(lineWidth: 2, lineCap: .round))
             .frame(width: 80, height: 80)
             .rotationEffect(.degrees(rotation))
+            .accessibilityHidden(true)
             .onAppear {
+                guard !reduceMotion else { return }
                 withAnimation(.linear(duration: 1).repeatForever(autoreverses: false)) {
                     rotation = 360
                 }

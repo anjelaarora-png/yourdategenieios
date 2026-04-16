@@ -14,9 +14,30 @@ function jsonResponse(status: number, body: unknown) {
 
 const GATEWAY_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
 
+/** Decodes a base64url JWT payload without verification (Supabase already verified via config.toml). */
+function jwtRole(authHeader: string | null): string | null {
+  if (!authHeader?.startsWith("Bearer ")) return null;
+  try {
+    const parts = authHeader.slice(7).split(".");
+    if (parts.length !== 3) return null;
+    const padded = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const pad = padded.length % 4 === 0 ? "" : "=".repeat(4 - (padded.length % 4));
+    const payload = JSON.parse(atob(padded + pad));
+    return typeof payload?.role === "string" ? payload.role : null;
+  } catch {
+    return null;
+  }
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
+  }
+
+  // Reject anonymous (anon-key-only) calls — a signed-in user is required.
+  const role = jwtRole(req.headers.get("Authorization"));
+  if (role !== "authenticated") {
+    return jsonResponse(401, { error: "Authenticated user required" });
   }
 
   try {

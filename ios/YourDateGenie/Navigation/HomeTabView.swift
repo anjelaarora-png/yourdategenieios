@@ -14,15 +14,16 @@ struct LuxuryHomeTabView: View {
     @EnvironmentObject private var access: AccessManager
     @Environment(\.scenePhase) private var scenePhase
     @StateObject private var notificationManager = NotificationManager.shared
-    @StateObject private var memoryManager = MemoryManager.shared
-    @State private var pulseAnimation = false
+    @EnvironmentObject private var memoryManager: MemoryManager
     @State private var planForCalendar: DatePlan?
     @State private var calendarDate = Date()
     @State private var calendarMessage: String?
     @State private var showCalendarAlert = false
     @State private var trendingPlaces: [GooglePlacesService.PlaceSearchResult] = []
     @State private var trendingPlacesLoading = false
+    @State private var trendingFetchFailed = false
     @State private var lastLoadedLocationKey: String = ""
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     
     private var planForTonight: DatePlan? {
         let calendar = Calendar.current
@@ -38,15 +39,18 @@ struct LuxuryHomeTabView: View {
                 Color.luxuryMaroon
                     .ignoresSafeArea()
                 
-                FloatingParticlesView()
-                    .ignoresSafeArea()
-                    .opacity(0.6)
+                if !reduceMotion && !ProcessInfo.processInfo.isLowPowerModeEnabled {
+                    FloatingParticlesView()
+                        .ignoresSafeArea()
+                        .opacity(0.6)
+                }
                 
                 ScrollView(.vertical, showsIndicators: false) {
                     VStack(spacing: 28) {
                         headerSection
                         heroSection
                         quickActionsSection
+                        DateExperiencesSection()
                         yourUpcomingDatesSection
                         experiencesWaitingSection
                         trendingInYourAreaSection
@@ -90,6 +94,7 @@ struct LuxuryHomeTabView: View {
                         .scaledToFit()
                         .frame(width: 36, height: 36)
                         .frame(minWidth: 80, minHeight: 44, alignment: .leading)
+                        .accessibilityLabel("Your Date Genie")
                 }
                 
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -275,12 +280,14 @@ struct LuxuryHomeTabView: View {
             await MainActor.run {
                 trendingPlaces = places
                 trendingPlacesLoading = false
+                trendingFetchFailed = false
                 lastLoadedLocationKey = location
             }
         } catch {
             await MainActor.run {
                 trendingPlaces = []
                 trendingPlacesLoading = false
+                trendingFetchFailed = true
             }
         }
     }
@@ -422,6 +429,33 @@ struct LuxuryHomeTabView: View {
                     .cornerRadius(12)
                 }
                 .buttonStyle(.plain)
+            } else if trendingFetchFailed {
+                VStack(spacing: 10) {
+                    Image(systemName: "wifi.exclamationmark")
+                        .font(.system(size: 22))
+                        .foregroundColor(Color.luxuryGold.opacity(0.7))
+                    Text("Couldn't load nearby spots. Check your connection and pull down to refresh.")
+                        .font(Font.bodySans(13, weight: .medium))
+                        .foregroundColor(Color.luxuryCreamMuted)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 24)
+                    Button {
+                        Task { await loadTrendingPlaces(force: true) }
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "arrow.clockwise")
+                                .font(.system(size: 13, weight: .semibold))
+                            Text("Try Again")
+                                .font(Font.bodySans(13, weight: .semibold))
+                        }
+                        .foregroundColor(Color.luxuryMaroon)
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 10)
+                        .background(LinearGradient.goldShimmer)
+                        .cornerRadius(12)
+                    }
+                    .buttonStyle(.plain)
+                }
             } else {
                 Text("Highly rated restaurants and things to do will appear here. Pull down to refresh or tap below for more.")
                     .font(Font.bodySans(14, weight: .medium))
@@ -993,6 +1027,7 @@ private struct LuxuryUnifiedDateCard: View {
 
 // MARK: - Floating Particles View
 struct FloatingParticlesView: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var particles: [Particle] = []
     @State private var particleTimer: Timer?
 
@@ -1006,27 +1041,33 @@ struct FloatingParticlesView: View {
     }
     
     var body: some View {
-        GeometryReader { geometry in
-            ZStack {
-                ForEach(particles) { particle in
-                    Image(systemName: "sparkle")
-                        .font(.system(size: particle.size))
-                        .foregroundColor(Color.luxuryGold)
-                        .opacity(particle.opacity)
-                        .position(x: particle.x, y: particle.y)
+        if reduceMotion {
+            Color.clear
+                .accessibilityHidden(true)
+        } else {
+            GeometryReader { geometry in
+                ZStack {
+                    ForEach(particles) { particle in
+                        Image(systemName: "sparkle")
+                            .font(.system(size: particle.size))
+                            .foregroundColor(Color.luxuryGold)
+                            .opacity(particle.opacity)
+                            .position(x: particle.x, y: particle.y)
+                    }
                 }
-            }
-            .onAppear {
-                if particles.isEmpty {
-                    createParticles(in: geometry.size)
+                .accessibilityHidden(true)
+                .onAppear {
+                    if particles.isEmpty {
+                        createParticles(in: geometry.size)
+                    }
+                    if particleTimer == nil {
+                        startAnimating(in: geometry.size)
+                    }
                 }
-                if particleTimer == nil {
-                    startAnimating(in: geometry.size)
+                .onDisappear {
+                    particleTimer?.invalidate()
+                    particleTimer = nil
                 }
-            }
-            .onDisappear {
-                particleTimer?.invalidate()
-                particleTimer = nil
             }
         }
     }

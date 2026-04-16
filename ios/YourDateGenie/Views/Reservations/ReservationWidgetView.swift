@@ -232,8 +232,8 @@ struct ReservationWidgetView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.top, 6)
                     }
-                    if let url = websiteUrl, !url.isEmpty {
-                        Link(destination: URL(string: url)!) {
+                    if let urlString = websiteUrl, !urlString.isEmpty, let url = URL(string: urlString) {
+                        Link(destination: url) {
                             HStack(spacing: 6) {
                                 Image(systemName: "globe")
                                     .foregroundColor(Color.luxuryGold)

@@ -6,8 +6,13 @@ struct LuxuryProfileTabView: View {
     @EnvironmentObject private var access: AccessManager
     @ObservedObject private var profileManager = UserProfileManager.shared
     @StateObject private var notificationManager = NotificationManager.shared
-    @StateObject private var memoryManager = MemoryManager.shared
+    @EnvironmentObject private var memoryManager: MemoryManager
     @State private var showSignOutAlert = false
+    @State private var showDeleteAccountAlert = false
+    @State private var showDeleteAccountConfirm = false
+    @State private var isDeletingAccount = false
+    @State private var restoreMessage: String?
+    @State private var showRestoreAlert = false
     
     private var userProfile: UserProfile? {
         profileManager.currentUser
@@ -44,9 +49,11 @@ struct LuxuryProfileTabView: View {
                                         .foregroundColor(Color.luxuryMuted)
                                 }
                                 
-                                Text("Member since \(userProfile?.memberSince ?? "2024")")
-                                    .font(Font.bodySans(12, weight: .regular))
-                                    .foregroundColor(Color.luxuryMuted.opacity(0.7))
+                                if let memberSince = userProfile?.memberSince, !memberSince.isEmpty {
+                                    Text("Member since \(memberSince)")
+                                        .font(Font.bodySans(12, weight: .regular))
+                                        .foregroundColor(Color.luxuryMuted.opacity(0.7))
+                                }
                             }
                         }
                         .padding(.top, 16)
@@ -101,6 +108,39 @@ struct LuxuryProfileTabView: View {
                         .luxuryCard(hasBorder: false)
                         .padding(.horizontal, 20)
                         
+                        // Restore Purchases
+                        Button {
+                            Task {
+                                do {
+                                    try await PurchaseManager.shared.restorePurchases()
+                                    restoreMessage = "Purchases restored successfully."
+                                } catch {
+                                    restoreMessage = "No purchases found to restore."
+                                }
+                                showRestoreAlert = true
+                            }
+                        } label: {
+                            HStack(spacing: 10) {
+                                Image(systemName: "arrow.clockwise.circle.fill")
+                                    .font(.system(size: 20))
+                                    .foregroundColor(Color.luxuryGold)
+                                    .frame(width: 24, height: 24)
+                                Text("Restore Purchases")
+                            }
+                            .font(Font.bodySans(14, weight: .medium))
+                            .foregroundColor(Color.luxuryGold)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
+                            .background(Color.luxuryMaroonLight)
+                            .cornerRadius(12)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(Color.luxuryGold.opacity(0.3), lineWidth: 1)
+                            )
+                        }
+                        .padding(.horizontal, 20)
+
+                        // Sign Out
                         Button {
                             showSignOutAlert = true
                         } label: {
@@ -124,6 +164,26 @@ struct LuxuryProfileTabView: View {
                             )
                         }
                         .padding(.horizontal, 20)
+
+                        // Delete Account (required by App Store / GDPR)
+                        Button {
+                            showDeleteAccountAlert = true
+                        } label: {
+                            if isDeletingAccount {
+                                ProgressView()
+                                    .tint(Color.luxuryError.opacity(0.7))
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 14)
+                            } else {
+                                Text("Delete Account")
+                                    .font(Font.bodySans(13, weight: .medium))
+                                    .foregroundColor(Color.luxuryError.opacity(0.7))
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 14)
+                            }
+                        }
+                        .disabled(isDeletingAccount)
+                        .padding(.horizontal, 20)
                     }
                     .padding(.bottom, 120)
                 }
@@ -143,6 +203,32 @@ struct LuxuryProfileTabView: View {
                 }
             } message: {
                 Text("Are you sure you want to sign out?")
+            }
+            .alert("Delete Account", isPresented: $showDeleteAccountAlert) {
+                Button("Cancel", role: .cancel) { }
+                Button("Delete", role: .destructive) {
+                    isDeletingAccount = true
+                    Task {
+                        do {
+                            try await profileManager.deleteAccount(password: "")
+                            await MainActor.run {
+                                isDeletingAccount = false
+                                coordinator.signOut()
+                            }
+                        } catch {
+                            await MainActor.run {
+                                isDeletingAccount = false
+                            }
+                        }
+                    }
+                }
+            } message: {
+                Text("This will permanently delete your account and all data. This action cannot be undone.")
+            }
+            .alert("Restore Purchases", isPresented: $showRestoreAlert) {
+                Button("OK", role: .cancel) { }
+            } message: {
+                Text(restoreMessage ?? "")
             }
         }
     }

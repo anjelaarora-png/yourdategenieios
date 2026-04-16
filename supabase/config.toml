@@ -1,19 +1,29 @@
 project_id = "vuqmxacjtrhsqvswxmxu"
 
+# generate-date-plan is called by the web/Lovable frontend (not the iOS app) so it remains
+# with verify_jwt = false to avoid breaking the web flow. All other functions require a
+# valid Supabase JWT (either anon or authenticated) before the function body executes.
+
 [functions.generate-date-plan]
 verify_jwt = false
 
 [functions.generate-more-gifts]
-verify_jwt = false
+verify_jwt = true
 
 [functions.generate-playlist]
-verify_jwt = false
+verify_jwt = true
 
 [functions.send-date-plan-email]
-verify_jwt = false
+verify_jwt = true
 
 [functions.notify-new-signup]
-verify_jwt = false
+verify_jwt = true
 
 [functions.send-welcome-email]
-verify_jwt = false
+verify_jwt = true
+
+[functions.import-eventbrite-event]
+verify_jwt = true
+
+[functions.delete-account]
+verify_jwt = true

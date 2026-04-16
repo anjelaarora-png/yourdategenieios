@@ -9,15 +9,21 @@ final class SupabaseManager {
     let client: SupabaseClient
 
     private init() {
-        let supabaseURLString = "https://jhpwacmsocjmzhimtbxj.supabase.co"
-        let anonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpocHdhY21zb2NqbXpoaW10YnhqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMwNzY5OTMsImV4cCI6MjA4ODY1Mjk5M30.-CN9vCUtTl3M8nkrYmcWtQguMQgH7qmL9lqrf7q_UJQ"
+        let supabaseURLString = AppConfig.supabaseURL
+        let anonKey = AppConfig.supabaseAnonKey
 
         let normalizedURL = supabaseURLString.hasPrefix("http")
             ? supabaseURLString
             : "https://\(supabaseURLString)"
 
         guard let url = URL(string: normalizedURL) else {
-            fatalError("SupabaseManager: invalid Supabase URL")
+            assertionFailure("SupabaseManager: invalid Supabase URL '\(normalizedURL)'")
+            // Provide a non-fatal no-op client to avoid crashing in edge cases
+            client = SupabaseClient(
+                supabaseURL: URL(string: "https://localhost")!,
+                supabaseKey: ""
+            )
+            return
         }
 
         client = SupabaseClient(

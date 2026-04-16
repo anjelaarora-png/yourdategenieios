@@ -734,12 +734,36 @@ const vibeConfig: Record<string, { description: string }> = {
   blues: { description: "Blues & Soul" },
 };
 
+/** Decodes a base64url JWT payload without verification (Supabase already verified via config.toml). */
+function jwtRole(authHeader: string | null): string | null {
+  if (!authHeader?.startsWith("Bearer ")) return null;
+  try {
+    const parts = authHeader.slice(7).split(".");
+    if (parts.length !== 3) return null;
+    const padded = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const pad = padded.length % 4 === 0 ? "" : "=".repeat(4 - (padded.length % 4));
+    const payload = JSON.parse(atob(padded + pad));
+    return typeof payload?.role === "string" ? payload.role : null;
+  } catch {
+    return null;
+  }
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   const jsonHeaders = { ...corsHeaders, "Content-Type": "application/json" };
+
+  // Reject anonymous (anon-key-only) calls — a signed-in user is required.
+  const role = jwtRole(req.headers.get("Authorization"));
+  if (role !== "authenticated") {
+    return new Response(JSON.stringify({ error: "Authenticated user required" }), {
+      status: 401,
+      headers: jsonHeaders,
+    });
+  }
 
   try {
     const apiKey = Deno.env.get("LASTFM_API_KEY");

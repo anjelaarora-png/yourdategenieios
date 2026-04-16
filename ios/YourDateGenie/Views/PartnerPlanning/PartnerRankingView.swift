@@ -166,7 +166,9 @@ struct PartnerRankingView: View {
             } label: {
                 Group {
                     if isSubmitting {
-                        ProgressView().tint(Color.luxuryMaroon)
+                        ProgressView()
+                            .tint(Color.luxuryMaroon)
+                            .accessibilityLabel("Submitting rankings")
                     } else {
                         HStack(spacing: 8) {
                             Image(systemName: "checkmark.circle.fill")
@@ -233,7 +235,7 @@ struct PartnerRankingView: View {
 
             if partnerManager.currentPhase == .finalOptionSelected {
                 Button {
-                    coordinator.loadFinalOptionAndShowRevealPublic()
+                    coordinator.loadFinalOptionAndShowReveal()
                 } label: {
                     HStack(spacing: 8) {
                         Image(systemName: "star.circle.fill")
@@ -443,13 +445,6 @@ private struct RankingOptionCard: View {
     }
 }
 
-// MARK: - NavigationCoordinator public entry point for reveal
-
-extension NavigationCoordinator {
-    func loadFinalOptionAndShowRevealPublic() {
-        loadFinalOptionAndShowReveal()
-    }
-}
 
 #Preview("Partner Ranking") {
     NavigationStack {

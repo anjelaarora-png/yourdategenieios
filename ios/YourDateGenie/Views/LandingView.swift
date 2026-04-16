@@ -40,6 +40,13 @@ struct LandingView: View {
     
     // MARK: - Hero Section
     private var heroSection: some View {
+        GeometryReader { geo in
+            heroContent(heroHeight: geo.size.height * 0.6 > 300 ? geo.size.height * 0.6 : 420)
+        }
+        .frame(height: 520)
+    }
+
+    private func heroContent(heroHeight: CGFloat) -> some View {
         ZStack(alignment: .bottom) {
             // Background Image with overlay
             AsyncImage(url: URL(string: "https://images.unsplash.com/photo-1529333166437-7750a6dd5a70?w=800&h=600&fit=crop")) { phase in
@@ -55,7 +62,7 @@ struct LandingView: View {
                     EmptyView()
                 }
             }
-            .frame(height: UIScreen.main.bounds.height * 0.6)
+            .frame(height: heroHeight)
             .clipped()
             .overlay(
                 LinearGradient(

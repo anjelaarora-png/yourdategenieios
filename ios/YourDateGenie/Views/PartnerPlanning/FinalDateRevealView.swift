@@ -7,6 +7,7 @@ struct FinalDateRevealView: View {
     @EnvironmentObject var coordinator: NavigationCoordinator
     @EnvironmentObject private var access: AccessManager
     @StateObject private var partnerManager = PartnerSessionManager.shared
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     @State private var hasRevealed = false
     @State private var revealScale: CGFloat = 0.85
@@ -14,16 +15,22 @@ struct FinalDateRevealView: View {
     @State private var confettiPieces: [RevealConfettiPiece] = []
     @State private var showRunnerUp = false
     @State private var isConfirming = false
+    @State private var loadingTimedOut = false
+    @State private var loadingTimeoutTask: Task<Void, Never>?
 
     private var winningPlan: DatePlan? {
         guard let sel = coordinator.finalOptionSelection,
-              sel.winningPlanIndex - 1 < coordinator.generatedPlans.count else { return coordinator.generatedPlans.first }
+              sel.winningPlanIndex >= 1,
+              sel.winningPlanIndex - 1 < coordinator.generatedPlans.count else {
+            return coordinator.generatedPlans.first
+        }
         return coordinator.generatedPlans[sel.winningPlanIndex - 1]
     }
 
     private var runnerUpPlan: DatePlan? {
         guard let sel = coordinator.finalOptionSelection,
               let idx = sel.runnerUpPlanIndex,
+              idx >= 1,
               idx - 1 < coordinator.generatedPlans.count else { return nil }
         return coordinator.generatedPlans[idx - 1]
     }
@@ -33,19 +40,22 @@ struct FinalDateRevealView: View {
             Color.luxuryMaroon.ignoresSafeArea()
             FloatingParticlesView().ignoresSafeArea().opacity(0.5)
 
-            // Confetti layer
-            GeometryReader { geo in
-                ForEach(confettiPieces) { piece in
-                    RoundedRectangle(cornerRadius: 1)
-                        .fill(piece.color)
-                        .frame(width: piece.w, height: piece.h)
-                        .rotationEffect(.degrees(piece.rotation))
-                        .position(x: piece.x, y: piece.y)
-                        .opacity(piece.opacity)
+            // Confetti layer (decorative, skipped when Reduce Motion is on)
+            if !reduceMotion {
+                GeometryReader { geo in
+                    ForEach(confettiPieces) { piece in
+                        RoundedRectangle(cornerRadius: 1)
+                            .fill(piece.color)
+                            .frame(width: piece.w, height: piece.h)
+                            .rotationEffect(.degrees(piece.rotation))
+                            .position(x: piece.x, y: piece.y)
+                            .opacity(piece.opacity)
+                    }
+                    Color.clear.onAppear { spawnConfetti(in: geo.size) }
                 }
-                Color.clear.onAppear { spawnConfetti(in: geo.size) }
+                .ignoresSafeArea()
+                .accessibilityHidden(true)
             }
-            .ignoresSafeArea()
 
             ScrollView(.vertical, showsIndicators: false) {
                 VStack(spacing: 32) {
@@ -59,6 +69,8 @@ struct FinalDateRevealView: View {
                         if let runner = runnerUpPlan {
                             runnerUpSection(plan: runner)
                         }
+                    } else if loadingTimedOut {
+                        loadingErrorState
                     } else {
                         loadingState
                     }
@@ -85,12 +97,31 @@ struct FinalDateRevealView: View {
         .toolbarBackground(.visible, for: .navigationBar)
         .onAppear {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                withAnimation(.spring(response: 0.55, dampingFraction: 0.72)) {
+                if reduceMotion {
                     revealScale = 1.0
                     revealOpacity = 1.0
+                } else {
+                    withAnimation(.spring(response: 0.55, dampingFraction: 0.72)) {
+                        revealScale = 1.0
+                        revealOpacity = 1.0
+                    }
+                    animateConfetti()
                 }
-                animateConfetti()
             }
+            if winningPlan == nil {
+                loadingTimeoutTask = Task {
+                    try? await Task.sleep(nanoseconds: 15_000_000_000)
+                    await MainActor.run {
+                        if winningPlan == nil { loadingTimedOut = true }
+                    }
+                }
+            }
+        }
+        .onDisappear {
+            loadingTimeoutTask?.cancel()
+        }
+        .onChange(of: winningPlan == nil) { _, isNil in
+            if !isNil { loadingTimeoutTask?.cancel() }
         }
     }
 
@@ -120,7 +151,24 @@ struct FinalDateRevealView: View {
 
     private func winnerCard(plan: DatePlan) -> some View {
         VStack(alignment: .leading, spacing: 20) {
-            // Title row
+            winnerCardHeader(plan: plan)
+            winnerCardStops(plan: plan)
+            winnerCardHints(plan: plan)
+        }
+        .padding(20)
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(Color.luxuryMaroonLight)
+                .shadow(color: Color.luxuryGold.opacity(0.2), radius: 20, y: 6)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 20)
+                .stroke(Color.luxuryGold.opacity(0.5), lineWidth: 1.5)
+        )
+    }
+
+    private func winnerCardHeader(plan: DatePlan) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 6) {
@@ -140,75 +188,68 @@ struct FinalDateRevealView: View {
                 }
                 Spacer()
             }
-
             if !plan.tagline.isEmpty {
                 Text(plan.tagline)
                     .font(Font.bodySans(14, weight: .regular))
                     .foregroundColor(Color.luxuryCreamMuted)
                     .fixedSize(horizontal: false, vertical: true)
             }
+        }
+    }
 
-            // Plan details grid
-            if !plan.stops.isEmpty {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("YOUR EVENING")
-                        .font(Font.bodySans(10, weight: .bold))
-                        .tracking(2)
-                        .foregroundColor(Color.luxuryGold.opacity(0.7))
-                    ForEach(stops.prefix(4), id: \.name) { stop in
-                        HStack(alignment: .top, spacing: 10) {
-                            Circle()
-                                .fill(Color.luxuryGold)
-                                .frame(width: 6, height: 6)
-                                .padding(.top, 5)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(stop.name)
-                                    .font(Font.bodySans(14, weight: .semibold))
-                                    .foregroundColor(Color.luxuryCream)
-                                if !stop.description.isEmpty {
-                                    Text(stop.description)
-                                        .font(Font.bodySans(12, weight: .regular))
-                                        .foregroundColor(Color.luxuryCreamMuted)
-                                        .lineLimit(2)
-                                }
+    @ViewBuilder
+    private func winnerCardStops(plan: DatePlan) -> some View {
+        if !plan.stops.isEmpty {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("YOUR EVENING")
+                    .font(Font.bodySans(10, weight: .bold))
+                    .tracking(2)
+                    .foregroundColor(Color.luxuryGold.opacity(0.7))
+                ForEach(plan.stops.prefix(4), id: \.name) { stop in
+                    HStack(alignment: .top, spacing: 10) {
+                        Circle()
+                            .fill(Color.luxuryGold)
+                            .frame(width: 6, height: 6)
+                            .padding(.top, 5)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(stop.name)
+                                .font(Font.bodySans(14, weight: .semibold))
+                                .foregroundColor(Color.luxuryCream)
+                            if !stop.description.isEmpty {
+                                Text(stop.description)
+                                    .font(Font.bodySans(12, weight: .regular))
+                                    .foregroundColor(Color.luxuryCreamMuted)
+                                    .lineLimit(2)
                             }
                         }
                     }
                 }
-                .padding(14)
-                .background(Color.luxuryMaroon.opacity(0.5))
-                .cornerRadius(12)
             }
+            .padding(14)
+            .background(Color.luxuryMaroon.opacity(0.5))
+            .cornerRadius(12)
+        }
+    }
 
-            // Activity tags derived from packing list as a lightweight proxy
-            let activityHints = Array(plan.packingList.prefix(4))
-            if !activityHints.isEmpty {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        ForEach(activityHints, id: \.self) { hint in
-                            Text(hint)
-                                .font(Font.bodySans(11, weight: .semibold))
-                                .foregroundColor(Color.luxuryGold)
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 4)
-                                .background(Color.luxuryGold.opacity(0.12))
-                                .cornerRadius(10)
-                                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.luxuryGold.opacity(0.3), lineWidth: 1))
-                        }
+    @ViewBuilder
+    private func winnerCardHints(plan: DatePlan) -> some View {
+        let hints = Array(plan.packingList.prefix(4))
+        if !hints.isEmpty {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(hints, id: \.self) { hint in
+                        Text(hint)
+                            .font(Font.bodySans(11, weight: .semibold))
+                            .foregroundColor(Color.luxuryGold)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 4)
+                            .background(Color.luxuryGold.opacity(0.12))
+                            .cornerRadius(10)
+                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.luxuryGold.opacity(0.3), lineWidth: 1))
                     }
                 }
             }
         }
-        .padding(20)
-        .background(
-            RoundedRectangle(cornerRadius: 20)
-                .fill(Color.luxuryMaroonLight)
-                .shadow(color: Color.luxuryGold.opacity(0.2), radius: 20, y: 6)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 20)
-                .stroke(Color.luxuryGold.opacity(0.5), lineWidth: 1.5)
-        )
     }
 
     // MARK: - Selection reason
@@ -358,6 +399,37 @@ struct FinalDateRevealView: View {
                 .foregroundColor(Color.luxuryCreamMuted)
         }
         .padding(.top, 60)
+    }
+
+    private var loadingErrorState: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "wifi.exclamationmark")
+                .font(.system(size: 32))
+                .foregroundColor(Color.luxuryGold.opacity(0.7))
+            Text("Couldn't load your date plan")
+                .font(Font.tangerine(28, weight: .bold))
+                .italic()
+                .foregroundColor(Color.luxuryGold)
+                .multilineTextAlignment(.center)
+            Text("Check your connection and try again, or go back and retry.")
+                .font(Font.bodySans(14, weight: .regular))
+                .foregroundColor(Color.luxuryCreamMuted)
+                .multilineTextAlignment(.center)
+            Button {
+                coordinator.dismissSheet()
+            } label: {
+                Text("Go Back")
+                    .font(Font.bodySans(15, weight: .semibold))
+                    .foregroundColor(Color.luxuryMaroon)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .background(LinearGradient.goldShimmer)
+                    .cornerRadius(14)
+            }
+            .buttonStyle(.plain)
+            .padding(.horizontal, 40)
+        }
+        .padding(.top, 40)
     }
 
     // MARK: - Actions

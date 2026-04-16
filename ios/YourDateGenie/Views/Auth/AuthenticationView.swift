@@ -1,11 +1,13 @@
 import SwiftUI
 import Combine
 import UIKit
+import AuthenticationServices
 
 struct AuthenticationView: View {
     @EnvironmentObject var coordinator: NavigationCoordinator
     @StateObject private var viewModel = AuthViewModelState()
     @StateObject private var profileManager = UserProfileManager.shared
+    @StateObject private var socialAuth = SocialAuthService.shared
     @FocusState private var focusedField: AuthInputField?
     @State private var showResetPasswordSheet = false
     @State private var resendCooldownRemaining = 0
@@ -56,6 +58,12 @@ struct AuthenticationView: View {
                                 forgotPasswordButton
                                     .padding(.top, 12)
                             }
+
+                            socialDivider
+                                .padding(.top, 28)
+
+                            socialAuthButtons
+                                .padding(.top, 16)
 
                             if viewModel.isSignUp {
                                 signUpBenefits
@@ -169,6 +177,68 @@ struct AuthenticationView: View {
                     coordinator.completeSignUp()
                 }
             }
+        }
+    }
+
+    // MARK: - Social Auth
+
+    private var socialDivider: some View {
+        HStack(spacing: 12) {
+            Rectangle()
+                .fill(Color.luxuryMuted.opacity(0.3))
+                .frame(height: 1)
+            Text("or continue with")
+                .font(Font.bodySans(12, weight: .regular))
+                .foregroundColor(Color.luxuryMuted)
+                .fixedSize()
+            Rectangle()
+                .fill(Color.luxuryMuted.opacity(0.3))
+                .frame(height: 1)
+        }
+    }
+
+    private var socialAuthButtons: some View {
+        VStack(spacing: 12) {
+            // Sign in with Apple (required by Apple when Google is offered)
+            SignInWithAppleButton(
+                .signIn,
+                onRequest: { request in
+                    request.requestedScopes = [.fullName, .email]
+                },
+                onCompletion: { _ in
+                    socialAuth.signInWithApple()
+                }
+            )
+            .signInWithAppleButtonStyle(.white)
+            .frame(height: 50)
+            .cornerRadius(12)
+            .disabled(socialAuth.isLoading)
+
+            // Sign in with Google (Supabase OAuth via ASWebAuthenticationSession)
+            Button {
+                socialAuth.signInWithGoogle()
+            } label: {
+                HStack(spacing: 10) {
+                    Image(systemName: "globe")
+                        .font(.system(size: 18, weight: .medium))
+                    Text("Continue with Google")
+                        .font(Font.bodySans(15, weight: .medium))
+                }
+                .foregroundColor(.black)
+                .frame(maxWidth: .infinity)
+                .frame(height: 50)
+                .background(Color.white)
+                .cornerRadius(12)
+            }
+            .disabled(socialAuth.isLoading)
+        }
+        .alert("Sign In Error", isPresented: Binding(
+            get: { socialAuth.error != nil },
+            set: { if !$0 { socialAuth.error = nil } }
+        )) {
+            Button("OK", role: .cancel) { socialAuth.error = nil }
+        } message: {
+            Text(socialAuth.error?.localizedDescription ?? "")
         }
     }
 

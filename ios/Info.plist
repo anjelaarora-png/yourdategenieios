@@ -75,12 +75,27 @@
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
 	
-	<!-- Allow network connections - required for Supabase auth -->
+	<!-- ATS: all app connections use HTTPS, so no arbitrary loads are needed.
+	     Supabase and Google APIs all enforce TLS — remove the blanket exception. -->
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>
-		<true/>
+		<false/>
+		<key>NSExceptionDomains</key>
+		<dict>
+			<key>supabase.co</key>
+			<dict>
+				<key>NSIncludesSubdomains</key>
+				<true/>
+				<key>NSExceptionRequiresForwardSecrecy</key>
+				<false/>
+			</dict>
+		</dict>
 	</dict>
+
+	<!-- App Store export compliance — app uses only standard iOS encryption (HTTPS/TLS). -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	
 	<!-- Calendar access for adding date plans -->
 	<key>NSCalendarsUsageDescription</key>

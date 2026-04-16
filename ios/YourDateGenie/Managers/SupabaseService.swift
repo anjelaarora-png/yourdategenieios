@@ -28,7 +28,15 @@ final class SupabaseService: ObservableObject {
         self.anonKey = AppConfig.supabaseAnonKey
         
         guard let url = URL(string: baseURL.hasPrefix("http") ? baseURL : "https://\(baseURL)") else {
-            fatalError("Invalid Supabase URL")
+            AppLogger.error("Invalid Supabase URL: \(baseURL)", category: .network)
+            assertionFailure("Invalid Supabase URL '\(baseURL)' — check Config.swift / Secrets.xcconfig")
+            // Fall back to a no-op placeholder so the app doesn't crash on init
+            self.supabaseClient = SupabaseClient(supabaseURL: URL(string: "https://localhost")!, supabaseKey: "")
+            let fallbackConfig = URLSessionConfiguration.ephemeral
+            self.session = URLSession(configuration: fallbackConfig)
+            self.decoder = JSONDecoder()
+            self.encoder = JSONEncoder()
+            return
         }
         // Opt in to upcoming default: emit cached session first, then refresh (see supabase-swift PR #822).
         self.supabaseClient = SupabaseClient(
@@ -354,6 +362,29 @@ final class SupabaseService: ObservableObject {
     
     func deleteUser(userId: UUID) async throws {
         try await delete(table: "users", column: "user_id", value: userId.uuidString)
+    }
+
+    /// Calls the `delete-account` Edge Function which uses the service role to permanently
+    /// remove the auth.users entry (and cascade-deletes all user data via FK constraints).
+    func deleteAccountViaEdgeFunction() async throws {
+        try? await refreshRestAuthFromSDK()
+        let urlString = baseURL.hasSuffix("/")
+            ? "\(baseURL)functions/v1/delete-account"
+            : "\(baseURL)/functions/v1/delete-account"
+        guard let url = URL(string: urlString) else { throw SupabaseError.invalidResponse }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        if let token = accessToken {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        } else {
+            request.setValue("Bearer \(anonKey)", forHTTPHeaderField: "Authorization")
+        }
+        let (_, response) = try await session.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse,
+              (200...299).contains(httpResponse.statusCode) else {
+            throw SupabaseError.invalidResponse
+        }
     }
     
     /// Creates `public.users` and a solo `public.couples` row if missing (trigger may already have created them).
@@ -1079,51 +1110,20 @@ final class SupabaseService: ObservableObject {
     
     /// Uploads a memory photo to the `Memories` bucket and returns the **public** object URL string.
     func uploadMemoryImage(data: Data, userId: String) async throws -> String {
-        print("🚀 Upload function called — userId=\(userId) rawBytes=\(data.count)")
-        print("🔧 Supabase URL: \(baseURL)")
-        print("🔧 Bucket: \(Self.memoriesStorageBucket)")
+        AppLogger.debug("uploadMemoryImage: userId=\(userId) rawBytes=\(data.count)", category: .storage)
         do {
             let prepared = try Self.prepareMemoryImageDataUnder5MB(data)
-            print("📦 Image size after compression: \(prepared.count) bytes")
+            AppLogger.debug("uploadMemoryImage: compressed to \(prepared.count) bytes", category: .storage)
             let filename = "\(UUID().uuidString).jpg"
             let path = "\(userId)/\(filename)"
             let bucket = Self.memoriesStorageBucket
-            print("🚀 Upload started — path: \(bucket)/\(path)")
             _ = try await uploadImage(data: prepared, bucket: bucket, path: path)
             let publicURL = getPublicURL(bucket: bucket, path: path)
-            print("✅ Upload success — url: \(publicURL.absoluteString)")
+            AppLogger.debug("uploadMemoryImage: success url=\(publicURL.absoluteString)", category: .storage)
             return publicURL.absoluteString
         } catch {
-            print("❌ Upload error (uploadMemoryImage):", error)
+            AppLogger.error("uploadMemoryImage failed: \(error)", category: .storage)
             throw error
-        }
-    }
-    
-    // MARK: - Debug Test Upload (remove before release)
-
-    /// Call this from a button or onAppear to isolate storage vs integration issues.
-    /// Creates a 1×1 red JPEG and uploads it to `Memories/debug/test.jpg`.
-    func debugTestStorageUpload() {
-        Task {
-            print("🧪 debugTestStorageUpload: start")
-            print("🔧 Supabase URL: \(baseURL)")
-            // Build a 1×1 red pixel JPEG
-            let renderer = UIGraphicsImageRenderer(size: CGSize(width: 1, height: 1))
-            let img = renderer.image { ctx in
-                UIColor.red.setFill()
-                ctx.fill(CGRect(x: 0, y: 0, width: 1, height: 1))
-            }
-            guard let data = img.jpegData(compressionQuality: 1.0) else {
-                print("❌ debugTestStorageUpload: could not create test image data")
-                return
-            }
-            print("📦 debugTestStorageUpload: test image size=\(data.count) bytes")
-            do {
-                let url = try await uploadMemoryImage(data: data, userId: "debug")
-                print("✅ debugTestStorageUpload: SUCCESS — url=\(url)")
-            } catch {
-                print("❌ debugTestStorageUpload: FAILED —", error)
-            }
         }
     }
 
@@ -1136,7 +1136,7 @@ final class SupabaseService: ObservableObject {
         let token = sdkSession.accessToken
         // Keep cached property in sync for other callers
         await MainActor.run { self.accessToken = token }
-        print("🔑 uploadImage: accessToken obtained (prefix: \(token.prefix(12))…)")
+        AppLogger.debug("uploadImage: access token obtained", category: .storage)
 
         let url = URL(string: "\(baseURL)/storage/v1/object/\(bucket)/\(path)")!
         print("🌐 uploadImage: POST \(url.absoluteString)")
@@ -1534,9 +1534,9 @@ final class SupabaseService: ObservableObject {
                             isAuthenticated = false
                         }
                     }
-                } catch {
-                    print("Failed to load cached session: \(error)")
-                    clearSessionKeychainAsync()
+            } catch {
+                AppLogger.error("Failed to load cached session: \(error)", category: .auth)
+                clearSessionKeychainAsync()
                     await MainActor.run {
                         accessToken = nil
                         refreshToken = nil

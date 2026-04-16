@@ -10,6 +10,7 @@ struct PlanGeneratingView: View {
 
     @EnvironmentObject var coordinator: NavigationCoordinator
     @StateObject private var partnerManager = PartnerSessionManager.shared
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     @State private var pulseScale: CGFloat = 1.0
     @State private var shimmerOffset: CGFloat = -1.0
@@ -143,6 +144,13 @@ struct PlanGeneratingView: View {
     // MARK: - Animations
 
     private func startAnimations() {
+        guard !reduceMotion else {
+            // Static state for Reduce Motion — just cycle messages slowly
+            dotTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { _ in
+                messageIndex = (messageIndex + 1) % progressMessages.count
+            }
+            return
+        }
         // Pulse
         withAnimation(.easeInOut(duration: 1.4).repeatForever(autoreverses: true)) {
             pulseScale = 1.12

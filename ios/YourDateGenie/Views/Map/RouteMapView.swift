@@ -319,9 +319,10 @@ struct RouteMapView: View {
             ])
         } else {
             // Fallback: Google Maps URL - origin = starting point when set, else first stop
-            var components = URLComponents(string: "https://www.google.com/maps/dir/")!
+            guard !stops.isEmpty,
+                  var components = URLComponents(string: "https://www.google.com/maps/dir/") else { return }
             components.queryItems = [URLQueryItem(name: "api", value: "1")]
-            let destStop = stops.last!
+            guard let destStop = stops.last else { return }
             let destValue = MapURLHelper.directionsQueryValue(for: destStop)
             let originValue: String
             let waypointStops: ArraySlice<DatePlanStop>
@@ -329,7 +330,7 @@ struct RouteMapView: View {
                 originValue = "\(start.latitude),\(start.longitude)"
                 waypointStops = stops.count > 1 ? stops.dropLast() : []
             } else {
-                let originStop = stops.first!
+                guard let originStop = stops.first else { return }
                 originValue = MapURLHelper.directionsQueryValue(for: originStop)
                 waypointStops = stops.count > 2 ? stops.dropFirst().dropLast() : []
             }
@@ -357,8 +358,8 @@ private extension RouteMapView {
         guard !coordinates.isEmpty else { return nil }
         let lats = coordinates.map(\.latitude)
         let lons = coordinates.map(\.longitude)
-        let minLat = lats.min()!, maxLat = lats.max()!
-        let minLon = lons.min()!, maxLon = lons.max()!
+        guard let minLat = lats.min(), let maxLat = lats.max(),
+              let minLon = lons.min(), let maxLon = lons.max() else { return nil }
         let padding = 0.015
         let latDelta = max(maxLat - minLat + padding * 2, 0.02)
         let lonDelta = max(maxLon - minLon + padding * 2, 0.02)
@@ -383,8 +384,8 @@ private extension RouteMapView {
         guard !valid.isEmpty else { return nil }
         let lats = valid.map(\.latitude)
         let lons = valid.map(\.longitude)
-        let minLat = lats.min()!, maxLat = lats.max()!
-        let minLon = lons.min()!, maxLon = lons.max()!
+        guard let minLat = lats.min(), let maxLat = lats.max(),
+              let minLon = lons.min(), let maxLon = lons.max() else { return nil }
         let padding = 0.015
         let latDelta = max(maxLat - minLat + padding * 2, 0.02)
         let lonDelta = max(maxLon - minLon + padding * 2, 0.02)

@@ -86,15 +86,23 @@ Deno.serve(async (req) => {
       );
     }
 
-    const { email, display_name, first_name } = payload;
+    const { display_name, first_name } = payload;
     const greeting = first_name || display_name || "there";
+    // Use the JWT-verified email address — prevents sending to arbitrary addresses
+    const verifiedEmail = user.email;
+    if (!verifiedEmail) {
+      return new Response(
+        JSON.stringify({ error: "No email address associated with this account" }),
+        { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
 
-    console.log("Sending welcome email to:", email);
+    console.log("Sending welcome email to verified user:", user.id);
 
     // Send luxurious welcome email to the new user
     const welcomeEmailResponse = await resend.emails.send({
       from: "Your Date Genie <onboarding@resend.dev>",
-      to: [email],
+      to: [verifiedEmail],
       subject: `Welcome to the magic ✨`,
       html: `
 <!DOCTYPE html>

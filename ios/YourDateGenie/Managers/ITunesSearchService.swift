@@ -27,7 +27,15 @@ struct ITunesSearchResponse: Codable {
 /// Uses iTunes Search API for song search (no auth, same as web).
 enum ITunesSearchService {
     private static let base = "https://itunes.apple.com/search"
-    
+
+    /// Dedicated URLSession with a 10 s request timeout to prevent the app hanging on slow connections.
+    private static let urlSession: URLSession = {
+        let config = URLSessionConfiguration.ephemeral
+        config.timeoutIntervalForRequest  = 10
+        config.timeoutIntervalForResource = 30
+        return URLSession(configuration: config)
+    }()
+
     /// In-memory cache for preview URLs to reduce API calls and improve repeat taps.
     private static let previewCache = NSMapTable<NSString, NSString>.strongToStrongObjects()
     private static let cacheLock = NSLock()
@@ -53,7 +61,7 @@ enum ITunesSearchService {
         ]
         guard let url = comp.url else { return [] }
         
-        let (data, _) = try await URLSession.shared.data(from: url)
+        let (data, _) = try await urlSession.data(from: url)
         let response = try JSONDecoder().decode(ITunesSearchResponse.self, from: data)
         return response.results
     }

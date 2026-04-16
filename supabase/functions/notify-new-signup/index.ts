@@ -94,7 +94,16 @@ Deno.serve(async (req) => {
       );
     }
 
-    console.log("New signup notification received:", payload);
+    // Validate that the user_id in the payload matches the authenticated user
+    if (payload.user_id !== userId) {
+      console.error(`user_id mismatch: payload=${payload.user_id} jwt=${userId}`);
+      return new Response(
+        JSON.stringify({ error: "Forbidden: user_id does not match authenticated user" }),
+        { status: 403, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
+    console.log("New signup notification received for user:", userId);
 
     const { user_id, email, display_name, created_at } = payload;
     const signupDate = new Date(created_at).toLocaleString("en-US", {

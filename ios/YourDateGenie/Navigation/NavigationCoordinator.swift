@@ -72,6 +72,7 @@ enum AppDestination: Hashable {
 }
 
 // MARK: - Navigation Coordinator
+@MainActor
 class NavigationCoordinator: ObservableObject {
     static let shared = NavigationCoordinator()
     
@@ -145,7 +146,7 @@ class NavigationCoordinator: ObservableObject {
     
     enum Tab: String, CaseIterable {
         case home = "Home"
-        case loveNote = "Love Note"
+        case loveNote = "Love Notes"
         case gifts = "Gifts"
         case memories = "Memories"
         case profile = "Profile"
@@ -278,7 +279,8 @@ class NavigationCoordinator: ObservableObject {
             // Show generating screen if not already in partner-plan flow
             guard let sid = PartnerSessionManager.shared.sessionId else { return }
             let role = PartnerSessionManager.shared.currentRole ?? .inviter
-            if activeSheet != .planGenerating(sessionId: sid, role: role) {
+            let targetId = ActiveSheet.planGenerating(sessionId: sid, role: role).id
+            if activeSheet?.id != targetId {
                 activeSheet = .planGenerating(sessionId: sid, role: role)
             }
         case .optionsReadyForRanking:
@@ -319,7 +321,7 @@ class NavigationCoordinator: ObservableObject {
         }
     }
 
-    private func loadFinalOptionAndShowReveal() {
+    func loadFinalOptionAndShowReveal() {
         guard let rowId = PartnerSessionManager.shared.activeSessionRowId else { return }
         Task {
             do {
@@ -386,6 +388,7 @@ class NavigationCoordinator: ObservableObject {
                     )
                 }
             } catch {
+                AppLogger.error("regenerateFromOptions failed: \(error)")
                 await MainActor.run { isRegeneratingFromOptions = false }
             }
         }
@@ -673,10 +676,10 @@ class NavigationCoordinator: ObservableObject {
                     scheduleSyncAllUnsavedExperiencesToCloud()
                 }
             } catch {
+                AppLogger.error("regenerateWithModifiedPreferences failed: \(error)")
                 await MainActor.run {
                     isRegeneratingFromOptions = false
                     activeSheet = .datePlanOptions
-                    // Keep previous plans visible; generator.error is shown by loading view or we could present an alert
                 }
             }
         }
@@ -1039,7 +1042,7 @@ class NavigationCoordinator: ObservableObject {
     
     /// Upload or update a single plan on Supabase so history persists across reinstalls.
     private func uploadPlanToCloud(_ plan: DatePlan, status: String) async {
-        print("[uploadPlanToCloud] called planId=\(plan.id) status=\(status)")
+        AppLogger.debug("uploadPlanToCloud planId=\(plan.id) status=\(status)")
         do {
             let userId = try await SupabaseService.shared.syncAuthSessionAndReturnUserId()
             await MainActor.run {
@@ -1085,12 +1088,12 @@ class NavigationCoordinator: ObservableObject {
                 print("[uploadPlanToCloud] error: no coupleId for user_id=\(userId) after ensure")
                 return
             }
-            print("[uploadPlanToCloud] before upsert date_plans user_id=\(userId) couple_id=\(coupleId)")
+            AppLogger.debug("uploadPlanToCloud upserting planId=\(plan.id)")
             let dbPlan = DatePlanSyncHelpers.dbDatePlan(from: plan, userId: userId, coupleId: coupleId, status: status)
             _ = try await SupabaseService.shared.upsertDatePlan(dbPlan)
-            print("[uploadPlanToCloud] upsertDatePlan success planId=\(plan.id)")
+            AppLogger.debug("uploadPlanToCloud success planId=\(plan.id)")
         } catch {
-            print("[uploadPlanToCloud] error: \(error)")
+            AppLogger.error("uploadPlanToCloud failed: \(error)")
         }
     }
 
