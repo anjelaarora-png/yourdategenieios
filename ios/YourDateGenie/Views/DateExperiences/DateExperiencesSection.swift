@@ -22,12 +22,30 @@ final class DateExperienceViewModel: ObservableObject {
                 .order("date_time", ascending: true)
                 .execute()
                 .value
+            notifyForNewEvents(results)
             experiences = results
         } catch {
             fetchError = error.localizedDescription
         }
 
         isLoading = false
+    }
+
+    private func notifyForNewEvents(_ fetched: [DateExperience]) {
+        let key = "dateGenie_seenEventIds"
+        let seenIds = Set(UserDefaults.standard.stringArray(forKey: key) ?? [])
+        let newEvents = fetched.filter { !seenIds.contains($0.id.uuidString) }
+
+        for event in newEvents.prefix(3) {
+            NotificationManager.shared.addNotification(AppNotification(
+                type: .newEvent,
+                title: "New experience: \(event.title)",
+                message: "\(event.location) · \(event.formattedDate)",
+                timestamp: Date()
+            ))
+        }
+
+        UserDefaults.standard.set(fetched.map(\.id.uuidString), forKey: key)
     }
 }
 
@@ -160,7 +178,7 @@ struct EventCardView: View {
             HStack(alignment: .bottom) {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(experience.title)
-                        .font(Font.header(15, weight: .semibold))
+                        .font(Font.bodySans(15, weight: .semibold))
                         .foregroundColor(.white)
                         .lineLimit(2)
                         .fixedSize(horizontal: false, vertical: true)
@@ -224,7 +242,6 @@ struct EventCardView: View {
 struct DateExperiencesSection: View {
     @StateObject private var viewModel = DateExperienceViewModel()
     @State private var selectedExperience: DateExperience? = nil
-    @State private var showImportSheet = false
     @State private var appeared = false
 
     var body: some View {
@@ -243,56 +260,21 @@ struct DateExperiencesSection: View {
         .sheet(item: $selectedExperience) { experience in
             EventDetailView(experience: experience)
         }
-        .sheet(isPresented: $showImportSheet) {
-            EventImportView {
-                // Refresh the section after a new event is saved
-                Task { await viewModel.fetchExperiences() }
-            }
-        }
     }
 
     // MARK: Section Header
 
     private var sectionHeader: some View {
         VStack(alignment: .leading, spacing: 4) {
-            HStack(alignment: .center, spacing: 0) {
-                HStack(spacing: 6) {
-                    Text("Date")
-                        .font(Font.tangerine(32, weight: .bold))
-                        .italic()
-                        .foregroundColor(Color.luxuryGold)
-                    Text("Experiences")
-                        .font(Font.tangerine(32, weight: .bold))
-                        .italic()
-                        .foregroundColor(Color.luxuryGold)
-                }
-
-                Spacer(minLength: 8)
-
-                // Import button — tap to add an event from an Eventbrite link
-                Button {
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    showImportSheet = true
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "plus")
-                            .font(.system(size: 11, weight: .semibold))
-                        Text("Add")
-                            .font(Font.bodySans(12, weight: .semibold))
-                    }
-                    .foregroundColor(Color(hex: "1A0A0A"))
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(
-                        LinearGradient(
-                            colors: [Color(hex: "E8C27D"), Color(hex: "F3D9A4")],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                    )
-                    .clipShape(Capsule())
-                }
-                .buttonStyle(.plain)
+            HStack(spacing: 6) {
+                Text("Date")
+                    .font(Font.tangerine(32, weight: .bold))
+                    .italic()
+                    .foregroundColor(Color.luxuryGold)
+                Text("Experiences")
+                    .font(Font.tangerine(32, weight: .bold))
+                    .italic()
+                    .foregroundColor(Color.luxuryGold)
             }
 
             Text("Curated evenings designed for unforgettable connections")

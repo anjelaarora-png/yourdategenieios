@@ -637,37 +637,36 @@ struct ReservationWidgetView: View {
         }
     }
     
-    /// Resy venue pages: `resy.com/cities/{city-state}/venues/{slug}?date=&seats=` (same slug rules as OpenTable path).
-    private func resyCityPathForVenueURL(from address: String?) -> String {
-        if let parsed = resyCityPathParsedFromAddress(address) {
+    /// Known Resy city paths (verified operating markets). Used to validate both parsed and
+    /// short-slug-derived paths before constructing a venue URL.
+    private static let resyKnownCityPaths: Set<String> = [
+        "new-york-ny", "los-angeles-ca", "san-francisco-ca", "chicago-il",
+        "miami-fl", "austin-tx", "denver-co", "seattle-wa", "boston-ma",
+        "washington-dc", "atlanta-ga", "nashville-tn", "houston-tx",
+        "dallas-tx", "philadelphia-pa", "portland-or", "san-diego-ca",
+        "toronto-on", "vancouver-bc", "montreal-qc", "calgary-ab", "ottawa-on",
+    ]
+
+    /// Returns the Resy city path for venue URLs, or nil for unsupported markets.
+    /// A nil result causes `resyVenuePageUrl` to return nil, letting the flow fall through to
+    /// `resySearchUrl` (which uses the safe global /search endpoint for unknown cities).
+    private func resyCityPathForVenueURL(from address: String?) -> String? {
+        // Prefer the parsed form (e.g. "chicago-il") but only when it's a confirmed Resy market.
+        if let parsed = resyCityPathParsedFromAddress(address),
+           Self.resyKnownCityPaths.contains(parsed) {
             return parsed
         }
-        let short = resyCitySlugFromAddress(address)
-        let fallback: [String: String] = [
-            "ny": "new-york-ny",
-            "la": "los-angeles-ca",
-            "sf": "san-francisco-ca",
-            "chi": "chicago-il",
-            "mia": "miami-fl",
-            "atx": "austin-tx",
-            "den": "denver-co",
-            "sea": "seattle-wa",
-            "bos": "boston-ma",
-            "dc": "washington-dc",
-            "atl": "atlanta-ga",
-            "nash": "nashville-tn",
-            "hou": "houston-tx",
-            "dal": "dallas-tx",
-            "phl": "philadelphia-pa",
-            "pdx": "portland-or",
-            "sd": "san-diego-ca",
-            "toronto": "toronto-on",
-            "vancouver": "vancouver-bc",
-            "montreal": "montreal-qc",
-            "calgary": "calgary-ab",
-            "ottawa": "ottawa-on",
+        guard let short = resyCitySlugFromAddress(address) else { return nil }
+        let fullPath: [String: String] = [
+            "ny": "new-york-ny", "la": "los-angeles-ca", "sf": "san-francisco-ca",
+            "chi": "chicago-il", "mia": "miami-fl", "atx": "austin-tx", "den": "denver-co",
+            "sea": "seattle-wa", "bos": "boston-ma", "dc": "washington-dc",
+            "atl": "atlanta-ga", "nash": "nashville-tn", "hou": "houston-tx",
+            "dal": "dallas-tx", "phl": "philadelphia-pa", "pdx": "portland-or",
+            "sd": "san-diego-ca", "toronto": "toronto-on", "vancouver": "vancouver-bc",
+            "montreal": "montreal-qc", "calgary": "calgary-ab", "ottawa": "ottawa-on",
         ]
-        return fallback[short] ?? "new-york-ny"
+        return fullPath[short]
     }
     
     /// Parses "..., City Name, ST 12345" → `city-name-st` for Resy `/cities/` paths.
@@ -710,8 +709,8 @@ struct ReservationWidgetView: View {
     
     private var resyVenuePageUrl: URL? {
         let venueSlug = openTableRestaurantSlug(from: venueName)
-        guard !venueSlug.isEmpty else { return nil }
-        let cityPath = resyCityPathForVenueURL(from: address)
+        guard !venueSlug.isEmpty,
+              let cityPath = resyCityPathForVenueURL(from: address) else { return nil }
         guard var comp = URLComponents(string: "https://resy.com/cities/\(cityPath)/venues/\(venueSlug)") else { return nil }
         comp.queryItems = [
             URLQueryItem(name: "date", value: isoDateString),
@@ -780,9 +779,10 @@ struct ReservationWidgetView: View {
         return comp.url
     }
     
-    /// Resy city path scopes search so results map to local venues (US/CA markets).
-    private func resyCitySlugFromAddress(_ addr: String?) -> String {
-        guard let addr = addr, !addr.isEmpty else { return "ny" }
+    /// Returns the Resy city slug for a known metro, or nil for cities outside Resy's network.
+    /// Returning nil prevents the URL from defaulting to New York for unsupported cities.
+    private func resyCitySlugFromAddress(_ addr: String?) -> String? {
+        guard let addr = addr, !addr.isEmpty else { return nil }
         let lower = addr.lowercased()
         if lower.contains("toronto") { return "toronto" }
         if lower.contains("vancouver") { return "vancouver" }
@@ -790,7 +790,7 @@ struct ReservationWidgetView: View {
         if lower.contains("calgary") { return "calgary" }
         if lower.contains("ottawa") { return "ottawa" }
         let parts = addr.split(separator: ",")
-        guard parts.count >= 2 else { return "ny" }
+        guard parts.count >= 2 else { return nil }
         let city = parts[parts.count - 2].trimmingCharacters(in: .whitespaces).lowercased()
         let map: [String: String] = [
             "new york": "ny", "nyc": "ny", "manhattan": "ny", "brooklyn": "ny", "queens": "ny",
@@ -804,20 +804,31 @@ struct ReservationWidgetView: View {
         for (key, value) in map {
             if city.contains(key) { return value }
         }
-        return "ny"
+        return nil
     }
-    
-    /// Resy: city-scoped search URL (query + date + party) toward the venue booking flow.
+
+    /// Resy search URL:
+    /// - Known metro → `/cities/{slug}?query=...` for tighter city-scoped results
+    /// - Unknown city → `/search?query=...` global endpoint (works everywhere, never defaults to NY)
     private var resySearchUrl: URL? {
         let termRaw = restaurantSearchTerm(venueName: venueName, address: address)
-        let citySlug = resyCitySlugFromAddress(address)
-        var comp = URLComponents(string: "https://resy.com/cities/\(citySlug)")!
-        comp.queryItems = [
-            URLQueryItem(name: "query", value: termRaw),
-            URLQueryItem(name: "date", value: isoDateString),
-            URLQueryItem(name: "seats", value: "\(partySize)"),
-        ]
-        return comp.url
+        if let citySlug = resyCitySlugFromAddress(address) {
+            var comp = URLComponents(string: "https://resy.com/cities/\(citySlug)")!
+            comp.queryItems = [
+                URLQueryItem(name: "query", value: termRaw),
+                URLQueryItem(name: "date", value: isoDateString),
+                URLQueryItem(name: "seats", value: "\(partySize)"),
+            ]
+            return comp.url
+        } else {
+            var comp = URLComponents(string: "https://resy.com/search")!
+            comp.queryItems = [
+                URLQueryItem(name: "query", value: termRaw),
+                URLQueryItem(name: "date", value: isoDateString),
+                URLQueryItem(name: "seats", value: "\(partySize)"),
+            ]
+            return comp.url
+        }
     }
     
     private func chopeCitySlugFromAddress(_ addr: String?) -> String {

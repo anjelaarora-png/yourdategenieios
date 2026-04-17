@@ -3,13 +3,31 @@ import SwiftUI
 // MARK: - Shared row (style 2: gold chips on dark maroon)
 
 /// OpenTable / Resy / Call chips — shared by the single-venue sheet and the multi-venue reserve list.
-/// Call is always shown: dials directly when a phone number is available, otherwise opens a
-/// Google search for the venue's number so the chip is never missing.
+///
+/// Visibility rules:
+/// - **OpenTable**: always shown for any restaurant (OpenTable operates in US/CA/UK/AU).
+/// - **Resy**: shown only when (a) `reservationPlatforms` explicitly contains "resy",
+///   OR (b) platforms is unknown/empty AND the address resolves to a city in Resy's network.
+/// - **Call**: always shown; dials directly when a phone number is available, otherwise
+///   opens a Google search for the venue's number so the chip is never missing.
 struct ReservationPlatformActionRow: View {
     let venueName: String
     let phoneNumber: String?
+    /// Full address used to detect whether Resy operates in this city.
+    var address: String? = nil
+    /// Confirmed booking platforms from AI / Google Places. nil = unknown (use city-based fallback).
+    var reservationPlatforms: [String]? = nil
     /// Called after OpenTable, Resy, or Call (e.g. dismiss sheet).
     var onAction: () -> Void = {}
+
+    // Resy is shown when explicitly confirmed, or when the city is in Resy's network and
+    // platforms are unknown (never hidden just because we couldn't detect them).
+    private var showResy: Bool {
+        if let platforms = reservationPlatforms, !platforms.isEmpty {
+            return platforms.contains("resy")
+        }
+        return OpenTableReservationSafari.isResySupported(for: address)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -17,25 +35,31 @@ struct ReservationPlatformActionRow: View {
                 .font(Font.inter(15, weight: .semibold))
                 .foregroundColor(Color.luxuryCream)
                 .fixedSize(horizontal: false, vertical: true)
-            HStack(alignment: .center, spacing: 8) {
+            Text("Choose how you\'d like to book:")
+                .font(Font.bodySans(13, weight: .regular))
+                .foregroundColor(Color.luxuryMuted)
+
+            VStack(spacing: 10) {
                 Button {
                     OpenTableReservationSafari.openSearch(venueName: venueName)
                     onAction()
                 } label: {
-                    Text("OpenTable")
+                    ResRowLabel(title: "OpenTable", detail: "Book online instantly", icon: "calendar.badge.plus")
                 }
-                .buttonStyle(LuxuryReservationPlatformButtonStyle())
+                .buttonStyle(ResOptionButtonStyle())
+                .accessibilityLabel("Book on OpenTable")
 
-                Button {
-                    OpenTableReservationSafari.openResySearch(venueName: venueName)
-                    onAction()
-                } label: {
-                    Text("Resy")
+                if showResy {
+                    Button {
+                        OpenTableReservationSafari.openResySearch(venueName: venueName)
+                        onAction()
+                    } label: {
+                        ResRowLabel(title: "Resy", detail: "Alternative online booking", icon: "calendar.badge.plus")
+                    }
+                    .buttonStyle(ResOptionButtonStyle())
+                    .accessibilityLabel("Book on Resy")
                 }
-                .buttonStyle(LuxuryReservationPlatformButtonStyle())
 
-                // Always show Call: dial directly when we have a number, otherwise search Google
-                // for the restaurant's phone so the chip is never absent.
                 Button {
                     if let tel = OpenTableReservationSafari.sanitizedPhoneForTel(phoneNumber) {
                         if let url = URL(string: "tel:\(tel)") {
@@ -50,9 +74,10 @@ struct ReservationPlatformActionRow: View {
                     }
                     onAction()
                 } label: {
-                    Text("Call")
+                    ResRowLabel(title: "Call", detail: "Speak directly with the restaurant", icon: "phone.fill")
                 }
-                .buttonStyle(LuxuryReservationPlatformButtonStyle())
+                .buttonStyle(ResOptionButtonStyle())
+                .accessibilityLabel("Call the restaurant")
             }
         }
     }
@@ -71,13 +96,15 @@ struct ReservationPlatformPickerSheet: View {
                 Color.luxuryMaroon.ignoresSafeArea()
                 ScrollView {
                     VStack(alignment: .leading, spacing: 20) {
-                        Text("Search on OpenTable or Resy, or call the restaurant.")
+                        Text("Book via a reservation platform or call the restaurant directly.")
                             .font(Font.inter(14, weight: .medium))
                             .foregroundColor(Color.luxuryCreamMuted)
                             .fixedSize(horizontal: false, vertical: true)
                         ReservationPlatformActionRow(
                             venueName: payload.venueName,
                             phoneNumber: payload.phoneNumber,
+                            address: payload.address,
+                            reservationPlatforms: payload.reservationPlatforms,
                             onAction: onDismiss
                         )
                         .padding(16)
@@ -111,3 +138,46 @@ struct ReservationPlatformPickerSheet: View {
         }
     }
 }
+
+// MARK: - Reservation row helpers
+
+private struct ResRowLabel: View {
+    let title: String
+    let detail: String
+    let icon: String
+    var body: some View {
+        HStack(spacing: 14) {
+            Image(systemName: icon)
+                .font(.system(size: 16, weight: .medium))
+                .foregroundColor(Color.luxuryGold)
+                .frame(width: 24)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(Font.bodySans(15, weight: .semibold))
+                    .foregroundColor(Color.luxuryCream)
+                Text(detail)
+                    .font(Font.bodySans(12, weight: .regular))
+                    .foregroundColor(Color.luxuryMuted)
+            }
+            Spacer()
+            Image(systemName: "chevron.right")
+                .font(.system(size: 12))
+                .foregroundColor(Color.luxuryMuted)
+        }
+    }
+}
+
+private struct ResOptionButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            .frame(maxWidth: .infinity, minHeight: 56)
+            .background(Color.luxuryMaroonLight.opacity(configuration.isPressed ? 0.9 : 0.7))
+            .cornerRadius(12)
+            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.luxuryGold.opacity(0.3), lineWidth: 1))
+            .scaleEffect(configuration.isPressed ? 0.98 : 1)
+            .animation(.easeInOut(duration: 0.12), value: configuration.isPressed)
+    }
+}
+

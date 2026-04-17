@@ -228,6 +228,13 @@ class NavigationCoordinator: ObservableObject {
         pendingPartnerJoinSessionId = sessionId
         pendingPartnerJoinInviterName = inviterName
         activeSheet = .partnerJoin(sessionId: sessionId, inviterName: inviterName)
+        let inviter = inviterName ?? "Someone"
+        NotificationManager.shared.addNotification(AppNotification(
+            type: .partnerInvite,
+            title: "\(inviter) invited you to plan a date!",
+            message: "Tap to join and share your preferences.",
+            timestamp: Date()
+        ))
     }
 
     /// Open a past Plan Together session: load saved plans and present DatePlanOptionsView (e.g. from Plan Together → Past list).
@@ -542,8 +549,13 @@ class NavigationCoordinator: ObservableObject {
         activeSheet = .playlist(planTitle: planTitle, planId: planId)
     }
     
-    func showReservation(venueName: String, venueType: String, address: String?, phone: String?, bookingUrl: String? = nil, websiteUrl: String? = nil, openingHours: [String]? = nil) {
-        reservationPlatformPickerPayload = ReservationPlatformPickerPayload(venueName: venueName, phoneNumber: phone)
+    func showReservation(venueName: String, venueType: String, address: String?, phone: String?, bookingUrl: String? = nil, websiteUrl: String? = nil, openingHours: [String]? = nil, reservationPlatforms: [String]? = nil) {
+        reservationPlatformPickerPayload = ReservationPlatformPickerPayload(
+            venueName: venueName,
+            phoneNumber: phone,
+            address: address,
+            reservationPlatforms: reservationPlatforms
+        )
     }
     
     func showPartnerShare(for plan: DatePlan) {
@@ -599,6 +611,12 @@ class NavigationCoordinator: ObservableObject {
         }
         saveState()
         Task { await uploadPlanToCloud(plan, status: "completed") }
+        NotificationManager.shared.addNotification(AppNotification(
+            type: .memoryCapture,
+            title: "Capture your memory from \"\(plan.title)\"",
+            message: "Add a photo and note to remember this special night.",
+            timestamp: Date()
+        ))
     }
     
     func savePlan(_ plan: DatePlan) {
@@ -624,6 +642,19 @@ class NavigationCoordinator: ObservableObject {
                 message: "\"\(planToSave.title)\" is saved to your upcoming dates.",
                 timestamp: Date()
             ))
+            let milestones = [1, 3, 5, 10, 25]
+            let count = savedPlans.count
+            if milestones.contains(count) {
+                let ordinal = count == 1 ? "1st" : "\(count)th"
+                NotificationManager.shared.addNotification(AppNotification(
+                    type: .dateMilestone,
+                    title: "\(ordinal) date plan saved!",
+                    message: count == 1
+                        ? "Your first date plan is ready. Let the magic begin!"
+                        : "You\'ve planned \(count) dates. Your romance game is strong!",
+                    timestamp: Date()
+                ))
+            }
         }
         // Do not remove from generatedPlans here — keeps the options sheet on the same plan and avoids showing sample (e.g. NYC) when all three are saved. Cleared on sheet dismiss.
     }
@@ -1160,14 +1191,26 @@ class NavigationCoordinator: ObservableObject {
         let unsaved = generatedPlans.filter { !savedIds.contains($0.id) }
         if !unsaved.isEmpty {
             var updated = experiencesWaiting
+            var newlyAdded: [DatePlan] = []
             for plan in unsaved {
                 if !updated.contains(where: { $0.id == plan.id }) {
                     updated.append(plan)
+                    newlyAdded.append(plan)
                 }
             }
             if updated != experiencesWaiting {
                 experiencesWaiting = updated
                 saveState()
+            }
+            if !newlyAdded.isEmpty {
+                let count = newlyAdded.count
+                let label = count == 1 ? "1 unsaved date idea" : "\(count) unsaved date ideas"
+                NotificationManager.shared.addNotification(AppNotification(
+                    type: .unsavedDateWaiting,
+                    title: "\(label) waiting for you",
+                    message: "Save them before they disappear — your perfect date is in there!",
+                    timestamp: Date()
+                ))
             }
         }
         generatedPlans = []
@@ -1183,6 +1226,41 @@ class NavigationCoordinator: ObservableObject {
             try? await SupabaseService.shared.deleteExperiencesWaiting(planId: planId)
         }
         scheduleSyncAllUnsavedExperiencesToCloud()
+    }
+
+    // MARK: - Upcoming Date Check
+
+    /// Fires an in-app notification when a saved plan is scheduled today or tomorrow.
+    /// Deduplicates per plan per day using UserDefaults so it fires at most once per calendar day.
+    func checkUpcomingDates() {
+        let key = "dateGenie_upcomingDateNotifiedIds"
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        guard let tomorrow = calendar.date(byAdding: .day, value: 1, to: today) else { return }
+        let dayAfterTomorrow = calendar.date(byAdding: .day, value: 2, to: today) ?? tomorrow
+
+        var notifiedIds = Set(UserDefaults.standard.stringArray(forKey: key) ?? [])
+
+        for plan in savedPlans {
+            guard let scheduled = plan.scheduledDate else { continue }
+            let planDay = calendar.startOfDay(for: scheduled)
+            let isUpcoming = planDay >= today && planDay < dayAfterTomorrow
+            guard isUpcoming else { continue }
+
+            let dedupeKey = "\(plan.id.uuidString)_\(today.timeIntervalSince1970)"
+            guard !notifiedIds.contains(dedupeKey) else { continue }
+
+            let isToday = planDay == today
+            NotificationManager.shared.addNotification(AppNotification(
+                type: .upcomingDate,
+                title: isToday ? "Your date is tonight! 🌹" : "Your date is tomorrow! ✨",
+                message: "\"\(plan.title)\" — are you ready for a magical night?",
+                timestamp: Date()
+            ))
+            notifiedIds.insert(dedupeKey)
+        }
+
+        UserDefaults.standard.set(Array(notifiedIds), forKey: key)
     }
 }
 
@@ -1239,6 +1317,7 @@ struct RootNavigationView: View {
         .onChange(of: scenePhase) { _, newPhase in
             if newPhase == .active {
                 Task { await PurchaseManager.shared.refreshEntitlements() }
+                coordinator.checkUpcomingDates()
             }
         }
         .sheet(isPresented: $accessManager.isPaywallPresented, onDismiss: {

@@ -13,6 +13,7 @@ struct LuxuryProfileTabView: View {
     @State private var isDeletingAccount = false
     @State private var restoreMessage: String?
     @State private var showRestoreAlert = false
+    @State private var showHelpSupport = false
     
     private var userProfile: UserProfile? {
         profileManager.currentUser
@@ -103,6 +104,9 @@ struct LuxuryProfileTabView: View {
                             }
                             LuxuryProfileMenuItem(icon: "gearshape.fill", title: "Settings") {
                                 coordinator.activeSheet = .settings
+                            }
+                            LuxuryProfileMenuItem(icon: "questionmark.circle.fill", title: "Help & Support") {
+                                showHelpSupport = true
                             }
                         }
                         .luxuryCard(hasBorder: false)
@@ -195,6 +199,9 @@ struct LuxuryProfileTabView: View {
             .toolbarBackground(.visible, for: .navigationBar)
             .sheet(isPresented: $notificationManager.showNotificationsSheet) {
                 NotificationsSheetView(notificationManager: notificationManager)
+            }
+            .sheet(isPresented: $showHelpSupport) {
+                HelpSupportSheetView()
             }
             .alert("Sign Out", isPresented: $showSignOutAlert) {
                 Button("Cancel", role: .cancel) { }

@@ -20,6 +20,7 @@ struct PartnerPlanningSheetView: View {
     @State private var planStep: Int = 1
     @State private var showingPlanFlow = false
     @State private var selectedMainTab: PlanTogetherMainTab = .invite
+    @AppStorage("hasSeenPartnerTutorial") private var hasSeenPartnerTutorial = false
     @State private var pendingSessions: [DBPartnerSession] = []
     @State private var pastSessions: [DBPartnerSession] = []
     @State private var sessionsLoading = false
@@ -970,6 +971,13 @@ struct PartnerPlanningSheetView: View {
 
     private var inviteTabContent: some View {
         VStack(alignment: .leading, spacing: 20) {
+            // One-time tutorial banner
+            if !hasSeenPartnerTutorial {
+                PartnerTutorialBannerView {
+                    withAnimation { hasSeenPartnerTutorial = true }
+                }
+            }
+
             Text("Share the link via Messages, WhatsApp, or any app — no email required.")
                 .font(Font.bodySans(13, weight: .regular))
                 .foregroundColor(Color.luxuryCreamMuted)
@@ -1502,3 +1510,63 @@ struct WaitingRingView: View {
         WaitingRingView()
     }
 }
+
+// MARK: - Partner Tutorial Banner
+
+private struct PartnerTutorialBannerView: View {
+    let onDismiss: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                Image(systemName: "person.2.fill")
+                    .foregroundColor(Color.luxuryGold)
+                Text("How Partner Planning works")
+                    .font(Font.bodySans(15, weight: .semibold))
+                    .foregroundColor(Color.luxuryCream)
+                Spacer()
+                Button(action: onDismiss) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(Color.luxuryMuted)
+                        .frame(width: 28, height: 28)
+                        .background(Color.luxuryMaroonLight)
+                        .clipShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Dismiss tutorial")
+            }
+
+            VStack(alignment: .leading, spacing: 10) {
+                TutorialStep(number: "1", text: "Enter your partner's name — no email needed")
+                TutorialStep(number: "2", text: "Share the link via Messages, WhatsApp, or any app")
+                TutorialStep(number: "3", text: "You both answer questions separately, then we reveal the best matching date")
+            }
+        }
+        .padding(16)
+        .background(Color.luxuryGold.opacity(0.08))
+        .cornerRadius(14)
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.luxuryGold.opacity(0.3), lineWidth: 1))
+        .transition(.opacity.combined(with: .move(edge: .top)))
+    }
+}
+
+private struct TutorialStep: View {
+    let number: String
+    let text: String
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            ZStack {
+                Circle().fill(Color.luxuryGold).frame(width: 22, height: 22)
+                Text(number)
+                    .font(Font.bodySans(12, weight: .bold))
+                    .foregroundColor(Color.luxuryMaroon)
+            }
+            Text(text)
+                .font(Font.bodySans(14, weight: .regular))
+                .foregroundColor(Color.luxuryCreamMuted)
+            Spacer()
+        }
+    }
+}
+

@@ -26,11 +26,13 @@ final class PurchaseManager: ObservableObject {
 
     /// Must match App Store Connect and `Products.storekit` for local testing.
     static let premiumMonthlyProductID = "com.yourdategenie.premium.monthly"
+    static let premiumAnnualProductID = "com.yourdategenie.premium.annual"
 
     private static let subscribedUserDefaultsKey = "com.yourdategenie.purchase.isSubscribed"
 
     @Published private(set) var isSubscribed: Bool
     @Published private(set) var premiumMonthlyProduct: Product?
+    @Published private(set) var premiumAnnualProduct: Product?
     @Published private(set) var isLoadingProducts = false
     @Published private(set) var isRestoring = false
     @Published private(set) var isPurchasing = false
@@ -68,9 +70,11 @@ final class PurchaseManager: ObservableObject {
         defer { isLoadingProducts = false }
 
         do {
-            let products = try await Product.products(for: [Self.premiumMonthlyProductID])
+            let productIDs = [Self.premiumMonthlyProductID, Self.premiumAnnualProductID]
+            let products = try await Product.products(for: productIDs)
             premiumMonthlyProduct = products.first(where: { $0.id == Self.premiumMonthlyProductID })
-            if premiumMonthlyProduct == nil {
+            premiumAnnualProduct = products.first(where: { $0.id == Self.premiumAnnualProductID })
+            if premiumMonthlyProduct == nil && premiumAnnualProduct == nil {
                 lastErrorMessage = PurchaseManagerError.productNotFound.localizedDescription
             }
         } catch {
@@ -85,6 +89,16 @@ final class PurchaseManager: ObservableObject {
             await loadProducts()
         }
         guard let product = premiumMonthlyProduct else {
+            throw PurchaseManagerError.productNotFound
+        }
+        try await purchase(product)
+    }
+
+    func purchasePremiumAnnual() async throws {
+        if premiumAnnualProduct == nil {
+            await loadProducts()
+        }
+        guard let product = premiumAnnualProduct else {
             throw PurchaseManagerError.productNotFound
         }
         try await purchase(product)
@@ -134,17 +148,27 @@ final class PurchaseManager: ObservableObject {
     /// Re-reads verified active entitlements from StoreKit and updates `isSubscribed` and UserDefaults.
     func refreshEntitlements() async {
         let subscribed = await computeIsSubscribedFromStore()
+        let wasSubscribed = isSubscribed
         if isSubscribed != subscribed {
             isSubscribed = subscribed
         }
         persistSubscribed(subscribed)
+        if subscribed && !wasSubscribed {
+            NotificationManager.shared.addNotification(AppNotification(
+                type: .subscriptionActivated,
+                title: "Welcome to Premium! 👑",
+                message: "Your full genie powers are unlocked — enjoy unlimited date magic.",
+                timestamp: Date()
+            ))
+        }
     }
 
     private func computeIsSubscribedFromStore() async -> Bool {
         for await result in Transaction.currentEntitlements {
             guard case .verified(let transaction) = result else { continue }
             guard transaction.revocationDate == nil else { continue }
-            guard transaction.productID == Self.premiumMonthlyProductID else { continue }
+            let validIDs: Set<String> = [Self.premiumMonthlyProductID, Self.premiumAnnualProductID]
+            guard validIDs.contains(transaction.productID) else { continue }
             return true
         }
         return false

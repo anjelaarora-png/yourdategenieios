@@ -15,6 +15,7 @@ struct QuestionnaireView: View {
     @State private var showPremiumPaywall = false
     /// True while editing preferences from Profile — avoids stale `LastQuestionnaireStore` and resume-store noise.
     @State private var sessionIsPreferencesOnlyEdit = false
+    @State private var showSavedIndicator = false
     
     var onComplete: ((QuestionnaireData) -> Void)?
     
@@ -74,12 +75,24 @@ struct QuestionnaireView: View {
                         Button {
                             closeQuestionnaireTapped()
                         } label: {
-                            Image(systemName: "xmark.circle.fill")
-                                .font(.system(size: 28))
-                                .foregroundStyle(Color.luxuryGold.opacity(0.9))
-                                .symbolRenderingMode(.hierarchical)
+                            HStack(spacing: 6) {
+                                Image(systemName: "checkmark.circle")
+                                    .font(.system(size: 14, weight: .medium))
+                                Text("Save & Exit")
+                                    .font(Font.inter(14, weight: .medium))
+                            }
+                            .foregroundColor(Color.luxuryGold)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(Color.luxuryMaroonLight.opacity(0.8))
+                            .cornerRadius(20)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 20)
+                                    .stroke(Color.luxuryGold.opacity(0.4), lineWidth: 1)
+                            )
                         }
-                        .accessibilityLabel("Close")
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Save progress and exit")
                     }
                 }
             }
@@ -154,6 +167,7 @@ struct QuestionnaireView: View {
                 if coordinator.planIntent != .fresh && !sessionIsPreferencesOnlyEdit {
                     QuestionnaireProgressStore.save(data: viewModel.data, step: viewModel.currentStep)
                 }
+                flashSavedIndicator()
             }
             .onDisappear {
                 let prefsOnly = sessionIsPreferencesOnlyEdit
@@ -187,6 +201,20 @@ struct QuestionnaireView: View {
     }
     
     private var navigationButtons: some View {
+        VStack(spacing: 0) {
+            // Auto-save indicator
+            HStack(spacing: 6) {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 12))
+                    .foregroundColor(Color.luxurySuccess)
+                Text("Progress saved")
+                    .font(Font.bodySans(12, weight: .regular))
+                    .foregroundColor(Color.luxurySuccess)
+            }
+            .opacity(showSavedIndicator ? 1 : 0)
+            .animation(.easeInOut(duration: 0.3), value: showSavedIndicator)
+            .padding(.top, 6)
+
         HStack(spacing: 16) {
             if viewModel.currentStep > 1 {
                 Button {
@@ -271,6 +299,14 @@ struct QuestionnaireView: View {
             Color.luxuryMaroon
                 .shadow(color: Color.black.opacity(0.3), radius: 10, y: -5)
         )
+        } // end outer VStack
+    }
+
+    private func flashSavedIndicator() {
+        showSavedIndicator = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+            withAnimation { showSavedIndicator = false }
+        }
     }
 
     private func goToHomeFromQuestionnaire() {

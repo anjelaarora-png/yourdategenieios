@@ -6,6 +6,11 @@ struct ReservationPlatformPickerPayload: Equatable, Identifiable {
     var id: String { "\(venueName)|\(phoneNumber ?? "")" }
     let venueName: String
     let phoneNumber: String?
+    /// Full address — used to detect whether Resy operates in this city.
+    var address: String?
+    /// Platforms the venue is confirmed to be on (e.g. ["opentable", "resy"]).
+    /// nil / empty means unknown; the UI falls back to city-based detection.
+    var reservationPlatforms: [String]?
 }
 
 // MARK: - Date Plan Stop
@@ -42,6 +47,9 @@ struct DatePlanStop: Identifiable, Hashable, Codable {
     var bookingUrl: String?
     /// Place photo URL from Google Business Profile (Place Details photos), for cards and lists.
     var imageUrl: String?
+    /// Reservation platforms this venue is confirmed to be on (e.g. ["opentable", "resy"]).
+    /// Populated by the AI and verified by the Google Places website URL check.
+    var reservationPlatforms: [String]?
     
     init(
         order: Int,
@@ -66,7 +74,8 @@ struct DatePlanStop: Identifiable, Hashable, Codable {
         openingHours: [String]? = nil,
         estimatedCostPerPerson: String? = nil,
         bookingUrl: String? = nil,
-        imageUrl: String? = nil
+        imageUrl: String? = nil,
+        reservationPlatforms: [String]? = nil
     ) {
         self.id = UUID()
         self.order = order
@@ -92,6 +101,7 @@ struct DatePlanStop: Identifiable, Hashable, Codable {
         self.estimatedCostPerPerson = estimatedCostPerPerson
         self.bookingUrl = bookingUrl
         self.imageUrl = imageUrl
+        self.reservationPlatforms = reservationPlatforms
     }
     
     enum CodingKeys: String, CodingKey {
@@ -99,6 +109,7 @@ struct DatePlanStop: Identifiable, Hashable, Codable {
         case travelTimeFromPrevious, travelDistanceFromPrevious, travelMode
         case validated, placeId, address, latitude, longitude
         case websiteUrl, phoneNumber, openingHours, estimatedCostPerPerson, bookingUrl, imageUrl
+        case reservationPlatforms
     }
     
     init(from decoder: Decoder) throws {
@@ -127,6 +138,7 @@ struct DatePlanStop: Identifiable, Hashable, Codable {
         estimatedCostPerPerson = try c.decodeIfPresent(String.self, forKey: .estimatedCostPerPerson)
         bookingUrl = try c.decodeIfPresent(String.self, forKey: .bookingUrl)
         imageUrl = try c.decodeIfPresent(String.self, forKey: .imageUrl)
+        reservationPlatforms = try c.decodeIfPresent([String].self, forKey: .reservationPlatforms)
     }
     
     func encode(to encoder: Encoder) throws {
@@ -155,6 +167,7 @@ struct DatePlanStop: Identifiable, Hashable, Codable {
         try c.encodeIfPresent(estimatedCostPerPerson, forKey: .estimatedCostPerPerson)
         try c.encodeIfPresent(bookingUrl, forKey: .bookingUrl)
         try c.encodeIfPresent(imageUrl, forKey: .imageUrl)
+        try c.encodeIfPresent(reservationPlatforms, forKey: .reservationPlatforms)
     }
 }
 

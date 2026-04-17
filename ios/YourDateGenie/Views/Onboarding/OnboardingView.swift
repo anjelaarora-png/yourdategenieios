@@ -5,6 +5,7 @@ struct MobileOnboardingView: View {
     @EnvironmentObject var coordinator: NavigationCoordinator
     @State private var currentSlide = 0
     @State private var showContent = false
+    @State private var hasSwipedOnce = false
     
     private let totalSlides = 4
     
@@ -21,16 +22,30 @@ struct MobileOnboardingView: View {
             
             VStack(spacing: 0) {
                 // Progress dots
-                HStack(spacing: 10) {
+                HStack(spacing: 12) {
                     ForEach(0..<totalSlides, id: \.self) { index in
                         Capsule()
                             .fill(index == currentSlide ? Color.luxuryGold : Color.luxuryMuted.opacity(0.4))
-                            .frame(width: index == currentSlide ? 24 : 8, height: 8)
+                            .frame(width: index == currentSlide ? 28 : 10, height: 10)
                             .animation(.spring(response: 0.4), value: currentSlide)
                     }
                 }
                 .padding(.top, 60)
-                .padding(.bottom, 12)
+                .padding(.bottom, 8)
+                
+                // Swipe affordance hint — fades out after first swipe
+                HStack(spacing: 6) {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 11, weight: .medium))
+                    Text("Swipe to explore")
+                        .font(Font.bodySans(12, weight: .regular))
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 11, weight: .medium))
+                }
+                .foregroundColor(Color.luxuryMuted.opacity(0.7))
+                .opacity(hasSwipedOnce ? 0 : 1)
+                .animation(.easeOut(duration: 0.4), value: hasSwipedOnce)
+                .padding(.bottom, 8)
                 
                 // Main content
                 TabView(selection: $currentSlide) {
@@ -48,10 +63,21 @@ struct MobileOnboardingView: View {
                 
                 // Bottom actions
                 VStack(spacing: 12) {
+                    // Free vs paid disclosure on last slide
+                    if currentSlide == totalSlides - 1 {
+                        Text("Free plan included • Premium unlocks Love Notes, Gifts & Memories")
+                            .font(Font.bodySans(13, weight: .regular))
+                            .foregroundColor(Color.luxuryCreamMuted)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 8)
+                            .transition(.opacity)
+                    }
+                    
                     Button {
                         if currentSlide < totalSlides - 1 {
                             withAnimation {
                                 currentSlide += 1
+                                hasSwipedOnce = true
                             }
                         } else {
                             coordinator.completeOnboarding()
@@ -76,18 +102,26 @@ struct MobileOnboardingView: View {
                         Button {
                             coordinator.completeOnboarding()
                         } label: {
-                            Text("Skip")
-                                .font(Font.bodySans(14, weight: .regular))
-                                .foregroundColor(Color.luxuryMuted)
+                            Text("Skip intro")
+                                .font(Font.bodySans(15, weight: .semibold))
+                                .foregroundColor(Color.luxuryGold)
+                                .frame(maxWidth: .infinity)
+                                .frame(minHeight: 44)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 14)
+                                        .stroke(Color.luxuryGold.opacity(0.6), lineWidth: 1.5)
+                                )
                         }
-                        .padding(.vertical, 8)
+                        .buttonStyle(.plain)
                     }
                 }
                 .padding(.horizontal, 24)
                 .padding(.bottom, 44)
+                .animation(.easeInOut(duration: 0.25), value: currentSlide)
             }
         }
         .onChange(of: currentSlide) { _, _ in
+            hasSwipedOnce = true
             showContent = false
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 withAnimation(.easeOut(duration: 0.5)) {

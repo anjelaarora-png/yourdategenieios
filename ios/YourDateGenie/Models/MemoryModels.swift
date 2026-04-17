@@ -132,6 +132,18 @@ class MemoryManager: ObservableObject {
         memories.append(memory)
         saveMemories()
         Task { await uploadMemoryToCloudIfNeeded(memory) }
+        let count = memories.count
+        let milestones = [5, 10, 25, 50]
+        if milestones.contains(count) {
+            NotificationManager.shared.addNotification(AppNotification(
+                type: .memoryMilestone,
+                title: "\(count) memories captured!",
+                message: count == 5
+                    ? "You\'ve started building your love story — keep capturing moments!"
+                    : "\(count) beautiful memories and counting. Your gallery is growing!",
+                timestamp: Date()
+            ))
+        }
     }
     
     func updateMemory(_ memory: DateMemory) {

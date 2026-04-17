@@ -208,12 +208,13 @@ struct LuxuryMaroonButtonStyle: ButtonStyle {
 struct LuxuryReservationPlatformButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(Font.inter(12, weight: .semibold))
+            .font(Font.inter(13, weight: .semibold))
             .foregroundColor(Color.luxuryGold)
             .lineLimit(1)
             .minimumScaleFactor(0.8)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 14)
+            .frame(minHeight: 44)
             .background(
                 RoundedRectangle(cornerRadius: 10)
                     .fill(Color.luxuryMaroonLight.opacity(configuration.isPressed ? 0.85 : 0.65))

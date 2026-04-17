@@ -14,6 +14,8 @@ interface PlaceValidationResult {
   businessStatus?: string;
   /** Photo URL from Google Business Profile (Place Details photos) for cards and lists. */
   imageUrl?: string;
+  /** Reservation platforms detected from the venue's website URL (e.g. ["opentable", "resy"]). */
+  reservationPlatforms?: string[];
 }
 
 interface Stop {
@@ -36,6 +38,20 @@ interface Stop {
   openingHours?: string[];
   bookingUrl?: string;
   imageUrl?: string;
+  /** Booking platforms this venue is confirmed to be on. */
+  reservationPlatforms?: string[];
+}
+
+/** Detect reservation platforms from a restaurant's website URL or bookingUrl. */
+function detectReservationPlatforms(websiteUrl?: string, bookingUrl?: string): string[] {
+  const platforms: Set<string> = new Set();
+  for (const url of [websiteUrl, bookingUrl]) {
+    if (!url) continue;
+    const lower = url.toLowerCase();
+    if (lower.includes("opentable.com")) platforms.add("opentable");
+    if (lower.includes("resy.com")) platforms.add("resy");
+  }
+  return Array.from(platforms);
 }
 
 // Extract state abbreviation from city string (e.g., "Newark, NJ" -> "NJ")
@@ -327,6 +343,8 @@ export async function validateVenue(
       console.error("[Places API] Details fetch failed:", detailsResponse.status);
     }
 
+    const reservationPlatforms = detectReservationPlatforms(websiteUrl);
+
     return {
       isValid: true,
       officialName: confirmedName,
@@ -339,6 +357,7 @@ export async function validateVenue(
       openingHours,
       businessStatus,
       imageUrl,
+      reservationPlatforms: reservationPlatforms.length > 0 ? reservationPlatforms : undefined,
     };
   } catch (error) {
     console.error("[Places API] Error validating venue:", error);
@@ -577,6 +596,16 @@ export async function validateAllStops(
         console.log(`[Validation] Updated venue name: "${originalName}" → "${updatedName}"`);
       }
 
+      // Merge platforms: prefer Places-detected (from real website), then fall back to AI hint
+      const mergedPlatforms = (() => {
+        const fromPlaces = result.reservationPlatforms ?? [];
+        const fromAi = stop.reservationPlatforms ?? [];
+        // Also check bookingUrl from AI for platform hints
+        const fromBooking = detectReservationPlatforms(stop.bookingUrl);
+        const combined = new Set([...fromPlaces, ...fromBooking, ...fromAi]);
+        return combined.size > 0 ? Array.from(combined) : undefined;
+      })();
+
       validatedStops.push({
         ...stop,
         name: updatedName, // Use official Google Maps name
@@ -589,6 +618,7 @@ export async function validateAllStops(
         phoneNumber: result.phoneNumber ?? stop.phoneNumber,
         openingHours: result.openingHours ?? stop.openingHours,
         imageUrl: result.imageUrl ?? stop.imageUrl,
+        reservationPlatforms: mergedPlatforms,
       });
     } catch (err) {
       console.error(`[Validation] Unexpected error validating ${stop.name}:`, err);

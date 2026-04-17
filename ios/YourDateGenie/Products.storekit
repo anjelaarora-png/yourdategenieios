@@ -1,60 +1,77 @@
 {
-  "identifier" : "YDG_STOREKIT_LOCAL",
-  "nonRenewingSubscriptions" : [
-
-  ],
-  "products" : [
-
-  ],
-  "settings" : {
-    "_failTransactionsEnabled" : false,
-    "_locale" : "en_US",
-    "_storefront" : "USA"
+  "identifier": "YDG_STOREKIT_LOCAL",
+  "nonRenewingSubscriptions": [],
+  "products": [],
+  "settings": {
+    "_failTransactionsEnabled": false,
+    "_locale": "en_US",
+    "_storefront": "USA"
   },
-  "subscriptionGroups" : [
+  "subscriptionGroups": [
     {
-      "id" : "214F8A2C",
-      "localizations" : [
-
-      ],
-      "name" : "Premium",
-      "subscriptions" : [
+      "id": "214F8A2C",
+      "localizations": [],
+      "name": "Premium",
+      "subscriptions": [
         {
-          "adHocOffers" : [
-
-          ],
-          "codeOffers" : [
-
-          ],
-          "displayPrice" : "4.99",
-          "familyShareable" : false,
-          "groupNumber" : 1,
-          "internalID" : "01AABBCC",
-          "introductoryOffer" : {
-            "displayPrice" : "0.00",
-            "internalID" : "EEFF00AA",
-            "numberOfPeriods" : 1,
-            "paymentMode" : "free",
-            "subscriptionPeriod" : "P7D"
+          "adHocOffers": [],
+          "codeOffers": [],
+          "displayPrice": "49.99",
+          "familyShareable": false,
+          "groupNumber": 1,
+          "internalID": "02BBCCDD",
+          "introductoryOffer": {
+            "displayPrice": "0.00",
+            "internalID": "FF0011BB",
+            "numberOfPeriods": 1,
+            "paymentMode": "free",
+            "subscriptionPeriod": "P7D"
           },
-          "localizations" : [
+          "localizations": [
             {
-              "description" : "Unlock premium date planning features.",
-              "displayName" : "Premium Monthly",
-              "locale" : "en_US"
+              "description": "Unlock all premium date planning features for a full year.",
+              "displayName": "Premium Annual",
+              "locale": "en_US"
             }
           ],
-          "productID" : "com.yourdategenie.premium.monthly",
-          "recurringSubscriptionPeriod" : "P1M",
-          "referenceName" : "Premium Monthly",
-          "subscriptionGroupID" : "214F8A2C",
-          "type" : "RecurringSubscription"
+          "productID": "com.yourdategenie.premium.annual",
+          "recurringSubscriptionPeriod": "P1Y",
+          "referenceName": "Premium Annual",
+          "subscriptionGroupID": "214F8A2C",
+          "type": "RecurringSubscription"
+        },
+        {
+          "adHocOffers": [],
+          "codeOffers": [],
+          "displayPrice": "4.99",
+          "familyShareable": false,
+          "groupNumber": 2,
+          "internalID": "01AABBCC",
+          "introductoryOffer": {
+            "displayPrice": "0.00",
+            "internalID": "EEFF00AA",
+            "numberOfPeriods": 1,
+            "paymentMode": "free",
+            "subscriptionPeriod": "P7D"
+          },
+          "localizations": [
+            {
+              "description": "Unlock premium date planning features.",
+              "displayName": "Premium Monthly",
+              "locale": "en_US"
+            }
+          ],
+          "productID": "com.yourdategenie.premium.monthly",
+          "recurringSubscriptionPeriod": "P1M",
+          "referenceName": "Premium Monthly",
+          "subscriptionGroupID": "214F8A2C",
+          "type": "RecurringSubscription"
         }
       ]
     }
   ],
-  "version" : {
-    "major" : 2,
-    "minor" : 0
+  "version": {
+    "major": 2,
+    "minor": 0
   }
 }

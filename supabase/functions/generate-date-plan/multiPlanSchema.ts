@@ -20,8 +20,8 @@ export const multiDatePlanTool = {
                 type: "string",
                 description: "Short label like 'Classic Romance', 'Adventure', 'Cozy & Intimate'",
               },
-              title: { type: "string", description: "Short creative name (2-6 words), e.g. 'Sunset & Vinyl' or 'Secret Garden Evening'. Do not use only cuisine or neighborhood names." },
-              tagline: { type: "string", description: "Romantic one-liner; can mention cuisine or area" },
+              title: { type: "string", description: "Magical, cinematic 2-6 word title evoking MOOD or ATMOSPHERE of this specific plan. NEVER use lazy generic titles like 'Mediterranean Evening', 'Italian Night', or '[Cuisine] + [generic word]'. NEVER use generic phrases like 'Date Night' or 'Evening Out'. Cuisine/cultural words ARE allowed if used creatively and poetically (e.g. 'Mediterranean Moonlight', 'Saffron & Slow Jazz', 'Spice, Stars & You'). Each plan's title must feel completely different. Examples: 'Velvet & City Lights', 'The Midnight Detour', 'Salt Air & Starlight', 'Candlelight & Conspiracy', 'Stolen Kisses Open Sky', 'Mediterranean Moonlight'" },
+              tagline: { type: "string", description: "Romantic one-liner that sets the scene; this is where you can mention cuisine or neighborhood (NOT the title)" },
               totalDuration: {
                 type: "string",
                 description: "Total time like '3-4 hours'",
@@ -84,6 +84,11 @@ export const multiDatePlanTool = {
                     estimatedCostPerPerson: {
                       type: "string",
                       description: "Estimated cost per person for this stop, e.g. '$25-40' or 'Free'"
+                    },
+                    reservationPlatforms: {
+                      type: "array",
+                      items: { type: "string" },
+                      description: "Reservation platforms this specific venue is confirmed to be listed on. Only include platforms you are confident about based on your knowledge. Valid values: 'opentable', 'resy'. Leave empty or omit if unsure. Example: ['opentable'] for a restaurant known to be on OpenTable, ['resy'] for one on Resy."
                     },
                   },
                   required: [

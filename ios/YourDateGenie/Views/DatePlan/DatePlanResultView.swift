@@ -90,7 +90,10 @@ struct DatePlanResultView: View {
                                 Image(systemName: "ellipsis.circle")
                                     .font(.system(size: 15))
                                     .foregroundColor(Color.luxuryGold)
+                                    .frame(width: 44, height: 44)
+                                    .contentShape(Rectangle())
                             }
+                            .accessibilityLabel("More options")
                         }
                         
                         Button {
@@ -102,12 +105,18 @@ struct DatePlanResultView: View {
                                 .font(.system(size: 15))
                                 .foregroundColor(Color.luxuryGold)
                                 .opacity(access.canAccess(.datePlan) ? 1 : 0.45)
+                                .frame(width: 44, height: 44)
+                                .contentShape(Rectangle())
                         }
+                        .accessibilityLabel("Share this plan")
                         
                         if isSaved {
                             Image(systemName: "checkmark")
                                 .font(.system(size: 15, weight: .semibold))
                                 .foregroundColor(Color.luxuryGold)
+                                .frame(width: 44, height: 44)
+                                .accessibilityLabel("Plan saved")
+                                .accessibilityHidden(true)
                         }
                     }
                 }
@@ -157,6 +166,8 @@ struct DatePlanResultView: View {
                             ReservationPlatformActionRow(
                                 venueName: stop.name,
                                 phoneNumber: stop.phoneNumber,
+                                address: stop.address,
+                                reservationPlatforms: stop.reservationPlatforms,
                                 onAction: { showReserveVenuePicker = false }
                             )
                             .padding(.vertical, 4)
@@ -453,7 +464,12 @@ struct DatePlanResultView: View {
                     useDarkStyle: true,
                     onTap: {
                         if isReservable(stop) {
-                            platformPickerPayload = ReservationPlatformPickerPayload(venueName: stop.name, phoneNumber: stop.phoneNumber)
+                            platformPickerPayload = ReservationPlatformPickerPayload(
+                                venueName: stop.name,
+                                phoneNumber: stop.phoneNumber,
+                                address: stop.address,
+                                reservationPlatforms: stop.reservationPlatforms
+                            )
                         }
                     }
                 )
@@ -673,7 +689,12 @@ struct DatePlanResultView: View {
                             showNoReservableAlert = true
                         } else if reservable.count == 1 {
                             let stop = reservable[0]
-                            platformPickerPayload = ReservationPlatformPickerPayload(venueName: stop.name, phoneNumber: stop.phoneNumber)
+                            platformPickerPayload = ReservationPlatformPickerPayload(
+                                venueName: stop.name,
+                                phoneNumber: stop.phoneNumber,
+                                address: stop.address,
+                                reservationPlatforms: stop.reservationPlatforms
+                            )
                         } else {
                             reservableStopsForPicker = reservable
                             showReserveVenuePicker = true

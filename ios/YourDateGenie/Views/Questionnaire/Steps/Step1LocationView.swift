@@ -1,8 +1,10 @@
 import SwiftUI
+import CoreLocation
 
 struct Step1LocationView: View {
     @Binding var data: QuestionnaireData
-    
+    @StateObject private var locationHelper = CurrentLocationHelper()
+
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 24) {
@@ -30,6 +32,38 @@ struct Step1LocationView: View {
                                 .font(Font.inter(11, weight: .regular))
                                 .foregroundColor(Color.luxuryGold.opacity(0.9))
                         }
+
+                        Button {
+                            locationHelper.requestCurrentLocation { address in
+                                if let address = address {
+                                    data.startingAddress = address
+                                }
+                            }
+                        } label: {
+                            HStack(spacing: 8) {
+                                if locationHelper.isLoading {
+                                    ProgressView()
+                                        .scaleEffect(0.8)
+                                        .tint(Color.luxuryGold)
+                                } else {
+                                    Image(systemName: "location.fill")
+                                        .font(.system(size: 14))
+                                }
+                                Text(locationHelper.isLoading ? "Finding your location..." : "Use my current location")
+                                    .font(Font.bodySans(14, weight: .medium))
+                            }
+                            .foregroundColor(Color.luxuryGold)
+                            .frame(maxWidth: .infinity)
+                            .frame(minHeight: 44)
+                            .background(Color.luxuryMaroonLight.opacity(0.7))
+                            .cornerRadius(12)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(Color.luxuryGold.opacity(0.5), lineWidth: 1)
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(locationHelper.isLoading)
                     }
                 }
                 
@@ -244,6 +278,72 @@ struct CustomTextFieldStyle: TextFieldStyle {
                 RoundedRectangle(cornerRadius: 14)
                     .stroke(Color.luxuryGold.opacity(0.3), lineWidth: 1)
             )
+    }
+}
+
+// MARK: - Current Location Helper
+
+@MainActor
+final class CurrentLocationHelper: NSObject, ObservableObject, CLLocationManagerDelegate {
+    @Published var isLoading = false
+    private let manager = CLLocationManager()
+    private var completion: ((String?) -> Void)?
+
+    override init() {
+        super.init()
+        manager.delegate = self
+        manager.desiredAccuracy = kCLLocationAccuracyHundredMeters
+    }
+
+    func requestCurrentLocation(completion: @escaping (String?) -> Void) {
+        self.completion = completion
+        isLoading = true
+        let status = manager.authorizationStatus
+        if status == .notDetermined {
+            manager.requestWhenInUseAuthorization()
+        } else if status == .authorizedWhenInUse || status == .authorizedAlways {
+            manager.requestLocation()
+        } else {
+            isLoading = false
+            completion(nil)
+        }
+    }
+
+    nonisolated func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        guard let loc = locations.first else {
+            Task { @MainActor in self.finish(with: nil) }
+            return
+        }
+        let geocoder = CLGeocoder()
+        geocoder.reverseGeocodeLocation(loc) { placemarks, _ in
+            let placemark = placemarks?.first
+            var parts: [String] = []
+            if let number = placemark?.subThoroughfare { parts.append(number) }
+            if let street = placemark?.thoroughfare { parts.append(street) }
+            if let city = placemark?.locality { parts.append(city) }
+            if let state = placemark?.administrativeArea { parts.append(state) }
+            let address = parts.isEmpty ? nil : parts.joined(separator: " ")
+            Task { @MainActor in self.finish(with: address) }
+        }
+    }
+
+    nonisolated func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+        Task { @MainActor in self.finish(with: nil) }
+    }
+
+    nonisolated func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+        let status = manager.authorizationStatus
+        if status == .authorizedWhenInUse || status == .authorizedAlways {
+            DispatchQueue.main.async { manager.requestLocation() }
+        } else if status != .notDetermined {
+            Task { @MainActor in self.finish(with: nil) }
+        }
+    }
+
+    private func finish(with address: String?) {
+        isLoading = false
+        completion?(address)
+        completion = nil
     }
 }
 

@@ -34,7 +34,14 @@ struct LuxuryExploreTabView: View {
     @State private var explorePlacesLoading = false
     @State private var exploreNextPageToken: String?
     @State private var exploreLoadMoreLoading = false
-    
+    @State private var exploreRadiusMiles: Int = 10
+
+    private static let radiusOptions: [(label: String, miles: Int)] = [
+        ("5 mi", 5), ("10 mi", 10), ("25 mi", 25), ("50 mi", 50)
+    ]
+
+    private var exploreRadiusMeters: Int { exploreRadiusMiles * 1609 }
+
     /// Same as Home: starting point address first, then city (from Google Places / Maps).
     private var preferredCity: String {
         guard let user = UserProfileManager.shared.currentUser else { return "your area" }
@@ -76,6 +83,9 @@ struct LuxuryExploreTabView: View {
                             .padding(.top, 16)
                             .padding(.horizontal, 20)
                             
+                            // Radius filter bar
+                            radiusBar
+
                             // 6 tiles: horizontal scroll of recommended places
                             recommendedTilesSection(geo: geo)
                             
@@ -309,6 +319,52 @@ struct LuxuryExploreTabView: View {
         .frame(maxWidth: .infinity)
     }
     
+    private var radiusBar: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 5) {
+                Image(systemName: "location.circle.fill")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(Color.luxuryGold)
+                Text("Area radius")
+                    .font(Font.bodySans(12, weight: .medium))
+                    .foregroundColor(Color.luxuryCreamMuted)
+            }
+            .padding(.horizontal, 20)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(Self.radiusOptions, id: \.miles) { option in
+                        Button {
+                            guard exploreRadiusMiles != option.miles else { return }
+                            exploreRadiusMiles = option.miles
+                            Task {
+                                await loadRecommendedPlaces()
+                                await loadExplorePlaces()
+                            }
+                        } label: {
+                            Text(option.label)
+                                .font(Font.bodySans(13, weight: .semibold))
+                                .foregroundColor(exploreRadiusMiles == option.miles ? Color.luxuryMaroon : Color.luxuryCream)
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 8)
+                                .background(exploreRadiusMiles == option.miles ? Color.luxuryGold : Color.luxuryMaroonLight.opacity(0.8))
+                                .cornerRadius(20)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 20)
+                                        .stroke(Color.luxuryGold.opacity(exploreRadiusMiles == option.miles ? 1 : 0.35), lineWidth: 1)
+                                )
+                        }
+                        .buttonStyle(ChipButtonStyle())
+                    }
+                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 2)
+            }
+            .scrollBounceBehavior(.automatic)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
     private func chipLabel(_ title: String, isSelected: Bool) -> some View {
         Text(title)
             .font(Font.bodySans(14, weight: .semibold))
@@ -330,8 +386,9 @@ struct LuxuryExploreTabView: View {
             return
         }
         await MainActor.run { if recommendedLoading { return }; recommendedLoading = true }
+        let radius = exploreRadiusMeters
         do {
-            let places = try await GooglePlacesService.shared.fetchRecommendedInCity(city: city, limit: 6)
+            let places = try await GooglePlacesService.shared.fetchRecommendedInCity(city: city, limit: 6, radiusMeters: radius)
             await MainActor.run { recommendedPlaces = places; recommendedLoading = false }
         } catch {
             await MainActor.run { recommendedPlaces = []; recommendedLoading = false }
@@ -346,12 +403,13 @@ struct LuxuryExploreTabView: View {
         }
         await MainActor.run { if explorePlacesLoading { return }; explorePlacesLoading = true }
         let isAll = selectedExploreCategory == nil
+        let radius = exploreRadiusMeters
         do {
             let page: GooglePlacesService.TrendingPlacesPage
             if isAll {
-                page = try await GooglePlacesService.shared.fetchTrendingPlacesAllCategory(city: city, minCount: 10)
+                page = try await GooglePlacesService.shared.fetchTrendingPlacesAllCategory(city: city, minCount: 10, radiusMeters: radius)
             } else {
-                page = try await GooglePlacesService.shared.fetchTrendingPlacesPage(city: city, categoryId: selectedExploreCategory?.id, pageToken: nil)
+                page = try await GooglePlacesService.shared.fetchTrendingPlacesPage(city: city, categoryId: selectedExploreCategory?.id, pageToken: nil, radiusMeters: radius)
             }
             await MainActor.run {
                 explorePlaces = page.places
@@ -378,20 +436,21 @@ struct LuxuryExploreTabView: View {
 
         let categoryId = selectedExploreCategory?.id
         let token = await MainActor.run { exploreNextPageToken }
+        let radius = exploreRadiusMeters
 
         do {
             let page: GooglePlacesService.TrendingPlacesPage
             if let token, !token.isEmpty {
                 // Pagination token available — brief delay for Google's token to activate
                 try? await Task.sleep(nanoseconds: 2_000_000_000)
-                page = try await GooglePlacesService.shared.fetchTrendingPlacesPage(city: city, categoryId: categoryId, pageToken: token)
+                page = try await GooglePlacesService.shared.fetchTrendingPlacesPage(city: city, categoryId: categoryId, pageToken: token, radiusMeters: radius)
             } else {
                 // No token — fetch a fresh set and append genuinely new spots
                 let isAll = categoryId == nil
                 if isAll {
-                    page = try await GooglePlacesService.shared.fetchTrendingPlacesAllCategory(city: city, minCount: 10)
+                    page = try await GooglePlacesService.shared.fetchTrendingPlacesAllCategory(city: city, minCount: 10, radiusMeters: radius)
                 } else {
-                    page = try await GooglePlacesService.shared.fetchTrendingPlacesPage(city: city, categoryId: categoryId, pageToken: nil)
+                    page = try await GooglePlacesService.shared.fetchTrendingPlacesPage(city: city, categoryId: categoryId, pageToken: nil, radiusMeters: radius)
                 }
             }
             await MainActor.run {

@@ -26,6 +26,7 @@ struct DatePlanOptionsView: View {
     @State private var inviterFirstChoiceIndex: Int?
     @State private var inviterSecondChoiceIndex: Int?
     @State private var inviterRankSubmitted = false
+    @AppStorage("hasSwipedOptions") private var hasSwipedOptions = false
 
     private var isPartnerPlanMode: Bool { coordinator.currentPlanPartnerNames != nil }
 
@@ -85,6 +86,8 @@ struct DatePlanOptionsView: View {
                         )
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel("Save and exit")
+                    .accessibilityHint("Closes this screen. Your plans are saved.")
                 }
                 
                 ToolbarItem(placement: .principal) {
@@ -284,6 +287,7 @@ struct DatePlanOptionsView: View {
         .tabViewStyle(.page(indexDisplayMode: .never))
         .animation(.spring(response: 0.45, dampingFraction: 0.8), value: selectedPlanIndex)
         .onChange(of: selectedPlanIndex) { _, _ in
+            hasSwipedOptions = true
             if selectedPlanIndex < plans.count {
                 itineraryAppeared = false
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) { itineraryAppeared = true }
@@ -465,6 +469,16 @@ struct DatePlanOptionsView: View {
         .frame(minHeight: 120)
         .background(Color.luxuryMaroon)
         .contentShape(Rectangle())
+        .overlay(alignment: .bottom) {
+            if !hasSwipedOptions && plans.count > 1 {
+                Text("Swipe between options or tap above")
+                    .font(Font.bodySans(12, weight: .regular))
+                    .foregroundColor(Color.luxuryMuted)
+                    .padding(.bottom, 4)
+                    .transition(.opacity)
+                    .animation(.easeOut, value: hasSwipedOptions)
+            }
+        }
     }
 
     private func submitInviterRanks() {

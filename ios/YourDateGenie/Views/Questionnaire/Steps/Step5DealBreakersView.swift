@@ -2,10 +2,17 @@ import SwiftUI
 
 struct Step5DealBreakersView: View {
     @Binding var data: QuestionnaireData
-    
+    @State private var showDealBreakerHelp = false
+
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 24) {
+                StepHelpCard(
+                    isExpanded: $showDealBreakerHelp,
+                    hint: "What counts as a deal-breaker?",
+                    explanation: "Deal-breakers are things that would make a date uncomfortable — like food allergies, mobility needs, or places you want to avoid. Only used to filter out bad matches."
+                )
+
                 // Info banner
                 HStack(spacing: 12) {
                     Image(systemName: "info.circle.fill")

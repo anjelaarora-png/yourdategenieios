@@ -8,8 +8,8 @@ export const datePlanTool = {
     parameters: {
       type: "object",
       properties: {
-        title: { type: "string", description: "Short creative name (2-6 words), not only cuisine/neighborhood; e.g. 'Sunset & Vinyl'" },
-        tagline: { type: "string", description: "Romantic one-liner; can mention cuisine or area" },
+        title: { type: "string", description: "Magical, cinematic 2-6 word title evoking MOOD or ATMOSPHERE. NEVER use lazy generic titles like 'Mediterranean Evening' or 'Italian Night'. Cuisine words ARE allowed if used creatively (e.g. 'Mediterranean Moonlight', 'Saffron & Slow Jazz'). No generic phrases like 'Date Night' or 'Evening Out'. Examples: 'Velvet & City Lights', 'The Midnight Detour', 'Salt Air & Starlight'" },
+        tagline: { type: "string", description: "Romantic one-liner that sets the scene; this is where you can mention cuisine or neighborhood (NOT the title)" },
         totalDuration: {
           type: "string",
           description: "Total time like '3-4 hours'",
@@ -32,6 +32,11 @@ export const datePlanTool = {
               whyItFits: { type: "string" },
               romanticTip: { type: "string" },
               emoji: { type: "string" },
+              reservationPlatforms: {
+                type: "array",
+                items: { type: "string" },
+                description: "Reservation platforms this venue is confirmed on. Valid values: 'opentable', 'resy'. Only include if confident. Leave empty if unsure."
+              },
             },
             required: [
               "order",

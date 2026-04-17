@@ -90,6 +90,12 @@ final class LoveNoteStorageManager: ObservableObject {
         let note = SavedLoveNote(message: message, signOffName: signOffName)
         savedNotes.insert(note, at: 0)
         save()
+        NotificationManager.shared.addNotification(AppNotification(
+            type: .loveNoteSaved,
+            title: "Love note saved!",
+            message: "\"\(String(message.prefix(60)).trimmingCharacters(in: .whitespaces))\(message.count > 60 ? "…" : "")\"",
+            timestamp: Date()
+        ))
     }
 
     func remove(id: UUID) {

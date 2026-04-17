@@ -24,6 +24,11 @@ struct LuxuryHomeTabView: View {
     @State private var trendingFetchFailed = false
     @State private var lastLoadedLocationKey: String = ""
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @AppStorage("hasSeenHomeTutorial") private var hasSeenHomeTutorial = false
+    @State private var showHomeTutorial = false
+    @AppStorage("hasChosenMapsApp") private var hasChosenMapsApp = false
+    @State private var showMapsAppPicker = false
+    @State private var pendingPlaceForMaps: GooglePlacesService.PlaceSearchResult?
     
     private var planForTonight: DatePlan? {
         let calendar = Calendar.current
@@ -64,6 +69,32 @@ struct LuxuryHomeTabView: View {
             .onAppear {
                 coordinator.refreshPreferencesState()
                 Task { await loadTrendingPlaces() }
+                if !hasSeenHomeTutorial {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                        showHomeTutorial = true
+                        hasSeenHomeTutorial = true
+                    }
+                }
+            }
+            .fullScreenCover(isPresented: $showHomeTutorial) {
+                HomeTutorialOverlayView(isPresented: $showHomeTutorial)
+            }
+            .confirmationDialog("Open route in which app?", isPresented: $showMapsAppPicker, titleVisibility: .visible) {
+                Button("Apple Maps") {
+                    UserDefaults.standard.set("apple", forKey: "dateGenie_preferredMapsApp")
+                    hasChosenMapsApp = true
+                    if let place = pendingPlaceForMaps { openPlaceInPreferredMaps(place: place) }
+                    pendingPlaceForMaps = nil
+                }
+                Button("Google Maps") {
+                    UserDefaults.standard.set("google", forKey: "dateGenie_preferredMapsApp")
+                    hasChosenMapsApp = true
+                    if let place = pendingPlaceForMaps { openPlaceInPreferredMaps(place: place) }
+                    pendingPlaceForMaps = nil
+                }
+                Button("Cancel", role: .cancel) { pendingPlaceForMaps = nil }
+            } message: {
+                Text("Your choice will be remembered. Change it later in Profile > Settings.")
             }
             .onChange(of: trendingLocationKey) { _, _ in
                 Task { await loadTrendingPlaces(force: true) }
@@ -293,7 +324,13 @@ struct LuxuryHomeTabView: View {
     }
     
     /// Opens the business profile in Google Maps or Apple Maps (reviews, hours, photos).
+    /// On first use, prompts the user to choose their preferred app.
     private func openPlaceInPreferredMaps(place: GooglePlacesService.PlaceSearchResult) {
+        guard hasChosenMapsApp else {
+            pendingPlaceForMaps = place
+            showMapsAppPicker = true
+            return
+        }
         let app = UserDefaults.standard.string(forKey: "dateGenie_preferredMapsApp") ?? "apple"
         if app == "google" {
             // Google Maps: api=1 + query (lat,lon) + query_place_id opens the business profile in the app

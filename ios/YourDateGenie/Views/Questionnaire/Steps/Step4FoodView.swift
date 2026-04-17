@@ -2,10 +2,17 @@ import SwiftUI
 
 struct Step4FoodView: View {
     @Binding var data: QuestionnaireData
-    
+    @State private var showFoodHelp = false
+
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 24) {
+                StepHelpCard(
+                    isExpanded: $showFoodHelp,
+                    hint: "How do food preferences help?",
+                    explanation: "Your cuisine and dietary preferences help us filter out restaurants that won\'t work for you. If you have allergies or restrictions, we\'ll make sure every venue on your date is safe and enjoyable."
+                )
+
                 // Budget
                 VStack(alignment: .leading, spacing: 12) {
                     SectionHeader(

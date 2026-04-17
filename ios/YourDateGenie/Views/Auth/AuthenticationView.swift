@@ -200,19 +200,25 @@ struct AuthenticationView: View {
     private var socialAuthButtons: some View {
         VStack(spacing: 12) {
             // Sign in with Apple (required by Apple when Google is offered)
-            SignInWithAppleButton(
-                .signIn,
-                onRequest: { request in
-                    request.requestedScopes = [.fullName, .email]
-                },
-                onCompletion: { _ in
-                    socialAuth.signInWithApple()
-                }
-            )
-            .signInWithAppleButtonStyle(.white)
-            .frame(height: 50)
-            .cornerRadius(12)
-            .disabled(socialAuth.isLoading)
+            VStack(spacing: 4) {
+                SignInWithAppleButton(
+                    .signIn,
+                    onRequest: { request in
+                        request.requestedScopes = [.fullName, .email]
+                    },
+                    onCompletion: { _ in
+                        socialAuth.signInWithApple()
+                    }
+                )
+                .signInWithAppleButtonStyle(.white)
+                .frame(height: 50)
+                .cornerRadius(12)
+                .disabled(socialAuth.isLoading)
+
+                Text("Use your Apple ID \u{2014} no new password needed")
+                    .font(Font.bodySans(12, weight: .regular))
+                    .foregroundColor(Color.luxuryMuted)
+            }
 
             // Sign in with Google (Supabase OAuth via ASWebAuthenticationSession)
             Button {
@@ -231,6 +237,27 @@ struct AuthenticationView: View {
                 .cornerRadius(12)
             }
             .disabled(socialAuth.isLoading)
+
+            // SMS/OTP login placeholder (backend integration pending)
+            Button {} label: {
+                HStack(spacing: 10) {
+                    Image(systemName: "message.fill")
+                        .font(.system(size: 16, weight: .medium))
+                    Text("Sign in with Phone (coming soon)")
+                        .font(Font.bodySans(15, weight: .medium))
+                }
+                .foregroundColor(Color.luxuryMuted)
+                .frame(maxWidth: .infinity)
+                .frame(height: 50)
+                .background(Color.luxuryMaroonLight)
+                .cornerRadius(12)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(Color.luxuryMuted.opacity(0.3), lineWidth: 1)
+                )
+            }
+            .disabled(true)
+            .opacity(0.6)
         }
         .alert("Sign In Error", isPresented: Binding(
             get: { socialAuth.error != nil },
@@ -321,12 +348,20 @@ struct AuthenticationView: View {
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 8)
 
-            Text("If you confirmed in Safari or Mail, the app may not receive the link. Use “Already verified? Sign in” below with the same password you chose—or keep this screen open; we’ll retry signing you in automatically.")
-                .font(Font.bodySans(14, weight: .regular))
+            VStack(alignment: .leading, spacing: 14) {
+                EmailConfirmationStep(number: "1", text: "Open the email we just sent to \(pendingEmail)")
+                EmailConfirmationStep(number: "2", text: "Tap the confirmation link inside it")
+                EmailConfirmationStep(number: "3", text: "Come back here — the app will open automatically")
+            }
+            .padding(.top, 20)
+            .padding(.horizontal, 8)
+
+            Text("If the app doesn't open after clicking the link, tap 'Already verified? Sign in' below.")
+                .font(Font.bodySans(13, weight: .regular))
                 .foregroundColor(Color.luxuryMuted)
                 .multilineTextAlignment(.center)
-                .padding(.top, 20)
-                .padding(.horizontal, 4)
+                .padding(.top, 12)
+                .padding(.horizontal, 8)
 
             VStack(spacing: 12) {
                 mailAppQuickActions
@@ -420,29 +455,35 @@ struct AuthenticationView: View {
                 }
             } label: {
                 Text("Sign In")
-                    .font(Font.bodySans(15, weight: viewModel.isSignUp ? .regular : .semibold))
+                    .font(Font.bodySans(16, weight: viewModel.isSignUp ? .regular : .semibold))
                     .foregroundColor(viewModel.isSignUp ? Color.luxuryMuted : Color.luxuryMaroon)
                     .frame(maxWidth: .infinity)
+                    .frame(minHeight: 48)
                     .padding(.vertical, 14)
                     .background(
                         viewModel.isSignUp ? AnyShapeStyle(Color.clear) : AnyShapeStyle(LinearGradient.goldShimmer)
                     )
             }
+            .accessibilityLabel("Sign In")
+            .accessibilityAddTraits(viewModel.isSignUp ? [] : .isSelected)
             
             Button {
                 withAnimation(.easeInOut(duration: 0.2)) {
                     viewModel.isSignUp = true
                 }
             } label: {
-                Text("Sign Up")
-                    .font(Font.bodySans(15, weight: viewModel.isSignUp ? .semibold : .regular))
+                Text("Create Account")
+                    .font(Font.bodySans(16, weight: viewModel.isSignUp ? .semibold : .regular))
                     .foregroundColor(viewModel.isSignUp ? Color.luxuryMaroon : Color.luxuryMuted)
                     .frame(maxWidth: .infinity)
+                    .frame(minHeight: 48)
                     .padding(.vertical, 14)
                     .background(
                         viewModel.isSignUp ? AnyShapeStyle(LinearGradient.goldShimmer) : AnyShapeStyle(Color.clear)
                     )
             }
+            .accessibilityLabel("Create Account")
+            .accessibilityAddTraits(viewModel.isSignUp ? .isSelected : [])
         }
         .background(Color.luxuryMaroonLight)
         .cornerRadius(12)
@@ -509,13 +550,20 @@ struct AuthenticationView: View {
             )
             .focused($focusedField, equals: .email)
             
-            AuthSecureField(
-                title: "Password",
-                placeholder: "••••••••",
-                text: $viewModel.password,
-                icon: "lock.fill"
-            )
-            .focused($focusedField, equals: .password)
+            VStack(alignment: .leading, spacing: 6) {
+                AuthSecureField(
+                    title: "Password",
+                    placeholder: "••••••••",
+                    text: $viewModel.password,
+                    icon: "lock.fill"
+                )
+                .focused($focusedField, equals: .password)
+                
+                Text("Must be at least 8 characters")
+                    .font(Font.bodySans(12, weight: .regular))
+                    .foregroundColor(Color.luxuryMuted)
+                    .padding(.leading, 4)
+            }
             
             AuthSecureField(
                 title: "Confirm Password",
@@ -1043,6 +1091,31 @@ private class AuthViewModelState: ObservableObject {
             return !email.isEmpty &&
                    email.contains("@") &&
                    !password.isEmpty
+        }
+    }
+}
+
+// MARK: - Email Confirmation Step Row
+
+private struct EmailConfirmationStep: View {
+    let number: String
+    let text: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 14) {
+            ZStack {
+                Circle()
+                    .fill(LinearGradient.goldShimmer)
+                    .frame(width: 28, height: 28)
+                Text(number)
+                    .font(Font.bodySans(14, weight: .bold))
+                    .foregroundColor(Color.luxuryMaroon)
+            }
+            Text(text)
+                .font(Font.bodySans(15, weight: .regular))
+                .foregroundColor(Color.luxuryCream)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer()
         }
     }
 }

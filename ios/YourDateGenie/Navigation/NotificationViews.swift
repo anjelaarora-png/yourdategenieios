@@ -18,6 +18,24 @@ struct AppNotification: Identifiable, Equatable {
         case giftIdea         = "gift"
         case specialOccasion  = "occasion"
         case weekendSuggestion = "weekend"
+        // Events
+        case newEvent               = "new_event"
+        // Partner invite
+        case partnerInvite          = "partner_invite"
+        // Unsaved plans waiting
+        case unsavedDateWaiting     = "unsaved_date_waiting"
+        // Memory capture prompt (after a date is marked as done)
+        case memoryCapture          = "memory_capture"
+        // Upcoming scheduled date (day-of or day-before)
+        case upcomingDate           = "upcoming_date"
+        // Milestone: Nth saved date plan (1st, 3rd, 5th, 10th)
+        case dateMilestone          = "date_milestone"
+        // Milestone: Nth memory saved (5th, 10th, 25th)
+        case memoryMilestone        = "memory_milestone"
+        // Love note saved to collection
+        case loveNoteSaved          = "love_note_saved"
+        // Premium subscription just activated
+        case subscriptionActivated  = "subscription_activated"
         // Partner planning — one type per phase event
         case partnerSubmitted       = "partner_submitted"       // legacy
         case partnerPreferencesIn   = "partner_preferences_in"
@@ -39,6 +57,15 @@ struct AppNotification: Identifiable, Equatable {
         case .giftIdea:               return "gift.fill"
         case .specialOccasion:        return "star.fill"
         case .weekendSuggestion:      return "sun.max.fill"
+        case .newEvent:               return "ticket.fill"
+        case .partnerInvite:          return "envelope.open.fill"
+        case .unsavedDateWaiting:     return "clock.badge.exclamationmark"
+        case .memoryCapture:          return "camera.fill"
+        case .upcomingDate:           return "calendar.badge.clock"
+        case .dateMilestone:          return "rosette"
+        case .memoryMilestone:        return "photo.stack.fill"
+        case .loveNoteSaved:          return "heart.text.square.fill"
+        case .subscriptionActivated:  return "crown.fill"
         case .partnerSubmitted,
              .partnerPreferencesIn:   return "person.2.fill"
         case .optionsReadyToRank:     return "list.number"
@@ -60,6 +87,15 @@ struct AppNotification: Identifiable, Equatable {
         case .giftIdea:               return Color(hex: "FF69B4")
         case .specialOccasion:        return Color(hex: "FFB347")
         case .weekendSuggestion:      return Color(hex: "87CEEB")
+        case .newEvent:               return Color(hex: "FF8C42")
+        case .partnerInvite:          return Color.luxuryGold
+        case .unsavedDateWaiting:     return Color(hex: "C9A84C")
+        case .memoryCapture:          return Color(hex: "E8A0BF")
+        case .upcomingDate:           return Color.luxuryGoldLight
+        case .dateMilestone:          return Color(hex: "FFD700")
+        case .memoryMilestone:        return Color(hex: "87CEEB")
+        case .loveNoteSaved:          return Color(hex: "FF69B4")
+        case .subscriptionActivated:  return Color(hex: "FFD700")
         case .partnerSubmitted,
              .partnerPreferencesIn,
              .partnerJoined:          return Color.luxuryGold

@@ -313,7 +313,7 @@ class GooglePlacesService {
     /// Fetch trending / popular places in the given city (e.g. for "Trending in your Area" on home).
     /// Optional `categoryId` from ExploreCategory (e.g. "restaurants", "bars") narrows results; nil = general date-night mix.
     /// Uses Places Text Search; returns up to `limit` results.
-    func fetchTrendingPlacesInCity(city: String, categoryId: String? = nil, limit: Int = 6) async throws -> [PlaceSearchResult] {
+    func fetchTrendingPlacesInCity(city: String, categoryId: String? = nil, limit: Int = 6, radiusMeters: Int = 25_000) async throws -> [PlaceSearchResult] {
         let trimmed = city.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, Config.isGooglePlacesConfigured else { return [] }
         
@@ -330,7 +330,6 @@ class GooglePlacesService {
         
         var urlString = "\(Config.googlePlacesEndpoint)/textsearch/json?query=\(encodedQuery)"
         if let bias = locationBias {
-            let radiusMeters = 25_000
             urlString += "&location=\(bias.lat),\(bias.lon)&radius=\(radiusMeters)"
         }
         urlString += "&key=\(Config.googlePlacesAPIKey)"
@@ -374,7 +373,7 @@ class GooglePlacesService {
     
     /// Fetch one page of trending places. Pass `pageToken` from a previous response to get the next page (up to 20 more; API max 60 total).
     /// When `pageToken` is nil, runs a new search; when non-nil, requests only with the token (other params ignored by API).
-    func fetchTrendingPlacesPage(city: String, categoryId: String?, pageToken: String?) async throws -> TrendingPlacesPage {
+    func fetchTrendingPlacesPage(city: String, categoryId: String?, pageToken: String?, radiusMeters: Int = 25_000) async throws -> TrendingPlacesPage {
         let trimmed = city.trimmingCharacters(in: .whitespacesAndNewlines)
         guard Config.isGooglePlacesConfigured else { return TrendingPlacesPage(places: [], nextPageToken: nil) }
         
@@ -398,7 +397,7 @@ class GooglePlacesService {
             }
             var base = "\(Config.googlePlacesEndpoint)/textsearch/json?query=\(encodedQuery)"
             if let bias = locationBias {
-                base += "&location=\(bias.lat),\(bias.lon)&radius=25000"
+                base += "&location=\(bias.lat),\(bias.lon)&radius=\(radiusMeters)"
             }
             urlString = "\(base)&key=\(Config.googlePlacesAPIKey)"
         }
@@ -437,17 +436,17 @@ class GooglePlacesService {
     /// Covers restaurants, bars, outdoor spots, arts & culture, live music, and romantic venues.
     /// Sorts by rating then review count and enforces a 4.0★ minimum; falls back to full sorted
     /// list only when fewer than `limit` four-star results exist.
-    func fetchRecommendedInCity(city: String, limit: Int = 6) async throws -> [PlaceSearchResult] {
+    func fetchRecommendedInCity(city: String, limit: Int = 6, radiusMeters: Int = 25_000) async throws -> [PlaceSearchResult] {
         let trimmed = city.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, Config.isGooglePlacesConfigured else { return [] }
         
-        let restaurants = (try? await fetchTrendingPlacesInCity(city: trimmed, categoryId: "restaurants", limit: 8)) ?? []
-        let arts       = (try? await fetchTrendingPlacesInCity(city: trimmed, categoryId: "arts",        limit: 4)) ?? []
-        let outdoor    = (try? await fetchTrendingPlacesInCity(city: trimmed, categoryId: "outdoor",     limit: 4)) ?? []
-        let romantic   = (try? await fetchTrendingPlacesInCity(city: trimmed, categoryId: "romantic",    limit: 4)) ?? []
-        let bars       = (try? await fetchTrendingPlacesInCity(city: trimmed, categoryId: "bars",        limit: 4)) ?? []
-        let liveMusic  = (try? await fetchTrendingPlacesInCity(city: trimmed, categoryId: "live_music",  limit: 3)) ?? []
-        let activities = (try? await fetchTrendingPlacesInCity(city: trimmed, categoryId: "date_night",  limit: 3)) ?? []
+        let restaurants = (try? await fetchTrendingPlacesInCity(city: trimmed, categoryId: "restaurants", limit: 8,  radiusMeters: radiusMeters)) ?? []
+        let arts       = (try? await fetchTrendingPlacesInCity(city: trimmed, categoryId: "arts",        limit: 4,  radiusMeters: radiusMeters)) ?? []
+        let outdoor    = (try? await fetchTrendingPlacesInCity(city: trimmed, categoryId: "outdoor",     limit: 4,  radiusMeters: radiusMeters)) ?? []
+        let romantic   = (try? await fetchTrendingPlacesInCity(city: trimmed, categoryId: "romantic",    limit: 4,  radiusMeters: radiusMeters)) ?? []
+        let bars       = (try? await fetchTrendingPlacesInCity(city: trimmed, categoryId: "bars",        limit: 4,  radiusMeters: radiusMeters)) ?? []
+        let liveMusic  = (try? await fetchTrendingPlacesInCity(city: trimmed, categoryId: "live_music",  limit: 3,  radiusMeters: radiusMeters)) ?? []
+        let activities = (try? await fetchTrendingPlacesInCity(city: trimmed, categoryId: "date_night",  limit: 3,  radiusMeters: radiusMeters)) ?? []
         
         var combined = restaurants
         var seen = Set(combined.map(\.placeId))
@@ -469,16 +468,16 @@ class GooglePlacesService {
     
     /// "All" category: broad date-worthy mix (restaurants, bars, outdoor, arts, live music, romantic),
     /// 4★+ Google-rated, trending. Returns at least `minCount` when possible (no pagination).
-    func fetchTrendingPlacesAllCategory(city: String, minCount: Int = 10) async throws -> TrendingPlacesPage {
+    func fetchTrendingPlacesAllCategory(city: String, minCount: Int = 10, radiusMeters: Int = 25_000) async throws -> TrendingPlacesPage {
         let trimmed = city.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, Config.isGooglePlacesConfigured else { return TrendingPlacesPage(places: [], nextPageToken: nil) }
-        let restaurants = (try? await fetchTrendingPlacesInCity(city: trimmed, categoryId: "restaurants", limit: 10)) ?? []
-        let arts       = (try? await fetchTrendingPlacesInCity(city: trimmed, categoryId: "arts",        limit: 6)) ?? []
-        let outdoor    = (try? await fetchTrendingPlacesInCity(city: trimmed, categoryId: "outdoor",     limit: 6)) ?? []
-        let romantic   = (try? await fetchTrendingPlacesInCity(city: trimmed, categoryId: "romantic",    limit: 6)) ?? []
-        let bars       = (try? await fetchTrendingPlacesInCity(city: trimmed, categoryId: "bars",        limit: 5)) ?? []
-        let liveMusic  = (try? await fetchTrendingPlacesInCity(city: trimmed, categoryId: "live_music",  limit: 4)) ?? []
-        let activities = (try? await fetchTrendingPlacesInCity(city: trimmed, categoryId: "date_night",  limit: 4)) ?? []
+        let restaurants = (try? await fetchTrendingPlacesInCity(city: trimmed, categoryId: "restaurants", limit: 10, radiusMeters: radiusMeters)) ?? []
+        let arts       = (try? await fetchTrendingPlacesInCity(city: trimmed, categoryId: "arts",        limit: 6,  radiusMeters: radiusMeters)) ?? []
+        let outdoor    = (try? await fetchTrendingPlacesInCity(city: trimmed, categoryId: "outdoor",     limit: 6,  radiusMeters: radiusMeters)) ?? []
+        let romantic   = (try? await fetchTrendingPlacesInCity(city: trimmed, categoryId: "romantic",    limit: 6,  radiusMeters: radiusMeters)) ?? []
+        let bars       = (try? await fetchTrendingPlacesInCity(city: trimmed, categoryId: "bars",        limit: 5,  radiusMeters: radiusMeters)) ?? []
+        let liveMusic  = (try? await fetchTrendingPlacesInCity(city: trimmed, categoryId: "live_music",  limit: 4,  radiusMeters: radiusMeters)) ?? []
+        let activities = (try? await fetchTrendingPlacesInCity(city: trimmed, categoryId: "date_night",  limit: 4,  radiusMeters: radiusMeters)) ?? []
         var combined = restaurants
         var seen = Set(combined.map(\.placeId))
         for place in arts + outdoor + romantic + bars + liveMusic + activities {

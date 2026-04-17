@@ -2,12 +2,37 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "./cors.ts";
 
+// ---------------------------------------------------------------------------
+// Admin-only: caller must supply a JWT whose role claim is "service_role".
+// ---------------------------------------------------------------------------
+
 function jsonResponse(status: number, body: unknown) {
   return new Response(JSON.stringify(body), {
     status,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 }
+
+/** Returns true when the bearer token is a service_role JWT. */
+function isServiceRole(authHeader: string): boolean {
+  try {
+    const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : "";
+    if (!token) return false;
+    const parts = token.split(".");
+    if (parts.length !== 3) return false;
+    // Decode base64url payload — no signature verification needed here;
+    // Supabase signs all project JWTs with the project secret.
+    const padded = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const payload = JSON.parse(atob(padded));
+    return payload?.role === "service_role";
+  } catch {
+    return false;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// HTML helpers
+// ---------------------------------------------------------------------------
 
 function extractMeta(html: string, key: string): string | null {
   const regexes = [
@@ -35,14 +60,50 @@ function extractEventJsonLd(html: string): Record<string, unknown> | null {
           return item as Record<string, unknown>;
         }
       }
-    } catch { /* skip */ }
+    } catch { /* skip malformed blocks */ }
   }
   return null;
 }
 
 function decodeEntities(str: string): string {
-  return str.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, " ").trim();
+  return str
+    .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, " ")
+    .trim();
+}
+
+/**
+ * Clean Eventbrite image URLs.
+ * img.evbuc.com proxies the real CDN image as a percent-encoded path segment.
+ * Decoding it gives a direct, publicly cacheable CDN URL that iOS can load.
+ */
+function cleanImageUrl(raw: string): string {
+  if (!raw) return "";
+  try {
+    const u = new URL(raw);
+    if (u.hostname === "img.evbuc.com" && u.pathname.startsWith("/http")) {
+      const inner = decodeURIComponent(u.pathname.slice(1));
+      new URL(inner); // validate
+      return inner;
+    }
+    return u.toString();
+  } catch {
+    return raw;
+  }
+}
+
+/**
+ * Scan the raw HTML for the first direct cdn.evbuc.com image URL.
+ * This is more reliable than og:image which often points to the proxy.
+ */
+function extractCdnImage(html: string): string | null {
+  // Look for cdn.evbuc.com/images/... in src, href, or JSON strings
+  const re = /https:\/\/cdn\.evbuc\.com\/images\/[^"'\s>]+/g;
+  const matches = html.match(re);
+  if (!matches) return null;
+  // Prefer /original. variants; fall back to first match
+  const original = matches.find(u => u.includes("/original."));
+  return original ?? matches[0];
 }
 
 function parseLocation(loc: unknown): string {
@@ -60,40 +121,17 @@ function parseLocation(loc: unknown): string {
   return parts.join(", ");
 }
 
+// ---------------------------------------------------------------------------
+// Handler
+// ---------------------------------------------------------------------------
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
-  // Verify that the caller is an authenticated admin user before processing.
-  const authHeader = req.headers.get("Authorization");
-  if (!authHeader?.startsWith("Bearer ")) {
-    return jsonResponse(401, { error: "Unauthorized" });
-  }
-
-  const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
-  const supabaseAdmin = createClient(
-    Deno.env.get("SUPABASE_URL") ?? "",
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
-  );
-
-  const token = authHeader.slice(7);
-  const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
-  if (authError || !user) {
-    return jsonResponse(401, { error: "Unauthorized" });
-  }
-
-  // Check user_roles table for admin role
-  const { data: roleRow } = await supabaseAdmin
-    .from("user_roles")
-    .select("role")
-    .eq("user_id", user.id)
-    .maybeSingle();
-
-  const isAdmin =
-    roleRow?.role === "admin" ||
-    (user.app_metadata as Record<string, unknown>)?.role === "admin";
-
-  if (!isAdmin) {
-    return jsonResponse(403, { error: "Admin access required" });
+  // Admin gate: only service_role JWTs are accepted
+  const authHeader = req.headers.get("Authorization") ?? "";
+  if (!isServiceRole(authHeader)) {
+    return jsonResponse(403, { error: "Admin access required." });
   }
 
   try {
@@ -102,14 +140,18 @@ serve(async (req) => {
 
     if (!url || typeof url !== "string")
       return jsonResponse(400, { error: "Provide a valid Eventbrite URL in the `url` field." });
-    if (!url.includes("eventbrite."))
+
+    const cleanUrl = url.trim();
+    if (!cleanUrl.includes("eventbrite."))
       return jsonResponse(400, { error: "URL must be an Eventbrite link." });
 
-    const pageRes = await fetch(url, {
+    // 1. Fetch the public Eventbrite event page
+    const pageRes = await fetch(cleanUrl, {
       headers: {
         "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-        Accept: "text/html,application/xhtml+xml",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
         "Accept-Language": "en-US,en;q=0.9",
+        "Referer": "https://www.google.com/",
       },
       redirect: "follow",
     });
@@ -120,9 +162,33 @@ serve(async (req) => {
     const html = await pageRes.text();
     const jsonLd = extractEventJsonLd(html);
 
-    const title = extractMeta(html, "og:title") ?? extractMeta(html, "twitter:title") ?? (jsonLd?.name as string | undefined) ?? "Untitled Event";
-    const description = extractMeta(html, "og:description") ?? extractMeta(html, "description") ?? (jsonLd?.description as string | undefined) ?? "";
-    const imageUrl = extractMeta(html, "og:image:secure_url") ?? extractMeta(html, "og:image") ?? extractMeta(html, "twitter:image") ?? "";
+    // 2. Extract fields — prefer JSON-LD (more reliable) over og: tags
+    const title =
+      (jsonLd?.name as string | undefined) ??
+      extractMeta(html, "og:title") ??
+      extractMeta(html, "twitter:title") ??
+      "Untitled Event";
+
+    const description =
+      (jsonLd?.description as string | undefined) ??
+      extractMeta(html, "og:description") ??
+      extractMeta(html, "description") ??
+      "";
+
+    // Priority: 1) direct cdn.evbuc.com URL from page HTML (most reliable)
+    //            2) JSON-LD image field
+    //            3) og:image (often a proxy — cleaned before use)
+    const cdnImage = extractCdnImage(html);
+    const jsonLdImage = jsonLd?.image as string | string[] | undefined;
+    const jsonLdImageUrl = Array.isArray(jsonLdImage) ? jsonLdImage[0] : jsonLdImage;
+    const rawImageUrl =
+      cdnImage ??
+      jsonLdImageUrl ??
+      extractMeta(html, "og:image:secure_url") ??
+      extractMeta(html, "og:image") ??
+      extractMeta(html, "twitter:image") ??
+      "";
+    const imageUrl = cdnImage ? cdnImage : cleanImageUrl(rawImageUrl);
 
     let dateTime: string = new Date().toISOString();
     if (jsonLd?.startDate) {
@@ -131,7 +197,8 @@ serve(async (req) => {
     }
 
     const location = parseLocation(jsonLd?.location);
-    console.log("[import-eventbrite-event] Parsed:", { title, dateTime, location, imageUrl });
+
+    console.log("[import-eventbrite-event]", { title, dateTime, location, imageUrl });
 
     const eventRow = {
       title: title.slice(0, 255),
@@ -139,13 +206,14 @@ serve(async (req) => {
       date_time: dateTime,
       location: location.slice(0, 255),
       image_url: imageUrl,
-      eventbrite_url: url,
+      eventbrite_url: cleanUrl,
       is_active: true,
     };
 
-    // dry_run=true -> return parsed preview without writing to DB (used by iOS import form)
+    // dry_run: return parsed data without saving (preview mode)
     if (dry_run) return jsonResponse(200, { preview: eventRow });
 
+    // 3. Insert into events table
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!

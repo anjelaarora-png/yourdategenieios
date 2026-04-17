@@ -493,6 +493,26 @@ IMPORTANT: This is a SOLO DATE for ONE PERSON. All activities should be enjoyabl
 5. Use ONLY real, well-known venues that actually exist in ${data.city} or within the travel radius.
 6. Be specific with venue names - use actual restaurant names, park names, etc.
 7. Double-check that every venue's address is in ${data.city} or within ${travelRadius} of it.
-9. PLAN TITLES: Give each plan a short, creative title (2–6 words) that fits on a card. Do NOT use only cuisine names (e.g. "Italian Night") or neighborhood names alone. Use evocative, memorable names like "Sunset & Vinyl", "Secret Garden Evening", "Rooftop & Bubbles", "Books, Bites & Starlight", "Jazz and Velvet". Taglines can mention cuisine or neighborhood; keep titles punchy and wrap-friendly.
+9. PLAN TITLES — CRITICAL RULES (READ CAREFULLY):
+   ❌ FORBIDDEN: Lazy, generic titles — NO "Mediterranean Evening", "Italian Night", "Japanese Dinner", "French Bistro Night", "Brunch Date", or any title that is just "[Cuisine] + [generic time/word]".
+   ❌ FORBIDDEN: Do not use neighborhood names alone as the entire title.
+   ❌ FORBIDDEN: Do not use generic phrases like "Evening Out", "Date Night", "Night Out", "Romantic Evening", "Dinner Date".
+   ❌ FORBIDDEN: All 3 plan titles must be completely different in structure and theme — no two can share the same formula or feel similar.
+   
+   ✅ REQUIRED: Each title must capture the MOOD, ATMOSPHERE, or EMOTIONAL EXPERIENCE of that specific plan — what it FEELS like.
+   ✅ REQUIRED: Titles must feel magical, cinematic, and personal. Imagine a movie title or a song title for the night.
+   ✅ REQUIRED: 2–6 words, punchy, wrap-friendly, fits on a card.
+   ✅ ALLOWED: Cuisine/cultural words CAN appear if used creatively and poetically — e.g. "Mediterranean Moonlight", "A Taste of Midnight", "Spice, Stars & You", "Saffron & Slow Jazz" are great. The word must add atmosphere, not just label the food.
+   
+   GREAT TITLE FORMULAS TO USE (pick different formulas for each plan):
+   - Sensory + Place: "Velvet & City Lights", "Salt Air & Starlight", "Neon Glow & Slow Wine"
+   - Poetic Moment: "The Night We Stayed", "Where the Music Finds You", "Golden Hour, Last Dance"
+   - Emotion + Element: "Champagne & Butterflies", "Barefoot & Breathless", "Stolen Kisses, Open Sky"
+   - Mystery/Wonder: "The Midnight Detour", "Something Borrowed, Somewhere New", "Follow the Lanterns"
+   - Playful/Bold: "Plot Twist Romance", "One Wild Beautiful Night", "Break All the Rules"
+   - Atmosphere-first: "Candlelight & Conspiracy", "Fog, Jazz & You", "Rooftop Confessions"
+   - Creative cuisine use: "Mediterranean Moonlight", "Saffron & Slow Jazz", "Spice, Stars & You"
+   
+   The tagline is where you can freely describe cuisine, neighborhood, and food details in plain language.
 ${scheduledDate ? `10. The date is scheduled for ${scheduledDate}${scheduledTime ? ` starting at ${scheduledTime}` : ""}. Make sure all venues will be OPEN at the specified times and plan the time slots accordingly starting from the scheduled start time.` : ""}`;
 };

@@ -10,6 +10,7 @@ struct SettingsSheetView: View {
     @State private var showMapsPicker = false
     @State private var showEditAccount = false
     @State private var showSubscriptionOffer = false
+    @AppStorage("hasSeenHomeTutorial") private var hasSeenHomeTutorial = false
 
     @State private var remotePreferences: DBPreferences?
     @State private var isLoadingRemotePreferences = false
@@ -83,7 +84,7 @@ struct SettingsSheetView: View {
                                     Text(
                                         purchases.isSubscribed
                                             ? "Thank you for supporting Your Date Genie."
-                                            : "Unlock premium features with a monthly or yearly plan."
+                                            : "Start free for 7 days, then $4.99/month or $49.99/year."
                                     )
                                     .font(Font.bodySans(13, weight: .regular))
                                     .foregroundColor(Color.luxuryMuted)
@@ -284,6 +285,29 @@ struct SettingsSheetView: View {
                     }
                     .padding(20)
                 }
+
+                // App tour
+                Button {
+                    hasSeenHomeTutorial = false
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: "questionmark.circle.fill")
+                            .foregroundColor(Color.luxuryGold)
+                            .frame(width: 24)
+                        Text("Show home tutorial again")
+                            .font(Font.bodySans(15, weight: .regular))
+                            .foregroundColor(Color.luxuryCream)
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 12))
+                            .foregroundColor(Color.luxuryMuted)
+                    }
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 14)
+                    .frame(minHeight: 44)
+                }
+                .buttonStyle(.plain)
+                .padding(.horizontal, 20)
             }
             .sheet(isPresented: $showEditAccount) {
                 EditAccountSheetView()

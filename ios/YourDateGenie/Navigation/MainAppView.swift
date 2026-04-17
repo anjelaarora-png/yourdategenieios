@@ -5,6 +5,9 @@ struct LuxuryMainAppView: View {
     @EnvironmentObject var coordinator: NavigationCoordinator
     @EnvironmentObject private var access: AccessManager
     @ObservedObject private var planGenerator = DatePlanGeneratorService.shared
+    @StateObject private var network = NetworkMonitor.shared
+    @State private var undoDeletedPlan: DatePlan?
+    @State private var undoTimer: Timer?
     
     var body: some View {
         TabView(selection: $coordinator.currentTab) {
@@ -136,6 +139,39 @@ struct LuxuryMainAppView: View {
                 }
             }
         }
+        // Offline banner at the top
+        .safeAreaInset(edge: .top, spacing: 0) {
+            if !network.isConnected {
+                OfflineBannerView()
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                    .animation(.easeInOut(duration: 0.35), value: network.isConnected)
+            }
+        }
+        // Undo snackbar at the bottom
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if let plan = undoDeletedPlan {
+                UndoSnackbarView(message: "Plan deleted") {
+                    // Undo: restore the plan
+                    coordinator.savedPlans.insert(plan, at: 0)
+                    undoDeletedPlan = nil
+                    undoTimer?.invalidate()
+                } onDismiss: {
+                    undoDeletedPlan = nil
+                }
+                .animation(.spring(response: 0.4), value: undoDeletedPlan != nil)
+            }
+        }
+    }
+
+    /// Call this from any delete-plan action to trigger the undo snackbar.
+    func planWasDeleted(_ plan: DatePlan) {
+        undoDeletedPlan = plan
+        undoTimer?.invalidate()
+        undoTimer = Timer.scheduledTimer(withTimeInterval: 5, repeats: false) { _ in
+            DispatchQueue.main.async {
+                withAnimation { undoDeletedPlan = nil }
+            }
+        }
     }
     
     @ViewBuilder
@@ -175,13 +211,17 @@ struct LuxuryMainAppView: View {
             GiftFinderView(datePlan: datePlan, dateLocation: dateLocation)
         case .playlist(let title, let planId):
             PlaylistWidgetView(planTitle: title, planId: planId)
-        case .reservation(let name, _, _, let phone, _, _, _):
+        case .reservation(let name, _, let addr, let phone, _, _, _):
             // Redirect: set the platform picker payload directly and dismiss so the
             // dedicated reservationPlatformPickerPayload sheet handles presentation
             // without a flicker-prone relay.
             EmptyView()
                 .onAppear {
-                    coordinator.reservationPlatformPickerPayload = ReservationPlatformPickerPayload(venueName: name, phoneNumber: phone)
+                    coordinator.reservationPlatformPickerPayload = ReservationPlatformPickerPayload(
+                        venueName: name,
+                        phoneNumber: phone,
+                        address: addr
+                    )
                     coordinator.dismissSheet()
                 }
         case .partnerShare(let plan):

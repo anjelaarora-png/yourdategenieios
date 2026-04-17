@@ -36,8 +36,8 @@ enum OpenTableReservationSafari {
 
     // MARK: - Resy
 
-    /// `https://resy.com/?query=VenueName&date=yyyy-MM-dd&seats=2`
-    /// Uses the Resy root so there is no city-slug path that could 404.
+    /// `https://resy.com/search?query=VenueName&date=yyyy-MM-dd&seats=2`
+    /// Uses /search (not root "/") so Resy actually processes the query parameters.
     static func makeResySearchURL(venueName: String, partySize: Int = 2) -> URL? {
         let df = DateFormatter()
         df.dateFormat = "yyyy-MM-dd"
@@ -47,13 +47,35 @@ enum OpenTableReservationSafari {
         var comp = URLComponents()
         comp.scheme = "https"
         comp.host = "resy.com"
-        comp.path = "/"
+        comp.path = "/search"
         comp.queryItems = [
             URLQueryItem(name: "query", value: venueName.trimmingCharacters(in: .whitespacesAndNewlines)),
             URLQueryItem(name: "date", value: dateString),
             URLQueryItem(name: "seats", value: "\(partySize)"),
         ]
         return comp.url
+    }
+
+    /// Returns true when the address resolves to a city in Resy's operating network.
+    /// Resy only covers ~25 US/CA metro areas; everywhere else the button should be hidden.
+    static func isResySupported(for address: String?) -> Bool {
+        guard let address = address, !address.isEmpty else { return false }
+        let lower = address.lowercased()
+        // Canadian markets supported by Resy
+        for token in ["toronto", "vancouver", "montreal", "montréal", "calgary", "ottawa"] {
+            if lower.contains(token) { return true }
+        }
+        let parts = address.split(separator: ",")
+        guard parts.count >= 2 else { return false }
+        let city = parts[parts.count - 2].trimmingCharacters(in: .whitespaces).lowercased()
+        let supportedCities: Set<String> = [
+            "new york", "nyc", "manhattan", "brooklyn", "queens",
+            "los angeles", "san francisco", "chicago", "miami", "austin",
+            "denver", "seattle", "boston", "washington", "dc", "atlanta",
+            "nashville", "houston", "dallas", "philadelphia", "portland",
+            "san diego",
+        ]
+        return supportedCities.contains(where: { city.contains($0) })
     }
 
     /// Opens the Resy search page in the system Safari browser.

@@ -2,10 +2,19 @@ import SwiftUI
 
 struct Step3VibeView: View {
     @Binding var data: QuestionnaireData
-    
+    @State private var showVibeHelp = false
+
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 24) {
+
+                // Contextual help card
+                StepHelpCard(
+                    isExpanded: $showVibeHelp,
+                    hint: "What does \"vibe\" mean?",
+                    explanation: "Vibe sets the mood for your whole evening. Cozy & Intimate means a quieter, candlelit setting. Adventurous means something new and exciting. Active means you'll be on the move. Pick whatever feels right for where you are as a couple."
+                )
+
                 // Energy Level
                 VStack(alignment: .leading, spacing: 12) {
                     SectionHeader(

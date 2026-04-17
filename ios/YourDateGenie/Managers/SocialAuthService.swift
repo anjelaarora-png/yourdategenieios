@@ -12,6 +12,9 @@ final class SocialAuthService: NSObject, ObservableObject {
     @Published var isLoading = false
     @Published var error: Error?
 
+    /// Retained strongly so ASWebAuthenticationSession stays alive until the callback fires.
+    private var activeWebAuthSession: ASWebAuthenticationSession?
+
     private override init() {}
 
     // MARK: - Sign in with Apple
@@ -34,9 +37,8 @@ final class SocialAuthService: NSObject, ObservableObject {
     func signInWithGoogle() {
         isLoading = true
 
-        // Supabase Google OAuth URL — the app's URL scheme is `yourdategenie://`
-        let supabaseURL   = AppConfig.supabaseURL.trimmingCharacters(in: .init(charactersIn: "/"))
-        let redirectURL   = "yourdategenie://auth-callback"
+        let supabaseURL = AppConfig.supabaseURL.trimmingCharacters(in: .init(charactersIn: "/"))
+        let redirectURL = "yourdategenie://auth-callback"
         guard let encoded = redirectURL.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
               let oauthURL = URL(string: "\(supabaseURL)/auth/v1/authorize?provider=google&redirect_to=\(encoded)") else {
             isLoading = false
@@ -48,15 +50,18 @@ final class SocialAuthService: NSObject, ObservableObject {
             callbackURLScheme: "yourdategenie"
         ) { [weak self] _, sessionError in
             Task { @MainActor [weak self] in
+                self?.activeWebAuthSession = nil
                 self?.isLoading = false
                 if let sessionError, (sessionError as NSError).code != ASWebAuthenticationSessionError.canceledLogin.rawValue {
                     self?.error = sessionError
                 }
-                // On success the system will call scene(_:openURLContexts:) / onOpenURL which
-                // routes the callback URL through NavigationCoordinator.handleAuthCallback(url:)
+                // On success the system calls onOpenURL which routes the callback through
+                // YourDateGenieApp.handleAuthCallback(url:)
             }
         }
+        session.presentationContextProvider = self
         session.prefersEphemeralWebBrowserSession = true
+        activeWebAuthSession = session
         session.start()
     }
 }
@@ -101,10 +106,21 @@ extension SocialAuthService: ASAuthorizationControllerDelegate {
     }
 }
 
-// MARK: - ASAuthorizationControllerPresentationContextProviding
+// MARK: - ASAuthorizationControllerPresentationContextProviding (Sign in with Apple)
 
 extension SocialAuthService: ASAuthorizationControllerPresentationContextProviding {
     nonisolated func presentationAnchor(for controller: ASAuthorizationController) -> ASPresentationAnchor {
+        UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap { $0.windows }
+            .first { $0.isKeyWindow } ?? UIWindow()
+    }
+}
+
+// MARK: - ASWebAuthenticationPresentationContextProviding (Sign in with Google)
+
+extension SocialAuthService: ASWebAuthenticationPresentationContextProviding {
+    nonisolated func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
         UIApplication.shared.connectedScenes
             .compactMap { $0 as? UIWindowScene }
             .flatMap { $0.windows }
