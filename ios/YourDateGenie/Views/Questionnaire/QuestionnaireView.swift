@@ -125,6 +125,7 @@ struct QuestionnaireView: View {
                     if UserProfileManager.shared.currentUser != nil {
                         UserProfileManager.shared.savePreferencesFromQuestionnaire(viewModel.data)
                     }
+                    access.recordDatePlanGenerated()
                     onComplete?(viewModel.data)
                     dismiss()
                 }
@@ -350,7 +351,7 @@ struct QuestionnaireView: View {
     
     /// Presents the premium paywall when needed, then runs generation.
     private func requestGenerateDatePlan() {
-        guard access.canAccess(.datePlan) else {
+        guard access.canGenerateDatePlan() else {
             showPremiumPaywall = true
             return
         }

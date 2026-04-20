@@ -20,7 +20,8 @@ enum DatePlanSyncHelpers {
             weatherNote: db.weatherNote ?? "",
             giftSuggestions: db.giftSuggestions,
             conversationStarters: db.conversationStarters,
-            scheduledDate: db.dateScheduled
+            scheduledDate: db.dateScheduled,
+            createdAt: db.createdAt ?? Date()
         )
     }
 

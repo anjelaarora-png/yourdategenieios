@@ -3,8 +3,14 @@ import SwiftUI
 
 // MARK: - SocialAuthService
 
-/// Handles Sign in with Apple (native) and Sign in with Google (Supabase OAuth via ASWebAuthenticationSession).
-/// Add SocialAuthService.shared.error to an alert in the calling view to surface failures.
+/// Handles Sign in with Apple (native) and Sign in with Google (Supabase PKCE OAuth).
+///
+/// All token exchanges go through `SupabaseService.shared` so the cached session, PKCE verifier,
+/// and `isAuthenticated` flag all live on a single Supabase client. Using a different client for
+/// OAuth made the PKCE code verifier unreachable during `exchangeCodeForSession`, which silently
+/// bounced users back to the login screen after Google completed.
+///
+/// Observe `SocialAuthService.shared.error` in an alert to surface failures to the user.
 @MainActor
 final class SocialAuthService: NSObject, ObservableObject {
     static let shared = SocialAuthService()
@@ -12,14 +18,11 @@ final class SocialAuthService: NSObject, ObservableObject {
     @Published var isLoading = false
     @Published var error: Error?
 
-    /// Retained strongly so ASWebAuthenticationSession stays alive until the callback fires.
-    private var activeWebAuthSession: ASWebAuthenticationSession?
-
     private override init() {}
 
     // MARK: - Sign in with Apple
 
-    /// Initiates the native Sign in with Apple flow and exchanges the identity token with Supabase.
+    /// Initiates the native Sign in with Apple flow; token exchange happens in the delegate.
     func signInWithApple() {
         let request = ASAuthorizationAppleIDProvider().createRequest()
         request.requestedScopes = [.fullName, .email]
@@ -32,37 +35,28 @@ final class SocialAuthService: NSObject, ObservableObject {
 
     // MARK: - Sign in with Google
 
-    /// Opens a Supabase-hosted Google OAuth page inside ASWebAuthenticationSession.
-    /// The existing `handleAuthCallback(url:)` in YourDateGenieApp catches the redirect.
+    /// Launches Google OAuth via Supabase's PKCE helper. The SDK opens its own
+    /// `ASWebAuthenticationSession`, exchanges the returned `?code=…` for a session, and updates
+    /// the shared client before this call returns.
     func signInWithGoogle() {
+        guard !isLoading else { return }
         isLoading = true
-
-        let supabaseURL = AppConfig.supabaseURL.trimmingCharacters(in: .init(charactersIn: "/"))
-        let redirectURL = "yourdategenie://auth-callback"
-        guard let encoded = redirectURL.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
-              let oauthURL = URL(string: "\(supabaseURL)/auth/v1/authorize?provider=google&redirect_to=\(encoded)") else {
-            isLoading = false
-            return
-        }
-
-        let session = ASWebAuthenticationSession(
-            url: oauthURL,
-            callbackURLScheme: "yourdategenie"
-        ) { [weak self] _, sessionError in
-            Task { @MainActor [weak self] in
-                self?.activeWebAuthSession = nil
-                self?.isLoading = false
-                if let sessionError, (sessionError as NSError).code != ASWebAuthenticationSessionError.canceledLogin.rawValue {
-                    self?.error = sessionError
+        Task { @MainActor in
+            defer { self.isLoading = false }
+            do {
+                _ = try await SupabaseService.shared.signInWithGoogle()
+                await UserProfileManager.shared.refreshAfterSocialSignIn()
+            } catch {
+                let nsError = error as NSError
+                // User cancelled the web sheet — don't show an error alert for that.
+                let cancelled = nsError.domain == ASWebAuthenticationSessionErrorDomain
+                    && nsError.code == ASWebAuthenticationSessionError.canceledLogin.rawValue
+                if !cancelled {
+                    self.error = error
+                    AppLogger.error("Sign in with Google failed: \(error)", category: .auth)
                 }
-                // On success the system calls onOpenURL which routes the callback through
-                // YourDateGenieApp.handleAuthCallback(url:)
             }
         }
-        session.presentationContextProvider = self
-        session.prefersEphemeralWebBrowserSession = true
-        activeWebAuthSession = session
-        session.start()
     }
 }
 
@@ -80,17 +74,15 @@ extension SocialAuthService: ASAuthorizationControllerDelegate {
         }
 
         Task { @MainActor in
-            isLoading = true
+            self.isLoading = true
+            defer { self.isLoading = false }
             do {
-                // Exchange the Apple identity token for a Supabase session
-                try await SupabaseManager.shared.client.auth.signInWithIdToken(
-                    credentials: .init(provider: .apple, idToken: idToken)
-                )
+                _ = try await SupabaseService.shared.signInWithApple(idToken: idToken)
+                await UserProfileManager.shared.refreshAfterSocialSignIn()
             } catch {
                 self.error = error
                 AppLogger.error("Sign in with Apple failed: \(error)", category: .auth)
             }
-            isLoading = false
         }
     }
 
@@ -98,7 +90,6 @@ extension SocialAuthService: ASAuthorizationControllerDelegate {
         controller: ASAuthorizationController,
         didCompleteWithError error: Error
     ) {
-        // Ignore cancellations
         guard (error as NSError).code != ASAuthorizationError.canceled.rawValue else { return }
         Task { @MainActor in
             self.error = error
@@ -110,17 +101,6 @@ extension SocialAuthService: ASAuthorizationControllerDelegate {
 
 extension SocialAuthService: ASAuthorizationControllerPresentationContextProviding {
     nonisolated func presentationAnchor(for controller: ASAuthorizationController) -> ASPresentationAnchor {
-        UIApplication.shared.connectedScenes
-            .compactMap { $0 as? UIWindowScene }
-            .flatMap { $0.windows }
-            .first { $0.isKeyWindow } ?? UIWindow()
-    }
-}
-
-// MARK: - ASWebAuthenticationPresentationContextProviding (Sign in with Google)
-
-extension SocialAuthService: ASWebAuthenticationPresentationContextProviding {
-    nonisolated func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
         UIApplication.shared.connectedScenes
             .compactMap { $0 as? UIWindowScene }
             .flatMap { $0.windows }

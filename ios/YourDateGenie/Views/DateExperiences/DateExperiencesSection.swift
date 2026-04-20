@@ -240,13 +240,16 @@ struct EventCardView: View {
 // MARK: - Date Experiences Section
 
 struct DateExperiencesSection: View {
+    /// Pass `false` when embedding inside a collapsible wrapper that already shows the header.
+    var showHeader: Bool = true
+
     @StateObject private var viewModel = DateExperienceViewModel()
     @State private var selectedExperience: DateExperience? = nil
     @State private var appeared = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            sectionHeader
+            if showHeader { sectionHeader }
             scrollContent
         }
         .opacity(appeared ? 1 : 0)
@@ -267,17 +270,17 @@ struct DateExperiencesSection: View {
     private var sectionHeader: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 6) {
-                Text("Date")
+                Text("Happening")
                     .font(Font.tangerine(32, weight: .bold))
                     .italic()
                     .foregroundColor(Color.luxuryGold)
-                Text("Experiences")
+                Text("Near You")
                     .font(Font.tangerine(32, weight: .bold))
                     .italic()
                     .foregroundColor(Color.luxuryGold)
             }
 
-            Text("Curated evenings designed for unforgettable connections")
+            Text("Live events & experiences within 60 miles")
                 .font(Font.bodySans(13, weight: .regular))
                 .foregroundColor(Color.luxuryCreamMuted)
         }

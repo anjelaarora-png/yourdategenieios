@@ -29,7 +29,16 @@ struct LuxuryHomeTabView: View {
     @AppStorage("hasChosenMapsApp") private var hasChosenMapsApp = false
     @State private var showMapsAppPicker = false
     @State private var pendingPlaceForMaps: GooglePlacesService.PlaceSearchResult?
-    
+
+    // Section collapse states — persisted across launches
+    @AppStorage("home_upcoming_expanded") private var upcomingExpanded = true
+    @AppStorage("home_experiences_expanded") private var dateExperiencesExpanded = true
+    @AppStorage("home_trending_expanded") private var trendingExpanded = true
+    @AppStorage("home_story_expanded") private var storyExpanded = true
+    // Upcoming Dates: show first 3, tap to expand
+    // Sheet for reviewing > 3 unsaved plans
+    @State private var showUnsavedPlansSheet = false
+
     private var planForTonight: DatePlan? {
         let calendar = Calendar.current
         return coordinator.savedPlans.first { plan in
@@ -37,7 +46,13 @@ struct LuxuryHomeTabView: View {
             return calendar.isDateInToday(d)
         }
     }
-    
+
+    /// All unsaved plans: prefers experiencesWaiting; falls back to generatedPlans.
+    private var allUnsavedPlans: [DatePlan] {
+        let waiting = coordinator.experiencesWaiting
+        return waiting.isEmpty ? coordinator.generatedPlans : waiting
+    }
+
     var body: some View {
         NavigationStack(path: $coordinator.navigationPath) {
             ZStack {
@@ -55,11 +70,9 @@ struct LuxuryHomeTabView: View {
                         headerSection
                         heroSection
                         quickActionsSection
-                        DateExperiencesSection()
                         yourUpcomingDatesSection
-                        experiencesWaitingSection
+                        dateExperiencesCollapsibleSection
                         trendingInYourAreaSection
-                        featuresSection
                         relationshipStorySection
                     }
                     .padding(.bottom, 120)
@@ -110,6 +123,9 @@ struct LuxuryHomeTabView: View {
                 set: { planForCalendar = $0?.plan }
             )) { wrapper in
                 addToCalendarSheet(plan: wrapper.plan)
+            }
+            .sheet(isPresented: $showUnsavedPlansSheet) {
+                unsavedPlansSheet
             }
             .alert("Calendar", isPresented: $showCalendarAlert) {
                 Button("OK") { calendarMessage = nil }
@@ -190,13 +206,11 @@ struct LuxuryHomeTabView: View {
         
         return VStack(spacing: 16) {
             Button {
-                access.require(.datePlan) {
-                    if hasPlanTonight, let plan = planForTonight {
-                        coordinator.currentDatePlan = plan
-                        coordinator.activeSheet = .datePlanResult
-                    } else {
-                        coordinator.startDatePlanning(mode: .fresh)
-                    }
+                if hasPlanTonight, let plan = planForTonight {
+                    coordinator.currentDatePlan = plan
+                    coordinator.activeSheet = .datePlanResult
+                } else {
+                    coordinator.startDatePlanning(mode: .fresh)
                 }
             } label: {
                 HStack(spacing: 8) {
@@ -213,54 +227,31 @@ struct LuxuryHomeTabView: View {
                 .shadow(color: Color.luxuryGold.opacity(0.35), radius: 12, y: 4)
             }
             .buttonStyle(.plain)
-            .opacity(access.canAccess(.datePlan) ? 1 : 0.5)
-            .overlay(alignment: .topTrailing) {
-                if !access.canAccess(.datePlan) {
-                    Image(systemName: "lock.fill")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(Color.luxuryMaroon.opacity(0.6))
-                        .padding(10)
-                }
-            }
             
-            if showUseLast && !hasPlanTonight {
+            if !access.isSubscribed && access.freePlansRemaining > 0 {
+                HStack(spacing: 4) {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 11))
+                    Text(access.freePlansRemaining == AccessManager.freePlanLimit
+                         ? "\(access.freePlansRemaining) free date plans included — no card needed"
+                         : "\(access.freePlansRemaining) free plan remaining · subscribe for unlimited")
+                        .font(Font.bodySans(12, weight: .regular))
+                }
+                .foregroundColor(Color.luxuryGold.opacity(0.8))
+                .multilineTextAlignment(.center)
+            }
+
+            if (showUseLast || showResume) && !hasPlanTonight {
                 Button {
-                    access.require(.datePlan) {
-                        coordinator.startDatePlanning(mode: .useLast)
-                    }
+                    coordinator.startDatePlanning(mode: showResume ? .resume : .useLast)
                 } label: {
-                    Text("Reuse Last Plan")
-                        .font(Font.bodySans(14, weight: .semibold))
+                    Text("or reuse your last plan")
+                        .font(Font.bodySans(13, weight: .semibold))
+                        .italic()
                         .foregroundColor(Color.luxuryGold)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 14)
-                                .stroke(Color.luxuryGold, lineWidth: 1.5)
-                        )
+                        .underline()
                 }
                 .buttonStyle(.plain)
-                .opacity(access.canAccess(.datePlan) ? 1 : 0.5)
-            }
-            
-            if showResume && !hasPlanTonight {
-                Button {
-                    access.require(.datePlan) {
-                        coordinator.startDatePlanning(mode: .resume)
-                    }
-                } label: {
-                    Text("Pick up where you left off")
-                        .font(Font.bodySans(14, weight: .semibold))
-                        .foregroundColor(Color.luxuryGold)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 14)
-                                .stroke(Color.luxuryGold, lineWidth: 1.5)
-                        )
-                }
-                .buttonStyle(.plain)
-                .opacity(access.canAccess(.datePlan) ? 1 : 0.5)
             }
         }
         .padding(.horizontal, 20)
@@ -362,82 +353,107 @@ struct LuxuryHomeTabView: View {
     }
     
     private var trendingInYourAreaSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 6) {
-                    Image(systemName: "map")
-                        .font(.system(size: 22))
-                        .foregroundColor(Color.luxuryGold)
-                    Text("Recommended in your area")
-                        .font(Font.tangerine(32, weight: .bold))
-                        .italic()
-                        .foregroundColor(Color.luxuryGold)
+        VStack(alignment: .leading, spacing: 0) {
+            // Gold section divider
+            Rectangle()
+                .fill(Color.luxuryGold.opacity(0.12))
+                .frame(height: 1)
+                .padding(.horizontal, 20)
+                .padding(.bottom, 18)
+
+            // Collapsible header
+            Button {
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                    trendingExpanded.toggle()
+                }
+            } label: {
+                HStack(spacing: 8) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "map")
+                                .font(.system(size: 20))
+                                .foregroundColor(Color.luxuryGold)
+                            Text("Local")
+                                .font(Font.tangerine(32, weight: .bold))
+                                .italic()
+                                .foregroundColor(Color.luxuryGold)
+                            Text("Gems")
+                                .font(Font.tangerine(32, weight: .bold))
+                                .italic()
+                                .foregroundColor(Color.luxuryGold)
+                        }
+                        Text("Top-rated spots handpicked for your next date")
+                            .font(Font.bodySans(13, weight: .regular))
+                            .foregroundColor(Color.luxuryCreamMuted)
+                    }
                     Spacer(minLength: 8)
-                    Button {
-                        coordinator.showExplore()
-                    } label: {
+                    Button { coordinator.showExplore() } label: {
                         Image(systemName: "sparkles")
-                            .font(.system(size: 22))
+                            .font(.system(size: 18))
                             .foregroundColor(Color.luxuryGold)
                     }
                     .buttonStyle(.plain)
+                    Image(systemName: trendingExpanded ? "chevron.up" : "chevron.down")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(Color.luxuryGold.opacity(0.7))
                 }
-                Text("4★+ restaurants, bars, activities & outdoor spots")
-                    .font(Font.bodySans(12, weight: .medium))
-                    .foregroundColor(Color.luxuryCreamMuted)
             }
+            .buttonStyle(.plain)
             .padding(.horizontal, 20)
-            
-            // Only show actual places from Google — no vague or fake cards
-            if trendingPlacesLoading {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 14) {
-                        ForEach(0..<3, id: \.self) { _ in
-                            RoundedRectangle(cornerRadius: 24)
-                                .fill(Color.luxuryMaroonLight.opacity(0.5))
-                                .frame(width: 200, height: 180)
-                                .overlay(ProgressView().tint(Color.luxuryGold))
+
+            // Keep views in the hierarchy when collapsed so AsyncImage requests are never cancelled.
+            VStack(alignment: .leading, spacing: 12) {
+                // Only show actual places from Google — no vague or fake cards
+                if trendingPlacesLoading {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 14) {
+                            ForEach(0..<3, id: \.self) { _ in
+                                RoundedRectangle(cornerRadius: 20)
+                                    .fill(Color.luxuryMaroonLight.opacity(0.5))
+                                    .frame(width: 200, height: 200)
+                                    .overlay(ProgressView().tint(Color.luxuryGold))
+                            }
                         }
-                        TrendingExploreCircleButton(action: { coordinator.showExplore() })
+                        .padding(.horizontal, 20)
                     }
-                    .padding(.horizontal, 20)
-                }
-            } else if !trendingPlaces.isEmpty {
-                // Real places from Google Places (rating/reviews, View in Maps)
-                let preferredCity = userProfileManager.currentUser?.preferences.defaultCity.trimmingCharacters(in: .whitespaces) ?? userProfileManager.currentUser?.preferences.defaultStartingPoint.trimmingCharacters(in: .whitespaces) ?? ""
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 14) {
-                        ForEach(trendingPlaces.prefix(6), id: \.placeId) { place in
-                            let price = CurrencyHelper.formattedPriceLevel(place.priceLevel)
-                            let cityState = MapURLHelper.cityStateOrRegionFromAddress(place.address)
-                            let location = cityState.isEmpty ? preferredCity : cityState
-                            let tagline: String = {
-                                if let r = place.rating {
-                                    let stars = "★ \(String(format: "%.1f", r))"
-                                    if let n = place.userRatingsTotal, n > 0 { return "\(stars) · \(n) reviews" }
-                                    return stars
-                                }
-                                return "On Google Maps"
-                            }()
-                            LuxuryUnifiedDateCard(
-                                imageUrl: place.photoUrl ?? "https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=400&h=300&fit=crop",
-                                title: place.name,
-                                tagline: tagline,
-                                location: location,
-                                time: place.openNow == true ? "Open now" : "",
-                                price: price,
-                                actionTitle: "View in Maps",
-                                action: { openPlaceInPreferredMaps(place: place) }
-                            )
+                } else if !trendingPlaces.isEmpty {
+                    let preferredCity = userProfileManager.currentUser?.preferences.defaultCity.trimmingCharacters(in: .whitespaces) ?? userProfileManager.currentUser?.preferences.defaultStartingPoint.trimmingCharacters(in: .whitespaces) ?? ""
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 14) {
+                            ForEach(trendingPlaces.prefix(6), id: \.placeId) { place in
+                                let price = CurrencyHelper.formattedPriceLevel(place.priceLevel)
+                                let cityState = MapURLHelper.cityStateOrRegionFromAddress(place.address)
+                                let location = cityState.isEmpty ? preferredCity : cityState
+                                let tagline: String = {
+                                    if let r = place.rating {
+                                        let stars = "★ \(String(format: "%.1f", r))"
+                                        if let n = place.userRatingsTotal, n > 0 { return "\(stars) · \(n) reviews" }
+                                        return stars
+                                    }
+                                    return "On Google Maps"
+                                }()
+                                LuxuryUnifiedDateCard(
+                                    imageUrl: place.photoUrl ?? "https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=400&h=300&fit=crop",
+                                    title: place.name,
+                                    tagline: tagline,
+                                    location: location,
+                                    time: place.openNow == true ? "Open now" : "",
+                                    price: price,
+                                    actionTitle: "View in Maps",
+                                    action: { openPlaceInPreferredMaps(place: place) }
+                                )
+                            }
+                            TrendingExploreCircleButton(action: { coordinator.showExplore() })
                         }
-                        TrendingExploreCircleButton(action: { coordinator.showExplore() })
+                        .padding(.horizontal, 20)
                     }
-                    .padding(.horizontal, 20)
+                } else {
+                    trendingEmptyState
                 }
-            } else {
-                // No fake cards — clear empty state so users set location or try Continue exploring
-                trendingEmptyState
             }
+            .opacity(trendingExpanded ? 1 : 0)
+            .frame(height: trendingExpanded ? nil : 0)
+            .clipped()
         }
     }
     
@@ -506,8 +522,149 @@ struct LuxuryHomeTabView: View {
         .padding(.horizontal, 20)
     }
     
-    // MARK: - Your Upcoming Dates (saved plans with unified cards)
-    
+    // MARK: - Upcoming Date Row
+    /// Elegant list row: gold left-accent bar, capsule chips for meta, clean gold action icon.
+    /// `isUnsaved`: dashed border + "UNSAVED" chip + bookmark icon.
+    private func upcomingDateRow(plan: DatePlan, isUnsaved: Bool = false) -> some View {
+        let location = MapURLHelper.cityStateOrRegionFromAddress(plan.stops.first?.address)
+        let time = plan.stops.first?.timeSlot ?? ""
+        let price = plan.estimatedCost
+
+        let tapAction: () -> Void = {
+            if isUnsaved {
+                if coordinator.experiencesWaiting.contains(where: { $0.id == plan.id }) {
+                    coordinator.currentDatePlan = plan
+                    coordinator.activeSheet = .datePlanResult
+                } else if let idx = coordinator.generatedPlans.firstIndex(where: { $0.id == plan.id }) {
+                    coordinator.generatedPlansSelectedIndex = idx
+                    coordinator.currentDatePlan = plan
+                    coordinator.activeSheet = .datePlanOptions
+                } else {
+                    coordinator.currentDatePlan = plan
+                    coordinator.activeSheet = .datePlanResult
+                }
+            } else {
+                coordinator.currentDatePlan = plan
+                coordinator.activeSheet = .datePlanResult
+            }
+        }
+
+        return Button(action: tapAction) {
+            HStack(spacing: 0) {
+                // Gold left accent bar
+                LinearGradient.goldShimmer
+                    .frame(width: 3)
+                    .cornerRadius(1.5)
+                    .padding(.vertical, 10)
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(plan.title)
+                        .font(Font.bodySans(15, weight: .semibold))
+                        .foregroundColor(Color.luxuryCream)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    // Gold capsule chips for location / time / price / UNSAVED badge
+                    HStack(spacing: 6) {
+                        if !location.isEmpty {
+                            upcomingMetaChip(icon: "mappin", text: location)
+                        }
+                        if !time.isEmpty {
+                            upcomingMetaChip(icon: "clock", text: time)
+                        }
+                        if !price.isEmpty {
+                            upcomingMetaChip(icon: nil, text: price)
+                        }
+                        if isUnsaved {
+                            Text("UNSAVED")
+                                .font(Font.bodySans(9, weight: .bold))
+                                .tracking(0.8)
+                                .foregroundColor(Color.luxuryMaroon)
+                                .padding(.horizontal, 7)
+                                .padding(.vertical, 3)
+                                .background(Color.luxuryGold)
+                                .clipShape(Capsule())
+                        }
+                    }
+                }
+                .padding(.leading, 14)
+                .padding(.vertical, 14)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                // Right action icon
+                Group {
+                    if isUnsaved {
+                        Image(systemName: "bookmark.fill")
+                            .font(.system(size: 15, weight: .medium))
+                            .foregroundColor(Color.luxuryGold)
+                    } else {
+                        Button {
+                            planForCalendar = plan
+                            calendarDate = plan.scheduledDate ?? Date()
+                        } label: {
+                            Image(systemName: "calendar.badge.plus")
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundColor(Color.luxuryGold)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.trailing, 18)
+            }
+            .background(
+                RoundedRectangle(cornerRadius: 14)
+                    .fill(Color.luxuryMaroonLight.opacity(0.22))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14)
+                            .strokeBorder(
+                                isUnsaved
+                                    ? Color.luxuryGold.opacity(0.45)
+                                    : Color.luxuryGold.opacity(0.18),
+                                style: isUnsaved
+                                    ? StrokeStyle(lineWidth: 1.5, dash: [6, 4])
+                                    : StrokeStyle(lineWidth: 1)
+                            )
+                    )
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+        }
+        .buttonStyle(.plain)
+        .contextMenu {
+            if isUnsaved {
+                Button(role: .destructive) {
+                    coordinator.removeFromExperiencesWaiting(planId: plan.id)
+                } label: {
+                    Label("Remove from list", systemImage: "trash")
+                }
+            } else {
+                Button(role: .destructive) {
+                    coordinator.deletePlan(plan)
+                } label: {
+                    Label("Delete plan", systemImage: "trash")
+                }
+            }
+        }
+    }
+
+    /// Small gold capsule chip used in upcoming date rows for location, time and price metadata.
+    @ViewBuilder
+    private func upcomingMetaChip(icon: String?, text: String) -> some View {
+        HStack(spacing: 4) {
+            if let iconName = icon {
+                Image(systemName: iconName)
+                    .font(.system(size: 9, weight: .medium))
+            }
+            Text(text)
+                .font(Font.bodySans(11, weight: .medium))
+        }
+        .foregroundColor(Color.luxuryGold)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 3)
+        .background(Color.luxuryGold.opacity(0.12))
+        .clipShape(Capsule())
+        .overlay(Capsule().stroke(Color.luxuryGold.opacity(0.35), lineWidth: 0.5))
+    }
+
     // MARK: - Add to Calendar Sheet (from Upcoming Magic cards)
     private func addToCalendarSheet(plan: DatePlan) -> some View {
         NavigationStack {
@@ -574,156 +731,306 @@ struct LuxuryHomeTabView: View {
         }
     }
     
-    // MARK: - Your Upcoming Dates (saved plans)
+    // MARK: - Your Upcoming Dates (saved + merged unsaved)
     private var yourUpcomingDatesSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack(spacing: 6) {
-                Text("Your")
-                    .font(Font.tangerine(32, weight: .bold))
-                    .italic()
-                    .foregroundColor(Color.luxuryGold)
-                Text("Upcoming Dates")
-                    .font(Font.tangerine(32, weight: .bold))
-                    .italic()
-                    .foregroundColor(Color.luxuryGold)
+        let unsaved = allUnsavedPlans
+        let unsavedToMerge = unsaved.count <= 3 ? unsaved : []
+        let savedCount = coordinator.savedPlans.count
+        let badgeCount = savedCount + unsavedToMerge.count
+
+        // Group saved plans by city, sorted soonest first
+        let cityGroups: [(city: String, plans: [DatePlan])] = {
+            let grouped = Dictionary(grouping: coordinator.savedPlans) { plan -> String in
+                let c = MapURLHelper.cityStateOrRegionFromAddress(plan.stops.first?.address)
+                return c.isEmpty ? "No Location" : c
             }
-            .padding(.horizontal, 20)
-            
-            if !coordinator.savedPlans.isEmpty {
-                Text("Saved plans — tap to view or add to calendar.")
-                    .font(Font.bodySans(13, weight: .regular))
-                    .foregroundColor(Color.luxuryCreamMuted)
-                    .padding(.horizontal, 20)
-                
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 14) {
-                        ForEach(coordinator.savedPlans) { plan in
-                            LuxuryUnifiedDateCard(
-                                imageUrl: plan.displayImageUrl,
-                                title: plan.title,
-                                tagline: plan.tagline,
-                                location: MapURLHelper.cityStateOrRegionFromAddress(plan.stops.first?.address),
-                                time: plan.stops.first?.timeSlot ?? "—",
-                                price: plan.estimatedCost,
-                                actionTitle: "View Plan",
-                                isPremiumLocked: !access.canAccess(.datePlan),
-                                action: {
-                                    access.require(.datePlan) {
-                                        coordinator.currentDatePlan = plan
-                                        coordinator.activeSheet = .datePlanResult
-                                    }
-                                },
-                                onAddToCalendar: {
-                                    access.require(.datePlan) {
-                                        planForCalendar = plan
-                                        calendarDate = plan.scheduledDate ?? Date()
-                                    }
-                                }
-                            )
-                            .contextMenu {
-                                Button(role: .destructive) {
-                                    coordinator.deletePlan(plan)
-                                } label: {
-                                    Label("Delete plan", systemImage: "trash")
-                                }
+            return grouped
+                .map { key, plans -> (city: String, plans: [DatePlan]) in
+                    let sorted = plans.sorted {
+                        let a = $0.scheduledDate ?? $0.createdAt
+                        let b = $1.scheduledDate ?? $1.createdAt
+                        return a < b
+                    }
+                    return (city: key, plans: sorted)
+                }
+                .sorted { a, b in
+                    let aDate = a.plans.first.map { $0.scheduledDate ?? $0.createdAt } ?? .distantFuture
+                    let bDate = b.plans.first.map { $0.scheduledDate ?? $0.createdAt } ?? .distantFuture
+                    return aDate < bDate
+                }
+        }()
+        let isMultiCity = cityGroups.count > 1
+
+        return VStack(alignment: .leading, spacing: 0) {
+            // Gold section divider
+            Rectangle()
+                .fill(Color.luxuryGold.opacity(0.12))
+                .frame(height: 1)
+                .padding(.horizontal, 20)
+                .padding(.bottom, 18)
+
+            // Collapsible header
+            Button {
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                    upcomingExpanded.toggle()
+                }
+            } label: {
+                HStack(spacing: 8) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack(spacing: 8) {
+                            Text("Your Upcoming Dates")
+                                .font(Font.tangerine(32, weight: .bold))
+                                .italic()
+                                .foregroundColor(Color.luxuryGold)
+                            if badgeCount > 0 {
+                                Text("\(badgeCount)")
+                                    .font(Font.bodySans(11, weight: .bold))
+                                    .foregroundColor(Color.luxuryMaroon)
+                                    .padding(.horizontal, 7)
+                                    .padding(.vertical, 3)
+                                    .background(Color.luxuryGold)
+                                    .clipShape(Capsule())
                             }
+                        }
+                        Text(isMultiCity
+                             ? "\(cityGroups.count) cities · tap a plan to view"
+                             : "Tap a plan to view or add to your calendar")
+                            .font(Font.bodySans(13, weight: .regular))
+                            .foregroundColor(Color.luxuryCreamMuted)
+                    }
+                    Spacer()
+                    Image(systemName: upcomingExpanded ? "chevron.up" : "chevron.down")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(Color.luxuryGold.opacity(0.7))
+                }
+            }
+            .buttonStyle(.plain)
+            .padding(.horizontal, 20)
+
+            VStack(alignment: .leading, spacing: 12) {
+                // Banner: > 3 unsaved plans waiting
+                if unsaved.count > 3 {
+                    Button { showUnsavedPlansSheet = true } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: "sparkles")
+                                .font(.system(size: 14))
+                                .foregroundColor(Color.luxuryMaroon)
+                            Text("\(unsaved.count) date plans waiting to be saved")
+                                .font(Font.bodySans(13, weight: .semibold))
+                                .foregroundColor(Color.luxuryMaroon)
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundColor(Color.luxuryMaroon)
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
+                        .background(LinearGradient.goldShimmer)
+                        .cornerRadius(14)
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 14)
+                }
+
+                // Saved plans — city-grouped when multi-city, flat list for single city
+                if !coordinator.savedPlans.isEmpty {
+                    if isMultiCity {
+                        VStack(alignment: .leading, spacing: 16) {
+                            ForEach(cityGroups, id: \.city) { group in
+                                upcomingCityGroupView(city: group.city, plans: Array(group.plans.prefix(2)))
+                            }
+                        }
+                        .padding(.horizontal, 20)
+                        .padding(.top, unsaved.count > 3 ? 8 : 14)
+                    } else {
+                        VStack(spacing: 10) {
+                            ForEach(Array(coordinator.savedPlans.prefix(3))) { plan in
+                                upcomingDateRow(plan: plan, isUnsaved: false)
+                            }
+                        }
+                        .padding(.horizontal, 20)
+                        .padding(.top, unsaved.count > 3 ? 8 : 14)
+                    }
+                }
+
+                // Unsaved plans merged in (≤ 3) with dashed-border styling
+                if !unsavedToMerge.isEmpty {
+                    HStack(spacing: 8) {
+                        Rectangle().fill(Color.luxuryGold.opacity(0.2)).frame(height: 1)
+                        Text("UNSAVED")
+                            .font(Font.bodySans(10, weight: .bold))
+                            .foregroundColor(Color.luxuryGold.opacity(0.6))
+                            .tracking(1.5)
+                        Rectangle().fill(Color.luxuryGold.opacity(0.2)).frame(height: 1)
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.top, coordinator.savedPlans.isEmpty ? 14 : 6)
+
+                    VStack(spacing: 10) {
+                        ForEach(unsavedToMerge) { plan in
+                            upcomingDateRow(plan: plan, isUnsaved: true)
                         }
                     }
                     .padding(.horizontal, 20)
                 }
-            } else {
-                Text("Save a plan and it will appear here.")
-                    .font(Font.bodySans(13, weight: .regular))
-                    .foregroundColor(Color.luxuryCreamMuted)
+
+                if coordinator.savedPlans.isEmpty && unsaved.isEmpty {
+                    Text("Save a plan and it will appear here.")
+                        .font(Font.bodySans(13, weight: .regular))
+                        .foregroundColor(Color.luxuryCreamMuted)
+                        .padding(.horizontal, 20)
+                        .padding(.top, 14)
+                }
+
+                // "View all" footer — shown when preview doesn't cover all saved plans
+                let previewCount = isMultiCity
+                    ? cityGroups.reduce(0) { $0 + min($1.plans.count, 2) }
+                    : min(coordinator.savedPlans.count, 3)
+                if !coordinator.savedPlans.isEmpty && coordinator.savedPlans.count > previewCount {
+                    Button { coordinator.activeSheet = .savedPlansList } label: {
+                        HStack(spacing: 6) {
+                            Text("View all \(coordinator.savedPlans.count) saved plans")
+                                .font(Font.bodySans(13, weight: .semibold))
+                                .foregroundColor(Color.luxuryGold)
+                            Image(systemName: "arrow.right")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundColor(Color.luxuryGold)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 11)
+                        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.luxuryGold.opacity(0.3), lineWidth: 1))
+                    }
+                    .buttonStyle(.plain)
                     .padding(.horizontal, 20)
+                    .padding(.top, 4)
+                }
+            }
+            .opacity(upcomingExpanded ? 1 : 0)
+            .frame(height: upcomingExpanded ? nil : 0)
+            .clipped()
+        }
+    }
+
+    // MARK: - City group header + plan rows for multi-city upcoming view
+    @ViewBuilder
+    private func upcomingCityGroupView(city: String, plans: [DatePlan]) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            // City pill header
+            HStack(spacing: 5) {
+                Image(systemName: "mappin.circle.fill")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(Color.luxuryGold)
+                Text(city)
+                    .font(Font.bodySans(12, weight: .semibold))
+                    .foregroundColor(Color.luxuryGold)
+                    .tracking(0.3)
+                Spacer()
+                let total = coordinator.savedPlans.filter {
+                    let c = MapURLHelper.cityStateOrRegionFromAddress($0.stops.first?.address)
+                    return (c.isEmpty ? "No Location" : c) == city
+                }.count
+                if total > 2 {
+                    Button { coordinator.activeSheet = .savedPlansList } label: {
+                        Text("+\(total - 2) more")
+                            .font(Font.bodySans(11, weight: .medium))
+                            .foregroundColor(Color.luxuryGold)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 7)
+            .background(Color.luxuryGold.opacity(0.08))
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.luxuryGold.opacity(0.2), lineWidth: 0.5))
+
+            VStack(spacing: 8) {
+                ForEach(plans) { plan in
+                    upcomingDateRow(plan: plan, isUnsaved: false)
+                }
             }
         }
     }
     
-    // MARK: - Experiences Waiting (unsaved generated plans — same links as before)
-    private var experiencesWaitingSection: some View {
-        let hasWaiting = !coordinator.experiencesWaiting.isEmpty
-        let hasGenerated = !coordinator.generatedPlans.isEmpty
-        
-        return Group {
-            if hasWaiting || hasGenerated {
-                VStack(alignment: .leading, spacing: 16) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "calendar.badge.clock")
-                            .font(.system(size: 22))
-                            .foregroundColor(Color.luxuryGold)
-                        Text("Experiences")
-                            .font(Font.tangerine(32, weight: .bold))
-                            .italic()
-                            .foregroundColor(Color.luxuryGold)
-                        Text("Waiting")
-                            .font(Font.tangerine(32, weight: .bold))
-                            .italic()
-                            .foregroundColor(Color.luxuryGold)
-                    }
-                    .padding(.horizontal, 20)
-                    
-                    Text(hasWaiting ? "Unsaved plans — tap to view and save." : "Tap to choose one and save to Your Upcoming Dates.")
+    // MARK: - Unsaved Plans Sheet (shown when > 3 unsaved plans)
+    private var unsavedPlansSheet: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 12) {
+                    Text("Tap a plan to view and save it before it's gone.")
                         .font(Font.bodySans(13, weight: .regular))
                         .foregroundColor(Color.luxuryCreamMuted)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.horizontal, 20)
-                    
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 14) {
-                            if hasWaiting {
-                                ForEach(coordinator.experiencesWaiting) { plan in
-                                    LuxuryUnifiedDateCard(
-                                        imageUrl: plan.displayImageUrl,
-                                        title: plan.title,
-                                        tagline: plan.tagline,
-                                        location: MapURLHelper.cityStateOrRegionFromAddress(plan.stops.first?.address),
-                                        time: plan.stops.first?.timeSlot ?? "—",
-                                        price: plan.estimatedCost,
-                                        actionTitle: "View Plan",
-                                        isPremiumLocked: !access.canAccess(.datePlan),
-                                        action: {
-                                            access.require(.datePlan) {
-                                                coordinator.currentDatePlan = plan
-                                                coordinator.activeSheet = .datePlanResult
-                                            }
-                                        }
-                                    )
-                                    .contextMenu {
-                                        Button(role: .destructive) {
-                                            coordinator.removeFromExperiencesWaiting(planId: plan.id)
-                                        } label: {
-                                            Label("Remove from list", systemImage: "trash")
-                                        }
-                                    }
-                                }
-                            } else {
-                                ForEach(Array(coordinator.generatedPlans.enumerated()), id: \.element.id) { index, plan in
-                                    LuxuryUnifiedDateCard(
-                                        imageUrl: plan.displayImageUrl,
-                                        title: plan.title,
-                                        tagline: plan.tagline,
-                                        location: MapURLHelper.cityStateOrRegionFromAddress(plan.stops.first?.address),
-                                        time: plan.stops.first?.timeSlot ?? "—",
-                                        price: plan.estimatedCost,
-                                        actionTitle: "Choose",
-                                        isPremiumLocked: !access.canAccess(.datePlan),
-                                        action: {
-                                            access.require(.datePlan) {
-                                                coordinator.generatedPlansSelectedIndex = index
-                                                coordinator.currentDatePlan = plan
-                                                coordinator.activeSheet = .datePlanOptions
-                                            }
-                                        }
-                                    )
-                                }
-                            }
-                        }
-                        .padding(.horizontal, 20)
+                        .padding(.top, 16)
+
+                    ForEach(allUnsavedPlans) { plan in
+                        upcomingDateRow(plan: plan, isUnsaved: true)
+                            .padding(.horizontal, 20)
                     }
                 }
-            } else {
-                EmptyView()
+                .padding(.bottom, 40)
             }
+            .background(Color.luxuryMaroon)
+            .navigationTitle("Plans Waiting to be Saved")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Done") { showUnsavedPlansSheet = false }
+                        .foregroundColor(Color.luxuryGold)
+                }
+            }
+            .toolbarBackground(Color.luxuryMaroon, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+        }
+    }
+
+    // MARK: - Date Experiences collapsible wrapper
+    private var dateExperiencesCollapsibleSection: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // Gold section divider
+            Rectangle()
+                .fill(Color.luxuryGold.opacity(0.12))
+                .frame(height: 1)
+                .padding(.horizontal, 20)
+                .padding(.bottom, 18)
+
+            // Collapsible header
+            Button {
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                    dateExperiencesExpanded.toggle()
+                }
+            } label: {
+                HStack(spacing: 8) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack(spacing: 6) {
+                            Text("Happening")
+                                .font(Font.tangerine(32, weight: .bold))
+                                .italic()
+                                .foregroundColor(Color.luxuryGold)
+                            Text("Near You")
+                                .font(Font.tangerine(32, weight: .bold))
+                                .italic()
+                                .foregroundColor(Color.luxuryGold)
+                        }
+                        Text("Live events & experiences within 60 miles")
+                            .font(Font.bodySans(13, weight: .regular))
+                            .foregroundColor(Color.luxuryCreamMuted)
+                    }
+                    Spacer()
+                    Image(systemName: dateExperiencesExpanded ? "chevron.up" : "chevron.down")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(Color.luxuryGold.opacity(0.7))
+                }
+            }
+            .buttonStyle(.plain)
+            .padding(.horizontal, 20)
+
+            DateExperiencesSection(showHeader: false)
+                .opacity(dateExperiencesExpanded ? 1 : 0)
+                .frame(height: dateExperiencesExpanded ? nil : 0)
+                .clipped()
         }
     }
     
@@ -740,62 +1047,35 @@ struct LuxuryHomeTabView: View {
                     .foregroundColor(Color.luxuryGold)
             }
             .frame(maxWidth: .infinity)
-            
-            HStack(spacing: 8) {
-                LuxuryQuickTile(icon: "gift", title: "Gift Finder", color: Color.luxuryGold, isLocked: !access.canAccess(.gifting)) {
-                    access.require(.gifting) {
-                        coordinator.showGiftFinder(
-                            datePlan: coordinator.currentDatePlan,
-                            dateLocation: coordinator.currentDatePlan?.stops.first?.address
-                        )
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 12) {
+                    LuxuryQuickTile(icon: "gift", title: "Gift Finder", color: Color.luxuryGold, isLocked: !access.canAccess(.gifting)) {
+                        access.require(.gifting) {
+                            coordinator.showGiftFinder(
+                                datePlan: coordinator.currentDatePlan,
+                                dateLocation: coordinator.currentDatePlan?.stops.first?.address
+                            )
+                        }
                     }
-                }
-                .frame(maxWidth: .infinity)
-                LuxuryQuickTile(icon: "music.note.list", title: "Date Playlist", color: Color.luxuryGoldLight, isLocked: !access.canAccess(.playlist)) {
-                    access.require(.playlist) {
-                        coordinator.showPlaylist(for: coordinator.currentDatePlan?.title ?? "Date Night", planId: coordinator.currentDatePlan?.id)
+                    LuxuryQuickTile(icon: "music.note.list", title: "Date Playlist", color: Color.luxuryGoldLight, isLocked: !access.canAccess(.playlist)) {
+                        access.require(.playlist) {
+                            coordinator.showPlaylist(for: coordinator.currentDatePlan?.title ?? "Date Night", planId: coordinator.currentDatePlan?.id)
+                        }
                     }
-                }
-                .frame(maxWidth: .infinity)
-                LuxuryQuickTile(icon: "bubble.left.and.bubble.right", title: "Conversation Starters", color: Color.luxuryGold, isLocked: !access.canAccess(.conversation)) {
-                    access.require(.conversation) {
-                        coordinator.showConversationStarters()
+                    LuxuryQuickTile(icon: "bubble.left.and.bubble.right", title: "Convo Starters", color: Color.luxuryGold, isLocked: !access.canAccess(.conversation)) {
+                        access.require(.conversation) {
+                            coordinator.showConversationStarters()
+                        }
                     }
-                }
-                .frame(maxWidth: .infinity)
-                LuxuryQuickTile(icon: "person.2.fill", title: "Plan Together", color: Color.luxuryGold, isLocked: !access.canAccess(.datePlan)) {
-                    access.require(.datePlan) {
-                        coordinator.showPartnerPlanning()
+                    LuxuryQuickTile(icon: "person.2.fill", title: "Plan Together", color: Color.luxuryGold, isLocked: !access.canAccess(.datePlan)) {
+                        access.require(.datePlan) {
+                            coordinator.showPartnerPlanning()
+                        }
                     }
-                }
-                .frame(maxWidth: .infinity)
-                LuxuryQuickTile(icon: "clock", title: "Past Dates", color: Color.luxuryGoldLight, isLocked: !access.canAccess(.datePlan)) {
-                    access.require(.datePlan) {
+                    LuxuryQuickTile(icon: "clock", title: "Past Dates", color: Color.luxuryGoldLight, isLocked: false) {
                         coordinator.showPastMagic()
                     }
-                }
-                .frame(maxWidth: .infinity)
-            }
-            .padding(.horizontal, 16)
-        }
-    }
-    
-    private var featuresSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack(spacing: 6) {
-                Text("Magical")
-                    .font(Font.tangerine(34, weight: .bold))
-                    .italic()
-                    .foregroundColor(Color.luxuryGold)
-                Text("Tools")
-                    .font(Font.tangerine(34, weight: .bold))
-                    .italic()
-                    .foregroundColor(Color.luxuryGold)
-            }
-            .padding(.horizontal, 20)
-            
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 14) {
                     LuxuryQuickTile(icon: "map", title: "Journey Map", color: Color.luxuryGoldLight, isLocked: !access.canAccess(.datePlan)) {
                         access.require(.datePlan) {
                             let allPastStops = coordinator.pastPlans.flatMap { $0.stops }
@@ -806,11 +1086,6 @@ struct LuxuryHomeTabView: View {
                             } else {
                                 coordinator.activeSheet = .routeMap(stops: [], startingPoint: nil, showRouteLine: false)
                             }
-                        }
-                    }
-                    LuxuryQuickTile(icon: "music.note", title: "Mood Music", color: Color.luxuryGold, isLocked: !access.canAccess(.playlist)) {
-                        access.require(.playlist) {
-                            coordinator.showPlaylist(for: coordinator.currentDatePlan?.title ?? "Date Night", planId: coordinator.currentDatePlan?.id)
                         }
                     }
                     LuxuryQuickTile(icon: "heart", title: "Share Joy", color: Color.luxuryGoldLight, isLocked: !access.canAccess(.datePlan)) {
@@ -831,21 +1106,42 @@ struct LuxuryHomeTabView: View {
         }
     }
     
+    
     // MARK: - Your Relationship Story
     private var relationshipStorySection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack(spacing: 6) {
-                Text("Your")
-                    .font(Font.tangerine(32, weight: .bold))
-                    .italic()
-                    .foregroundColor(Color.luxuryGold)
-                Text("Relationship Story")
-                    .font(Font.tangerine(32, weight: .bold))
-                    .italic()
-                    .foregroundColor(Color.luxuryGold)
+        VStack(alignment: .leading, spacing: 0) {
+            // Gold section divider
+            Rectangle()
+                .fill(Color.luxuryGold.opacity(0.12))
+                .frame(height: 1)
+                .padding(.horizontal, 20)
+                .padding(.bottom, 18)
+
+            // Collapsible header
+            Button {
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                    storyExpanded.toggle()
+                }
+            } label: {
+                HStack(spacing: 8) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Your Relationship Story")
+                            .font(Font.tangerine(32, weight: .bold))
+                            .italic()
+                            .foregroundColor(Color.luxuryGold)
+                        Text("Your journey together at a glance")
+                            .font(Font.bodySans(13, weight: .regular))
+                            .foregroundColor(Color.luxuryCreamMuted)
+                    }
+                    Spacer()
+                    Image(systemName: storyExpanded ? "chevron.up" : "chevron.down")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(Color.luxuryGold.opacity(0.7))
+                }
             }
+            .buttonStyle(.plain)
             .padding(.horizontal, 20)
-            
+
             HStack(spacing: 20) {
                 VStack(spacing: 6) {
                     Text("\(coordinator.savedPlans.count)")
@@ -906,6 +1202,10 @@ struct LuxuryHomeTabView: View {
                 .buttonStyle(.plain)
             }
             .padding(.horizontal, 20)
+            .padding(.top, 16)
+            .opacity(storyExpanded ? 1 : 0)
+            .frame(height: storyExpanded ? nil : 0)
+            .clipped()
         }
     }
 }
@@ -980,7 +1280,7 @@ private struct LuxuryUnifiedDateCard: View {
                         endPoint: .bottom
                     )
                 )
-                .clipShape(RoundedRectangle(cornerRadius: 24))
+                .clipShape(RoundedRectangle(cornerRadius: 20))
                 .overlay(alignment: .topTrailing) {
                     if isPremiumLocked {
                         Image(systemName: "lock.fill")
@@ -1048,15 +1348,15 @@ private struct LuxuryUnifiedDateCard: View {
             .frame(width: 200)
             .opacity(isPremiumLocked ? 0.5 : 1)
             .background(
-                RoundedRectangle(cornerRadius: 24)
+                RoundedRectangle(cornerRadius: 20)
                     .fill(Color.luxuryMaroonLight.opacity(0.7))
                     .overlay(
-                        RoundedRectangle(cornerRadius: 24)
+                        RoundedRectangle(cornerRadius: 20)
                             .stroke(Color.luxuryGold.opacity(0.25), lineWidth: 1)
                     )
                     .shadow(color: Color.luxuryGold.opacity(0.15), radius: 12, y: 4)
             )
-            .clipShape(RoundedRectangle(cornerRadius: 24))
+            .clipShape(RoundedRectangle(cornerRadius: 20))
         }
         .buttonStyle(.plain)
     }

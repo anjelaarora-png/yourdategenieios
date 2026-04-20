@@ -34,9 +34,12 @@ struct Step1LocationView: View {
                         }
 
                         Button {
-                            locationHelper.requestCurrentLocation { address in
+                            locationHelper.requestCurrentLocation { address, city in
                                 if let address = address {
                                     data.startingAddress = address
+                                }
+                                if let city = city, data.city.isEmpty {
+                                    data.city = city
                                 }
                             }
                         } label: {
@@ -188,6 +191,16 @@ struct Step1LocationView: View {
                 data.startTime = "7:00 PM"
             }
         }
+        .alert("Location Access Needed", isPresented: $locationHelper.showPermissionDeniedAlert) {
+            Button("Open Settings") {
+                if let url = URL(string: UIApplication.openSettingsURLString) {
+                    UIApplication.shared.open(url)
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Please allow location access in Settings so we can fill in your starting address automatically.")
+        }
     }
     
     private func timeOptions(for period: String) -> [String] {
@@ -286,8 +299,9 @@ struct CustomTextFieldStyle: TextFieldStyle {
 @MainActor
 final class CurrentLocationHelper: NSObject, ObservableObject, CLLocationManagerDelegate {
     @Published var isLoading = false
+    @Published var showPermissionDeniedAlert = false
     private let manager = CLLocationManager()
-    private var completion: ((String?) -> Void)?
+    private var completion: ((String?, String?) -> Void)?
 
     override init() {
         super.init()
@@ -295,7 +309,9 @@ final class CurrentLocationHelper: NSObject, ObservableObject, CLLocationManager
         manager.desiredAccuracy = kCLLocationAccuracyHundredMeters
     }
 
-    func requestCurrentLocation(completion: @escaping (String?) -> Void) {
+    /// Requests the device's current location and reverse-geocodes it.
+    /// Completion delivers `(address, city)` — both may be nil on failure or denial.
+    func requestCurrentLocation(completion: @escaping (String?, String?) -> Void) {
         self.completion = completion
         isLoading = true
         let status = manager.authorizationStatus
@@ -305,13 +321,14 @@ final class CurrentLocationHelper: NSObject, ObservableObject, CLLocationManager
             manager.requestLocation()
         } else {
             isLoading = false
-            completion(nil)
+            showPermissionDeniedAlert = true
+            completion(nil, nil)
         }
     }
 
     nonisolated func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         guard let loc = locations.first else {
-            Task { @MainActor in self.finish(with: nil) }
+            Task { @MainActor in self.finish(address: nil, city: nil) }
             return
         }
         let geocoder = CLGeocoder()
@@ -320,15 +337,16 @@ final class CurrentLocationHelper: NSObject, ObservableObject, CLLocationManager
             var parts: [String] = []
             if let number = placemark?.subThoroughfare { parts.append(number) }
             if let street = placemark?.thoroughfare { parts.append(street) }
-            if let city = placemark?.locality { parts.append(city) }
+            if let cityName = placemark?.locality { parts.append(cityName) }
             if let state = placemark?.administrativeArea { parts.append(state) }
-            let address = parts.isEmpty ? nil : parts.joined(separator: " ")
-            Task { @MainActor in self.finish(with: address) }
+            let address = parts.isEmpty ? nil : parts.joined(separator: ", ")
+            let city = placemark?.locality
+            Task { @MainActor in self.finish(address: address, city: city) }
         }
     }
 
     nonisolated func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
-        Task { @MainActor in self.finish(with: nil) }
+        Task { @MainActor in self.finish(address: nil, city: nil) }
     }
 
     nonisolated func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
@@ -336,13 +354,16 @@ final class CurrentLocationHelper: NSObject, ObservableObject, CLLocationManager
         if status == .authorizedWhenInUse || status == .authorizedAlways {
             DispatchQueue.main.async { manager.requestLocation() }
         } else if status != .notDetermined {
-            Task { @MainActor in self.finish(with: nil) }
+            Task { @MainActor in
+                self.showPermissionDeniedAlert = true
+                self.finish(address: nil, city: nil)
+            }
         }
     }
 
-    private func finish(with address: String?) {
+    private func finish(address: String?, city: String?) {
         isLoading = false
-        completion?(address)
+        completion?(address, city)
         completion = nil
     }
 }

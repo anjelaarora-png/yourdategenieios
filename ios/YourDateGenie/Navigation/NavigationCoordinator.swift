@@ -837,8 +837,17 @@ class NavigationCoordinator: ObservableObject {
     }
     
     func signOut() {
-        UserProfileManager.shared.signOut()
+        // 1. Flip the flag that `RootNavigationView` switches on — view tree starts routing to the
+        //    login screen within this main-actor tick. Do this BEFORE the heavier resets below so
+        //    the user sees an instant transition, even if JSON-encode / UserDefaults writes hiccup.
         isLoggedIn = false
+        activeSheet = nil
+
+        // 2. Kick off profile manager sign-out (also flips its `isLoggedIn` and fires network teardown
+        //    in the background — see `SupabaseService.signOut`).
+        UserProfileManager.shared.signOut()
+
+        // 3. Remaining state resets — all cheap, but run after the auth flag is already false.
         hasCompletedSignUp = false
         hasCompletedPreferences = false
         hasDeferredInitialPreferences = false
@@ -853,8 +862,6 @@ class NavigationCoordinator: ObservableObject {
         experiencesCloudPullCompleted = true
         currentTab = .home
         navigationPath = NavigationPath()
-        activeSheet = nil
-        // Explicitly clear hasSkippedLogin from UserDefaults so it doesn't persist to the next session
         UserDefaults.standard.removeObject(forKey: "hasSkippedLogin")
         saveState()
     }
@@ -902,11 +909,33 @@ class NavigationCoordinator: ObservableObject {
             UserDefaults.standard.set(false, forKey: "hasCompletedOnboarding")
             saveState()
         }
+        migratePastDuePlans()
     }
     
     /// Call when home tab appears or app becomes active so "Use & Generate" visibility stays correct after async preference load.
     func refreshPreferencesState() {
         hasCompletedPreferences = UserProfileManager.shared.hasCompletedPreferences || UserDefaults.standard.bool(forKey: "hasCompletedPreferences")
+        migratePastDuePlans()
+    }
+
+    /// Moves any saved plan whose date has already passed into pastPlans automatically.
+    /// Primary signal: scheduledDate is in the past.
+    /// Fallback: no scheduledDate but the plan was created 30+ days ago.
+    func migratePastDuePlans() {
+        let startOfToday = Calendar.current.startOfDay(for: Date())
+        let thirtyDaysAgo = Calendar.current.date(byAdding: .day, value: -30, to: startOfToday) ?? startOfToday
+        let overdue = savedPlans.filter { plan in
+            if let scheduled = plan.scheduledDate {
+                return scheduled < startOfToday
+            }
+            return plan.createdAt < thirtyDaysAgo
+        }
+        guard !overdue.isEmpty else { return }
+        let overdueIds = Set(overdue.map(\.id))
+        savedPlans = savedPlans.filter { !overdueIds.contains($0.id) }
+        let existingPastIds = Set(pastPlans.map(\.id))
+        pastPlans = pastPlans + overdue.filter { !existingPastIds.contains($0.id) }
+        saveState()
     }
     
     /// Build a single Date from questionnaire date + start time for display and calendar.
@@ -999,6 +1028,7 @@ class NavigationCoordinator: ObservableObject {
             savedPlans = remoteSaved + unsyncedSaved
             pastPlans = remotePast + unsyncedPast
             saveState()
+            migratePastDuePlans()
         }
         await uploadAllLocalDatePlansToCloud()
     }

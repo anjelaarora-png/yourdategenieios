@@ -13,13 +13,54 @@ enum AppFeature {
     case nearby
 }
 
-/// Central subscription gate. Mirrors `PurchaseManager.shared.isSubscribed` and coordinates a single app-wide paywall + deferred navigation.
+/// Central subscription gate. Mirrors `PurchaseManager.shared.isSubscribed` and coordinates a
+/// single app-wide paywall + deferred navigation.
+///
+/// Free tier: users may generate up to `freePlanLimit` date plans before subscribing.
+/// Viewing previously generated plans is always allowed so users are never locked out of content
+/// they already created.
 @MainActor
 final class AccessManager: ObservableObject {
     static let shared = AccessManager()
 
+    // MARK: - Free tier constants
+
+    private static let freePlansUsedKey = "com.yourdategenie.freePlansUsed"
+    /// Number of free date-plan generations allowed before the paywall appears.
+    static let freePlanLimit = 2
+
+    // MARK: - Published state
+
     @Published var isSubscribed: Bool = false
     @Published var isPaywallPresented: Bool = false
+
+    // MARK: - Free usage tracking
+
+    /// How many free date plans this device has generated (ignored once subscribed).
+    var freePlansUsed: Int {
+        UserDefaults.standard.integer(forKey: Self.freePlansUsedKey)
+    }
+
+    /// Remaining free generations before the paywall. Always 0 when subscribed.
+    var freePlansRemaining: Int {
+        guard !isSubscribed else { return 0 }
+        return max(0, Self.freePlanLimit - freePlansUsed)
+    }
+
+    /// `true` when the user can start a new date-plan generation (either subscribed or still
+    /// within the free tier allowance).
+    func canGenerateDatePlan() -> Bool {
+        return isSubscribed || freePlansUsed < Self.freePlanLimit
+    }
+
+    /// Call this once after each successful date-plan generation to consume one free credit.
+    /// No-ops when already subscribed — subscribers have unlimited generations.
+    func recordDatePlanGenerated() {
+        guard !isSubscribed else { return }
+        UserDefaults.standard.set(freePlansUsed + 1, forKey: Self.freePlansUsedKey)
+    }
+
+    // MARK: - Private
 
     private var pendingUnlock: (() -> Void)?
     private var cancellables = Set<AnyCancellable>()
@@ -33,6 +74,8 @@ final class AccessManager: ObservableObject {
             }
             .store(in: &cancellables)
     }
+
+    // MARK: - Feature access
 
     func canAccess(_ feature: AppFeature) -> Bool {
         switch feature {

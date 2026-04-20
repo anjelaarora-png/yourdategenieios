@@ -83,9 +83,14 @@ final class SupabaseService: ObservableObject {
     private static let signUpEmailRedirectURL = URL(string: "yourdategenie://auth-callback")
     
     /// True when the account has no email (e.g. phone-only) or the email is confirmed.
+    /// OAuth users (Google, Apple, etc.) verify email at the provider; `email_confirmed_at` can be missing in some JWT payloads until refresh.
     private static func hasConfirmedEmailIfNeeded(user: User) -> Bool {
         if user.email == nil { return true }
-        return user.emailConfirmedAt != nil
+        if user.emailConfirmedAt != nil { return true }
+        if let identities = user.identities, identities.contains(where: { $0.provider != "email" }) {
+            return true
+        }
+        return false
     }
     
     /// Sign up with email and password (uses Supabase SDK)
@@ -145,16 +150,99 @@ final class SupabaseService: ObservableObject {
         return mapToSupabaseUser(session.user, defaultName: nil)
     }
     
+    // MARK: - OAuth (Google / Apple)
+
+    /// Redirect URL used by every OAuth provider. Must be listed under Supabase
+    /// Authentication → URL configuration → Redirect URLs.
+    private static let oauthRedirectURL = URL(string: "yourdategenie://auth-callback")!
+
+    /// Starts the Google OAuth flow via `ASWebAuthenticationSession` and exchanges the PKCE code
+    /// for a Supabase session.
+    ///
+    /// We deliberately go through the SDK's `signInWithOAuth` helper so:
+    ///   * the code verifier it generates is written into the SDK's own storage, and
+    ///   * the same client exchanges the auth code — nothing else can read that verifier.
+    /// Bypassing this (the old manual `/authorize` URL + `ASWebAuthenticationSession` + `onOpenURL`
+    /// path) silently dropped the `?code=…` callback and left the user on the login screen.
+    @MainActor
+    func signInWithGoogle() async throws -> SupabaseUser {
+        await setLoading(true)
+        defer { Task { await setLoading(false) } }
+
+        let session = try await supabaseClient.auth.signInWithOAuth(
+            provider: .google,
+            redirectTo: Self.oauthRedirectURL
+        ) { webAuthSession in
+            webAuthSession.prefersEphemeralWebBrowserSession = true
+        }
+
+        await syncSessionFromSDK(session)
+
+        let authenticated = isAuthenticated
+        if !authenticated {
+            throw SupabaseError.authFailed("Google sign in did not complete.")
+        }
+
+        return mapToSupabaseUser(session.user, defaultName: nil)
+    }
+
+    /// Exchanges an Apple identity token for a Supabase session via the SAME client used for all
+    /// other auth operations. Keeps PKCE/state consistent and makes `isAuthenticated` reflect the
+    /// result synchronously once this returns.
+    @MainActor
+    func signInWithApple(idToken: String, nonce: String? = nil) async throws -> SupabaseUser {
+        await setLoading(true)
+        defer { Task { await setLoading(false) } }
+
+        let session = try await supabaseClient.auth.signInWithIdToken(
+            credentials: OpenIDConnectCredentials(provider: .apple, idToken: idToken, nonce: nonce)
+        )
+        await syncSessionFromSDK(session)
+        if !isAuthenticated {
+            throw SupabaseError.authFailed("Sign in with Apple did not complete.")
+        }
+        return mapToSupabaseUser(session.user, defaultName: nil)
+    }
+
     /// Sign out (uses Supabase SDK)
+    ///
+    /// Scope `.global` revokes the refresh token server-side but requires a round-trip to
+    /// `/auth/v1/logout` — on slow/flaky networks that used to block the UI for seconds. We:
+    ///   1. Attempt a server-side revocation in a **detached** task (fire-and-forget) while we
+    ///      still have a valid access token.
+    ///   2. Immediately clear local auth state and the SDK's stored session via `.local`.
+    /// The UI observes `isAuthenticated` flipping to `false` within the same main-actor tick, so
+    /// the login screen appears instantly regardless of network latency.
     func signOut() async throws {
-        try await supabaseClient.auth.signOut()
-        accessToken = nil
-        refreshToken = nil
-        clearSessionKeychainAsync()
+        let tokenForGlobalRevocation = accessToken
+        let client = supabaseClient
+
+        if let token = tokenForGlobalRevocation, !token.isEmpty {
+            Task.detached(priority: .utility) { [weak self] in
+                guard let self else { return }
+                // Build a minimal logout request using the captured token so revocation still works
+                // even though we immediately clear the local session below.
+                let url = URL(string: "\(self.baseURL)/auth/v1/logout?scope=global")!
+                var request = URLRequest(url: url)
+                request.httpMethod = "POST"
+                request.addValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+                request.addValue(self.anonKey, forHTTPHeaderField: "apikey")
+                request.timeoutInterval = 5
+                _ = try? await self.session.data(for: request)
+            }
+        }
+
+        // Clear local auth state first so observers react on the next main tick.
         await MainActor.run {
             self.currentUser = nil
             self.isAuthenticated = false
+            self.accessToken = nil
+            self.refreshToken = nil
         }
+        clearSessionKeychainAsync()
+
+        // Clear the Supabase SDK's local session (no network) so subsequent calls see no auth.
+        try? await client.auth.signOut(scope: .local)
     }
     
     /// Send password reset email (uses Supabase SDK)
@@ -266,11 +354,19 @@ final class SupabaseService: ObservableObject {
         return coupleId
     }
     
-    /// Handle auth callback from deep link (email confirmation)
+    /// Handle auth callback from deep link (OAuth redirect or email confirmation).
     func handleAuthCallback(accessToken: String, refreshToken: String) async throws {
         try await supabaseClient.auth.setSession(accessToken: accessToken, refreshToken: refreshToken)
-        if let session = supabaseClient.auth.currentSession {
-            await syncSessionFromSDK(session)
+        // `currentSession` may still be expired right after setSession; `session` refreshes as needed.
+        // Without this, `syncSessionFromSDK` can return early (expired branch) while `completeSignIn()` runs,
+        // then refresh/sign-out flips `isAuthenticated` and the user lands back on the login screen.
+        let session = try await supabaseClient.auth.session
+        await syncSessionFromSDK(session)
+        let authenticated = await MainActor.run { self.isAuthenticated }
+        if !authenticated {
+            throw SupabaseError.authFailed(
+                "Sign in did not complete. Confirm your email if you recently signed up with password, or try again."
+            )
         }
     }
     

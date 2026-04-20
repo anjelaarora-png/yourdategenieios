@@ -358,11 +358,75 @@ class UserProfileManager: ObservableObject {
         await PostLoginCloudSync.run(coupleId: couple?.coupleId, userId: supabaseUser.id)
     }
     
-    func signOut() {
-        Task {
-            try? await supabase.signOut()
+    /// Called after a social (Google/Apple) OAuth flow completes with a valid Supabase session.
+    ///
+    /// Mirrors the post-login bookkeeping `signIn(email:password:)` does: ensures the
+    /// `public.users` / `couples` rows exist, pulls profile + preferences, flips `isLoggedIn`, and
+    /// kicks the cloud sync so the coordinator routes past the auth screen. Without this, the
+    /// Supabase session is authenticated but `UserProfileManager` state never updates, so
+    /// `RootNavigationView` keeps showing `AuthenticationView`.
+    func refreshAfterSocialSignIn() async {
+        guard let supabaseUser = supabase.currentUser else { return }
+
+        let email = supabaseUser.email ?? ""
+        let name = [supabaseUser.firstName, supabaseUser.lastName]
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+        let nameForRow = name.isEmpty ? (email.isEmpty ? "Guest" : email) : name
+
+        do {
+            try await supabase.ensureUserAndCoupleIfMissing(
+                userId: supabaseUser.id,
+                email: email.lowercased(),
+                name: nameForRow
+            )
+        } catch {
+            print("ensureUserAndCoupleIfMissing after social sign in: \(error)")
         }
-        
+
+        let dbUser = try? await supabase.getUser(userId: supabaseUser.id)
+        let preferences = try? await supabase.getPreferences(userId: supabaseUser.id)
+        let couple = try? await supabase.getCoupleForUser(userId: supabaseUser.id)
+
+        await MainActor.run {
+            var profile = UserProfile()
+            if let dbUser = dbUser {
+                let nameParts = dbUser.name.components(separatedBy: " ")
+                profile.firstName = nameParts.first ?? ""
+                profile.lastName = nameParts.count > 1 ? nameParts.dropFirst().joined(separator: " ") : ""
+                profile.email = dbUser.email
+                profile.dateOfBirth = dbUser.birthday
+                profile.location = dbUser.homeAddress ?? ""
+            } else {
+                profile.firstName = supabaseUser.firstName
+                profile.lastName = supabaseUser.lastName
+                profile.email = email
+            }
+            if let existing = self.currentUser, !existing.phoneNumber.isEmpty {
+                profile.phoneNumber = existing.phoneNumber
+            }
+            if let prefs = preferences {
+                profile.preferences = self.convertToDatePreferences(prefs)
+                self.hasCompletedPreferences = true
+                self.lastServerPreferencesUpdatedAt = prefs.updatedAt
+            }
+            self.currentUser = profile
+            self.userId = supabaseUser.id
+            self.coupleId = couple?.coupleId
+            self.isLoggedIn = true
+            self.pendingEmailConfirmation = false
+            self.pendingConfirmationEmail = nil
+            UserDefaults.standard.set(true, forKey: self.loggedInKey)
+            UserDefaults.standard.set(self.hasCompletedPreferences, forKey: self.preferencesCompleteKey)
+            self.keychain.setHasEverLoggedIn(true)
+        }
+
+        await PostLoginCloudSync.run(coupleId: couple?.coupleId, userId: supabaseUser.id)
+    }
+
+    func signOut() {
+        // Flip the observable auth flag first so any view tree dependent on `isLoggedIn`
+        // starts transitioning to the login screen immediately — before keychain/network work.
         isLoggedIn = false
         userId = nil
         coupleId = nil
@@ -371,6 +435,11 @@ class UserProfileManager: ObservableObject {
         lastServerPreferencesUpdatedAt = nil
         pendingEmailConfirmation = false
         pendingConfirmationEmail = nil
+
+        // Network signOut is fire-and-forget (see `SupabaseService.signOut`); do not await.
+        Task { try? await supabase.signOut() }
+
+        // Remaining disk/state work runs synchronously but is cheap.
         persistPendingEmailConfirmationToDisk()
         UserDefaults.standard.set(false, forKey: loggedInKey)
         UserDefaults.standard.set(false, forKey: preferencesCompleteKey)

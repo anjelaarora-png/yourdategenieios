@@ -14,6 +14,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		9330C1CA2F92BE28006FE40F /* Products.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; name = Products.storekit; path = YourDateGenie/Products.storekit; sourceTree = "<group>"; };
 		93786F352F84563C00D8A04E /* StoreKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = StoreKit.framework; path = System/Library/Frameworks/StoreKit.framework; sourceTree = SDKROOT; };
 		A1000001000000000000000A /* YourDateGenie.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = YourDateGenie.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A1000012000000000000000A /* Secrets.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Secrets.xcconfig; sourceTree = "<group>"; };
@@ -57,6 +58,7 @@
 		A1000004000000000000000A = {
 			isa = PBXGroup;
 			children = (
+				9330C1CA2F92BE28006FE40F /* Products.storekit */,
 				A1000002000000000000000A /* YourDateGenie */,
 				A1000005000000000000000A /* Products */,
 				93078AB32F61D5C500B42816 /* Recovered References */,

@@ -97,6 +97,10 @@
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	
+	<!-- Location access for finding nearby venues and date spots -->
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Your Date Genie uses your location to find nearby restaurants, venues, and date spots so your plans are tailored to where you are.</string>
+
 	<!-- Calendar access for adding date plans -->
 	<key>NSCalendarsUsageDescription</key>
 	<string>Your Date Genie adds your chosen date plan to your calendar so you don't miss the adventure.</string>

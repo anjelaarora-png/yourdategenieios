@@ -385,7 +385,12 @@ struct LuxuryExploreTabView: View {
             await MainActor.run { recommendedPlaces = []; recommendedLoading = false }
             return
         }
-        await MainActor.run { if recommendedLoading { return }; recommendedLoading = true }
+        let alreadyLoading = await MainActor.run { () -> Bool in
+            if recommendedLoading { return true }
+            recommendedLoading = true
+            return false
+        }
+        guard !alreadyLoading else { return }
         let radius = exploreRadiusMeters
         do {
             let places = try await GooglePlacesService.shared.fetchRecommendedInCity(city: city, limit: 6, radiusMeters: radius)
@@ -401,7 +406,12 @@ struct LuxuryExploreTabView: View {
             await MainActor.run { explorePlaces = []; exploreNextPageToken = nil; explorePlacesLoading = false }
             return
         }
-        await MainActor.run { if explorePlacesLoading { return }; explorePlacesLoading = true }
+        let alreadyLoading = await MainActor.run { () -> Bool in
+            if explorePlacesLoading { return true }
+            explorePlacesLoading = true
+            return false
+        }
+        guard !alreadyLoading else { return }
         let isAll = selectedExploreCategory == nil
         let radius = exploreRadiusMeters
         do {

@@ -22,6 +22,15 @@ CRITICAL RULES:
 7. Each option should offer a genuinely different experience style
 8. Include the FULL ADDRESS with city and state abbreviation for every venue
 
+**PLAN TITLES — NON-NEGOTIABLE:**
+- Each title must be magical and cinematic — it should capture the MOOD or EMOTIONAL EXPERIENCE of the plan, like a song or movie title for that night.
+- NEVER produce a lazy title that is just "[Cuisine] + [generic word]" — e.g. "Mediterranean Evening", "Italian Night", "Japanese Dinner" are all forbidden.
+- NEVER use generic phrases: "Date Night", "Evening Out", "Romantic Evening", "Dinner Date".
+- Cuisine/cultural words ARE allowed only when used poetically alongside an evocative word — e.g. "Mediterranean Moonlight", "Saffron & Slow Jazz", "Spice, Stars & You" ✅
+- All 3 titles MUST feel completely different from each other — different structure, different emotion, different vibe.
+- Great title formulas: "Velvet & City Lights" / "The Midnight Detour" / "Salt Air & Starlight" / "Candlelight & Conspiracy" / "Stolen Kisses, Open Sky" / "Follow the Lanterns" / "One Wild Beautiful Night"
+- Put cuisine/neighborhood details in the tagline, NOT the title.
+
 IMPORTANT: The "stops" array is the MOST CRITICAL part of each plan. Never return empty stops!`;
 
 const GATEWAY_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";

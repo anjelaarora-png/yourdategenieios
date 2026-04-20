@@ -283,6 +283,9 @@ struct DatePlan: Identifiable, Equatable, Codable {
     
     /// When the user added this plan to the calendar; shown on saved-plan cards.
     var scheduledDate: Date?
+
+    /// When this plan was first created; used to auto-archive old undated plans.
+    var createdAt: Date
     
     /// Use when creating a new plan (generates new id).
     init(
@@ -298,7 +301,8 @@ struct DatePlan: Identifiable, Equatable, Codable {
         weatherNote: String,
         giftSuggestions: [GiftSuggestion]? = nil,
         conversationStarters: [ConversationStarter]? = nil,
-        scheduledDate: Date? = nil
+        scheduledDate: Date? = nil,
+        createdAt: Date = Date()
     ) {
         self.id = UUID()
         self.optionLabel = optionLabel
@@ -314,6 +318,7 @@ struct DatePlan: Identifiable, Equatable, Codable {
         self.giftSuggestions = giftSuggestions
         self.conversationStarters = conversationStarters
         self.scheduledDate = scheduledDate
+        self.createdAt = createdAt
     }
     
     /// Use when restoring from cloud (preserves plan id for sync).
@@ -331,7 +336,8 @@ struct DatePlan: Identifiable, Equatable, Codable {
         weatherNote: String,
         giftSuggestions: [GiftSuggestion]? = nil,
         conversationStarters: [ConversationStarter]? = nil,
-        scheduledDate: Date? = nil
+        scheduledDate: Date? = nil,
+        createdAt: Date = Date()
     ) {
         self.id = id
         self.optionLabel = optionLabel
@@ -347,8 +353,57 @@ struct DatePlan: Identifiable, Equatable, Codable {
         self.giftSuggestions = giftSuggestions
         self.conversationStarters = conversationStarters
         self.scheduledDate = scheduledDate
+        self.createdAt = createdAt
     }
-    
+
+    // Custom Codable so that plans saved before `createdAt` was added still decode
+    // correctly — missing key falls back to Date() instead of throwing.
+    enum CodingKeys: String, CodingKey {
+        case id, optionLabel, title, tagline, totalDuration, estimatedCost
+        case stops, startingPoint, genieSecretTouch, packingList, weatherNote
+        case giftSuggestions, conversationStarters, scheduledDate, createdAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id                  = try c.decode(UUID.self, forKey: .id)
+        optionLabel         = try c.decodeIfPresent(String.self, forKey: .optionLabel)
+        title               = try c.decode(String.self, forKey: .title)
+        tagline             = try c.decode(String.self, forKey: .tagline)
+        totalDuration       = try c.decode(String.self, forKey: .totalDuration)
+        estimatedCost       = try c.decode(String.self, forKey: .estimatedCost)
+        stops               = try c.decode([DatePlanStop].self, forKey: .stops)
+        startingPoint       = try c.decodeIfPresent(StartingPoint.self, forKey: .startingPoint)
+        genieSecretTouch    = try c.decode(GenieSecretTouch.self, forKey: .genieSecretTouch)
+        packingList         = try c.decode([String].self, forKey: .packingList)
+        weatherNote         = try c.decode(String.self, forKey: .weatherNote)
+        giftSuggestions     = try c.decodeIfPresent([GiftSuggestion].self, forKey: .giftSuggestions)
+        conversationStarters = try c.decodeIfPresent([ConversationStarter].self, forKey: .conversationStarters)
+        scheduledDate       = try c.decodeIfPresent(Date.self, forKey: .scheduledDate)
+        // Graceful fallback: plans saved before `createdAt` existed decode as Date()
+        // so they are never silently dropped when the JSON array is deserialized.
+        createdAt           = (try? c.decodeIfPresent(Date.self, forKey: .createdAt)) ?? Date()
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id,                   forKey: .id)
+        try c.encodeIfPresent(optionLabel, forKey: .optionLabel)
+        try c.encode(title,                forKey: .title)
+        try c.encode(tagline,              forKey: .tagline)
+        try c.encode(totalDuration,        forKey: .totalDuration)
+        try c.encode(estimatedCost,        forKey: .estimatedCost)
+        try c.encode(stops,                forKey: .stops)
+        try c.encodeIfPresent(startingPoint, forKey: .startingPoint)
+        try c.encode(genieSecretTouch,     forKey: .genieSecretTouch)
+        try c.encode(packingList,          forKey: .packingList)
+        try c.encode(weatherNote,          forKey: .weatherNote)
+        try c.encodeIfPresent(giftSuggestions,      forKey: .giftSuggestions)
+        try c.encodeIfPresent(conversationStarters, forKey: .conversationStarters)
+        try c.encodeIfPresent(scheduledDate,        forKey: .scheduledDate)
+        try c.encode(createdAt,            forKey: .createdAt)
+    }
+
     /// Preferred image for cards/lists: first stop's Google place photo, or a theme-based stock image.
     var displayImageUrl: String {
         if let url = stops.first?.imageUrl, !url.isEmpty { return url }

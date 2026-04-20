@@ -12,6 +12,8 @@ import Dashboard from "./pages/Dashboard";
 import Preferences from "./pages/Preferences";
 import Admin from "./pages/Admin";
 import Mobile from "./pages/Mobile";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
+import Terms from "./pages/Terms";
 import NotFound from "./pages/NotFound";
 import { AuthProvider } from "@/hooks/useAuth";
 import { UserPreferencesProvider } from "@/hooks/useUserPreferences";
@@ -65,6 +67,8 @@ const App = () => (
           <Route path="/preferences" element={<Preferences />} />
           <Route path="/admin" element={<Admin />} />
           <Route path="/app" element={<Mobile />} />
+          <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+          <Route path="/terms" element={<Terms />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

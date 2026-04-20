@@ -323,14 +323,18 @@ class GooglePlacesService {
         }
         
         let queryTerms = Self.trendingQueryTerms(for: categoryId)
-        let query = "\(queryTerms) \(trimmed)"
+        // When coordinates are available, omit the city name from the query so the location+radius
+        // is the primary geographic anchor and changing radius actually expands/contracts the area.
+        let query = locationBias != nil ? queryTerms : "\(queryTerms) \(trimmed)"
         guard let encodedQuery = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) else {
             return []
         }
         
         var urlString = "\(Config.googlePlacesEndpoint)/textsearch/json?query=\(encodedQuery)"
         if let bias = locationBias {
-            urlString += "&location=\(bias.lat),\(bias.lon)&radius=\(radiusMeters)"
+            // Google Places Text Search caps radius at 50,000 m; clamp to avoid silent rejection.
+            let clampedRadius = min(radiusMeters, 50_000)
+            urlString += "&location=\(bias.lat),\(bias.lon)&radius=\(clampedRadius)"
         }
         urlString += "&key=\(Config.googlePlacesAPIKey)"
         
@@ -391,13 +395,15 @@ class GooglePlacesService {
                 locationBias = (geo.latitude, geo.longitude)
             }
             let queryTerms = Self.trendingQueryTerms(for: categoryId)
-            let query = "\(queryTerms) \(trimmed)"
+            // Omit city name when coordinates are available so location+radius is the geographic anchor.
+            let query = locationBias != nil ? queryTerms : "\(queryTerms) \(trimmed)"
             guard let encodedQuery = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) else {
                 return TrendingPlacesPage(places: [], nextPageToken: nil)
             }
             var base = "\(Config.googlePlacesEndpoint)/textsearch/json?query=\(encodedQuery)"
             if let bias = locationBias {
-                base += "&location=\(bias.lat),\(bias.lon)&radius=\(radiusMeters)"
+                let clampedRadius = min(radiusMeters, 50_000)
+                base += "&location=\(bias.lat),\(bias.lon)&radius=\(clampedRadius)"
             }
             urlString = "\(base)&key=\(Config.googlePlacesAPIKey)"
         }

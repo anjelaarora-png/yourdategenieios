@@ -54,12 +54,18 @@ const Footer = () => {
             </div>
 
             {/* Links */}
-            <nav className="flex items-center gap-6 text-sm text-muted-foreground">
+            <nav className="flex items-center gap-6 text-sm text-muted-foreground flex-wrap justify-center">
               <Link to="/login" className="hover:text-foreground transition-colors">
                 Sign In
               </Link>
               <Link to="/signup" className="text-primary hover:text-primary/80 transition-colors font-medium">
                 Sign Up Free
+              </Link>
+              <Link to="/privacy-policy" className="hover:text-foreground transition-colors">
+                Privacy Policy
+              </Link>
+              <Link to="/terms" className="hover:text-foreground transition-colors">
+                Terms of Service
               </Link>
             </nav>
 
