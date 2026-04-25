@@ -2,6 +2,9 @@ import SwiftUI
 
 @main
 struct YourDateGenieApp: App {
+    // Bridge to UIKit so AppDelegate.application(_:open:options:) fires for OAuth redirects.
+    @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+
     @StateObject private var coordinator = NavigationCoordinator.shared
     @StateObject private var notificationManager = PushNotificationManager.shared
     @StateObject private var memoryManager = MemoryManager.shared
@@ -21,6 +24,11 @@ struct YourDateGenieApp: App {
                     validateConfiguration()
                 }
                 .onOpenURL { url in
+                    // Primary entry point for every OAuth redirect and email-confirmation link.
+                    // Forward to the Supabase Auth SDK first so it can exchange PKCE codes or set
+                    // implicit-flow tokens before any navigation side-effects run.
+                    print("[Auth] onOpenURL received: \(url.absoluteString)")
+                    supabase.handle(url)
                     handleDeepLink(url)
                 }
                 .onReceive(NotificationCenter.default.publisher(for: .openMemoryGallery)) { _ in

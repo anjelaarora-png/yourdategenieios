@@ -72,6 +72,7 @@ struct Step6ExtrasView: View {
                 .background(Color.luxuryMaroonLight.opacity(0.6))
                 .cornerRadius(12)
                 
+                if !isPreferencesOnly {
                 // Info banner
                 HStack(spacing: 12) {
                     Image(systemName: "sparkles")
@@ -203,6 +204,7 @@ struct Step6ExtrasView: View {
                         .cornerRadius(12)
                     }
                 }
+                } // end if !isPreferencesOnly
                 
                 // Summary card
                 VStack(alignment: .leading, spacing: 12) {

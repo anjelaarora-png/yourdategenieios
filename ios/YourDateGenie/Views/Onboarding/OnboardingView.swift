@@ -21,17 +21,44 @@ struct MobileOnboardingView: View {
                 .ignoresSafeArea()
             
             VStack(spacing: 0) {
-                // Progress dots
-                HStack(spacing: 12) {
-                    ForEach(0..<totalSlides, id: \.self) { index in
-                        Capsule()
-                            .fill(index == currentSlide ? Color.luxuryGold : Color.luxuryMuted.opacity(0.4))
-                            .frame(width: index == currentSlide ? 28 : 10, height: 10)
-                            .animation(.spring(response: 0.4), value: currentSlide)
+                // Top bar: back chevron (left) · progress dots (centre) · balance spacer (right)
+                HStack(alignment: .center) {
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            currentSlide -= 1
+                            hasSwipedOnce = true
+                        }
+                    } label: {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 17, weight: .semibold))
+                            .foregroundColor(Color.luxuryGold)
+                            .frame(width: 44, height: 44)
                     }
+                    .buttonStyle(.plain)
+                    .opacity(currentSlide > 0 ? 1 : 0)
+                    .disabled(currentSlide == 0)
+                    .animation(.easeInOut(duration: 0.2), value: currentSlide)
+
+                    Spacer()
+
+                    HStack(spacing: 12) {
+                        ForEach(0..<totalSlides, id: \.self) { index in
+                            Capsule()
+                                .fill(index == currentSlide ? Color.luxuryGold : Color.luxuryMuted.opacity(0.4))
+                                .frame(width: index == currentSlide ? 28 : 10, height: 10)
+                                .animation(.spring(response: 0.4), value: currentSlide)
+                        }
+                    }
+
+                    Spacer()
+
+                    // Invisible balance element so dots stay perfectly centred
+                    Color.clear
+                        .frame(width: 44, height: 44)
                 }
-                .padding(.top, 60)
-                .padding(.bottom, 8)
+                .padding(.top, 56)
+                .padding(.horizontal, 16)
+                .padding(.bottom, 0)
                 
                 // Swipe affordance hint — fades out after first swipe
                 HStack(spacing: 6) {
@@ -161,7 +188,7 @@ struct LuxurySlideWelcome: View {
                         EmptyView()
                     }
                 }
-                .frame(height: UIScreen.main.bounds.height * 0.42)
+                .frame(height: UIScreen.main.bounds.height * 0.36)
                 .clipped()
                 .overlay(
                     LinearGradient(

@@ -206,8 +206,19 @@ struct AuthenticationView: View {
                     onRequest: { request in
                         request.requestedScopes = [.fullName, .email]
                     },
-                    onCompletion: { _ in
-                        socialAuth.signInWithApple()
+                    onCompletion: { result in
+                        // Pass the authorization Apple already collected straight to the service.
+                        // Do NOT call signInWithApple() here — that creates a second
+                        // ASAuthorizationController and shows the Apple sheet a second time.
+                        switch result {
+                        case .success(let authorization):
+                            socialAuth.handleAppleAuthorization(authorization)
+                        case .failure(let error):
+                            let nsErr = error as NSError
+                            if nsErr.code != ASAuthorizationError.canceled.rawValue {
+                                socialAuth.error = error
+                            }
+                        }
                     }
                 )
                 .signInWithAppleButtonStyle(.white)
@@ -238,26 +249,6 @@ struct AuthenticationView: View {
             }
             .disabled(socialAuth.isLoading)
 
-            // SMS/OTP login placeholder (backend integration pending)
-            Button {} label: {
-                HStack(spacing: 10) {
-                    Image(systemName: "message.fill")
-                        .font(.system(size: 16, weight: .medium))
-                    Text("Sign in with Phone (coming soon)")
-                        .font(Font.bodySans(15, weight: .medium))
-                }
-                .foregroundColor(Color.luxuryMuted)
-                .frame(maxWidth: .infinity)
-                .frame(height: 50)
-                .background(Color.luxuryMaroonLight)
-                .cornerRadius(12)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color.luxuryMuted.opacity(0.3), lineWidth: 1)
-                )
-            }
-            .disabled(true)
-            .opacity(0.6)
         }
         .alert("Sign In Error", isPresented: Binding(
             get: { socialAuth.error != nil },

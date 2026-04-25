@@ -60,8 +60,9 @@ final class SupabaseService: ObservableObject {
         
         self.encoder = JSONEncoder()
         self.encoder.dateEncodingStrategy = .iso8601
-        
-        loadCachedSessionFromSDK()
+        // Session restore is driven explicitly by restoreSessionOnLaunch(), which RootNavigationView
+        // awaits before dismissing the splash. No implicit background Task here — that race between
+        // a fixed splash timer and an unguarded Task was what caused the login-screen flash.
     }
 
     /// `SecItemAdd` / `securityd` can block the main thread for hundreds of ms; persist session off the UI thread.
@@ -173,7 +174,10 @@ final class SupabaseService: ObservableObject {
             provider: .google,
             redirectTo: Self.oauthRedirectURL
         ) { webAuthSession in
-            webAuthSession.prefersEphemeralWebBrowserSession = true
+            // false = share the existing Safari session so Google's 2-Step Verification (and any
+            // other mid-flow state) survives across redirects. true (ephemeral/incognito) severs
+            // session continuity and causes Google to show "Something went wrong" at the 2FA step.
+            webAuthSession.prefersEphemeralWebBrowserSession = false
         }
 
         await syncSessionFromSDK(session)
@@ -211,13 +215,17 @@ final class SupabaseService: ObservableObject {
     ///   1. Attempt a server-side revocation in a **detached** task (fire-and-forget) while we
     ///      still have a valid access token.
     ///   2. Immediately clear local auth state and the SDK's stored session via `.local`.
+    ///   3. Verify the SDK has no remaining session; if one somehow survives, force a second clear.
     /// The UI observes `isAuthenticated` flipping to `false` within the same main-actor tick, so
     /// the login screen appears instantly regardless of network latency.
     func signOut() async throws {
         let tokenForGlobalRevocation = accessToken
         let client = supabaseClient
 
+        print("[Auth][SignOut] Initiating sign-out — userId: \(currentUser?.id.uuidString ?? "none")")
+
         if let token = tokenForGlobalRevocation, !token.isEmpty {
+            print("[Auth][SignOut] Firing server-side global revocation (fire-and-forget)")
             Task.detached(priority: .utility) { [weak self] in
                 guard let self else { return }
                 // Build a minimal logout request using the captured token so revocation still works
@@ -229,20 +237,50 @@ final class SupabaseService: ObservableObject {
                 request.addValue(self.anonKey, forHTTPHeaderField: "apikey")
                 request.timeoutInterval = 5
                 _ = try? await self.session.data(for: request)
+                print("[Auth][SignOut] Global revocation request completed")
             }
+        } else {
+            print("[Auth][SignOut] No access token present — skipping global revocation")
         }
 
-        // Clear local auth state first so observers react on the next main tick.
+        // Clear local auth state so observers flip to the login screen on the next main tick.
         await MainActor.run {
             self.currentUser = nil
             self.isAuthenticated = false
             self.accessToken = nil
             self.refreshToken = nil
         }
-        clearSessionKeychainAsync()
+        print("[Auth][SignOut] Local auth state cleared (isAuthenticated = false)")
 
-        // Clear the Supabase SDK's local session (no network) so subsequent calls see no auth.
+        // Clear keychain synchronously so the session is gone even on immediate force-quit.
+        try? KeychainManager.shared.clearSession()
+        print("[Auth][SignOut] Keychain session cleared")
+
+        // Clear the Supabase SDK's stored session (local, no network call).
         try? await client.auth.signOut(scope: .local)
+        print("[Auth][SignOut] SDK local session cleared")
+
+        // ── Post-sign-out session verification ──────────────────────────────────────
+        // Confirm that asking the SDK for a session now throws / returns nothing.
+        // If a session somehow survives (e.g. a concurrent token refresh raced us),
+        // force a second clear and ensure isAuthenticated stays false.
+        do {
+            let staleSession = try await client.auth.session
+            print("[Auth][SignOut] ⚠️  Stale session detected after sign-out " +
+                  "(user: \(staleSession.user.email ?? staleSession.user.id.uuidString)) — forcing second clear")
+            try? await client.auth.signOut(scope: .local)
+            try? KeychainManager.shared.clearSession()
+            await MainActor.run {
+                self.currentUser = nil
+                self.isAuthenticated = false
+                self.accessToken = nil
+                self.refreshToken = nil
+            }
+            print("[Auth][SignOut] Second clear completed — no session should remain")
+        } catch {
+            // Expected path: SDK correctly reports no active session.
+            print("[Auth][SignOut] ✓ Session check passed — no SDK session remains after sign-out")
+        }
     }
     
     /// Send password reset email (uses Supabase SDK)
@@ -354,6 +392,15 @@ final class SupabaseService: ObservableObject {
         return coupleId
     }
     
+    /// Passes an incoming deep-link URL to the Supabase Auth SDK for processing.
+    ///
+    /// The SDK internally handles both PKCE code-exchange (`?code=…`) and implicit-flow fragment
+    /// tokens (`#access_token=…&refresh_token=…`). Call this from every URL entry point
+    /// (AppDelegate and `.onOpenURL`) so no OAuth redirect is ever missed.
+    func handle(_ url: URL) {
+        supabaseClient.auth.handle(url)
+    }
+
     /// Handle auth callback from deep link (OAuth redirect or email confirmation).
     func handleAuthCallback(accessToken: String, refreshToken: String) async throws {
         try await supabaseClient.auth.setSession(accessToken: accessToken, refreshToken: refreshToken)
@@ -1600,45 +1647,63 @@ final class SupabaseService: ObservableObject {
         }
     }
     
-    private func loadCachedSessionFromSDK() {
-        Task {
+    /// Restores a persisted Supabase session on app launch.
+    ///
+    /// Call this once at launch and `await` the result before dismissing the splash screen.
+    /// Doing so guarantees that `isAuthenticated` (and therefore every downstream view that
+    /// depends on it) reflects the true auth state before any routing decision is made — no
+    /// flash of the login screen for users who are already signed in.
+    ///
+    /// Strategy:
+    ///   1. Ask the SDK for its stored session via `supabase.auth.session`. The SDK handles
+    ///      token refresh automatically when the access token is expired.
+    ///   2. If the SDK has no session (throws), fall back to our own Keychain copy and re-hydrate
+    ///      the SDK via `setSession` so subsequent REST calls carry a valid `Authorization` header.
+    ///   3. On any failure, clear auth state so the app routes to the login screen.
+    func restoreSessionOnLaunch() async {
+        do {
+            let session = try await supabaseClient.auth.session
+            print("[Auth] Session restored on launch — user: \(session.user.email ?? session.user.id.uuidString)")
+            await MainActor.run {
+                syncSessionFromSDK(session)
+            }
+        } catch {
+            print("[Auth] No SDK session on launch (\(error.localizedDescription)) — trying Keychain fallback")
             do {
-                let session = try await supabaseClient.auth.session
-                await MainActor.run {
-                    syncSessionFromSDK(session)
-                }
-            } catch {
-                // No valid session - try our keychain as fallback and restore into SDK so API calls work
-                do {
-                    guard let session = try keychain.getSession(), !session.isExpired,
-                          let access = session.idToken, let refresh = session.refreshToken else {
-                        return
-                    }
-                    try await supabaseClient.auth.setSession(accessToken: access, refreshToken: refresh)
-                    if let s = supabaseClient.auth.currentSession {
-                        await MainActor.run {
-                            syncSessionFromSDK(s)
-                        }
-                    } else {
-                        // Never mark authenticated without a session we can run through `syncSessionFromSDK`
-                        // (email confirmation and other invariants live there).
-                        clearSessionKeychainAsync()
-                        await MainActor.run {
-                            accessToken = nil
-                            refreshToken = nil
-                            currentUser = nil
-                            isAuthenticated = false
-                        }
-                    }
-            } catch {
-                AppLogger.error("Failed to load cached session: \(error)", category: .auth)
-                clearSessionKeychainAsync()
+                guard let cached = try keychain.getSession(), !cached.isExpired,
+                      let access = cached.idToken, let refresh = cached.refreshToken else {
+                    print("[Auth] No valid Keychain session — routing to login screen")
                     await MainActor.run {
                         accessToken = nil
                         refreshToken = nil
                         currentUser = nil
                         isAuthenticated = false
                     }
+                    return
+                }
+                try await supabaseClient.auth.setSession(accessToken: access, refreshToken: refresh)
+                if let restored = supabaseClient.auth.currentSession {
+                    print("[Auth] Keychain session restored for user: \(restored.user.email ?? restored.user.id.uuidString)")
+                    await MainActor.run {
+                        syncSessionFromSDK(restored)
+                    }
+                } else {
+                    clearSessionKeychainAsync()
+                    await MainActor.run {
+                        accessToken = nil
+                        refreshToken = nil
+                        currentUser = nil
+                        isAuthenticated = false
+                    }
+                }
+            } catch {
+                AppLogger.error("Session restore failed: \(error)", category: .auth)
+                clearSessionKeychainAsync()
+                await MainActor.run {
+                    accessToken = nil
+                    refreshToken = nil
+                    currentUser = nil
+                    isAuthenticated = false
                 }
             }
         }

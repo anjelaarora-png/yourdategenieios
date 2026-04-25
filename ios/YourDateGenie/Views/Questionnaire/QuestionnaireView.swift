@@ -39,19 +39,19 @@ struct QuestionnaireView: View {
                         Group {
                             switch viewModel.currentStep {
                             case 1:
-                                Step1LocationView(data: $viewModel.data)
+                                Step1LocationView(data: $viewModel.data, isPreferencesOnly: coordinator.questionnairePreferencesOnly)
                             case 2:
                                 Step2TransportationView(data: $viewModel.data)
                             case 3:
-                                Step3VibeView(data: $viewModel.data)
+                                Step3VibeView(data: $viewModel.data, isPreferencesOnly: coordinator.questionnairePreferencesOnly)
                             case 4:
                                 Step4FoodView(data: $viewModel.data)
                             case 5:
-                                Step5DealBreakersView(data: $viewModel.data)
+                                Step5DealBreakersView(data: $viewModel.data, isPreferencesOnly: coordinator.questionnairePreferencesOnly)
                             case 6:
                                 Step6ExtrasView(data: $viewModel.data, isPreferencesOnly: coordinator.questionnairePreferencesOnly)
                             default:
-                                Step1LocationView(data: $viewModel.data)
+                                Step1LocationView(data: $viewModel.data, isPreferencesOnly: coordinator.questionnairePreferencesOnly)
                             }
                         }
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -136,6 +136,7 @@ struct QuestionnaireView: View {
                 }
             }
             .onAppear {
+                viewModel.isPreferencesOnly = coordinator.questionnairePreferencesOnly
                 switch coordinator.planIntent {
                 case .fresh:
                     QuestionnaireProgressStore.clear()
@@ -504,6 +505,7 @@ struct StepProgressView: View {
 class QuestionnaireViewModel: ObservableObject {
     @Published var currentStep = 1
     @Published var data = QuestionnaireData()
+    var isPreferencesOnly: Bool = false
     
     init() {
         prePopulateFromSavedPreferences()
@@ -511,7 +513,7 @@ class QuestionnaireViewModel: ObservableObject {
     
     var stepTitle: String {
         switch currentStep {
-        case 1: return "Location & Date Type"
+        case 1: return isPreferencesOnly ? "Your Location" : "Location & Date Type"
         case 2: return "Getting Around"
         case 3: return "Vibe & Energy"
         case 4: return "Food & Drinks"
@@ -523,7 +525,9 @@ class QuestionnaireViewModel: ObservableObject {
     
     var isCurrentStepValid: Bool {
         switch currentStep {
-        case 1: return !data.city.isEmpty && !data.startingAddress.isEmpty && !data.dateType.isEmpty
+        case 1:
+            let locationOk = !data.city.isEmpty && !data.startingAddress.isEmpty
+            return isPreferencesOnly ? locationOk : (locationOk && !data.dateType.isEmpty)
         case 2: return !data.transportationMode.isEmpty && !data.travelRadius.isEmpty
         case 3: return !data.energyLevel.isEmpty
         case 4: return !data.budgetRange.isEmpty

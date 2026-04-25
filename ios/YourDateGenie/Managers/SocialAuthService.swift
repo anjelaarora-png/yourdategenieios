@@ -22,7 +22,37 @@ final class SocialAuthService: NSObject, ObservableObject {
 
     // MARK: - Sign in with Apple
 
-    /// Initiates the native Sign in with Apple flow; token exchange happens in the delegate.
+    /// Called from `SignInWithAppleButton.onCompletion` with the authorization Apple already
+    /// collected. Extracts the identity token and exchanges it for a Supabase session without
+    /// opening a second system sheet.
+    ///
+    /// This is the correct entry point when using SwiftUI's `SignInWithAppleButton` — the button
+    /// handles showing the native sheet; we only need to process the result it hands back.
+    func handleAppleAuthorization(_ authorization: ASAuthorization) {
+        guard let credential = authorization.credential as? ASAuthorizationAppleIDCredential,
+              let tokenData  = credential.identityToken,
+              let idToken    = String(data: tokenData, encoding: .utf8) else {
+            AppLogger.error("Sign in with Apple: missing or unreadable identity token", category: .auth)
+            return
+        }
+        guard !isLoading else { return }
+        isLoading = true
+        Task { @MainActor in
+            defer { self.isLoading = false }
+            do {
+                _ = try await SupabaseService.shared.signInWithApple(idToken: idToken)
+                await UserProfileManager.shared.refreshAfterSocialSignIn()
+            } catch {
+                self.error = error
+                AppLogger.error("Sign in with Apple failed: \(error)", category: .auth)
+            }
+        }
+    }
+
+    /// Initiates a Sign in with Apple flow via a manually created `ASAuthorizationController`.
+    /// Use this only when presenting from a context that does NOT already use `SignInWithAppleButton`
+    /// (e.g. a custom button outside the auth screen). For `SignInWithAppleButton` use
+    /// `handleAppleAuthorization(_:)` in its `onCompletion` instead.
     func signInWithApple() {
         let request = ASAuthorizationAppleIDProvider().createRequest()
         request.requestedScopes = [.fullName, .email]

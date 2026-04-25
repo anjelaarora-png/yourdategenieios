@@ -436,8 +436,8 @@ class UserProfileManager: ObservableObject {
         pendingEmailConfirmation = false
         pendingConfirmationEmail = nil
 
-        // Network signOut is fire-and-forget (see `SupabaseService.signOut`); do not await.
-        Task { try? await supabase.signOut() }
+        // Use userInitiated priority so the SDK session clear finishes before iOS can suspend.
+        Task(priority: .userInitiated) { try? await supabase.signOut() }
 
         // Remaining disk/state work runs synchronously but is cheap.
         persistPendingEmailConfirmationToDisk()
@@ -585,9 +585,22 @@ class UserProfileManager: ObservableObject {
     }
     
     func updatePreferences(_ preferences: DatePreferences) {
-        guard var profile = currentUser else { return }
-        profile.preferences = preferences
-        currentUser = profile
+        // Snapshot pre-edit location values for the server-wins merge check later.
+        // When currentUser is nil (profile fetch hasn't completed yet — common on first
+        // save right after sign-up), all three snapshots are empty strings which is
+        // correct: the user is setting these values for the first time, so user always wins.
+        let savedCity          = currentUser?.preferences.defaultCity          ?? ""
+        let savedNeighborhood  = currentUser?.preferences.defaultNeighborhood  ?? ""
+        let savedStartingPoint = currentUser?.preferences.defaultStartingPoint ?? ""
+
+        // Update local state only when the profile is already loaded.
+        // Do NOT hard-return here: the DB write (below) must always fire so preferences
+        // are persisted to Supabase even when currentUser hasn't been populated yet
+        // (e.g. InitialPreferencesGateView shown before loadProfileFromDatabase finishes).
+        if var profile = currentUser {
+            profile.preferences = preferences
+            currentUser = profile
+        }
         hasCompletedPreferences = true
         UserDefaults.standard.set(true, forKey: preferencesCompleteKey)
         
@@ -636,23 +649,44 @@ class UserProfileManager: ObservableObject {
                 // it with whatever city is still in local UserDefaults.
                 //
                 // Fix: check whether the server row is newer than what iOS last
-                // acknowledged. If so, the web made changes since our last sync —
-                // keep the server's location fields and only overwrite everything
-                // else with the fresh iOS values.
+                // acknowledged. If so, keep the server's location value — BUT only
+                // for fields the user did NOT change in this edit session.
+                //
+                // "User changed" is determined by comparing `preferences` (the new
+                // value passed in) against `savedCity/Neighborhood/StartingPoint` —
+                // the snapshot taken synchronously on the main actor before this Task
+                // started. If they differ the user explicitly edited that field, so
+                // the user's intent wins regardless of server state.
                 var prefsToSave = preferences
                 if let serverPrefs = existingPrefs {
                     let lastKnown = await MainActor.run { self.lastServerPreferencesUpdatedAt }
                     // serverIsNewer is true when:
-                    //   • we have a watermark and the server row is more recent (web edited location), OR
-                    //   • we have no watermark at all (no prior sync this session → trust server).
+                    //   • we have a watermark and the server row is more recent, OR
+                    //   • we have no watermark yet (no prior sync this session).
                     let serverIsNewer = lastKnown.map { serverPrefs.updatedAt > $0 } ?? true
                     if serverIsNewer {
-                        // Preserve server location fields so a stale iOS local cache
-                        // (e.g., "Michigan") doesn't overwrite a newer web edit ("New York").
-                        prefsToSave.defaultCity          = serverPrefs.defaultCity          ?? preferences.defaultCity
-                        prefsToSave.defaultNeighborhood  = serverPrefs.defaultNeighborhood  ?? preferences.defaultNeighborhood
-                        prefsToSave.defaultStartingPoint = serverPrefs.defaultStartingPoint ?? preferences.defaultStartingPoint
-                        // Advance the watermark so subsequent iOS saves in this session
+                        // Only apply the server value for fields the user did NOT change.
+                        // If the user explicitly typed a new address/city, their input wins.
+                        let userEditedCity          = preferences.defaultCity          != savedCity
+                        let userEditedNeighborhood  = preferences.defaultNeighborhood  != savedNeighborhood
+                        let userEditedStartingPoint = preferences.defaultStartingPoint != savedStartingPoint
+
+                        if !userEditedCity {
+                            prefsToSave.defaultCity = serverPrefs.defaultCity ?? preferences.defaultCity
+                        }
+                        if !userEditedNeighborhood {
+                            prefsToSave.defaultNeighborhood = serverPrefs.defaultNeighborhood ?? preferences.defaultNeighborhood
+                        }
+                        if !userEditedStartingPoint {
+                            prefsToSave.defaultStartingPoint = serverPrefs.defaultStartingPoint ?? preferences.defaultStartingPoint
+                        }
+
+                        print("[updatePreferences] server-wins merge: " +
+                              "city=\(userEditedCity ? "user" : "server"), " +
+                              "neighborhood=\(userEditedNeighborhood ? "user" : "server"), " +
+                              "startingPoint=\(userEditedStartingPoint ? "user" : "server")")
+
+                        // Advance the watermark so subsequent saves in this session
                         // don't keep treating the same server row as "newer".
                         await MainActor.run {
                             self.lastServerPreferencesUpdatedAt = serverPrefs.updatedAt
@@ -689,8 +723,12 @@ class UserProfileManager: ObservableObject {
     
     /// Save preferences from questionnaire data only (no date plan). Used when user edits preferences from Profile.
     func savePreferencesFromQuestionnaire(_ data: QuestionnaireData) {
-        guard var profile = currentUser else { return }
-        var prefs = profile.preferences
+        // Use existing preferences as the base so fields not covered by the questionnaire
+        // (e.g. gift preferences set elsewhere) are preserved. If currentUser hasn't loaded
+        // yet (can happen on first save right after sign-up), start from defaults — all
+        // questionnaire fields will be written below anyway, and updatePreferences() will
+        // fire the DB write regardless of currentUser state.
+        var prefs = currentUser?.preferences ?? DatePreferences()
         // Identity
         prefs.gender = Gender(rawValue: data.userGender) ?? .preferNotToSay
         prefs.partnerGender = Gender(rawValue: data.partnerGender) ?? .preferNotToSay

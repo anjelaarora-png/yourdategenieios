@@ -2,6 +2,7 @@ import SwiftUI
 
 struct Step5DealBreakersView: View {
     @Binding var data: QuestionnaireData
+    var isPreferencesOnly: Bool = false
     @State private var showDealBreakerHelp = false
 
     var body: some View {
@@ -72,6 +73,7 @@ struct Step5DealBreakersView: View {
                     }
                 }
                 
+                if !isPreferencesOnly {
                 // Additional Notes
                 VStack(alignment: .leading, spacing: 12) {
                     SectionHeader(
@@ -103,6 +105,7 @@ struct Step5DealBreakersView: View {
                             alignment: .topLeading
                         )
                 }
+                } // end if !isPreferencesOnly
             }
             .padding(20)
         }
@@ -118,6 +121,6 @@ struct Step5DealBreakersView: View {
 }
 
 #Preview {
-    Step5DealBreakersView(data: .constant(QuestionnaireData()))
+    Step5DealBreakersView(data: .constant(QuestionnaireData()), isPreferencesOnly: false)
         .background(Color.luxuryMaroon)
 }

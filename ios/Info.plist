@@ -16,42 +16,59 @@
 	<string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
 	<key>CFBundleShortVersionString</key>
 	<string>1.0</string>
-	<key>CFBundleVersion</key>
-	<string>1</string>
-	<key>LSRequiresIPhoneOS</key>
-	<true/>
-	
-	<!-- URL Scheme for Deep Linking -->
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
 			<key>CFBundleURLName</key>
-			<string>com.yourdategenie.app</string>
+			<string>yourdategenie</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>yourdategenie</string>
 			</array>
 		</dict>
 	</array>
-	
-	<!-- API Keys from Secrets.xcconfig -->
-	<key>OPENAI_API_KEY</key>
-	<string>$(OPENAI_API_KEY)</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
 	<key>GOOGLE_PLACES_API_KEY</key>
 	<string>$(GOOGLE_PLACES_API_KEY)</string>
-	<key>SUPABASE_URL</key>
-	<string>$(SUPABASE_URL)</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+	<key>LSRequiresIPhoneOS</key>
+	<true/>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<false/>
+		<key>NSExceptionDomains</key>
+		<dict>
+			<key>supabase.co</key>
+			<dict>
+				<key>NSExceptionRequiresForwardSecrecy</key>
+				<false/>
+				<key>NSIncludesSubdomains</key>
+				<true/>
+			</dict>
+		</dict>
+	</dict>
+	<key>NSCalendarsUsageDescription</key>
+	<string>Your Date Genie adds your chosen date plan to your calendar so you don't miss the adventure.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Your Date Genie uses your location to find nearby restaurants, venues, and date spots so your plans are tailored to where you are.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Save your love note as a photo so you can share it with someone special.</string>
+	<key>OPENAI_API_KEY</key>
+	<string>$(OPENAI_API_KEY)</string>
 	<key>SUPABASE_ANON_KEY</key>
 	<string>$(SUPABASE_ANON_KEY)</string>
-	
-	<!-- Custom Fonts: only list fonts that are in the app bundle. Tangerine only; body uses system font if Inter not bundled. -->
+	<key>SUPABASE_URL</key>
+	<string>$(SUPABASE_URL)</string>
 	<key>UIAppFonts</key>
 	<array>
 		<string>Tangerine-Regular.ttf</string>
 		<string>Tangerine-Bold.ttf</string>
 	</array>
-	
-	<!-- App Configuration -->
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
@@ -74,39 +91,5 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
-	
-	<!-- ATS: all app connections use HTTPS, so no arbitrary loads are needed.
-	     Supabase and Google APIs all enforce TLS — remove the blanket exception. -->
-	<key>NSAppTransportSecurity</key>
-	<dict>
-		<key>NSAllowsArbitraryLoads</key>
-		<false/>
-		<key>NSExceptionDomains</key>
-		<dict>
-			<key>supabase.co</key>
-			<dict>
-				<key>NSIncludesSubdomains</key>
-				<true/>
-				<key>NSExceptionRequiresForwardSecrecy</key>
-				<false/>
-			</dict>
-		</dict>
-	</dict>
-
-	<!-- App Store export compliance — app uses only standard iOS encryption (HTTPS/TLS). -->
-	<key>ITSAppUsesNonExemptEncryption</key>
-	<false/>
-	
-	<!-- Location access for finding nearby venues and date spots -->
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Your Date Genie uses your location to find nearby restaurants, venues, and date spots so your plans are tailored to where you are.</string>
-
-	<!-- Calendar access for adding date plans -->
-	<key>NSCalendarsUsageDescription</key>
-	<string>Your Date Genie adds your chosen date plan to your calendar so you don't miss the adventure.</string>
-	
-	<!-- Photo Library: save love note as image to share -->
-	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>Save your love note as a photo so you can share it with someone special.</string>
 </dict>
 </plist>

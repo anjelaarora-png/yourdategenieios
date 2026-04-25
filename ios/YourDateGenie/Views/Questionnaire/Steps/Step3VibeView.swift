@@ -2,6 +2,7 @@ import SwiftUI
 
 struct Step3VibeView: View {
     @Binding var data: QuestionnaireData
+    var isPreferencesOnly: Bool = false
     @State private var showVibeHelp = false
 
     var body: some View {
@@ -34,6 +35,7 @@ struct Step3VibeView: View {
                     }
                 }
                 
+                if !isPreferencesOnly {
                 // Duration
                 VStack(alignment: .leading, spacing: 12) {
                     SectionHeader(emoji: "⏱️", title: "How long?")
@@ -51,6 +53,7 @@ struct Step3VibeView: View {
                         }
                     }
                 }
+                } // end if !isPreferencesOnly
                 
                 // Activities
                 VStack(alignment: .leading, spacing: 12) {
@@ -135,6 +138,6 @@ struct FlowLayout: Layout {
 }
 
 #Preview {
-    Step3VibeView(data: .constant(QuestionnaireData()))
+    Step3VibeView(data: .constant(QuestionnaireData()), isPreferencesOnly: false)
         .background(Color.luxuryMaroon)
 }

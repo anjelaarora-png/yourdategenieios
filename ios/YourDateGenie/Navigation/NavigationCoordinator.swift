@@ -837,6 +837,8 @@ class NavigationCoordinator: ObservableObject {
     }
     
     func signOut() {
+        print("[Auth][SignOut] NavigationCoordinator.signOut() — routing to login screen")
+
         // 1. Flip the flag that `RootNavigationView` switches on — view tree starts routing to the
         //    login screen within this main-actor tick. Do this BEFORE the heavier resets below so
         //    the user sees an instant transition, even if JSON-encode / UserDefaults writes hiccup.
@@ -864,6 +866,8 @@ class NavigationCoordinator: ObservableObject {
         navigationPath = NavigationPath()
         UserDefaults.standard.removeObject(forKey: "hasSkippedLogin")
         saveState()
+
+        print("[Auth][SignOut] State reset complete — isLoggedIn=\(isLoggedIn), hasSkippedLogin=\(hasSkippedLogin)")
     }
     
     // MARK: - Persistence
@@ -900,11 +904,13 @@ class NavigationCoordinator: ObservableObject {
         
         hasDeferredInitialPreferences = UserDefaults.standard.bool(forKey: Self.deferredInitialPreferencesKey)
         
-        // If there is no account session but prefs were never finished, do not skip onboarding just because
-        // UserDefaults survived an update — otherwise users can land on the questionnaire without auth.
-        // Skip this when keychain may still be restoring a session (async).
+        // If there is no account session but prefs were never finished, do not skip onboarding just
+        // because UserDefaults survived an app update — otherwise users land on the questionnaire
+        // without auth. Guard with `getHasEverLoggedIn()` so users who deliberately signed out are
+        // never sent back through onboarding on their next launch.
         if !UserProfileManager.shared.isLoggedIn && !hasSkippedLogin && !hasCompletedPreferences && hasCompletedOnboarding,
-           !SupabaseService.shared.hasCachedSession() {
+           !SupabaseService.shared.hasCachedSession(),
+           !KeychainManager.shared.getHasEverLoggedIn() {
             hasCompletedOnboarding = false
             UserDefaults.standard.set(false, forKey: "hasCompletedOnboarding")
             saveState()
@@ -1337,7 +1343,28 @@ struct RootNavigationView: View {
         .animation(.easeInOut(duration: 0.4), value: coordinator.hasCompletedPreferences)
         .animation(.easeInOut(duration: 0.4), value: coordinator.hasDeferredInitialPreferences)
         .onAppear {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+            Task {
+                // Record when the splash appeared so we can enforce a minimum display duration.
+                let launchTime = Date()
+
+                // Await the session check before making any routing decision.
+                // `restoreSessionOnLaunch` calls `supabase.auth.session`, syncs the result into
+                // `SupabaseService.isAuthenticated`, and logs the outcome. The reactive chain
+                // (SupabaseService → UserProfileManager → NavigationCoordinator) then updates
+                // `coordinator.isLoggedIn` synchronously within this same Task, so by the time
+                // the splash is dismissed below, the correct screen is already determined.
+                await SupabaseService.shared.restoreSessionOnLaunch()
+
+                // Enforce a minimum splash duration (visual polish). If the session restore
+                // finished quickly the remaining time is topped up; if it was slow the splash
+                // already covered the wait and we dismiss immediately.
+                let elapsed = Date().timeIntervalSince(launchTime)
+                let minimumSplashSeconds: Double = 2.5
+                let remaining = minimumSplashSeconds - elapsed
+                if remaining > 0 {
+                    try? await Task.sleep(nanoseconds: UInt64(remaining * 1_000_000_000))
+                }
+
                 coordinator.syncOnboardingFromUserDefaults()
                 withAnimation {
                     showSplash = false

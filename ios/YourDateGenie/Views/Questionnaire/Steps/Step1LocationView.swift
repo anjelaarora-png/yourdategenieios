@@ -3,6 +3,7 @@ import CoreLocation
 
 struct Step1LocationView: View {
     @Binding var data: QuestionnaireData
+    var isPreferencesOnly: Bool = false
     @StateObject private var locationHelper = CurrentLocationHelper()
 
     var body: some View {
@@ -10,7 +11,7 @@ struct Step1LocationView: View {
             VStack(alignment: .leading, spacing: 24) {
                 // Location Input
                 VStack(alignment: .leading, spacing: 12) {
-                    SectionHeader(emoji: "📍", title: "Where are you planning?")
+                    SectionHeader(emoji: "📍", title: isPreferencesOnly ? "Your location" : "Where are you planning?")
                     
                     PlacesAutocompleteField(
                         placeholder: "City or neighborhood",
@@ -70,6 +71,7 @@ struct Step1LocationView: View {
                     }
                 }
                 
+                if !isPreferencesOnly {
                 // Date Type
                 VStack(alignment: .leading, spacing: 12) {
                     SectionHeader(emoji: "💑", title: "What kind of date?")
@@ -181,12 +183,13 @@ struct Step1LocationView: View {
                             .stroke(Color.luxuryGold.opacity(0.25), lineWidth: 1)
                     )
                 }
+                } // end if !isPreferencesOnly
             }
             .padding(20)
         }
         .scrollDismissesKeyboard(.interactively)
         .onAppear {
-            if data.timeOfDay.isEmpty {
+            if !isPreferencesOnly && data.timeOfDay.isEmpty {
                 data.timeOfDay = "evening"
                 data.startTime = "7:00 PM"
             }
@@ -369,6 +372,6 @@ final class CurrentLocationHelper: NSObject, ObservableObject, CLLocationManager
 }
 
 #Preview {
-    Step1LocationView(data: .constant(QuestionnaireData()))
+    Step1LocationView(data: .constant(QuestionnaireData()), isPreferencesOnly: false)
         .background(Color.luxuryMaroon)
 }
