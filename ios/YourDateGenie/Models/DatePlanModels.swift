@@ -9,8 +9,11 @@ struct ReservationPlatformPickerPayload: Equatable, Identifiable {
     /// Full address — used to detect whether Resy operates in this city.
     var address: String?
     /// Platforms the venue is confirmed to be on (e.g. ["opentable", "resy"]).
-    /// nil / empty means unknown; the UI falls back to city-based detection.
+    /// nil / empty means unknown; only show buttons for platforms explicitly listed here.
     var reservationPlatforms: [String]?
+    /// Direct booking URL (OpenTable restref, Resy venue page, or other booking system).
+    /// When set, the matching platform button opens this URL directly instead of a generic search.
+    var bookingUrl: String?
 }
 
 // MARK: - Date Plan Stop

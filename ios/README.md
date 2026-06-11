@@ -87,10 +87,11 @@ Set the following environment variables in your scheme or Info.plist:
 |----------|-------------|
 | `SUPABASE_URL` | Your Supabase project URL |
 | `SUPABASE_ANON_KEY` | Your Supabase anon/public key |
-| `OPENAI_API_KEY` | OpenAI API key for date plan generation |
 | `GOOGLE_PLACES_API_KEY` | Google API key for address autocomplete, place details, and geocoding. Enable **Places API** (autocomplete + details) and **Geocoding API** in Google Cloud Console. |
 
-See `ENV_TEMPLATE.txt` for a template.
+> **Note:** `OPENAI_API_KEY` is no longer required in the iOS app. All AI calls (date plan generation, gift suggestions, love note rewriting) are now routed through Supabase Edge Functions. Set `OPENAI_API_KEY` (or `LOVABLE_API_KEY`) as a Supabase secret instead — see [Supabase Edge Function secrets](https://supabase.com/docs/guides/functions/secrets).
+
+See `Secrets.xcconfig.example` for a template.
 
 ### Adding to Info.plist
 
@@ -99,13 +100,11 @@ See `ENV_TEMPLATE.txt` for a template.
 <string>$(SUPABASE_URL)</string>
 <key>SUPABASE_ANON_KEY</key>
 <string>$(SUPABASE_ANON_KEY)</string>
-<key>OPENAI_API_KEY</key>
-<string>$(OPENAI_API_KEY)</string>
 <key>GOOGLE_PLACES_API_KEY</key>
 <string>$(GOOGLE_PLACES_API_KEY)</string>
 ```
 
-Then set the actual values in your Xcode scheme's environment variables.
+Then set the actual values in `ios/Secrets.xcconfig`.
 
 ## Troubleshooting
 

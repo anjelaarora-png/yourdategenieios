@@ -6,6 +6,13 @@ enum SubscriptionPlan: CaseIterable {
     case annual, monthly
 }
 
+// MARK: - Legal URLs
+
+private enum LegalURLs {
+    static let privacy = URL(string: "https://yourdategenie.com/privacy-policy")!
+    static let terms   = URL(string: "https://yourdategenie.com/terms")!
+}
+
 // MARK: - Paywall
 
 /// Reusable subscription paywall (StoreKit 2 via `PurchaseManager`).
@@ -162,13 +169,13 @@ struct PaywallView: View {
                 switch selectedPlan {
                 case .annual:
                     priceCard(
-                        price: purchases.premiumAnnualProduct?.displayPrice ?? "$49.99",
+                        price: purchases.premiumAnnualProduct?.displayPrice ?? "$99.99",
                         period: "per year",
                         note: annualPerMonthNote
                     )
                 case .monthly:
                     priceCard(
-                        price: purchases.premiumMonthlyProduct?.displayPrice ?? "$4.99",
+                        price: purchases.premiumMonthlyProduct?.displayPrice ?? "$14.99",
                         period: "per month after free trial",
                         note: nil
                     )
@@ -182,7 +189,7 @@ struct PaywallView: View {
             let perMonth = NSDecimalNumber(decimal: annual.price).doubleValue / 12.0
             return String(format: "~$%.2f/mo · 7 days free", perMonth)
         }
-        return "~$4.17/mo · 7 days free"
+        return "~$8.33/mo · 7 days free"
     }
 
     private func priceCard(price: String, period: String, note: String?) -> some View {
@@ -310,19 +317,39 @@ struct PaywallView: View {
     // MARK: - Legal
 
     private var legalText: some View {
-        Text("7-day free trial, then \(selectedPlanPriceDescription). Renews automatically unless cancelled at least 24 hours before the end of the trial. Manage in Settings → Subscriptions.")
-            .font(Font.bodySans(11, weight: .regular))
-            .foregroundColor(Color.luxuryMuted.opacity(0.85))
-            .multilineTextAlignment(.center)
-            .padding(.top, 4)
+        VStack(spacing: 10) {
+            Text("7-day free trial, then \(selectedPlanPriceDescription). Subscription automatically renews unless cancelled at least 24 hours before the end of the current period. Manage in Settings → Subscriptions.")
+                .font(Font.bodySans(11, weight: .regular))
+                .foregroundColor(Color.luxuryMuted.opacity(0.85))
+                .multilineTextAlignment(.center)
+
+            HStack(spacing: 16) {
+                Button("Privacy Policy") {
+                    OpenTableReservationSafari.openInSafari(LegalURLs.privacy)
+                }
+                .font(.footnote)
+                .foregroundColor(Color.luxuryGold.opacity(0.85))
+
+                Text("·")
+                    .font(.footnote)
+                    .foregroundColor(Color.luxuryMuted)
+
+                Button("Terms of Use") {
+                    OpenTableReservationSafari.openInSafari(LegalURLs.terms)
+                }
+                .font(.footnote)
+                .foregroundColor(Color.luxuryGold.opacity(0.85))
+            }
+        }
+        .padding(.top, 4)
     }
 
     private var selectedPlanPriceDescription: String {
         switch selectedPlan {
         case .annual:
-            return "\(purchases.premiumAnnualProduct?.displayPrice ?? "$49.99")/year"
+            return "\(purchases.premiumAnnualProduct?.displayPrice ?? "$99.99")/year"
         case .monthly:
-            return "\(purchases.premiumMonthlyProduct?.displayPrice ?? "$4.99")/month"
+            return "\(purchases.premiumMonthlyProduct?.displayPrice ?? "$14.99")/month"
         }
     }
 }

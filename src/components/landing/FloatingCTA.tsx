@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Link } from "react-router-dom";
-import { Sparkles, X } from "lucide-react";
+import { X } from "lucide-react";
+import { PrimaryCTA } from "@/components/PrimaryCTA";
 
 const FloatingCTA = () => {
   const [isVisible, setIsVisible] = useState(false);
@@ -33,16 +33,11 @@ const FloatingCTA = () => {
             <p className="text-xs text-muted-foreground">Free • Takes 60 seconds</p>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
-            <Button 
-              asChild 
-              size="sm"
-              className="gradient-gold text-primary-foreground font-semibold px-4 glow-gold"
-            >
-              <Link to="/signup">
-                <Sparkles className="w-4 h-4 mr-1.5" />
-                Start Free
-              </Link>
-            </Button>
+            <PrimaryCTA
+              source="landing_sticky"
+              appStorePlacement="sticky"
+              className="text-sm px-4 py-2"
+            />
             <Button 
               variant="ghost" 
               size="icon" 

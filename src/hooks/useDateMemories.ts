@@ -60,25 +60,31 @@ export function useDateMemories() {
 
       if (error) throw error;
 
-      // Only generate signed URLs for paths under the current user (prevents cross-account exposure)
-      const memoriesWithSignedUrls = await Promise.all(
-        (data || []).map(async (memory) => {
+      // Only generate signed URLs for paths under the current user (prevents cross-account exposure).
+      // Run at most 5 Storage API calls concurrently to avoid connection contention / throttling.
+      const SIGNED_URL_CONCURRENCY = 5;
+      const rows = data || [];
+      const memoriesWithSignedUrls: (typeof rows[number] | null)[] = new Array(rows.length);
+      let idx = 0;
+      async function signWorker() {
+        while (idx < rows.length) {
+          const i = idx++;
+          const memory = rows[i];
           const filePath = storagePathFromImageUrl(memory.image_url);
-          if (!filePath) {
-            return memory;
-          }
-          if (!pathBelongsToUser(filePath, currentUserId)) {
-            return null;
+          if (!filePath || !pathBelongsToUser(filePath, currentUserId)) {
+            memoriesWithSignedUrls[i] = filePath ? null : memory;
+            continue;
           }
           const { data: signedUrlData } = await supabase.storage
             .from("date-memories")
             .createSignedUrl(filePath, 3600);
-
-          if (signedUrlData?.signedUrl) {
-            return { ...memory, image_url: signedUrlData.signedUrl };
-          }
-          return memory;
-        })
+          memoriesWithSignedUrls[i] = signedUrlData?.signedUrl
+            ? { ...memory, image_url: signedUrlData.signedUrl }
+            : memory;
+        }
+      }
+      await Promise.all(
+        Array.from({ length: Math.min(SIGNED_URL_CONCURRENCY, rows.length) }, signWorker)
       );
 
       setMemories(memoriesWithSignedUrls.filter(Boolean) as DateMemory[]);

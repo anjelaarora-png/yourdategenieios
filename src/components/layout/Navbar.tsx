@@ -3,6 +3,8 @@ import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import Logo from "@/components/Logo";
 import { Menu, ArrowRight, Sparkles } from "lucide-react";
+import { isLaunched, appStoreUrl } from "@/lib/launchConfig";
+import { Events } from "@/lib/analytics";
 import {
   Sheet,
   SheetContent,
@@ -60,29 +62,64 @@ const Navbar = () => {
 
           {/* Desktop CTA - Made more prominent */}
           <div className="hidden md:flex items-center gap-3">
-            <Button 
-              asChild 
-              size="lg"
-              className="gradient-gold text-primary-foreground font-semibold px-6 glow-gold hover:opacity-90 transition-all hover:scale-105 group"
-            >
-              <Link to="/signup">
-                Start Free
-                <ArrowRight className="ml-2 w-4 h-4 group-hover:translate-x-1 transition-transform" />
-              </Link>
-            </Button>
+            {isLaunched ? (
+              <Button
+                asChild
+                size="lg"
+                className="gradient-gold text-primary-foreground font-semibold px-6 glow-gold hover:opacity-90 transition-all hover:scale-105 group"
+              >
+                <a
+                  href={appStoreUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => Events.appStoreClick("navbar_desktop")}
+                >
+                  Download Free
+                  <ArrowRight className="ml-2 w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                </a>
+              </Button>
+            ) : (
+              <Button
+                asChild
+                size="lg"
+                className="gradient-gold text-primary-foreground font-semibold px-6 glow-gold hover:opacity-90 transition-all hover:scale-105 group"
+              >
+                <Link to="/waitlist">
+                  Join Waitlist
+                  <ArrowRight className="ml-2 w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                </Link>
+              </Button>
+            )}
           </div>
 
           {/* Mobile Menu */}
           <div className="md:hidden flex items-center gap-2">
-            <Button 
-              asChild 
-              size="sm" 
-              className="gradient-gold text-primary-foreground font-semibold px-4 glow-gold"
-            >
-              <Link to="/signup">
-                Start Free
-              </Link>
-            </Button>
+            {isLaunched ? (
+              <Button
+                asChild
+                size="sm"
+                className="gradient-gold text-primary-foreground font-semibold px-4 glow-gold"
+              >
+                <a
+                  href={appStoreUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => Events.appStoreClick("navbar_mobile")}
+                >
+                  Download
+                </a>
+              </Button>
+            ) : (
+              <Button
+                asChild
+                size="sm"
+                className="gradient-gold text-primary-foreground font-semibold px-4 glow-gold"
+              >
+                <Link to="/waitlist">
+                  Join Waitlist
+                </Link>
+              </Button>
+            )}
             
             <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
               <SheetTrigger asChild>
@@ -109,15 +146,35 @@ const Navbar = () => {
                     </Link>
                   ))}
                   <div className="mt-6 pt-6 border-t border-border space-y-3">
-                    <Button 
-                      asChild 
-                      className="w-full gradient-gold text-primary-foreground font-semibold py-6 text-base glow-gold"
-                    >
-                      <Link to="/signup" onClick={() => setMobileMenuOpen(false)}>
-                        <Sparkles className="w-4 h-4 mr-2" />
-                        Start Planning Free
-                      </Link>
-                    </Button>
+                    {isLaunched ? (
+                      <Button
+                        asChild
+                        className="w-full gradient-gold text-primary-foreground font-semibold py-6 text-base glow-gold"
+                      >
+                        <a
+                          href={appStoreUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={() => {
+                            Events.appStoreClick("navbar_sheet");
+                            setMobileMenuOpen(false);
+                          }}
+                        >
+                          <Sparkles className="w-4 h-4 mr-2" />
+                          Download on App Store
+                        </a>
+                      </Button>
+                    ) : (
+                      <Button
+                        asChild
+                        className="w-full gradient-gold text-primary-foreground font-semibold py-6 text-base glow-gold"
+                      >
+                        <Link to="/waitlist" onClick={() => setMobileMenuOpen(false)}>
+                          <Sparkles className="w-4 h-4 mr-2" />
+                          Join the Waitlist
+                        </Link>
+                      </Button>
+                    )}
                     <Button asChild variant="ghost" className="w-full">
                       <Link to="/login" onClick={() => setMobileMenuOpen(false)}>
                         Already have an account? Sign In

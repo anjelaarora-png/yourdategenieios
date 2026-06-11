@@ -139,6 +139,9 @@ struct ReservationWidgetView: View {
     var bookingUrl: String?
     var websiteUrl: String?
     var openingHours: [String]?
+    /// Confirmed booking platforms (e.g. ["opentable", "resy"]).
+    /// Platform buttons are only shown for platforms explicitly in this list.
+    var reservationPlatforms: [String]? = nil
     
     @Environment(\.dismiss) private var dismiss
     @State private var selectedDate = Date()
@@ -559,9 +562,22 @@ struct ReservationWidgetView: View {
         return nil
     }
     
-    /// Top two reservation platforms for the detected region (for "Reserve a table" buttons).
+    /// Platforms to show buttons for: only ones we have confirmed the restaurant is on.
+    /// Derived from explicit reservationPlatforms list first; if nil, check bookingUrl;
+    /// if neither is present no platform buttons are shown.
     private var reservedPlatforms: [ReservationPlatformItem] {
-        topTwoPlatforms(for: detectReservationRegion(from: address))
+        if let confirmed = reservationPlatforms, !confirmed.isEmpty {
+            return topTwoPlatforms(for: detectReservationRegion(from: address))
+                .filter { confirmed.contains($0.id) }
+        }
+        // Fall back to the bookingUrl's platform as the sole confirmed platform
+        if let platformId = effectiveReservationPlatformId {
+            let all = topTwoPlatforms(for: detectReservationRegion(from: address))
+            if let match = all.first(where: { $0.id == platformId }) {
+                return [match]
+            }
+        }
+        return []
     }
     
     /// Platform id for effectiveReservationUrl when it's a known booking platform (opentable / resy).
@@ -571,14 +587,15 @@ struct ReservationWidgetView: View {
         return reservationBookingPlatformId(for: urlString)
     }
     
-    /// URL to open for a platform: prefer stored booking URLs, else venue pages (OpenTable `/slug`, Resy `/cities/.../venues/slug`), then search.
+    /// URL to open for a platform: use stored booking URL when available, otherwise
+    /// go straight to search (never guess from name slug — guessed slugs open the
+    /// platform app home screen instead of the specific restaurant).
     private func reservationUrl(for platformId: String) -> URL? {
         if platformId == "opentable" {
             if let directId = effectiveReservationPlatformId, directId == "opentable",
                let urlString = effectiveReservationUrl {
                 return openTableURLAppendingIOSReferrer(urlString)
             }
-            if let venue = openTableVenuePageUrl { return venue }
             return openTableSearchUrl
         }
         if platformId == "resy" {
@@ -586,7 +603,6 @@ struct ReservationWidgetView: View {
                let urlString = effectiveReservationUrl {
                 return resyURLAppendingBookingContext(urlString)
             }
-            if let venue = resyVenuePageUrl { return venue }
             return resySearchUrl
         }
         if let directId = effectiveReservationPlatformId, directId == platformId,

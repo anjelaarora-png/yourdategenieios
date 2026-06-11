@@ -66,26 +66,23 @@ export function UserDetailsDialog({ open, onOpenChange, userId, userName }: User
     
     setLoading(true);
     try {
-      // Fetch date plans - get ALL plans regardless of status
-      const { data: plans } = await supabase
-        .from('date_plans')
-        .select('id, title, tagline, status, created_at, date_scheduled, estimated_cost, total_duration, weather_note, packing_list, stops, conversation_starters, gift_suggestions')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false });
-
-      // Fetch memories
-      const { data: mems } = await supabase
-        .from('date_memories')
-        .select('id, image_url, caption, taken_at, is_public')
-        .eq('user_id', userId)
-        .order('taken_at', { ascending: false });
-
-      // Fetch preferences with timestamps
-      const { data: prefs } = await supabase
-        .from('user_preferences')
-        .select('preferred_location, budget_range, energy_level, food_preferences, deal_breakers, created_at, updated_at')
-        .eq('user_id', userId)
-        .maybeSingle();
+      const [{ data: plans }, { data: mems }, { data: prefs }] = await Promise.all([
+        supabase
+          .from('date_plans')
+          .select('id, title, tagline, status, created_at, date_scheduled, estimated_cost, total_duration, weather_note, packing_list, stops, conversation_starters, gift_suggestions')
+          .eq('user_id', userId)
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('date_memories')
+          .select('id, image_url, caption, taken_at, is_public')
+          .eq('user_id', userId)
+          .order('taken_at', { ascending: false }),
+        supabase
+          .from('user_preferences')
+          .select('preferred_location, budget_range, energy_level, food_preferences, deal_breakers, created_at, updated_at')
+          .eq('user_id', userId)
+          .maybeSingle(),
+      ]);
 
       setDatePlans(plans || []);
       setMemories(mems || []);

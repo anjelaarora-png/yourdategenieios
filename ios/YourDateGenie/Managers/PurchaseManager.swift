@@ -49,16 +49,27 @@ final class PurchaseManager: ObservableObject {
         }
     }
 
-    /// Runs once on cold start (from `YourDateGenieApp`). Fast local entitlement read first, then `AppStore.sync()` off the main thread, then refresh again. Persists `isSubscribed` to `UserDefaults`.
+    /// Runs once on cold start (from `YourDateGenieApp`).
+    /// 1. Fast local StoreKit entitlement check (optimistic)
+    /// 2. AppStore.sync() to pull latest from Apple
+    /// 3. Report current entitlements to backend (validate-receipt)
+    /// 4. Re-read local entitlements
+    /// 5. Query subscriptions table for server-authoritative state
     func checkSubscriptionOnAppLaunch() {
         launchCheckTask?.cancel()
         launchCheckTask = Task { [weak self] in
             guard let self else { return }
+            // Read local StoreKit entitlements first (fast, no network).
             await self.refreshEntitlements()
-            await Task.detached(priority: .utility) {
-                try? await AppStore.sync()
-            }.value
+            // Report any unfinished verified transactions to the backend.
+            await self.reportCurrentEntitlementsToBackend()
+            // Re-read after backend sync.
             await self.refreshEntitlements()
+            // Authoritative check: query the server-side subscriptions table.
+            await self.refreshEntitlementsFromServer()
+            // NOTE: AppStore.sync() is intentionally NOT called here.
+            // Apple requires it only in response to an explicit user action (Restore Purchases).
+            // Calling it on cold start triggers an unexpected Apple ID authentication dialog.
         }
     }
 
@@ -113,6 +124,9 @@ final class PurchaseManager: ObservableObject {
         switch result {
         case .success(let verification):
             let transaction = try Self.verify(verification)
+            // jwsRepresentation lives on VerificationResult<Transaction>, not on Transaction.
+            // Send to backend BEFORE finish() so the transaction stays open if the call fails.
+            await reportReceiptToBackend(jwsRepresentation: verification.jwsRepresentation)
             await transaction.finish()
             await refreshEntitlements()
         case .userCancelled:
@@ -132,9 +146,24 @@ final class PurchaseManager: ObservableObject {
         defer { isRestoring = false }
         do {
             try await AppStore.sync()
+            // Re-validate all current entitlements with the backend so the
+            // subscriptions table is up to date even if S2S notifications were missed.
+            await reportCurrentEntitlementsToBackend()
             await refreshEntitlements()
         } catch {
             lastErrorMessage = error.localizedDescription
+        }
+    }
+
+    /// Iterates all verified current entitlements and calls validate-receipt for each.
+    /// Safe to call on launch (after AppStore.sync) and after restore.
+    private func reportCurrentEntitlementsToBackend() async {
+        for await result in Transaction.currentEntitlements {
+            guard case .verified(let transaction) = result else { continue }
+            let validIDs: Set<String> = [Self.premiumMonthlyProductID, Self.premiumAnnualProductID]
+            guard validIDs.contains(transaction.productID) else { continue }
+            // result is VerificationResult<Transaction> — jwsRepresentation is on the result, not the payload
+            await reportReceiptToBackend(jwsRepresentation: result.jwsRepresentation)
         }
     }
 
@@ -189,6 +218,8 @@ final class PurchaseManager: ObservableObject {
     private func handle(transactionResult: VerificationResult<Transaction>) async {
         do {
             let transaction = try Self.verify(transactionResult)
+            // transactionResult is VerificationResult<Transaction> — jwsRepresentation is on the result
+            await reportReceiptToBackend(jwsRepresentation: transactionResult.jwsRepresentation)
             await transaction.finish()
             await refreshEntitlements()
         } catch {
@@ -205,6 +236,55 @@ final class PurchaseManager: ObservableObject {
             throw PurchaseManagerError.purchaseFailed(error.localizedDescription)
         case .verified(let transaction):
             return transaction
+        }
+    }
+
+    // MARK: - Backend receipt validation
+
+    /// Posts the StoreKit 2 JWS string to the `validate-receipt` Edge Function.
+    /// On success the backend upserts the verified subscription row; on failure we
+    /// log and continue — StoreKit will retry unfinished transactions on the next launch.
+    private func reportReceiptToBackend(jwsRepresentation: String) async {
+        do {
+            let result = try await SupabaseService.shared.validateReceipt(
+                jwsRepresentation: jwsRepresentation
+            )
+            if result.isPremium {
+                // Optimistically sync server verdict to local state immediately
+                if !isSubscribed {
+                    isSubscribed = true
+                    persistSubscribed(true)
+                }
+            }
+        } catch {
+            // Non-fatal: StoreKit holds the transaction open until finish() is called.
+            // If this throws before finish(), the transaction listener retries on next launch.
+            print("[PurchaseManager] Receipt validation failed (will retry): \(error.localizedDescription)")
+        }
+    }
+
+    /// Queries the server-side `subscriptions` table for the authoritative premium state.
+    /// Called on cold start after AppStore.sync so the UI reflects real server state.
+    func refreshEntitlementsFromServer() async {
+        do {
+            guard let userId = await SupabaseService.shared.currentUser?.id else { return }
+            let serverIsPremium = try await SupabaseService.shared.fetchServerSubscriptionStatus(userId: userId)
+            let wasSubscribed = isSubscribed
+            if isSubscribed != serverIsPremium {
+                isSubscribed = serverIsPremium
+                persistSubscribed(serverIsPremium)
+            }
+            if serverIsPremium && !wasSubscribed {
+                NotificationManager.shared.addNotification(AppNotification(
+                    type: .subscriptionActivated,
+                    title: "Welcome to Premium! 👑",
+                    message: "Your full genie powers are unlocked — enjoy unlimited date magic.",
+                    timestamp: Date()
+                ))
+            }
+        } catch {
+            // Network failure — leave existing local state intact
+            print("[PurchaseManager] Server subscription check failed: \(error.localizedDescription)")
         }
     }
 }

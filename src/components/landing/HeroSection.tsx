@@ -1,7 +1,6 @@
-import { Button } from "@/components/ui/button";
-import { ArrowRight, Sparkles, Heart, Clock } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Sparkles, Heart, Clock } from "lucide-react";
 import AnimatedDatePlan from "./AnimatedDatePlan";
+import { PrimaryCTA } from "@/components/PrimaryCTA";
 
 const HeroSection = () => {
   return (
@@ -50,18 +49,11 @@ const HeroSection = () => {
             </div>
 
             {/* CTA */}
-            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center lg:justify-start items-center animate-fade-in" style={{ animationDelay: "0.4s" }}>
-              <Button 
-                asChild 
-                size="lg" 
-                className="gradient-gold text-primary-foreground font-bold w-full sm:w-auto px-6 sm:px-10 py-5 sm:py-7 text-base sm:text-xl glow-gold hover:opacity-90 transition-all hover:scale-105 animate-pulse-glow group"
-              >
-                <Link to="/signup">
-                  Start Planning Free
-                  <ArrowRight className="ml-2 w-5 h-5 sm:w-6 sm:h-6 group-hover:translate-x-1 transition-transform" />
-                </Link>
-              </Button>
-              <p className="text-muted-foreground text-sm">Free • No credit card required</p>
+            <div className="animate-fade-in w-full max-w-md mx-auto lg:mx-0" style={{ animationDelay: "0.4s" }}>
+              <PrimaryCTA source="landing_hero" appStorePlacement="hero" />
+              <p className="mt-2 text-muted-foreground text-sm text-center lg:text-left">
+                Free early access • No credit card required
+              </p>
             </div>
 
             {/* Social proof */}

@@ -15,13 +15,6 @@ struct Config {
         return t
     }
     
-    // MARK: - OpenAI API
-    static let openAIAPIKey: String = {
-        resolvedPlistString(key: "OPENAI_API_KEY", placeholderSuffix: "_here")
-    }()
-    static let openAIAPIEndpoint = "https://api.openai.com/v1/chat/completions"
-    static let openAIModel = "gpt-4o"
-    
     // MARK: - Google Places & Geocoding API
     /// Same key is used for: Places API (autocomplete, place details) and Geocoding API.
     /// In Google Cloud Console enable: Places API, Geocoding API.
@@ -41,51 +34,62 @@ struct Config {
     
     // MARK: - Supabase
     // Reads from Info.plist (populated by Secrets.xcconfig at build time).
-    // Falls back to the compile-time literals so the app still runs if the xcconfig
-    // hasn't been wired up in Xcode yet (Project → Info → Configurations).
+    // No hardcoded fallbacks — if the xcconfig is missing, the app fails fast with a clear message.
     static let supabaseURL: String = {
         let fromPlist = resolvedPlistString(key: "SUPABASE_URL", placeholderSuffix: ".supabase.co")
-        if !fromPlist.isEmpty && fromPlist.hasPrefix("https://") { return fromPlist }
-        return "https://jhpwacmsocjmzhimtbxj.supabase.co"
+        guard !fromPlist.isEmpty, fromPlist.hasPrefix("https://") else {
+            fatalError("SUPABASE_URL missing or invalid in Info.plist. Set it in ios/Secrets.xcconfig and rebuild.")
+        }
+        return fromPlist
     }()
     static let supabaseAnonKey: String = {
-        let fromPlist = resolvedPlistString(key: "SUPABASE_ANON_KEY")
-        if !fromPlist.isEmpty { return fromPlist }
-        return "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpocHdhY21zb2NqbXpoaW10YnhqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMwNzY5OTMsImV4cCI6MjA4ODY1Mjk5M30.-CN9vCUtTl3M8nkrYmcWtQguMQgH7qmL9lqrf7q_UJQ"
+        guard let raw = Bundle.main.infoDictionary?["SUPABASE_ANON_KEY"] as? String,
+              !raw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              !raw.hasPrefix("$("),
+              raw != "your_supabase_anon_key_here" else {
+            fatalError("SUPABASE_ANON_KEY missing from Info.plist. Set it in ios/Secrets.xcconfig and rebuild.")
+        }
+        return raw.trimmingCharacters(in: .whitespacesAndNewlines)
     }()
     
     // MARK: - Configuration Validation
-    static var isOpenAIConfigured: Bool {
-        !openAIAPIKey.isEmpty && openAIAPIKey != "your_openai_api_key_here"
-    }
-    
+
     static var isGooglePlacesConfigured: Bool {
         !googlePlacesAPIKey.isEmpty && googlePlacesAPIKey != "your_google_places_api_key_here"
     }
-    
+
+    /// True when the required Supabase URL and anon key are present and valid.
     static var isSupabaseConfigured: Bool {
-        !supabaseURL.isEmpty && !supabaseAnonKey.isEmpty &&
-        supabaseURL != "https://your-project-id.supabase.co"
+        let rawURL = (Bundle.main.infoDictionary?["SUPABASE_URL"] as? String ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let rawKey = (Bundle.main.infoDictionary?["SUPABASE_ANON_KEY"] as? String ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return rawURL.hasPrefix("https://") && !rawURL.hasPrefix("$(")
+            && !rawKey.isEmpty && !rawKey.hasPrefix("$(") && rawKey != "your_supabase_anon_key_here"
     }
-    
-    /// Validates that all required configuration keys are present
-    /// Returns an array of missing key names, empty if all configured
+
+    /// Returns a list of missing/invalid configuration key names.
+    /// Reads raw plist values so this method can report problems without triggering
+    /// the fatalError on the main properties above.
     static func validateConfiguration() -> [String] {
         var missingKeys: [String] = []
-        
-        if !isSupabaseConfigured {
-            if supabaseURL.isEmpty { missingKeys.append("SUPABASE_URL") }
-            if supabaseAnonKey.isEmpty { missingKeys.append("SUPABASE_ANON_KEY") }
+
+        let rawURL = (Bundle.main.infoDictionary?["SUPABASE_URL"] as? String ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        if rawURL.isEmpty || rawURL.hasPrefix("$(") || !rawURL.hasPrefix("https://") {
+            missingKeys.append("SUPABASE_URL — set it in ios/Secrets.xcconfig")
         }
-        
-        if !isOpenAIConfigured {
-            missingKeys.append("OPENAI_API_KEY")
+
+        let rawAnonKey = (Bundle.main.infoDictionary?["SUPABASE_ANON_KEY"] as? String ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        if rawAnonKey.isEmpty || rawAnonKey.hasPrefix("$(") || rawAnonKey == "your_supabase_anon_key_here" {
+            missingKeys.append("SUPABASE_ANON_KEY — set it in ios/Secrets.xcconfig")
         }
-        
+
         if !isGooglePlacesConfigured {
-            missingKeys.append("GOOGLE_PLACES_API_KEY")
+            missingKeys.append("GOOGLE_PLACES_API_KEY — set it in ios/Secrets.xcconfig")
         }
-        
+
         return missingKeys
     }
 }

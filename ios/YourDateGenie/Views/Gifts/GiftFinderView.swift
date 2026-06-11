@@ -840,34 +840,20 @@ struct GiftFinderView: View {
         var existingNames = gifts.map(\.name)
         let boughtNames = giftStore.purchasedGiftNames
         existingNames = Array(Set(existingNames + boughtNames))
-        let planForFallback = datePlan
         Task {
             do {
-                let result: [GiftSuggestion]
-                if Config.isOpenAIConfigured {
-                    result = try await GiftAIService.generateGifts(
-                        occasion: occasion.isEmpty ? "just because" : occasion,
-                        budget: budget.isEmpty ? "any" : budget,
-                        interests: interestsText,
-                        notes: notesText,
-                        location: loc,
-                        planTitle: planTitle,
-                        existingGiftNames: existingNames,
-                        recipient: recipient.isEmpty ? nil : recipient,
-                        giftStyle: style,
-                        count: 6
-                    )
-                } else {
-                    let fallback: [GiftSuggestion] = planForFallback.map { generateContextualGifts(for: $0) } ?? generateSampleGifts()
-                    await MainActor.run {
-                        self.gifts = fallback.shuffled()
-                        self.nearbyStores = self.generateNearbyStores()
-                        self.giftLoadError = "Add OPENAI_API_KEY in Secrets for AI-powered gift ideas."
-                        self.isLoading = false
-                        withAnimation(.spring(response: 0.5)) { self.showResults = true }
-                    }
-                    return
-                }
+                let result = try await SupabaseService.shared.generateMoreGifts(
+                    occasion: occasion.isEmpty ? "just because" : occasion,
+                    budget: budget.isEmpty ? nil : budget,
+                    interests: interestsText.isEmpty ? nil : interestsText,
+                    notes: notesText.isEmpty ? nil : notesText,
+                    location: loc.isEmpty ? nil : loc,
+                    planTitle: planTitle,
+                    existingGiftNames: existingNames,
+                    count: 6,
+                    recipient: recipient.isEmpty ? nil : recipient,
+                    giftStyle: style
+                )
                 await MainActor.run {
                     self.gifts = result
                     self.nearbyStores = self.generateNearbyStores()

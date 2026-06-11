@@ -1,3 +1,27 @@
+# Your Date Genie — Web App
+
+## Launch-mode feature flag
+
+All landing-page CTAs are controlled by a single environment variable:
+
+| `VITE_LAUNCH_MODE` | CTA behaviour |
+|--------------------|---------------|
+| `prelaunch` (default) | Shows the waitlist email-capture form |
+| `launched` | Shows "Download on App Store" button linking to `VITE_APP_STORE_URL` |
+
+**Day-of-launch action (2026-05-27):**
+1. In Vercel/Netlify → Production environment → set `VITE_LAUNCH_MODE=launched`
+2. Also update `VITE_APP_STORE_URL` to the real App Store URL once Apple assigns the ID
+3. Trigger a redeploy (or Vercel auto-deploys on env-var save)
+4. Done — all CTAs flip site-wide, and the "Now live on the App Store" banner appears
+
+**Testing the launched state without a deploy:**
+Append `?launchMode=launched` to any URL, e.g. `http://localhost:5173/?launchMode=launched`
+
+**Preview environments:** Set `VITE_LAUNCH_MODE=launched` on preview/staging so PR previews always show the post-launch UI.
+
+---
+
 # Welcome to your Lovable project
 
 ## Project info

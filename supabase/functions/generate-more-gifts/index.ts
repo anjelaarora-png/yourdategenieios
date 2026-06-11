@@ -12,7 +12,7 @@ function jsonResponse(status: number, body: unknown) {
   });
 }
 
-const GATEWAY_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
+const GATEWAY_URL = "https://api.openai.com/v1/chat/completions";
 
 /** Decodes a base64url JWT payload without verification (Supabase already verified via config.toml). */
 function jwtRole(authHeader: string | null): string | null {
@@ -67,9 +67,9 @@ serve(async (req) => {
       recipientSizes,
     } = await req.json();
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-      console.error("LOVABLE_API_KEY is not configured");
+    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
+    if (!OPENAI_API_KEY) {
+      console.error("OPENAI_API_KEY is not configured");
       return jsonResponse(500, { error: "AI service not configured" });
     }
 
@@ -157,11 +157,11 @@ Generate exactly ${giftCount} gifts. Every gift must have: name, description, pr
     const response = await fetch(GATEWAY_URL, {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${LOVABLE_API_KEY}`,
+        "Authorization": `Bearer ${OPENAI_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model: "gpt-4o-mini",
         messages: [
           { role: "system", content: "You are a gift suggestion expert. Always respond with valid JSON only." },
           { role: "user", content: prompt }

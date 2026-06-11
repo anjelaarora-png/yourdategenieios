@@ -576,6 +576,12 @@ class UserProfileManager: ObservableObject {
                 await MainActor.run { self.loadLocalProfile() }
                 return
             }
+            // Guard against a race where sign-out fires while this fetch was in-flight.
+            // Applying stale DB results after sign-out would repopulate currentUser /
+            // hasCompletedPreferences while isLoggedIn is already false.
+            guard await MainActor.run(resultType: Bool.self, body: { self.isLoggedIn }) else {
+                return
+            }
             await updateUI(with: fetched)
             await PostLoginCloudSync.run(coupleId: fetched.couple?.coupleId, userId: userId)
         } catch {

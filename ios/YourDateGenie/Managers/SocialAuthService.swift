@@ -1,4 +1,5 @@
 import AuthenticationServices
+import CryptoKit
 import SwiftUI
 
 // MARK: - SocialAuthService
@@ -18,16 +19,33 @@ final class SocialAuthService: NSObject, ObservableObject {
     @Published var isLoading = false
     @Published var error: Error?
 
+    /// Raw nonce generated per-attempt; stored so `SignInWithAppleButton.onRequest` and
+    /// `handleAppleAuthorization` share the same value without a race.
+    private(set) var currentRawNonce: String?
+
     private override init() {}
+
+    // MARK: - Nonce helpers
+
+    /// Generates a cryptographically random nonce and caches it for the current attempt.
+    /// Call from `SignInWithAppleButton.onRequest`.
+    func generateAndCacheNonce() -> String {
+        let raw = UUID().uuidString + UUID().uuidString
+        currentRawNonce = raw
+        return sha256(raw)
+    }
+
+    private func sha256(_ input: String) -> String {
+        let data = Data(input.utf8)
+        let hash = SHA256.hash(data: data)
+        return hash.compactMap { String(format: "%02x", $0) }.joined()
+    }
 
     // MARK: - Sign in with Apple
 
     /// Called from `SignInWithAppleButton.onCompletion` with the authorization Apple already
-    /// collected. Extracts the identity token and exchanges it for a Supabase session without
-    /// opening a second system sheet.
-    ///
-    /// This is the correct entry point when using SwiftUI's `SignInWithAppleButton` — the button
-    /// handles showing the native sheet; we only need to process the result it hands back.
+    /// collected. Extracts the identity token, passes the cached raw nonce, exchanges for a
+    /// Supabase session, and captures full name on first sign-in (Apple only sends it once).
     func handleAppleAuthorization(_ authorization: ASAuthorization) {
         guard let credential = authorization.credential as? ASAuthorizationAppleIDCredential,
               let tokenData  = credential.identityToken,
@@ -37,10 +55,24 @@ final class SocialAuthService: NSObject, ObservableObject {
         }
         guard !isLoading else { return }
         isLoading = true
+        let rawNonce = currentRawNonce
+        currentRawNonce = nil
+
+        // Apple only sends fullName on the very first authorization. Capture it now before the
+        // async boundary so it's available for profile hydration after the token exchange.
+        let displayName: String? = {
+            guard let fn = credential.fullName else { return nil }
+            let parts = [fn.givenName, fn.familyName].compactMap { $0?.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+            return parts.isEmpty ? nil : parts.joined(separator: " ")
+        }()
+
         Task { @MainActor in
             defer { self.isLoading = false }
             do {
-                _ = try await SupabaseService.shared.signInWithApple(idToken: idToken)
+                _ = try await SupabaseService.shared.signInWithApple(idToken: idToken, nonce: rawNonce)
+                if let name = displayName, !name.isEmpty {
+                    await SupabaseService.shared.updateAppleUserDisplayName(name)
+                }
                 await UserProfileManager.shared.refreshAfterSocialSignIn()
             } catch {
                 self.error = error
@@ -54,8 +86,10 @@ final class SocialAuthService: NSObject, ObservableObject {
     /// (e.g. a custom button outside the auth screen). For `SignInWithAppleButton` use
     /// `handleAppleAuthorization(_:)` in its `onCompletion` instead.
     func signInWithApple() {
+        let hashedNonce = generateAndCacheNonce()
         let request = ASAuthorizationAppleIDProvider().createRequest()
         request.requestedScopes = [.fullName, .email]
+        request.nonce = hashedNonce
 
         let controller = ASAuthorizationController(authorizationRequests: [request])
         controller.delegate = self
@@ -105,9 +139,19 @@ extension SocialAuthService: ASAuthorizationControllerDelegate {
 
         Task { @MainActor in
             self.isLoading = true
+            let rawNonce = self.currentRawNonce
+            self.currentRawNonce = nil
+            let displayName: String? = {
+                guard let fn = credential.fullName else { return nil }
+                let parts = [fn.givenName, fn.familyName].compactMap { $0?.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+                return parts.isEmpty ? nil : parts.joined(separator: " ")
+            }()
             defer { self.isLoading = false }
             do {
-                _ = try await SupabaseService.shared.signInWithApple(idToken: idToken)
+                _ = try await SupabaseService.shared.signInWithApple(idToken: idToken, nonce: rawNonce)
+                if let name = displayName, !name.isEmpty {
+                    await SupabaseService.shared.updateAppleUserDisplayName(name)
+                }
                 await UserProfileManager.shared.refreshAfterSocialSignIn()
             } catch {
                 self.error = error

@@ -554,7 +554,8 @@ class NavigationCoordinator: ObservableObject {
             venueName: venueName,
             phoneNumber: phone,
             address: address,
-            reservationPlatforms: reservationPlatforms
+            reservationPlatforms: reservationPlatforms,
+            bookingUrl: bookingUrl
         )
     }
     
@@ -632,8 +633,9 @@ class NavigationCoordinator: ObservableObject {
             savedPlans.append(planToSave)
         }
         saveState()
-        // Always sync to Supabase (retries first-time failures; RLS/JWT must succeed on each save).
-        Task { await uploadPlanToCloud(planToSave, status: "planned") }
+        // Upload with "saved" when a planned date is set, "draft" otherwise.
+        let uploadStatus = planToSave.scheduledDate != nil ? "saved" : "draft"
+        Task { await uploadPlanToCloud(planToSave, status: uploadStatus) }
         // Notify inbox that a new plan was saved
         if isNewSave {
             NotificationManager.shared.addNotification(AppNotification(
@@ -659,6 +661,14 @@ class NavigationCoordinator: ObservableObject {
         // Do not remove from generatedPlans here — keeps the options sheet on the same plan and avoids showing sample (e.g. NYC) when all three are saved. Cleared on sheet dismiss.
     }
     
+    /// Save a plan with an explicit planned date, bypassing the questionnaire-date fallback.
+    /// Use this when the date is collected via the date-picker gate at save time.
+    func savePlan(_ plan: DatePlan, plannedDate: Date) {
+        var planned = plan
+        planned.scheduledDate = plannedDate
+        savePlan(planned)
+    }
+
     /// Update the scheduled date for a saved plan (e.g. after adding to calendar).
     func updateScheduledDate(for planId: UUID, date: Date) {
         guard let idx = savedPlans.firstIndex(where: { $0.id == planId }) else { return }
@@ -666,7 +676,7 @@ class NavigationCoordinator: ObservableObject {
         plan.scheduledDate = date
         savedPlans[idx] = plan
         saveState()
-        Task { await uploadPlanToCloud(plan, status: "planned") }
+        Task { await uploadPlanToCloud(plan, status: "saved") }
     }
     
     /// Permanently delete a saved plan (local + backend if synced).
@@ -788,6 +798,12 @@ class NavigationCoordinator: ObservableObject {
         }
         if UserProfileManager.shared.hasCompletedPreferences {
             hasCompletedPreferences = true
+        } else {
+            // The async DB fetch hasn't finished yet. Defer the preferences gate so the
+            // returning user lands on the main app immediately rather than seeing the
+            // first-time onboarding screen. The $hasCompletedPreferences Combine sink will
+            // clear this flag (and set hasCompletedPreferences = true) once the fetch resolves.
+            hasDeferredInitialPreferences = true
         }
         saveState()
 
@@ -878,6 +894,7 @@ class NavigationCoordinator: ObservableObject {
     private static let deferredInitialPreferencesKey = "dateGenie_deferredInitialPreferences"
     
     private func loadSavedState() {
+        // Fast scalar reads — safe on main actor
         hasCompletedOnboarding = UserDefaults.standard.bool(forKey: "hasCompletedOnboarding")
         hasCompletedSignUp = UserDefaults.standard.bool(forKey: "hasCompletedSignUp")
         hasSkippedLogin = UserDefaults.standard.bool(forKey: "hasSkippedLogin")
@@ -887,19 +904,6 @@ class NavigationCoordinator: ObservableObject {
         
         if !hasCompletedPreferences {
             hasCompletedPreferences = UserDefaults.standard.bool(forKey: "hasCompletedPreferences")
-        }
-        
-        if let data = UserDefaults.standard.data(forKey: Self.savedPlansKey),
-           let plans = try? JSONDecoder().decode([DatePlan].self, from: data) {
-            savedPlans = plans
-        }
-        if let data = UserDefaults.standard.data(forKey: Self.pastPlansKey),
-           let plans = try? JSONDecoder().decode([DatePlan].self, from: data) {
-            pastPlans = plans
-        }
-        if let data = UserDefaults.standard.data(forKey: Self.experiencesWaitingKey),
-           let plans = try? JSONDecoder().decode([DatePlan].self, from: data) {
-            experiencesWaiting = plans
         }
         
         hasDeferredInitialPreferences = UserDefaults.standard.bool(forKey: Self.deferredInitialPreferencesKey)
@@ -915,7 +919,23 @@ class NavigationCoordinator: ObservableObject {
             UserDefaults.standard.set(false, forKey: "hasCompletedOnboarding")
             saveState()
         }
-        migratePastDuePlans()
+        
+        // Decode JSON plan arrays off the main thread — can be multiple MB on heavy users.
+        let savedPlansData = UserDefaults.standard.data(forKey: Self.savedPlansKey)
+        let pastPlansData = UserDefaults.standard.data(forKey: Self.pastPlansKey)
+        let experiencesData = UserDefaults.standard.data(forKey: Self.experiencesWaitingKey)
+        Task.detached(priority: .userInitiated) { [weak self] in
+            let saved = savedPlansData.flatMap { try? JSONDecoder().decode([DatePlan].self, from: $0) } ?? []
+            let past = pastPlansData.flatMap { try? JSONDecoder().decode([DatePlan].self, from: $0) } ?? []
+            let experiences = experiencesData.flatMap { try? JSONDecoder().decode([DatePlan].self, from: $0) } ?? []
+            await MainActor.run { [weak self] in
+                guard let self else { return }
+                self.savedPlans = saved
+                self.pastPlans = past
+                self.experiencesWaiting = experiences
+                self.migratePastDuePlans()
+            }
+        }
     }
     
     /// Call when home tab appears or app becomes active so "Use & Generate" visibility stays correct after async preference load.
@@ -1040,6 +1060,7 @@ class NavigationCoordinator: ObservableObject {
     }
 
     /// Upserts every saved and past plan so offline-only or failed uploads reach `date_plans` after login.
+    /// Uploads run concurrently (up to 4 at a time) to reduce total wall-clock time.
     private func uploadAllLocalDatePlansToCloud() async {
         let isLoggedIn = await MainActor.run { UserProfileManager.shared.isLoggedIn }
         guard isLoggedIn else { return }
@@ -1047,8 +1068,23 @@ class NavigationCoordinator: ObservableObject {
         let snapshot = await MainActor.run { () -> [(DatePlan, String)] in
             savedPlans.map { ($0, "planned") } + pastPlans.map { ($0, "completed") }
         }
-        for (plan, status) in snapshot where !sampleIds.contains(plan.id) {
-            await uploadPlanToCloud(plan, status: status)
+        let toUpload = snapshot.filter { !sampleIds.contains($0.0.id) }
+        guard !toUpload.isEmpty else { return }
+
+        await withTaskGroup(of: Void.self) { group in
+            var inFlight = 0
+            var pending = toUpload.makeIterator()
+            // Seed up to 4 concurrent uploads
+            while inFlight < 4, let item = pending.next() {
+                group.addTask { [weak self] in await self?.uploadPlanToCloud(item.0, status: item.1) }
+                inFlight += 1
+            }
+            // As each finishes, dispatch the next pending item
+            for await _ in group {
+                if let item = pending.next() {
+                    group.addTask { [weak self] in await self?.uploadPlanToCloud(item.0, status: item.1) }
+                }
+            }
         }
     }
 
@@ -1203,16 +1239,24 @@ class NavigationCoordinator: ObservableObject {
             }
             let coupleId = try await SupabaseService.shared.resolveCoupleIdForCurrentUser()
 
-            for plan in combined {
-                let row = DBExperiencesWaitingRow(id: plan.id, userId: userId, coupleId: coupleId, plan: plan)
-                _ = try await SupabaseService.shared.upsertExperiencesWaiting(row)
+            // Upsert all unsaved plans concurrently
+            try await withThrowingTaskGroup(of: Void.self) { group in
+                for plan in combined {
+                    let row = DBExperiencesWaitingRow(id: plan.id, userId: userId, coupleId: coupleId, plan: plan)
+                    group.addTask { _ = try await SupabaseService.shared.upsertExperiencesWaiting(row) }
+                }
+                try await group.waitForAll()
             }
 
             let remoteRows = try await SupabaseService.shared.getExperiencesWaiting(coupleId: coupleId)
             // Only trim server rows after the initial merge finished — avoids deleting remote data while pull is in flight.
             if snapshot.pullDone && !localIds.isEmpty {
-                for row in remoteRows where !localIds.contains(row.id) {
-                    try await SupabaseService.shared.deleteExperiencesWaiting(planId: row.id)
+                let toDelete = remoteRows.filter { !localIds.contains($0.id) }
+                try await withThrowingTaskGroup(of: Void.self) { group in
+                    for row in toDelete {
+                        group.addTask { try await SupabaseService.shared.deleteExperiencesWaiting(planId: row.id) }
+                    }
+                    try await group.waitForAll()
                 }
             }
             print("[syncExperiences] upserted \(combined.count) unsaved plans (generated + waiting)")
@@ -1359,7 +1403,7 @@ struct RootNavigationView: View {
                 // finished quickly the remaining time is topped up; if it was slow the splash
                 // already covered the wait and we dismiss immediately.
                 let elapsed = Date().timeIntervalSince(launchTime)
-                let minimumSplashSeconds: Double = 2.5
+                let minimumSplashSeconds: Double = 1.2
                 let remaining = minimumSplashSeconds - elapsed
                 if remaining > 0 {
                     try? await Task.sleep(nanoseconds: UInt64(remaining * 1_000_000_000))

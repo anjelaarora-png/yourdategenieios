@@ -87,11 +87,16 @@ final class AccessManager: ObservableObject {
     }
 
     /// Runs `perform` immediately if allowed; otherwise stores it and presents the paywall.
+    /// When the paywall is about to appear, we fire a server-side subscription check in
+    /// the background so the view reflects authoritative state as quickly as possible.
     func require(_ feature: AppFeature, perform: @escaping () -> Void) {
         if canAccess(feature) {
             perform()
         } else {
             pendingUnlock = perform
+            // Refresh server state before showing the paywall — catches renewals that
+            // arrived via S2S notification but haven't yet been synced locally.
+            Task { await PurchaseManager.shared.refreshEntitlementsFromServer() }
             isPaywallPresented = true
         }
     }

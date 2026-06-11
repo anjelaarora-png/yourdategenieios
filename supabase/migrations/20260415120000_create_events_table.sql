@@ -36,12 +36,14 @@ create index if not exists idx_events_active_date
 alter table public.events enable row level security;
 
 -- Allow any authenticated or anonymous user to read active events
+drop policy if exists "Anyone can read active events" on public.events;
 create policy "Anyone can read active events"
     on public.events
     for select
     using (is_active = true);
 
 -- Only service role (admin) can insert / update / delete
+drop policy if exists "Service role manages events" on public.events;
 create policy "Service role manages events"
     on public.events
     for all

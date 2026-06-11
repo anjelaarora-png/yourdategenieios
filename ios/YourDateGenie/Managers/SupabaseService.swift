@@ -22,6 +22,11 @@ final class SupabaseService: ObservableObject {
     private var accessToken: String?
     private var refreshToken: String?
     private let keychain = KeychainManager.shared
+
+    /// Tracks the last time we synced the SDK session into our REST token cache.
+    /// Avoids an `auth.session` round-trip before every single DB call in a burst.
+    private var lastAuthRefreshDate: Date = .distantPast
+    private let authRefreshCooldownSeconds: TimeInterval = 30
     
     private init() {
         self.baseURL = AppConfig.supabaseURL
@@ -190,6 +195,21 @@ final class SupabaseService: ObservableObject {
         return mapToSupabaseUser(session.user, defaultName: nil)
     }
 
+    /// Updates `user_metadata.full_name` after a first-time Sign in with Apple. Apple only sends
+    /// the name on the initial authorization; subsequent sign-ins return nil. Call immediately
+    /// after a successful `signInWithApple` when `credential.fullName` is non-nil.
+    func updateAppleUserDisplayName(_ name: String) async {
+        guard !name.trimmingCharacters(in: .whitespaces).isEmpty else { return }
+        do {
+            try await supabaseClient.auth.update(
+                user: UserAttributes(data: ["full_name": .string(name), "name": .string(name)])
+            )
+            AppLogger.info("Apple sign-in: display name '\(name)' saved to user metadata", category: .auth)
+        } catch {
+            AppLogger.error("Apple sign-in: failed to save display name — \(error)", category: .auth)
+        }
+    }
+
     /// Exchanges an Apple identity token for a Supabase session via the SAME client used for all
     /// other auth operations. Keeps PKCE/state consistent and makes `isAuthenticated` reflect the
     /// result synchronously once this returns.
@@ -210,77 +230,62 @@ final class SupabaseService: ObservableObject {
 
     /// Sign out (uses Supabase SDK)
     ///
-    /// Scope `.global` revokes the refresh token server-side but requires a round-trip to
-    /// `/auth/v1/logout` — on slow/flaky networks that used to block the UI for seconds. We:
-    ///   1. Attempt a server-side revocation in a **detached** task (fire-and-forget) while we
-    ///      still have a valid access token.
-    ///   2. Immediately clear local auth state and the SDK's stored session via `.local`.
-    ///   3. Verify the SDK has no remaining session; if one somehow survives, force a second clear.
-    /// The UI observes `isAuthenticated` flipping to `false` within the same main-actor tick, so
-    /// the login screen appears instantly regardless of network latency.
+    /// Clears auth state in three steps:
+    ///   1. Flip `isAuthenticated = false` immediately on the main actor so the login screen
+    ///      appears without waiting for any network round-trip.
+    ///   2. Clear the keychain so a force-quit before step 3 still leaves no session on disk.
+    ///   3. Call `signOut(scope: .local)` on every SDK client instance so their in-memory and
+    ///      persisted sessions are both gone.
+    ///
+    /// Server-side token revocation is fired in a detached task (fire-and-forget) using the
+    /// captured access token, so it still runs even after local state is cleared.
+    ///
+    /// NOTE: We intentionally do NOT query `client.auth.session` after signing out. Doing so
+    /// can trigger a token refresh, and — more critically — if the user re-authenticates before
+    /// that query completes, the new valid session would be misidentified as "stale" and cleared,
+    /// kicking the freshly-logged-in user back to the auth screen.
     func signOut() async throws {
         let tokenForGlobalRevocation = accessToken
-        let client = supabaseClient
 
         print("[Auth][SignOut] Initiating sign-out — userId: \(currentUser?.id.uuidString ?? "none")")
 
-        if let token = tokenForGlobalRevocation, !token.isEmpty {
-            print("[Auth][SignOut] Firing server-side global revocation (fire-and-forget)")
-            Task.detached(priority: .utility) { [weak self] in
-                guard let self else { return }
-                // Build a minimal logout request using the captured token so revocation still works
-                // even though we immediately clear the local session below.
-                let url = URL(string: "\(self.baseURL)/auth/v1/logout?scope=global")!
-                var request = URLRequest(url: url)
-                request.httpMethod = "POST"
-                request.addValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-                request.addValue(self.anonKey, forHTTPHeaderField: "apikey")
-                request.timeoutInterval = 5
-                _ = try? await self.session.data(for: request)
-                print("[Auth][SignOut] Global revocation request completed")
-            }
-        } else {
-            print("[Auth][SignOut] No access token present — skipping global revocation")
-        }
-
-        // Clear local auth state so observers flip to the login screen on the next main tick.
+        // 1. Flip observable state immediately so the login screen appears on the next main tick.
         await MainActor.run {
             self.currentUser = nil
             self.isAuthenticated = false
             self.accessToken = nil
             self.refreshToken = nil
         }
+        invalidateAuthRefreshCache()
         print("[Auth][SignOut] Local auth state cleared (isAuthenticated = false)")
 
-        // Clear keychain synchronously so the session is gone even on immediate force-quit.
+        // 2. Clear keychain before any await so it's gone even on a force-quit right after this.
         try? KeychainManager.shared.clearSession()
         print("[Auth][SignOut] Keychain session cleared")
 
-        // Clear the Supabase SDK's stored session (local, no network call).
-        try? await client.auth.signOut(scope: .local)
-        print("[Auth][SignOut] SDK local session cleared")
+        // 3. Clear the SDK-managed session storage on every client instance.
+        try? await supabaseClient.auth.signOut(scope: .local)
+        try? await SupabaseManager.shared.client.auth.signOut(scope: .local)
+        print("[Auth][SignOut] SDK local sessions cleared")
 
-        // ── Post-sign-out session verification ──────────────────────────────────────
-        // Confirm that asking the SDK for a session now throws / returns nothing.
-        // If a session somehow survives (e.g. a concurrent token refresh raced us),
-        // force a second clear and ensure isAuthenticated stays false.
-        do {
-            let staleSession = try await client.auth.session
-            print("[Auth][SignOut] ⚠️  Stale session detected after sign-out " +
-                  "(user: \(staleSession.user.email ?? staleSession.user.id.uuidString)) — forcing second clear")
-            try? await client.auth.signOut(scope: .local)
-            try? KeychainManager.shared.clearSession()
-            await MainActor.run {
-                self.currentUser = nil
-                self.isAuthenticated = false
-                self.accessToken = nil
-                self.refreshToken = nil
+        // Fire-and-forget server-side revocation using the token captured before clearing state.
+        if let token = tokenForGlobalRevocation, !token.isEmpty {
+            let baseURL = self.baseURL
+            let anonKey = self.anonKey
+            let urlSession = self.session
+            Task.detached(priority: .utility) {
+                let url = URL(string: "\(baseURL)/auth/v1/logout?scope=global")!
+                var request = URLRequest(url: url)
+                request.httpMethod = "POST"
+                request.addValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+                request.addValue(anonKey, forHTTPHeaderField: "apikey")
+                request.timeoutInterval = 8
+                _ = try? await urlSession.data(for: request)
+                print("[Auth][SignOut] Server-side global revocation completed")
             }
-            print("[Auth][SignOut] Second clear completed — no session should remain")
-        } catch {
-            // Expected path: SDK correctly reports no active session.
-            print("[Auth][SignOut] ✓ Session check passed — no SDK session remains after sign-out")
         }
+
+        print("[Auth][SignOut] ✓ Sign-out complete")
     }
     
     /// Send password reset email (uses Supabase SDK)
@@ -456,6 +461,8 @@ final class SupabaseService: ObservableObject {
         refreshToken = session.refreshToken
         currentUser = mapToSupabaseUser(session.user, defaultName: nil)
         isAuthenticated = true
+        // We just synced a fresh token — skip the next refreshRestAuthFromSDK cooldown check.
+        lastAuthRefreshDate = Date()
         
         let secureSession = SecureSession(
             userId: session.user.id.uuidString,
@@ -529,6 +536,48 @@ final class SupabaseService: ObservableObject {
             throw SupabaseError.invalidResponse
         }
     }
+
+    /// Calls the `submit-report` Edge Function (Apple §1.2 safety requirement).
+    /// Inserts into `user_reports` and notifies the moderation inbox.
+    func submitReport(reportedUserId: String?, category: String, description: String) async throws {
+        try? await refreshRestAuthFromSDK()
+        let urlString = baseURL.hasSuffix("/")
+            ? "\(baseURL)functions/v1/submit-report"
+            : "\(baseURL)/functions/v1/submit-report"
+        guard let url = URL(string: urlString) else { throw SupabaseError.invalidResponse }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        if let token = accessToken {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        } else {
+            request.setValue("Bearer \(anonKey)", forHTTPHeaderField: "Authorization")
+        }
+        var body: [String: Any] = ["category": category, "description": description]
+        if let rid = reportedUserId { body["reportedId"] = rid }
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        let (_, response) = try await session.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse,
+              (200...299).contains(httpResponse.statusCode) else {
+            throw SupabaseError.invalidResponse
+        }
+    }
+
+    /// Inserts a block row so the blocked user cannot send new partner session invites.
+    func blockUser(blockedId: UUID, reason: String? = nil) async throws {
+        struct BlockRow: Encodable {
+            let blocker_id: String
+            let blocked_id: String
+            let reason: String?
+        }
+        guard let currentUserId = currentUser?.id else { throw SupabaseError.unauthorized }
+        let row = BlockRow(
+            blocker_id: currentUserId.uuidString,
+            blocked_id: blockedId.uuidString,
+            reason: reason
+        )
+        _ = try await insert(table: "blocked_users", data: row)
+    }
     
     /// Creates `public.users` and a solo `public.couples` row if missing (trigger may already have created them).
     func ensureUserAndCoupleIfMissing(userId: UUID, email: String, name: String) async throws {
@@ -560,17 +609,13 @@ final class SupabaseService: ObservableObject {
     }
     
     func getCoupleForUser(userId: UUID) async throws -> DBCouple? {
+        let id = userId.uuidString
+        // Single request using PostgREST OR filter instead of two sequential queries.
         let couples: [DBCouple] = try await select(
             table: "couples",
-            query: "user_id_1=eq.\(userId.uuidString)"
+            query: "or=(user_id_1.eq.\(id),user_id_2.eq.\(id))&limit=1"
         )
-        if let couple = couples.first { return couple }
-        
-        let couplesAsUser2: [DBCouple] = try await select(
-            table: "couples",
-            query: "user_id_2=eq.\(userId.uuidString)"
-        )
-        return couplesAsUser2.first
+        return couples.first
     }
     
     // Preferences
@@ -733,11 +778,10 @@ final class SupabaseService: ObservableObject {
         _ = try await update(table: "partner_sessions", data: updated, column: "session_id", value: enc)
     }
 
-    /// Saves the 3 generated plans and returns the created rows (for ranking later).
+    /// Saves the 3 generated plans concurrently and returns the created rows (for ranking later).
     func savePartnerSessionPlans(partnerSessionId: UUID, plans: [DatePlan]) async throws -> [DBPartnerSessionPlan] {
-        var result: [DBPartnerSessionPlan] = []
-        for (index, plan) in plans.prefix(3).enumerated() {
-            let row = DBPartnerSessionPlan(
+        let rows = plans.prefix(3).enumerated().map { (index, plan) in
+            DBPartnerSessionPlan(
                 id: UUID(),
                 partnerSessionId: partnerSessionId,
                 planIndex: index + 1,
@@ -746,8 +790,14 @@ final class SupabaseService: ObservableObject {
                 partnerRank: nil,
                 createdAt: Date()
             )
-            let inserted: DBPartnerSessionPlan = try await insert(table: "partner_session_plans", data: row)
-            result.append(inserted)
+        }
+        var result: [DBPartnerSessionPlan] = try await withThrowingTaskGroup(of: DBPartnerSessionPlan.self) { group in
+            for row in rows {
+                group.addTask { try await self.insert(table: "partner_session_plans", data: row) }
+            }
+            var inserted: [DBPartnerSessionPlan] = []
+            for try await item in group { inserted.append(item) }
+            return inserted
         }
         return result.sorted(by: { $0.planIndex < $1.planIndex })
     }
@@ -867,11 +917,10 @@ final class SupabaseService: ObservableObject {
 
     // MARK: - Save partner session plans (up to 5)
 
-    /// Saves up to 5 generated plans and returns the created rows (for ranking later).
+    /// Saves up to 5 generated plans in parallel and returns the created rows (for ranking later).
     func savePartnerSessionPlansV2(partnerSessionId: UUID, plans: [DatePlan]) async throws -> [DBPartnerSessionPlan] {
-        var result: [DBPartnerSessionPlan] = []
-        for (index, plan) in plans.prefix(5).enumerated() {
-            let row = DBPartnerSessionPlan(
+        let rows = plans.prefix(5).enumerated().map { (index, plan) in
+            DBPartnerSessionPlan(
                 id: UUID(),
                 partnerSessionId: partnerSessionId,
                 planIndex: index + 1,
@@ -880,10 +929,17 @@ final class SupabaseService: ObservableObject {
                 partnerRank: nil,
                 createdAt: Date()
             )
-            let inserted: DBPartnerSessionPlan = try await insert(table: "partner_session_plans", data: row)
-            result.append(inserted)
         }
-        return result.sorted(by: { $0.planIndex < $1.planIndex })
+        return try await withThrowingTaskGroup(of: DBPartnerSessionPlan.self) { group in
+            for row in rows {
+                group.addTask { try await self.insert(table: "partner_session_plans", data: row) }
+            }
+            var results: [DBPartnerSessionPlan] = []
+            for try await inserted in group {
+                results.append(inserted)
+            }
+            return results.sorted(by: { $0.planIndex < $1.planIndex })
+        }
     }
 
     // MARK: - Raw insert helper (for ad-hoc JSON payloads like phase history)
@@ -997,6 +1053,136 @@ final class SupabaseService: ObservableObject {
     /// Delete a gift row by gift_id.
     func deleteGiftSuggestion(giftId: UUID) async throws {
         try await delete(table: "gift_suggestions", column: "gift_id", value: giftId.uuidString)
+    }
+
+    // MARK: - Receipt Validation + Server Subscription State
+
+    /// Calls the `validate-receipt` Edge Function with the StoreKit 2 JWS string.
+    /// The function verifies the Apple signature and upserts the `subscriptions` row.
+    func validateReceipt(jwsRepresentation: String) async throws -> ReceiptValidationResult {
+        try? await refreshRestAuthFromSDK()
+        let urlString = baseURL.hasSuffix("/")
+            ? "\(baseURL)functions/v1/validate-receipt"
+            : "\(baseURL)/functions/v1/validate-receipt"
+        guard let url = URL(string: urlString) else { throw SupabaseError.invalidResponse }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        if let token = accessToken {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        } else {
+            request.setValue("Bearer \(anonKey)", forHTTPHeaderField: "Authorization")
+        }
+        request.timeoutInterval = 30
+        request.httpBody = try JSONSerialization.data(withJSONObject: ["transactionJWS": jwsRepresentation])
+
+        let (data, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse else { throw SupabaseError.invalidResponse }
+        if http.statusCode == 401 { throw SupabaseError.unauthorized }
+        if !(200...299).contains(http.statusCode) {
+            let msg = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["error"] as? String
+                ?? "Receipt validation failed (\(http.statusCode))"
+            throw SupabaseError.authFailed(msg)
+        }
+        return try decoder.decode(ReceiptValidationResult.self, from: data)
+    }
+
+    /// Queries the server-side `subscriptions` table and returns whether the user has
+    /// an active, trialing, or grace-period subscription. Returns `false` on any error
+    /// so the app never accidentally blocks a paying user due to a network glitch.
+    func fetchServerSubscriptionStatus(userId: UUID) async throws -> Bool {
+        // PostgREST in() filter: status=in.(active,trialing,in_grace_period)
+        let query = "user_id=eq.\(userId.uuidString)&status=in.(active,trialing,in_grace_period)&limit=1"
+        let subs: [DBSubscription] = try await select(table: "subscriptions", query: query)
+        guard let sub = subs.first else { return false }
+        // Double-check period end hasn't passed (in case the row is stale)
+        if let end = sub.currentPeriodEnd {
+            return end > Date()
+        }
+        return sub.isPremium
+    }
+
+
+    // MARK: - Generate Date Plan (Edge Function)
+
+    /// Calls the generate-date-plan edge function with the full QuestionnaireData and returns
+    /// the raw response Data containing `{ "datePlans": [...] }`.
+    func generateDatePlanEdge(preferences: QuestionnaireData) async throws -> Data {
+        try? await refreshRestAuthFromSDK()
+        let urlString = baseURL.hasSuffix("/")
+            ? "\(baseURL)functions/v1/generate-date-plan"
+            : "\(baseURL)/functions/v1/generate-date-plan"
+        guard let url = URL(string: urlString) else { throw SupabaseError.invalidResponse }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(anonKey)", forHTTPHeaderField: "Authorization")
+        if let token = accessToken {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        request.timeoutInterval = 120
+
+        // Encode QuestionnaireData → wrap in { "preferences": {...} }
+        let preferencesData = try encoder.encode(preferences)
+        guard let preferencesJson = try JSONSerialization.jsonObject(with: preferencesData) as? [String: Any] else {
+            throw SupabaseError.invalidResponse
+        }
+        request.httpBody = try JSONSerialization.data(withJSONObject: ["preferences": preferencesJson])
+
+        let (data, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse else { throw SupabaseError.invalidResponse }
+        if http.statusCode != 200 {
+            if http.statusCode == 401 { throw SupabaseError.unauthorized }
+            if http.statusCode == 429 { throw SupabaseError.authFailed("Rate limited. Try again in a moment.") }
+            if http.statusCode == 502 || http.statusCode == 503 {
+                throw SupabaseError.authFailed("AI service temporarily unavailable. Please try again.")
+            }
+            let msg = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["error"] as? String
+                ?? "HTTP \(http.statusCode)"
+            throw SupabaseError.authFailed(msg)
+        }
+        return data
+    }
+
+    // MARK: - Rewrite Love Note (Edge Function)
+
+    /// Calls the rewrite-love-note edge function and returns the rewritten text.
+    func rewriteLoveNote(originalText: String, systemRole: String, styleInstruction: String) async throws -> String {
+        try? await refreshRestAuthFromSDK()
+        let urlString = baseURL.hasSuffix("/")
+            ? "\(baseURL)functions/v1/rewrite-love-note"
+            : "\(baseURL)/functions/v1/rewrite-love-note"
+        guard let url = URL(string: urlString) else { throw SupabaseError.invalidResponse }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(anonKey)", forHTTPHeaderField: "Authorization")
+        if let token = accessToken {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        request.timeoutInterval = 30
+        let body: [String: Any] = [
+            "originalText": originalText,
+            "systemRole": systemRole,
+            "styleInstruction": styleInstruction,
+        ]
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        let (data, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse else { throw SupabaseError.invalidResponse }
+        if http.statusCode != 200 {
+            if http.statusCode == 401 { throw SupabaseError.unauthorized }
+            if http.statusCode == 429 { throw SupabaseError.authFailed("Rate limited. Try again in a moment.") }
+            if http.statusCode == 503 { throw SupabaseError.authFailed("AI service temporarily unavailable.") }
+            let msg = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["error"] as? String
+                ?? "HTTP \(http.statusCode)"
+            throw SupabaseError.authFailed(msg)
+        }
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let rewrittenText = json["rewrittenText"] as? String, !rewrittenText.isEmpty else {
+            throw SupabaseError.invalidResponse
+        }
+        return rewrittenText
     }
 
     // MARK: - Generate More Gifts (Edge Function)
@@ -1255,7 +1441,10 @@ final class SupabaseService: ObservableObject {
     func uploadMemoryImage(data: Data, userId: String) async throws -> String {
         AppLogger.debug("uploadMemoryImage: userId=\(userId) rawBytes=\(data.count)", category: .storage)
         do {
-            let prepared = try Self.prepareMemoryImageDataUnder5MB(data)
+            // Image compression is CPU-heavy; run it off the main thread.
+            let prepared = try await Task.detached(priority: .userInitiated) {
+                try Self.prepareMemoryImageDataUnder5MB(data)
+            }.value
             AppLogger.debug("uploadMemoryImage: compressed to \(prepared.count) bytes", category: .storage)
             let filename = "\(UUID().uuidString).jpg"
             let path = "\(userId)/\(filename)"
@@ -1391,11 +1580,20 @@ final class SupabaseService: ObservableObject {
     // MARK: - Generic Database Operations
 
     /// PostgREST RLS uses `auth.uid()` from the JWT. Manual `URLRequest` must use the same access token as `supabaseClient.auth` (it can be nil/stale right after launch or in background `Task`s).
+    /// Skips the SDK round-trip if we refreshed within the last 30 seconds — avoids N serial auth hops when a screen fires multiple DB calls in a burst.
     private func refreshRestAuthFromSDK() async throws {
+        guard Date().timeIntervalSince(lastAuthRefreshDate) > authRefreshCooldownSeconds else { return }
         let s = try await supabaseClient.auth.session
         await MainActor.run {
             syncSessionFromSDK(s)
+            lastAuthRefreshDate = Date()
         }
+    }
+
+    /// Call after any auth state change (sign-in, sign-out, token rotation) to force the next
+    /// DB call to pick up a fresh token rather than serving the cached one.
+    private func invalidateAuthRefreshCache() {
+        lastAuthRefreshDate = .distantPast
     }
     
     private func select<T: Decodable>(table: String, query: String) async throws -> [T] {
@@ -1815,6 +2013,41 @@ private struct GeneratePlaylistAPISong: Decodable {
     let year: Int?
     let genre: String?
 }
+
+// MARK: - Receipt Validation Models
+
+/// Response from the `validate-receipt` Edge Function.
+struct ReceiptValidationResult: Codable {
+    let isPremium: Bool
+    let tier: String
+    let expiresAt: String?
+    let status: String?
+}
+
+/// Minimal projection of the `subscriptions` table row for premium gating.
+struct DBSubscription: Codable {
+    let id: UUID
+    let userId: UUID
+    let platform: String
+    let status: String
+    let tier: String
+    let currentPeriodEnd: Date?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case userId = "user_id"
+        case platform
+        case status
+        case tier
+        case currentPeriodEnd = "current_period_end"
+    }
+
+    var isPremium: Bool {
+        ["active", "trialing", "in_grace_period"].contains(status)
+    }
+}
+
+
 
 // MARK: - Supabase Errors
 

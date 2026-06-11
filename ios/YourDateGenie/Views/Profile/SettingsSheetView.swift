@@ -15,6 +15,7 @@ struct SettingsSheetView: View {
     @State private var remotePreferences: DBPreferences?
     @State private var isLoadingRemotePreferences = false
     @State private var remotePreferencesError: String?
+    @State private var showingReportSheet = false
 
     private var userProfile: UserProfile? {
         profileManager.currentUser
@@ -84,7 +85,7 @@ struct SettingsSheetView: View {
                                     Text(
                                         purchases.isSubscribed
                                             ? "Thank you for supporting Your Date Genie."
-                                            : "Start free for 7 days, then $4.99/month or $49.99/year."
+                                            : "Start free for 7 days, then $14.99/month or $99.99/year."
                                     )
                                     .font(Font.bodySans(13, weight: .regular))
                                     .foregroundColor(Color.luxuryMuted)
@@ -282,6 +283,122 @@ struct SettingsSheetView: View {
                         }
                         .padding(18)
                         .luxuryCard()
+
+                        // MARK: - Support & Safety (Apple §1.2)
+                        Text("Support & safety")
+                            .font(Font.bodySans(14, weight: .medium))
+                            .foregroundColor(Color.luxuryCreamMuted)
+                            .padding(.horizontal, 4)
+
+                        // MARK: - Legal (Apple §3.1.2 + §5.1.1)
+                        Text("Legal")
+                            .font(Font.bodySans(14, weight: .medium))
+                            .foregroundColor(Color.luxuryCreamMuted)
+                            .padding(.horizontal, 4)
+
+                        VStack(spacing: 12) {
+                            if let privacyURL = URL(string: "https://yourdategenie.com/privacy-policy") {
+                                Link(destination: privacyURL) {
+                                    HStack(spacing: 14) {
+                                        Image(systemName: "hand.raised.fill")
+                                            .font(.system(size: 18))
+                                            .foregroundColor(Color.luxuryGold)
+                                            .frame(width: 28)
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text("Privacy Policy")
+                                                .font(Font.bodySans(15, weight: .medium))
+                                                .foregroundColor(Color.luxuryCream)
+                                            Text("How we handle your data")
+                                                .font(Font.bodySans(12, weight: .regular))
+                                                .foregroundColor(Color.luxuryMuted)
+                                        }
+                                        Spacer()
+                                        Image(systemName: "arrow.up.right.square")
+                                            .font(.system(size: 13))
+                                            .foregroundColor(Color.luxuryMuted)
+                                    }
+                                    .padding(.vertical, 4)
+                                }
+                            }
+                            if let termsURL = URL(string: "https://yourdategenie.com/terms") {
+                                Link(destination: termsURL) {
+                                    HStack(spacing: 14) {
+                                        Image(systemName: "doc.text.fill")
+                                            .font(.system(size: 18))
+                                            .foregroundColor(Color.luxuryGold)
+                                            .frame(width: 28)
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text("Terms of Use")
+                                                .font(Font.bodySans(15, weight: .medium))
+                                                .foregroundColor(Color.luxuryCream)
+                                            Text("Your agreement with Your Date Genie LLC")
+                                                .font(Font.bodySans(12, weight: .regular))
+                                                .foregroundColor(Color.luxuryMuted)
+                                        }
+                                        Spacer()
+                                        Image(systemName: "arrow.up.right.square")
+                                            .font(.system(size: 13))
+                                            .foregroundColor(Color.luxuryMuted)
+                                    }
+                                    .padding(.vertical, 4)
+                                }
+                            }
+                        }
+                        .padding(18)
+                        .luxuryCard()
+
+                        VStack(spacing: 12) {
+                            if let contactURL = URL(string: "mailto:hello@yourdategenie.com") {
+                                Link(destination: contactURL) {
+                                    HStack(spacing: 14) {
+                                        Image(systemName: "envelope.fill")
+                                            .font(.system(size: 18))
+                                            .foregroundColor(Color.luxuryGold)
+                                            .frame(width: 28)
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text("Contact Support")
+                                                .font(Font.bodySans(15, weight: .medium))
+                                                .foregroundColor(Color.luxuryCream)
+                                            Text("hello@yourdategenie.com")
+                                                .font(Font.bodySans(12, weight: .regular))
+                                                .foregroundColor(Color.luxuryMuted)
+                                        }
+                                        Spacer()
+                                        Image(systemName: "arrow.up.right.square")
+                                            .font(.system(size: 13))
+                                            .foregroundColor(Color.luxuryMuted)
+                                    }
+                                    .padding(.vertical, 4)
+                                }
+                            }
+
+                            Button {
+                                showingReportSheet = true
+                            } label: {
+                                HStack(spacing: 14) {
+                                    Image(systemName: "exclamationmark.bubble.fill")
+                                        .font(.system(size: 18))
+                                        .foregroundColor(Color.luxuryGold)
+                                        .frame(width: 28)
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text("Report a Concern")
+                                            .font(Font.bodySans(15, weight: .medium))
+                                            .foregroundColor(Color.luxuryCream)
+                                        Text("Report safety or content issues")
+                                            .font(Font.bodySans(12, weight: .regular))
+                                            .foregroundColor(Color.luxuryMuted)
+                                    }
+                                    Spacer()
+                                    Image(systemName: "chevron.right")
+                                        .font(.system(size: 12))
+                                        .foregroundColor(Color.luxuryMuted)
+                                }
+                                .padding(.vertical, 4)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        .padding(18)
+                        .luxuryCard()
                     }
                     .padding(20)
                 }
@@ -311,6 +428,9 @@ struct SettingsSheetView: View {
             }
             .sheet(isPresented: $showEditAccount) {
                 EditAccountSheetView()
+            }
+            .sheet(isPresented: $showingReportSheet) {
+                ReportConcernView()
             }
             .sheet(isPresented: $showSubscriptionOffer) {
                 PaywallView(onSubscribed: {

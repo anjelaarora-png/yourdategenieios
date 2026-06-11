@@ -1,4 +1,4 @@
-project_id = "vuqmxacjtrhsqvswxmxu"
+project_id = "jhpwacmsocjmzhimtbxj"
 
 # generate-date-plan is called by the web/Lovable frontend (not the iOS app) so it remains
 # with verify_jwt = false to avoid breaking the web flow. All other functions require a

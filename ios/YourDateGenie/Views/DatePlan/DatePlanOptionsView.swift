@@ -22,6 +22,8 @@ struct DatePlanOptionsView: View {
     @State private var loadingSpinnerRotation: Double = 0
     @State private var showSavedBanner = false
     @State private var showCloseConfirmation = false
+    @State private var showSaveDatePicker = false
+    @State private var pendingPlanForSave: DatePlan? = nil
 
     @State private var inviterFirstChoiceIndex: Int?
     @State private var inviterSecondChoiceIndex: Int?
@@ -186,6 +188,22 @@ struct DatePlanOptionsView: View {
         .sheet(isPresented: $showAddToCalendar) {
             addToCalendarSheet(plan: selectedPlan)
         }
+        .sheet(isPresented: $showSaveDatePicker) {
+            if let plan = pendingPlanForSave, let onSave = onSave {
+                DatePickerSheet(planTitle: plan.title) { date in
+                    var updatedPlan = plan
+                    updatedPlan.scheduledDate = date
+                    showSaveDatePicker = false
+                    pendingPlanForSave = nil
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        commitSave(updatedPlan, using: onSave)
+                    }
+                } onCancel: {
+                    showSaveDatePicker = false
+                    pendingPlanForSave = nil
+                }
+            }
+        }
         .alert("Calendar", isPresented: $showCalendarAlert) {
             Button("OK") { calendarMessage = nil }
         } message: {
@@ -206,6 +224,20 @@ struct DatePlanOptionsView: View {
         }
     }
     
+    // MARK: - Commit Save (shared helper)
+    private func commitSave(_ plan: DatePlan, using onSave: (DatePlan) -> Void) {
+        onSave(plan)
+        withAnimation(.spring(response: 0.3)) {
+            savedPlanIds.insert(plan.id)
+        }
+        showSavedBanner = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+            withAnimation(.easeOut(duration: 0.25)) {
+                showSavedBanner = false
+            }
+        }
+    }
+
     // MARK: - Add to Calendar Sheet
     private func addToCalendarSheet(plan: DatePlan) -> some View {
         NavigationStack {
@@ -486,9 +518,10 @@ struct DatePlanOptionsView: View {
               let first = inviterFirstChoiceIndex, let second = inviterSecondChoiceIndex else { return }
         let third = [0, 1, 2].first(where: { $0 != first && $0 != second }) ?? 0
         Task {
-            try? await SupabaseService.shared.updatePartnerSessionPlanRank(planId: ids[first], inviterRank: 1, partnerRank: nil)
-            try? await SupabaseService.shared.updatePartnerSessionPlanRank(planId: ids[second], inviterRank: 2, partnerRank: nil)
-            try? await SupabaseService.shared.updatePartnerSessionPlanRank(planId: ids[third], inviterRank: 3, partnerRank: nil)
+            async let r1: () = { try? await SupabaseService.shared.updatePartnerSessionPlanRank(planId: ids[first], inviterRank: 1, partnerRank: nil) }()
+            async let r2: () = { try? await SupabaseService.shared.updatePartnerSessionPlanRank(planId: ids[second], inviterRank: 2, partnerRank: nil) }()
+            async let r3: () = { try? await SupabaseService.shared.updatePartnerSessionPlanRank(planId: ids[third], inviterRank: 3, partnerRank: nil) }()
+            _ = await (r1, r2, r3)
             await MainActor.run { inviterRankSubmitted = true }
         }
     }
@@ -499,15 +532,14 @@ struct DatePlanOptionsView: View {
             if let onSave = onSave {
                 let isCurrentSaved = savedPlanIds.contains(selectedPlan.id)
                 Button {
-                    onSave(selectedPlan)
-                    withAnimation(.spring(response: 0.3)) {
-                        savedPlanIds.insert(selectedPlan.id)
-                    }
-                    showSavedBanner = true
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
-                        withAnimation(.easeOut(duration: 0.25)) {
-                            showSavedBanner = false
-                        }
+                    let plan = selectedPlan
+                    if plan.scheduledDate != nil {
+                        // Date already set — save immediately
+                        commitSave(plan, using: onSave)
+                    } else {
+                        // No date yet — ask the user before saving
+                        pendingPlanForSave = plan
+                        showSaveDatePicker = true
                     }
                 } label: {
                     HStack(spacing: 10) {

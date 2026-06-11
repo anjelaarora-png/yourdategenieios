@@ -1,6 +1,7 @@
-import { Button } from "@/components/ui/button";
-import { Check, Sparkles, Zap, Gift, ArrowRight } from "lucide-react";
-import { Link } from "react-router-dom";
+import { useEffect, useRef } from "react";
+import { Check, Sparkles, Zap, Gift } from "lucide-react";
+import { Events } from "@/lib/analytics";
+import { PrimaryCTA } from "@/components/PrimaryCTA";
 
 const tiers = [
   {
@@ -59,8 +60,27 @@ const tiers = [
 ];
 
 const Pricing = () => {
+  const sectionRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    const node = sectionRef.current;
+    if (!node) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          Events.pricingViewed();
+          observer.disconnect();
+        }
+      },
+      { threshold: 0.3 }
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+
   return (
-    <section id="pricing" className="py-16 sm:py-24 bg-secondary/30">
+    <section ref={sectionRef} id="pricing" className="py-16 sm:py-24 bg-secondary/30">
       <div className="container px-4 sm:px-6 lg:px-8">
         <div className="text-center max-w-2xl mx-auto mb-10 sm:mb-16">
           <h2 className="font-display text-2xl sm:text-3xl md:text-4xl lg:text-5xl mb-4 text-foreground">
@@ -115,22 +135,11 @@ const Pricing = () => {
                 ))}
               </ul>
 
-              <Button 
-                asChild 
-                size="lg"
-                className={`w-full group ${
-                  tier.popular 
-                    ? "gradient-gold text-primary-foreground font-bold hover:opacity-90 glow-gold" 
-                    : tier.highlight === false && tier.price === "Free"
-                    ? "bg-primary text-primary-foreground font-semibold hover:bg-primary/90"
-                    : "bg-secondary hover:bg-secondary/80 text-foreground"
-                }`}
-              >
-                <Link to="/signup">
-                  {tier.cta}
-                  <ArrowRight className="ml-2 w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                </Link>
-              </Button>
+              <PrimaryCTA
+                source="landing_pricing"
+                appStorePlacement="pricing"
+                className="w-full"
+              />
             </div>
           ))}
         </div>

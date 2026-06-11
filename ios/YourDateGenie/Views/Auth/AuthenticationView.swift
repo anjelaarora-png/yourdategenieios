@@ -171,7 +171,15 @@ struct AuthenticationView: View {
         }
         .onChange(of: profileManager.isLoggedIn) { _, isLoggedIn in
             if isLoggedIn {
-                if profileManager.hasCompletedPreferences {
+                // `hasEverLoggedIn` is written to keychain on first successful auth and survives
+                // sign-out. Use it to distinguish a returning user (→ main app) from a brand-new
+                // user who has never set preferences (→ onboarding gate).
+                //
+                // We cannot rely on `profileManager.hasCompletedPreferences` here because it is
+                // cleared on sign-out and only restored once the async DB fetch finishes. Using it
+                // would incorrectly send returning users through the preferences onboarding.
+                let isReturningUser = KeychainManager.shared.getHasEverLoggedIn()
+                if isReturningUser || profileManager.hasCompletedPreferences {
                     coordinator.completeSignIn()
                 } else {
                     coordinator.completeSignUp()
@@ -205,6 +213,9 @@ struct AuthenticationView: View {
                     .signIn,
                     onRequest: { request in
                         request.requestedScopes = [.fullName, .email]
+                        // Generate a per-attempt nonce; hash goes to Apple, raw value goes to
+                        // Supabase during token exchange for replay protection.
+                        request.nonce = socialAuth.generateAndCacheNonce()
                     },
                     onCompletion: { result in
                         // Pass the authorization Apple already collected straight to the service.

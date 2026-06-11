@@ -5,28 +5,61 @@ import SwiftUI
 /// OpenTable / Resy / Call chips — shared by the single-venue sheet and the multi-venue reserve list.
 ///
 /// Visibility rules:
-/// - **OpenTable**: always shown for any restaurant (OpenTable operates in US/CA/UK/AU).
-/// - **Resy**: shown only when (a) `reservationPlatforms` explicitly contains "resy",
-///   OR (b) platforms is unknown/empty AND the address resolves to a city in Resy's network.
+/// - **OpenTable**: shown only when `reservationPlatforms` contains "opentable", OR when
+///   `bookingUrl` is an OpenTable URL. Never shown speculatively — this prevents the
+///   OpenTable app from intercepting the URL and displaying a generic "near you" home screen.
+/// - **Resy**: shown only when `reservationPlatforms` contains "resy", OR when `bookingUrl`
+///   is a Resy URL.
 /// - **Call**: always shown; dials directly when a phone number is available, otherwise
-///   opens a Google search for the venue's number so the chip is never missing.
+///   opens a Google search for the venue\'s number so the chip is never missing.
 struct ReservationPlatformActionRow: View {
     let venueName: String
     let phoneNumber: String?
-    /// Full address used to detect whether Resy operates in this city.
+    /// Full address (kept for display purposes).
     var address: String? = nil
-    /// Confirmed booking platforms from AI / Google Places. nil = unknown (use city-based fallback).
+    /// Confirmed booking platforms from AI / Google Places. Buttons are only shown for listed platforms.
     var reservationPlatforms: [String]? = nil
-    /// Called after OpenTable, Resy, or Call (e.g. dismiss sheet).
+    /// Direct booking URL (OpenTable restref, Resy venue page, etc.).
+    var bookingUrl: String? = nil
+    /// Called after any action (e.g. dismiss sheet).
     var onAction: () -> Void = {}
 
-    // Resy is shown when explicitly confirmed, or when the city is in Resy's network and
-    // platforms are unknown (never hidden just because we couldn't detect them).
+    private func platformFromUrl(_ url: String?) -> String? {
+        guard let url = url?.lowercased() else { return nil }
+        if url.contains("opentable.") { return "opentable" }
+        if url.contains("resy.com") { return "resy" }
+        return nil
+    }
+
+    /// Show OpenTable only when we have confirmed evidence the restaurant is listed there.
+    private var showOpenTable: Bool {
+        if let platforms = reservationPlatforms, !platforms.isEmpty {
+            return platforms.contains("opentable")
+        }
+        return platformFromUrl(bookingUrl) == "opentable"
+    }
+
+    /// Show Resy only when we have confirmed evidence the restaurant is listed there.
     private var showResy: Bool {
         if let platforms = reservationPlatforms, !platforms.isEmpty {
             return platforms.contains("resy")
         }
-        return OpenTableReservationSafari.isResySupported(for: address)
+        return platformFromUrl(bookingUrl) == "resy"
+    }
+
+    /// Opens the direct booking URL via in-app Safari when it matches the platform,
+    /// otherwise falls back to a pre-filled search — also via in-app Safari so the
+    /// platform app cannot intercept and ignore the search parameters.
+    private func openPlatform(_ platformId: String) {
+        let directPlatform = platformFromUrl(bookingUrl)
+        if directPlatform == platformId, let urlStr = bookingUrl, let url = URL(string: urlStr) {
+            OpenTableReservationSafari.openInSafari(url)
+        } else if platformId == "opentable" {
+            OpenTableReservationSafari.openSearch(venueName: venueName)
+        } else if platformId == "resy" {
+            OpenTableReservationSafari.openResySearch(venueName: venueName)
+        }
+        onAction()
     }
 
     var body: some View {
@@ -40,21 +73,21 @@ struct ReservationPlatformActionRow: View {
                 .foregroundColor(Color.luxuryMuted)
 
             VStack(spacing: 10) {
-                Button {
-                    OpenTableReservationSafari.openSearch(venueName: venueName)
-                    onAction()
-                } label: {
-                    ResRowLabel(title: "OpenTable", detail: "Book online instantly", icon: "calendar.badge.plus")
+                if showOpenTable {
+                    Button {
+                        openPlatform("opentable")
+                    } label: {
+                        ResRowLabel(title: "OpenTable", detail: "Book online", icon: "calendar.badge.plus")
+                    }
+                    .buttonStyle(ResOptionButtonStyle())
+                    .accessibilityLabel("Book on OpenTable")
                 }
-                .buttonStyle(ResOptionButtonStyle())
-                .accessibilityLabel("Book on OpenTable")
 
                 if showResy {
                     Button {
-                        OpenTableReservationSafari.openResySearch(venueName: venueName)
-                        onAction()
+                        openPlatform("resy")
                     } label: {
-                        ResRowLabel(title: "Resy", detail: "Alternative online booking", icon: "calendar.badge.plus")
+                        ResRowLabel(title: "Resy", detail: "Book online", icon: "calendar.badge.plus")
                     }
                     .buttonStyle(ResOptionButtonStyle())
                     .accessibilityLabel("Book on Resy")
@@ -105,6 +138,7 @@ struct ReservationPlatformPickerSheet: View {
                             phoneNumber: payload.phoneNumber,
                             address: payload.address,
                             reservationPlatforms: payload.reservationPlatforms,
+                            bookingUrl: payload.bookingUrl,
                             onAction: onDismiss
                         )
                         .padding(16)

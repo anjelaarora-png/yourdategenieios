@@ -26,33 +26,37 @@ class DatePlanGeneratorService: ObservableObject {
         case parsingError(String)
         case invalidResponse
         case timeout
+        case unauthorized
+        case rateLimited
         
         var errorDescription: String? {
             switch self {
-            case .missingAPIKey: return "OpenAI API key is not configured. Please add your API key in Xcode scheme environment variables."
+            case .missingAPIKey: return "Supabase is not configured. Please check your setup."
             case .networkError(let msg): return "Network error: \(msg)"
-            case .apiError(let msg): return "API error: \(msg)"
+            case .apiError(let msg): return "Error: \(msg)"
             case .parsingError(let msg): return "Parsing error: \(msg)"
             case .invalidResponse: return "Invalid response from AI"
             case .timeout: return "Request timed out. Please try again."
+            case .unauthorized: return "Please sign in to generate date plans."
+            case .rateLimited: return "Too many requests. Please wait a moment and try again."
             }
         }
         
         var recoverySuggestion: String? {
             switch self {
             case .missingAPIKey:
-                return "Go to Product > Scheme > Edit Scheme > Run > Arguments > Environment Variables, then add OPENAI_API_KEY with your OpenAI API key."
+                return "Check that SUPABASE_URL and SUPABASE_ANON_KEY are set in Secrets.xcconfig."
             case .networkError:
                 return "Please check your internet connection and try again."
             case .apiError(let msg):
-                if msg.contains("401") {
-                    return "Your API key may be invalid. Please verify it at platform.openai.com."
-                } else if msg.contains("429") {
-                    return "API rate limit reached. Please wait a moment and try again."
+                if msg.contains("429") {
+                    return "Rate limit reached. Please wait a moment and try again."
                 }
                 return "Please try again later."
             case .timeout:
-                return "The request took too long. Please try again with a simpler query."
+                return "The request took too long. Please try again."
+            case .rateLimited:
+                return "Please wait a minute before generating another plan."
             default:
                 return "Please try again."
             }
@@ -87,156 +91,22 @@ class DatePlanGeneratorService: ObservableObject {
         
         do {
             await updateProgress(0.1, message: "Consulting the stars...")
-            
-            let prompt = buildPrompt(from: questionnaire)
-            
             await updateProgress(0.2, message: "Finding hidden gems...")
-            
-            await MainActor.run {
-                startProgressSimulation()
-            }
-            
-            let response = try await callOpenAIAPI(prompt: prompt)
-            
-            await MainActor.run {
-                stopProgressSimulation()
-            }
-            await updateProgress(0.6, message: "Adding the magic touches...")
-            
-            let plans = try parseResponse(response)
-            
-            await updateProgress(0.85, message: "Almost ready...")
-            
-            var resultPlans: [DatePlan] = plans
-            
-            // Starting point from user-provided address (required). Use the user's exact input for display so "11 Lisa Ct, Colonia" appears as entered; use geocoding only for coordinates.
-            let startingPoint: StartingPoint?
-            if Config.isGooglePlacesConfigured,
-               let startResult = try? await GooglePlacesService.shared.geocodeAddress(startingAddress) {
-                startingPoint = StartingPoint(
-                    name: "Your location",
-                    address: startingAddress,
-                    latitude: startResult.latitude,
-                    longitude: startResult.longitude
-                )
-            } else {
-                startingPoint = nil
-            }
-            resultPlans = resultPlans.map { plan in
-                let itineraryStops = plan.stops.enumerated().map { index, stop in
-                    let legMode = questionnaire.transportationMode
-                    return DatePlanStop(
-                        order: index + 1,
-                        name: stop.name,
-                        venueType: stop.venueType,
-                        timeSlot: stop.timeSlot,
-                        duration: stop.duration,
-                        description: stop.description,
-                        whyItFits: stop.whyItFits,
-                        romanticTip: stop.romanticTip,
-                        emoji: stop.emoji,
-                        travelTimeFromPrevious: stop.travelTimeFromPrevious,
-                        travelDistanceFromPrevious: stop.travelDistanceFromPrevious,
-                        travelMode: legMode,
-                        validated: stop.validated,
-                        placeId: stop.placeId,
-                        address: stop.address,
-                        latitude: stop.latitude,
-                        longitude: stop.longitude,
-                        websiteUrl: stop.websiteUrl,
-                        phoneNumber: stop.phoneNumber,
-                        openingHours: stop.openingHours,
-                        estimatedCostPerPerson: stop.estimatedCostPerPerson,
-                        bookingUrl: stop.bookingUrl,
-                        imageUrl: stop.imageUrl
-                    )
-                }
-                return DatePlan(
-                    optionLabel: plan.optionLabel,
-                    title: plan.title,
-                    tagline: plan.tagline,
-                    totalDuration: plan.totalDuration,
-                    estimatedCost: plan.estimatedCost,
-                    stops: itineraryStops,
-                    startingPoint: startingPoint,
-                    genieSecretTouch: plan.genieSecretTouch,
-                    packingList: plan.packingList,
-                    weatherNote: plan.weatherNote,
-                    giftSuggestions: plan.giftSuggestions,
-                    conversationStarters: plan.conversationStarters
-                )
-            }
-            
-            // Verify option A only so we can show it immediately; B and C verify in background while user reviews A.
-            let city = questionnaire.city
-            await updateProgress(0.88, message: "Almost ready...")
-            var verifiedPlan0: DatePlan = resultPlans[0]
-            var verifiedStops0: [DatePlanStop] = []
-            for stop in resultPlans[0].stops {
-                if let verifiedStop = try? await GooglePlacesService.shared.verifyVenue(stop, city: city) {
-                    verifiedStops0.append(verifiedStop)
-                } else {
-                    verifiedStops0.append(stop)
-                }
-            }
-            verifiedPlan0 = DatePlan(
-                optionLabel: resultPlans[0].optionLabel,
-                title: resultPlans[0].title,
-                tagline: resultPlans[0].tagline,
-                totalDuration: resultPlans[0].totalDuration,
-                estimatedCost: resultPlans[0].estimatedCost,
-                stops: verifiedStops0,
-                startingPoint: resultPlans[0].startingPoint,
-                genieSecretTouch: resultPlans[0].genieSecretTouch,
-                packingList: resultPlans[0].packingList,
-                weatherNote: resultPlans[0].weatherNote,
-                giftSuggestions: resultPlans[0].giftSuggestions,
-                conversationStarters: resultPlans[0].conversationStarters
-            )
+
+            await MainActor.run { startProgressSimulation() }
+
+            // All generation, venue verification, and directions enrichment happen server-side.
+            let plans = try await callEdgeFunction(preferences: questionnaire)
+
+            await MainActor.run { stopProgressSimulation() }
             await updateProgress(1.0, message: "Your magical evening awaits!")
-            let initialPlans: [DatePlan] = [verifiedPlan0, resultPlans[1], resultPlans[2]]
+
             await MainActor.run {
-                self.generatedPlans = initialPlans
+                self.generatedPlans = plans
                 self.isGenerating = false
-                self.loadingPlanIndices = [1, 2]
+                self.loadingPlanIndices = []
             }
-            // Verify options B and C in background; user sees option A and preview of B/C until done.
-            for index in [1, 2] {
-                let planToVerify = resultPlans[index]
-                Task {
-                    var verifiedStops: [DatePlanStop] = []
-                    for stop in planToVerify.stops {
-                        if let verifiedStop = try? await GooglePlacesService.shared.verifyVenue(stop, city: city) {
-                            verifiedStops.append(verifiedStop)
-                        } else {
-                            verifiedStops.append(stop)
-                        }
-                    }
-                    let verifiedPlan = DatePlan(
-                        optionLabel: planToVerify.optionLabel,
-                        title: planToVerify.title,
-                        tagline: planToVerify.tagline,
-                        totalDuration: planToVerify.totalDuration,
-                        estimatedCost: planToVerify.estimatedCost,
-                        stops: verifiedStops,
-                        startingPoint: planToVerify.startingPoint,
-                        genieSecretTouch: planToVerify.genieSecretTouch,
-                        packingList: planToVerify.packingList,
-                        weatherNote: planToVerify.weatherNote,
-                        giftSuggestions: planToVerify.giftSuggestions,
-                        conversationStarters: planToVerify.conversationStarters
-                    )
-                    await MainActor.run {
-                        if index < self.generatedPlans.count {
-                            var updated = self.generatedPlans
-                            updated[index] = verifiedPlan
-                            self.generatedPlans = updated
-                        }
-                        self.loadingPlanIndices.remove(index)
-                    }
-                }
-            }
-            return initialPlans
+            return plans
             
         } catch {
             await MainActor.run {
@@ -249,8 +119,33 @@ class DatePlanGeneratorService: ObservableObject {
         }
     }
     
-    // MARK: - Build Prompt
-    
+    // MARK: - Edge Function Call
+
+    /// Calls the generate-date-plan Edge Function and parses the returned datePlans array.
+    private func callEdgeFunction(preferences: QuestionnaireData) async throws -> [DatePlan] {
+        guard Config.isSupabaseConfigured else {
+            throw GenerationError.missingAPIKey
+        }
+        do {
+            let data = try await SupabaseService.shared.generateDatePlanEdge(preferences: preferences)
+            guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let plansArray = json["datePlans"] as? [[String: Any]], !plansArray.isEmpty else {
+                throw GenerationError.invalidResponse
+            }
+            return try plansArray.map { try parseDatePlan(from: $0) }
+        } catch let supabaseError as SupabaseError {
+            switch supabaseError {
+            case .unauthorized: throw GenerationError.unauthorized
+            case .authFailed(let msg):
+                if msg.lowercased().contains("rate") { throw GenerationError.rateLimited }
+                throw GenerationError.apiError(msg)
+            default: throw GenerationError.networkError(supabaseError.localizedDescription)
+            }
+        }
+    }
+
+    // MARK: - Legacy Prompt Builder (kept for reference — no longer used at runtime)
+
     /// Currency for the user's region/VPN so costs display in local currency.
     private static var deviceCurrencyInstruction: String {
         let region = Locale.current.region?.identifier ?? ""
@@ -558,99 +453,34 @@ class DatePlanGeneratorService: ObservableObject {
         """
     }
     
-    // MARK: - Call OpenAI API
-    
-    private func callOpenAIAPI(prompt: String) async throws -> String {
-        // Pre-flight validation: Check for API key before making request
-        guard Config.isOpenAIConfigured else {
-            throw GenerationError.missingAPIKey
-        }
-        
-        guard let url = URL(string: Config.openAIAPIEndpoint) else {
-            throw GenerationError.networkError("Invalid API URL")
-        }
-        
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("Bearer \(Config.openAIAPIKey)", forHTTPHeaderField: "Authorization")
-        request.timeoutInterval = Config.apiTimeout
-        
-        let body: [String: Any] = [
-            "model": Config.openAIModel,
-            "max_tokens": 4096,
-            "messages": [
-                [
-                    "role": "system",
-                    "content": "You are a romantic date planning expert. Always respond with valid JSON only, no markdown code blocks or additional text. Create distinctly different plans and creative, non-generic titles every time."
-                ],
-                ["role": "user", "content": prompt]
-            ],
-            "response_format": ["type": "json_object"]
-        ]
-        
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
-        
-        let (data, response) = try await URLSession.shared.data(for: request)
-        
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw GenerationError.invalidResponse
-        }
-        
-        guard httpResponse.statusCode == 200 else {
-            let errorBody = String(data: data, encoding: .utf8) ?? "Unknown error"
-            throw GenerationError.apiError("Status \(httpResponse.statusCode): \(errorBody)")
-        }
-        
-        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let choices = json["choices"] as? [[String: Any]],
-              let firstChoice = choices.first,
-              let message = firstChoice["message"] as? [String: Any],
-              let content = message["content"] as? String else {
-            throw GenerationError.invalidResponse
-        }
-        
-        return content
-    }
-    
     // MARK: - Parse Response
     
     private func parseResponse(_ response: String) throws -> [DatePlan] {
-        // Handle empty response
         guard !response.isEmpty else {
             throw GenerationError.parsingError("Empty response received")
         }
-        
-        // Extract JSON from response (AI might include markdown code blocks)
+
         var jsonString = response.trimmingCharacters(in: .whitespacesAndNewlines)
-        
-        // Safely extract JSON object from response
+
         if let jsonStart = jsonString.firstIndex(of: "{"),
            let jsonEnd = jsonString.lastIndex(of: "}") {
-            // Ensure valid range (start must come before end)
             guard jsonStart <= jsonEnd else {
                 throw GenerationError.parsingError("Invalid JSON structure in response")
             }
             jsonString = String(jsonString[jsonStart...jsonEnd])
         }
-        
+
         guard let jsonData = jsonString.data(using: .utf8) else {
             throw GenerationError.parsingError("Could not convert response to data")
         }
-        
+
         guard let json = try JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
-              let plansArray = json["plans"] as? [[String: Any]] else {
+              // Accept both "plans" (legacy) and "datePlans" (Edge Function response)
+              let plansArray = (json["plans"] ?? json["datePlans"]) as? [[String: Any]] else {
             throw GenerationError.parsingError("Invalid JSON structure")
         }
-        
-        var plans: [DatePlan] = []
-        
-        for planJson in plansArray {
-            let plan = try parseDatePlan(from: planJson)
-            plans.append(plan)
-        }
-        
-        return plans
+
+        return try plansArray.map { try parseDatePlan(from: $0) }
     }
     
     private func parseDatePlan(from json: [String: Any]) throws -> DatePlan {

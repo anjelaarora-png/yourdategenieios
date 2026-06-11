@@ -28,7 +28,7 @@ export function useIsAdmin() {
     }
 
     checkAdmin();
-  }, [user]);
+  }, [user?.id]);
 
   return { isAdmin, loading };
 }

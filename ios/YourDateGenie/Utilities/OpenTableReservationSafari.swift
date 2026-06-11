@@ -28,10 +28,12 @@ enum OpenTableReservationSafari {
         return comp.url
     }
 
-    /// Opens the OpenTable search page in the system Safari browser.
+    /// Opens the OpenTable search page in the in-app Safari browser.
+    /// Using SFSafariViewController (via openInSafari) ensures the OpenTable app cannot
+    /// intercept the URL via universal links and replace the search with its home screen.
     static func openSearch(venueName: String, partySize: Int = 2) {
         guard let url = makeSearchURL(venueName: venueName, partySize: partySize) else { return }
-        UIApplication.shared.open(url)
+        openInSafari(url)
     }
 
     // MARK: - Resy
@@ -78,10 +80,11 @@ enum OpenTableReservationSafari {
         return supportedCities.contains(where: { city.contains($0) })
     }
 
-    /// Opens the Resy search page in the system Safari browser.
+    /// Opens the Resy search page in the in-app Safari browser.
+    /// Using SFSafariViewController ensures the Resy app cannot intercept the search URL.
     static func openResySearch(venueName: String, partySize: Int = 2) {
         guard let url = makeResySearchURL(venueName: venueName, partySize: partySize) else { return }
-        UIApplication.shared.open(url)
+        openInSafari(url)
     }
 
     // MARK: - Phone

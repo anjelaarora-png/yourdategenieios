@@ -211,7 +211,7 @@ struct LuxuryMainAppView: View {
             GiftFinderView(datePlan: datePlan, dateLocation: dateLocation)
         case .playlist(let title, let planId):
             PlaylistWidgetView(planTitle: title, planId: planId)
-        case .reservation(let name, _, let addr, let phone, _, _, _):
+        case .reservation(let name, _, let addr, let phone, let bookingUrl, _, _):
             // Redirect: set the platform picker payload directly and dismiss so the
             // dedicated reservationPlatformPickerPayload sheet handles presentation
             // without a flicker-prone relay.
@@ -220,7 +220,8 @@ struct LuxuryMainAppView: View {
                     coordinator.reservationPlatformPickerPayload = ReservationPlatformPickerPayload(
                         venueName: name,
                         phoneNumber: phone,
-                        address: addr
+                        address: addr,
+                        bookingUrl: bookingUrl
                     )
                     coordinator.dismissSheet()
                 }

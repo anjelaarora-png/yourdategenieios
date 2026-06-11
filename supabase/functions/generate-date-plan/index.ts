@@ -32,9 +32,9 @@ serve(async (req) => {
       return jsonResponse(400, { error: "Missing preferences data" });
     }
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-      console.error("LOVABLE_API_KEY is not configured");
+    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
+    if (!OPENAI_API_KEY) {
+      console.error("OPENAI_API_KEY is not configured");
       return jsonResponse(500, { error: "AI service not configured" });
     }
 
@@ -44,7 +44,7 @@ serve(async (req) => {
 
     let aiResponse: any;
     try {
-      aiResponse = await generateMultipleDatePlans({ apiKey: LOVABLE_API_KEY, prompt });
+      aiResponse = await generateMultipleDatePlans({ apiKey: OPENAI_API_KEY, prompt });
     } catch (e) {
       const status = (e as any)?.details?.status as number | undefined;
       const bodyPreview = (e as any)?.details?.bodyPreview as string | undefined;
@@ -126,40 +126,32 @@ serve(async (req) => {
     console.log(`[Validation] City: "${city}", Has API Key: ${!!GOOGLE_PLACES_API_KEY}`);
     
     if (GOOGLE_PLACES_API_KEY && city) {
-      console.log(`[Validation] Starting venue validation for ${plans.length} plans`);
-      
-      // Validate each plan with error isolation
-      for (const plan of plans) {
+      console.log(`[Validation] Starting venue validation for ${plans.length} plans (parallel)`);
+
+      // Validate all plans in parallel — each plan's stops are already parallelised inside validateAllStops.
+      await Promise.all(plans.map(async (plan: any) => {
         if (plan.stops && Array.isArray(plan.stops) && plan.stops.length > 0) {
           const originalStops = plan.stops.map((stop: any, index: number) => ({
             ...stop,
             validated: false,
             order: index + 1,
           }));
-          
           try {
             console.log(`[Validation] Validating ${plan.stops.length} stops for plan: ${plan.title || 'Untitled'}`);
             const validatedStops = await validateAllStops(plan.stops, city, GOOGLE_PLACES_API_KEY);
-            
-            // Use validated stops (includes both verified and unverified venues)
             plan.stops = validatedStops;
-            
-            // Log validation results
             const verified = plan.stops.filter((s: any) => s?.validated).length;
             const unverified = plan.stops.filter((s: any) => !s?.validated).length;
             const withWebsite = plan.stops.filter((s: any) => s?.websiteUrl).length;
-            
             console.log(`[Validation] Results - Verified: ${verified}, Unverified: ${unverified}, With Website: ${withWebsite}`);
           } catch (validationError) {
-            // Log error but don't fail - keep original stops as unverified
             console.error(`[Validation] Error validating plan "${plan.title || 'Untitled'}":`, validationError);
             plan.stops = originalStops;
           }
         } else if (!plan.stops || !Array.isArray(plan.stops)) {
-          // Ensure stops is at least an empty array
           plan.stops = [];
         }
-      }
+      }));
     } else {
       console.log(`[Validation] Cannot verify venues - missing ${!GOOGLE_PLACES_API_KEY ? 'API key' : 'city'}`);
       // Keep AI-generated stops as unverified - app works anywhere
@@ -220,9 +212,9 @@ serve(async (req) => {
       }
     }
 
-    // Enrich stops with accurate travel time/distance from Directions API; use selected transportation mode.
+    // Enrich stops with accurate travel time/distance from Directions API (all plans in parallel).
     if (GOOGLE_PLACES_API_KEY && sanitizedPlans.length > 0) {
-      for (const plan of sanitizedPlans) {
+      await Promise.all(sanitizedPlans.map(async (plan: any) => {
         const stops = Array.isArray(plan.stops) ? plan.stops : [];
         const start = plan.startingPoint;
         const withCoords = stops.filter(
@@ -232,7 +224,7 @@ serve(async (req) => {
             Number.isFinite(s.latitude) &&
             Number.isFinite(s.longitude)
         );
-        if (withCoords.length === 0) continue;
+        if (withCoords.length === 0) return;
 
         let legs: { durationText: string; distanceText: string }[] = [];
         if (start) {
@@ -258,7 +250,7 @@ serve(async (req) => {
           stop.travelDistanceFromPrevious = leg.distanceText || stop.travelDistanceFromPrevious;
           stop.travelMode = appTravelMode;
         }
-      }
+      }));
       console.log(`[Directions] Enriched travel legs using ${transportationMode}`);
     }
 

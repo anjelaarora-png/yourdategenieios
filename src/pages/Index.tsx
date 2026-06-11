@@ -7,10 +7,12 @@ import HowItWorks from "@/components/landing/HowItWorks";
 import Pricing from "@/components/landing/Pricing";
 import Footer from "@/components/landing/Footer";
 import FloatingCTA from "@/components/landing/FloatingCTA";
+import { LaunchBanner } from "@/components/LaunchBanner";
 
 const Index = () => {
   return (
     <div className="min-h-screen bg-background">
+      <LaunchBanner />
       <Navbar />
       <main>
         <HeroSection />

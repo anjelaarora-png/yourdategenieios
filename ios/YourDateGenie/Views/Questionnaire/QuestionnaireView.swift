@@ -394,8 +394,8 @@ struct QuestionnaireView: View {
     private func handleGenerationError(_ error: DatePlanGeneratorService.GenerationError) {
         switch error {
         case .missingAPIKey:
-            errorTitle = "API Key Required"
-            errorMessage = "OpenAI API key is not configured.\n\nTo fix this:\n1. Open Xcode\n2. Go to Product > Scheme > Edit Scheme\n3. Select Run > Arguments\n4. Add OPENAI_API_KEY to Environment Variables\n5. Set its value to your OpenAI API key"
+            errorTitle = "Configuration Error"
+            errorMessage = "Supabase is not configured. Please check that SUPABASE_URL and SUPABASE_ANON_KEY are set in ios/Secrets.xcconfig and rebuild the app."
             showRetryOption = false
             
         case .networkError:
@@ -405,8 +405,8 @@ struct QuestionnaireView: View {
             
         case .apiError(let msg):
             if msg.contains("401") {
-                errorTitle = "Invalid API Key"
-                errorMessage = "Your OpenAI API key appears to be invalid. Please verify your key at platform.openai.com."
+                errorTitle = "Authentication Error"
+                errorMessage = "Session expired. Please sign in again."
                 showRetryOption = false
             } else if msg.contains("429") {
                 errorTitle = "Rate Limited"
@@ -414,7 +414,7 @@ struct QuestionnaireView: View {
                 showRetryOption = true
             } else if msg.contains("500") || msg.contains("502") || msg.contains("503") {
                 errorTitle = "Server Error"
-                errorMessage = "OpenAI's servers are temporarily unavailable. Please try again in a few moments."
+                errorMessage = "AI service temporarily unavailable. Please try again in a few moments."
                 showRetryOption = true
             } else {
                 errorTitle = "API Error"
@@ -435,6 +435,16 @@ struct QuestionnaireView: View {
         case .timeout:
             errorTitle = "Request Timed Out"
             errorMessage = "The request took too long to complete. This might be due to high server load. Please try again."
+            showRetryOption = true
+
+        case .unauthorized:
+            errorTitle = "Sign In Required"
+            errorMessage = "Please sign in to generate date plans."
+            showRetryOption = false
+
+        case .rateLimited:
+            errorTitle = "Too Many Requests"
+            errorMessage = "You've made too many requests. Please wait a minute and try again."
             showRetryOption = true
         }
         

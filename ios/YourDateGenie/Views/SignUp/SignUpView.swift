@@ -461,7 +461,7 @@ struct LuxuryDatePicker: View {
             }
         }
         .sheet(isPresented: $showPicker) {
-            DatePickerSheet(date: $tempDate) {
+            BirthdayPickerSheet(date: $tempDate) {
                 date = tempDate
                 showPicker = false
             }
@@ -471,7 +471,7 @@ struct LuxuryDatePicker: View {
     }
 }
 
-struct DatePickerSheet: View {
+struct BirthdayPickerSheet: View {
     @Binding var date: Date
     let onConfirm: () -> Void
     @Environment(\.dismiss) private var dismiss

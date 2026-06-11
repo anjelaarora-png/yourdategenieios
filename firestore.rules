@@ -1,0 +1,19 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /waitlist/{doc} {
+      // Anyone can create a new entry. Required: email, fullName, city, source, createdAt.
+      // Optional: phone, partnerEmail, userAgent.
+      allow create: if request.resource.data.email is string
+                    && request.resource.data.email.matches('.+@.+\\..+')
+                    && request.resource.data.fullName is string
+                    && request.resource.data.fullName.size() >= 1
+                    && request.resource.data.city is string
+                    && request.resource.data.city.size() >= 1
+                    && request.resource.data.source is string
+                    && request.resource.data.createdAt == request.time;
+      // No client-side reads, updates, or deletes
+      allow read, update, delete: if false;
+    }
+  }
+}

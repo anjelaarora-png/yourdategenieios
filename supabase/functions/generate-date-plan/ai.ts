@@ -15,7 +15,7 @@ PLAN TITLE — NON-NEGOTIABLE:
 - Great examples: "Velvet & City Lights" / "The Midnight Detour" / "Salt Air & Starlight" / "Candlelight & Conspiracy"
 - Put cuisine/neighborhood details in the tagline, NOT the title.`;
 
-const GATEWAY_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
+const GATEWAY_URL = "https://api.openai.com/v1/chat/completions";
 
 const isRetryableStatus = (status: number) =>
   status === 429 || status === 500 || status === 502 || status === 503 ||

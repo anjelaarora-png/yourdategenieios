@@ -72,89 +72,29 @@ enum LoveNoteRewriteStyle: String, CaseIterable, Identifiable {
     }
 }
 
-/// Rewrites the user's raw words into a short love note in the chosen style using the configured OpenAI API.
+/// Rewrites the user's raw words into a short love note in the chosen style via the rewrite-love-note Edge Function.
 enum LoveNoteAIService {
 
     static func rewrite(userText: String, style: LoveNoteRewriteStyle) async throws -> String {
-        guard Config.isOpenAIConfigured else {
+        guard Config.isSupabaseConfigured else {
             throw LoveNoteAIError.notConfigured
         }
-
-        let systemPrompt = """
-        \(style.systemRole)
-
-        Rules:
-        - Keep the same meaning and sentiment; do not add new facts or make things up.
-        - Keep it concise: 2–5 sentences or one short paragraph. No lists or bullets.
-        - Write in second person ("you") as if the author is speaking to their loved one.
-        - Do not use clichés or generic phrases; keep their voice and their specific message.
-        - Output only the rewritten love note, no quotes, no preamble, no "Here's your love note:".
-        """
-
-        let userPrompt = """
-        \(style.styleInstruction)
-
-        "\(userText)"
-        """
-
-        var body: [String: Any] = [
-            "model": Config.openAIModel,
-            "messages": [
-                ["role": "system", "content": systemPrompt],
-                ["role": "user", "content": userPrompt]
-            ],
-            "temperature": 0.8,
-            "max_tokens": 400
-        ]
-
-        guard let url = URL(string: Config.openAIAPIEndpoint) else {
-            throw LoveNoteAIError.invalidURL
-        }
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("Bearer \(Config.openAIAPIKey)", forHTTPHeaderField: "Authorization")
-        request.timeoutInterval = 30
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
-
-        let (data, response) = try await URLSession.shared.data(for: request)
-        guard let http = response as? HTTPURLResponse else {
-            throw LoveNoteAIError.invalidResponse
-        }
-        if http.statusCode != 200 {
-            let err = (try? JSONDecoder().decode(OpenAIErrorResponse.self, from: data))?.error?.message
-            if http.statusCode == 429 { throw LoveNoteAIError.rateLimited }
-            throw LoveNoteAIError.apiError(err ?? "HTTP \(http.statusCode)")
-        }
-
-        let decoded = try JSONDecoder().decode(OpenAIChatResponse.self, from: data)
-        guard var content = decoded.choices.first?.message.content, !content.isEmpty else {
+        do {
+            return try await SupabaseService.shared.rewriteLoveNote(
+                originalText: userText,
+                systemRole: style.systemRole,
+                styleInstruction: style.styleInstruction
+            )
+        } catch SupabaseError.unauthorized {
+            throw LoveNoteAIError.notConfigured
+        } catch SupabaseError.authFailed(let msg) {
+            if msg.lowercased().contains("rate") { throw LoveNoteAIError.rateLimited }
+            throw LoveNoteAIError.apiError(msg)
+        } catch SupabaseError.invalidResponse {
             throw LoveNoteAIError.noContent
+        } catch {
+            throw LoveNoteAIError.apiError(error.localizedDescription)
         }
-        content = content
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .replacingOccurrences(of: "^[\"']|[\"']$", with: "", options: .regularExpression)
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        return content
-    }
-}
-
-// MARK: - Response types (shared shape with GiftAIService)
-
-private struct OpenAIChatResponse: Decodable {
-    let choices: [Choice]
-    struct Choice: Decodable {
-        let message: Message
-        struct Message: Decodable {
-            let content: String?
-        }
-    }
-}
-
-private struct OpenAIErrorResponse: Decodable {
-    let error: ErrorDetail?
-    struct ErrorDetail: Decodable {
-        let message: String?
     }
 }
 
@@ -168,10 +108,10 @@ enum LoveNoteAIError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .notConfigured: return "OpenAI API key not set. Add OPENAI_API_KEY in Secrets to rewrite love notes."
+        case .notConfigured: return "Please sign in to rewrite love notes."
         case .invalidURL: return "Invalid API endpoint."
         case .invalidResponse: return "Invalid response from server."
-        case .noContent: return "Could not generate a poetic version. Try again."
+        case .noContent: return "Could not generate a rewritten version. Try again."
         case .rateLimited: return "Too many requests. Try again in a moment."
         case .apiError(let msg): return msg
         }

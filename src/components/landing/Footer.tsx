@@ -1,6 +1,6 @@
-import { Sparkles, ArrowRight, Heart } from "lucide-react";
+import { Sparkles, Heart } from "lucide-react";
 import { Link } from "react-router-dom";
-import { Button } from "@/components/ui/button";
+import { PrimaryCTA } from "@/components/PrimaryCTA";
 
 const Footer = () => {
   return (
@@ -19,20 +19,11 @@ const Footer = () => {
             <p className="text-muted-foreground mb-8 text-base sm:text-lg max-w-lg mx-auto">
               Join hundreds of couples who've transformed their relationship with thoughtful, personalized date plans.
             </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-              <Button 
-                asChild 
-                size="lg" 
-                className="gradient-gold text-primary-foreground font-bold px-10 py-7 text-lg glow-gold hover:opacity-90 transition-all hover:scale-105 group animate-pulse-glow w-full sm:w-auto"
-              >
-                <Link to="/signup">
-                  Start Planning Free
-                  <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                </Link>
-              </Button>
+            <div className="max-w-md mx-auto w-full">
+              <PrimaryCTA source="landing_footer" appStorePlacement="footer" />
             </div>
             <p className="mt-4 text-muted-foreground text-sm">
-              ✓ Free to start &nbsp;&nbsp; ✓ No credit card required &nbsp;&nbsp; ✓ Cancel anytime
+              ✓ Free early access &nbsp;&nbsp; ✓ No credit card required
             </p>
           </div>
         </div>
@@ -61,7 +52,7 @@ const Footer = () => {
               <Link to="/signup" className="text-primary hover:text-primary/80 transition-colors font-medium">
                 Sign Up Free
               </Link>
-              <Link to="/privacy-policy" className="hover:text-foreground transition-colors">
+              <Link to="/privacy" className="hover:text-foreground transition-colors">
                 Privacy Policy
               </Link>
               <Link to="/terms" className="hover:text-foreground transition-colors">

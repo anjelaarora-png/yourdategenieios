@@ -25,6 +25,7 @@ struct DatePlanResultView: View {
     @State private var showReserveVenuePicker = false
     @State private var reservableStopsForPicker: [DatePlanStop] = []
     @State private var platformPickerPayload: ReservationPlatformPickerPayload?
+    @State private var showSaveDatePicker = false
     
     var body: some View {
         NavigationStack {
@@ -168,6 +169,7 @@ struct DatePlanResultView: View {
                                 phoneNumber: stop.phoneNumber,
                                 address: stop.address,
                                 reservationPlatforms: stop.reservationPlatforms,
+                                bookingUrl: stop.bookingUrl,
                                 onAction: { showReserveVenuePicker = false }
                             )
                             .padding(.vertical, 4)
@@ -192,6 +194,17 @@ struct DatePlanResultView: View {
                 }
                 .toolbarBackground(Color.luxuryMaroon, for: .navigationBar)
                 .toolbarBackground(.visible, for: .navigationBar)
+            }
+        }
+        .sheet(isPresented: $showSaveDatePicker) {
+            DatePickerSheet(planTitle: plan.title) { date in
+                showSaveDatePicker = false
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    coordinator.savePlan(plan, plannedDate: date)
+                    withAnimation(.spring(response: 0.3)) { isSaved = true }
+                }
+            } onCancel: {
+                showSaveDatePicker = false
             }
         }
         .alert("Calendar", isPresented: $showCalendarAlert) {
@@ -468,7 +481,8 @@ struct DatePlanResultView: View {
                                 venueName: stop.name,
                                 phoneNumber: stop.phoneNumber,
                                 address: stop.address,
-                                reservationPlatforms: stop.reservationPlatforms
+                                reservationPlatforms: stop.reservationPlatforms,
+                                bookingUrl: stop.bookingUrl
                             )
                         }
                     }
@@ -693,7 +707,8 @@ struct DatePlanResultView: View {
                                 venueName: stop.name,
                                 phoneNumber: stop.phoneNumber,
                                 address: stop.address,
-                                reservationPlatforms: stop.reservationPlatforms
+                                reservationPlatforms: stop.reservationPlatforms,
+                                bookingUrl: stop.bookingUrl
                             )
                         } else {
                             reservableStopsForPicker = reservable
@@ -712,11 +727,12 @@ struct DatePlanResultView: View {
             // Main Action Button (Save) - only when onSave provided and not yet saved
             if onSave != nil {
                 Button {
-                    if let onSave = onSave, !isSaved {
-                        withAnimation(.spring(response: 0.3)) {
-                            isSaved = true
-                        }
-                        onSave()
+                    guard !isSaved else { return }
+                    if plan.scheduledDate != nil || coordinator.lastQuestionnaireScheduledDate != nil {
+                        withAnimation(.spring(response: 0.3)) { isSaved = true }
+                        onSave?()
+                    } else {
+                        showSaveDatePicker = true
                     }
                 } label: {
                     HStack(spacing: 10) {

@@ -33,7 +33,7 @@ CRITICAL RULES:
 
 IMPORTANT: The "stops" array is the MOST CRITICAL part of each plan. Never return empty stops!`;
 
-const GATEWAY_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
+const GATEWAY_URL = "https://api.openai.com/v1/chat/completions";
 
 const isRetryableStatus = (status: number) =>
   status === 429 || status === 500 || status === 502 || status === 503 ||

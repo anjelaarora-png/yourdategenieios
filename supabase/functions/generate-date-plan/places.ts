@@ -560,55 +560,44 @@ export async function validateAllStops(
     console.warn("[Validation] Could not geocode city for location bias:", e);
   }
 
-  const validatedStops: Stop[] = [];
-  
-  for (const stop of stops) {
-    // Skip stops with missing name
-    if (!stop || !stop.name || typeof stop.name !== 'string') {
-      console.warn("[Validation] Skipping stop with invalid name");
-      continue;
-    }
-    
+  // Validate all stops concurrently with a cap of 4 in-flight Google Places requests.
+  const CONCURRENCY = 4;
+  const validStops = stops.filter(
+    (s) => s && s.name && typeof s.name === "string"
+  );
+  const skipped = stops.length - validStops.length;
+  if (skipped > 0) console.warn(`[Validation] Skipped ${skipped} stops with invalid names`);
+
+  async function validateOne(stop: Stop): Promise<Stop | null> {
     try {
       const result = await validateVenueWithRetry(stop.name, stop.venueType || "", city, apiKey, cityCenter);
 
-      // Skip permanently closed venues, but keep unverified ones
       if (result.isPermanentlyClosed) {
         console.log(`[Validation] Excluding permanently closed venue: ${stop.name}`);
-        continue;
+        return null;
       }
-      
-      // If venue couldn't be verified, include it as unverified (works for any location)
       if (!result.isValid) {
         console.log(`[Validation] Including unverified venue: ${stop.name}`);
-        validatedStops.push({
-          ...stop,
-          validated: false,
-        });
-        continue;
+        return { ...stop, validated: false };
       }
 
-      // Use the official Google Maps name instead of AI-generated name
       const originalName = stop.name;
       const updatedName = result.officialName || stop.name;
-      
       if (originalName !== updatedName) {
         console.log(`[Validation] Updated venue name: "${originalName}" → "${updatedName}"`);
       }
 
-      // Merge platforms: prefer Places-detected (from real website), then fall back to AI hint
       const mergedPlatforms = (() => {
         const fromPlaces = result.reservationPlatforms ?? [];
         const fromAi = stop.reservationPlatforms ?? [];
-        // Also check bookingUrl from AI for platform hints
         const fromBooking = detectReservationPlatforms(stop.bookingUrl);
         const combined = new Set([...fromPlaces, ...fromBooking, ...fromAi]);
         return combined.size > 0 ? Array.from(combined) : undefined;
       })();
 
-      validatedStops.push({
+      return {
         ...stop,
-        name: updatedName, // Use official Google Maps name
+        name: updatedName,
         validated: true,
         placeId: result.placeId,
         address: result.formattedAddress,
@@ -619,16 +608,22 @@ export async function validateAllStops(
         openingHours: result.openingHours ?? stop.openingHours,
         imageUrl: result.imageUrl ?? stop.imageUrl,
         reservationPlatforms: mergedPlatforms,
-      });
+      };
     } catch (err) {
       console.error(`[Validation] Unexpected error validating ${stop.name}:`, err);
-      // Include the venue as unverified rather than skipping
-      validatedStops.push({
-        ...stop,
-        validated: false,
-      });
+      return { ...stop, validated: false };
     }
   }
+
+  // Process in batches to respect CONCURRENCY limit without losing ordering context.
+  const resultSlots: (Stop | null)[] = [];
+  for (let i = 0; i < validStops.length; i += CONCURRENCY) {
+    const batch = validStops.slice(i, i + CONCURRENCY);
+    const batchResults = await Promise.all(batch.map(validateOne));
+    resultSlots.push(...batchResults);
+  }
+
+  const validatedStops: Stop[] = resultSlots.filter((s): s is Stop => s !== null);
 
   console.log(`[Validation] Kept ${validatedStops.length}/${stops.length} validated venues`);
   
@@ -637,4 +632,5 @@ export async function validateAllStops(
     ...stop,
     order: index + 1,
   }));
+}
 }

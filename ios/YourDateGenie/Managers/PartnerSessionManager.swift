@@ -306,16 +306,19 @@ final class PartnerSessionManager: ObservableObject {
                     userId: userId
                 )
 
-                // 2. Also update legacy inviter_rank / partner_rank columns for backwards compat
+                // 2. Also update legacy inviter_rank / partner_rank columns for backwards compat (parallel)
                 if let planRowIds = await fetchPlanRowIds(partnerSessionId: partnerSessionId) {
-                    for entry in rankings {
-                        let idx = entry.planIndex - 1
-                        guard idx < planRowIds.count else { continue }
-                        switch role {
-                        case .inviter:
-                            try? await SupabaseService.shared.updatePartnerSessionPlanRank(planId: planRowIds[idx], inviterRank: entry.rankPosition, partnerRank: nil)
-                        case .partner:
-                            try? await SupabaseService.shared.updatePartnerSessionPlanRank(planId: planRowIds[idx], inviterRank: nil, partnerRank: entry.rankPosition)
+                    await withTaskGroup(of: Void.self) { group in
+                        for entry in rankings {
+                            let idx = entry.planIndex - 1
+                            guard idx < planRowIds.count else { continue }
+                            let planId = planRowIds[idx]
+                            switch role {
+                            case .inviter:
+                                group.addTask { try? await SupabaseService.shared.updatePartnerSessionPlanRank(planId: planId, inviterRank: entry.rankPosition, partnerRank: nil) }
+                            case .partner:
+                                group.addTask { try? await SupabaseService.shared.updatePartnerSessionPlanRank(planId: planId, inviterRank: nil, partnerRank: entry.rankPosition) }
+                            }
                         }
                     }
                 }

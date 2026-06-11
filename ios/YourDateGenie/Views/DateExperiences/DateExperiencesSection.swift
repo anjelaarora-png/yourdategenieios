@@ -15,10 +15,17 @@ final class DateExperienceViewModel: ObservableObject {
         fetchError = nil
 
         do {
+            // Only show events whose date_time is on or after the start of today.
+            let startOfToday = Calendar.current.startOfDay(for: Date())
+            let iso8601 = ISO8601DateFormatter()
+            iso8601.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            let todayString = iso8601.string(from: startOfToday)
+
             let results: [DateExperience] = try await SupabaseManager.shared.client
                 .from("events")
                 .select()
                 .eq("is_active", value: true)
+                .gte("date_time", value: todayString)
                 .order("date_time", ascending: true)
                 .execute()
                 .value

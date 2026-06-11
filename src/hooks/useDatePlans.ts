@@ -153,7 +153,7 @@ export function useDatePlans() {
           packing_list: plan.packingList,
           weather_note: plan.weatherNote,
           starting_point: plan.startingPoint ? (plan.startingPoint as unknown as Json) : null,
-          status: "generated",
+          status: "draft",
           gift_suggestions: (plan.giftSuggestions || []) as unknown as Json,
           conversation_starters: (plan.conversationStarters || []) as unknown as Json,
         })
@@ -174,13 +174,89 @@ export function useDatePlans() {
       };
 
       setPlans((prev) => [savedPlan, ...prev]);
-      toast({
-        title: "Plan saved! ✨",
-        description: "Your date plan has been saved to your collection.",
-      });
       return savedPlan;
     } catch (error) {
       console.error("Error saving plan:", error);
+      toast({
+        title: "Error",
+        description: "Failed to save your date plan.",
+        variant: "destructive",
+      });
+      return null;
+    }
+  };
+
+  /**
+   * Save a plan and assign a planned date in one atomic operation.
+   * This is the primary save path: status is set to "saved" and date_scheduled
+   * is populated so the DB check constraint (status='saved' → date_scheduled IS NOT NULL)
+   * is always satisfied.
+   */
+  const savePlanWithDate = async (
+    plan: DatePlan,
+    plannedDate: Date
+  ): Promise<SavedDatePlan | null> => {
+    if (!user) {
+      toast({
+        title: "Not signed in",
+        description: "Please sign in to save plans.",
+        variant: "destructive",
+      });
+      return null;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from("date_plans")
+        .insert({
+          user_id: user.id,
+          title: plan.title,
+          tagline: plan.tagline,
+          total_duration: plan.totalDuration,
+          estimated_cost: plan.estimatedCost,
+          stops: plan.stops as unknown as Json,
+          genie_secret_touch: plan.genieSecretTouch as unknown as Json,
+          packing_list: plan.packingList,
+          weather_note: plan.weatherNote,
+          starting_point: plan.startingPoint
+            ? (plan.startingPoint as unknown as Json)
+            : null,
+          status: "saved",
+          date_scheduled: plannedDate.toISOString(),
+          gift_suggestions: (plan.giftSuggestions || []) as unknown as Json,
+          conversation_starters: (
+            plan.conversationStarters || []
+          ) as unknown as Json,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      const savedPlan: SavedDatePlan = {
+        ...data,
+        stops: data.stops as unknown as DatePlan["stops"],
+        genie_secret_touch: data.genie_secret_touch as unknown as DatePlan["genieSecretTouch"],
+        starting_point: data.starting_point
+          ? (data.starting_point as unknown as StartingPoint)
+          : null,
+        gift_suggestions:
+          (data.gift_suggestions as unknown as GiftSuggestion[]) || null,
+        conversation_starters:
+          (data.conversation_starters as unknown as ConversationStarter[]) ||
+          null,
+        rating: data.rating || null,
+        rating_notes: data.rating_notes || null,
+      };
+
+      setPlans((prev) => [savedPlan, ...prev]);
+      toast({
+        title: "Plan saved! ✨",
+        description: `Your date is set for ${plannedDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}.`,
+      });
+      return savedPlan;
+    } catch (error) {
+      console.error("Error saving plan with date:", error);
       toast({
         title: "Error",
         description: "Failed to save your date plan.",
@@ -272,6 +348,7 @@ export function useDatePlans() {
     plans,
     loading,
     savePlan,
+    savePlanWithDate,
     updatePlanStatus,
     deletePlan,
     ratePlan,

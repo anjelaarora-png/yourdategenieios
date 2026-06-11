@@ -28,6 +28,8 @@ struct PartnerPlanningSheetView: View {
     @State private var viewingPendingSessionId: String? = nil
     /// When true, show the "Invited" celebration screen with confetti.
     @State private var showingInvitedSuccess = false
+    @State private var showingUnlinkConfirmation = false
+    @State private var showingReportSheet = false
 
     private enum PlanTogetherMainTab: String, CaseIterable {
         case invite = "Invite"
@@ -1060,6 +1062,31 @@ struct PartnerPlanningSheetView: View {
         resetInviteForm()
     }
 
+    /// Block the partner and cancel the current session (Apple §1.2).
+    private func blockAndUnlinkCurrentPartner() {
+        guard let sid = partnerManager.sessionId else { return }
+        partnerManager.clearSession()
+        viewingPendingSessionId = nil
+        startNewInvite()
+        Task {
+            // Delete the session
+            try? await SupabaseService.shared.deletePartnerSession(sessionId: sid)
+            // Fetch the session to get the partner's userId for the block row, then insert
+            if let session = try? await SupabaseService.shared.getPartnerSession(sessionId: sid) {
+                let partnerUUID: UUID? = session.partnerUserId ?? session.inviterUserId
+                // Block whoever is the other party
+                if let otherUserId = partnerUUID,
+                   otherUserId != SupabaseService.shared.currentUser?.id {
+                    try? await SupabaseService.shared.blockUser(
+                        blockedId: otherUserId,
+                        reason: "Unlinked by user via app"
+                    )
+                }
+            }
+            await MainActor.run { refreshPendingPastLists() }
+        }
+    }
+
     /// Cancel the current invite: delete from backend, clear local state, show fresh invite form.
     private func cancelCurrentInvite() {
         guard let sid = partnerManager.sessionId else { return }
@@ -1275,6 +1302,30 @@ struct PartnerPlanningSheetView: View {
                     .foregroundColor(Color.luxuryCreamMuted)
             }
             .buttonStyle(.plain)
+
+            // MARK: Safety (Apple §1.2)
+            Divider()
+                .background(Color.luxuryGold.opacity(0.15))
+                .padding(.horizontal, 40)
+                .padding(.top, 8)
+
+            Button(role: .destructive) {
+                showingUnlinkConfirmation = true
+            } label: {
+                Label("Block & Unlink Partner", systemImage: "person.crop.circle.badge.xmark")
+                    .font(Font.bodySans(13, weight: .medium))
+                    .foregroundColor(Color.red.opacity(0.85))
+            }
+            .buttonStyle(.plain)
+
+            Button {
+                showingReportSheet = true
+            } label: {
+                Label("Report a Concern", systemImage: "exclamationmark.bubble")
+                    .font(Font.bodySans(13, weight: .medium))
+                    .foregroundColor(Color.luxuryCreamMuted)
+            }
+            .buttonStyle(.plain)
         }
         .padding(.vertical, 24)
         .frame(maxWidth: .infinity)
@@ -1286,6 +1337,15 @@ struct PartnerPlanningSheetView: View {
                         .stroke(Color.luxuryGold.opacity(0.25), lineWidth: 1)
                 )
         )
+        .alert("Block & Unlink Partner?", isPresented: $showingUnlinkConfirmation) {
+            Button("Block & Unlink", role: .destructive) { blockAndUnlinkCurrentPartner() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This will cancel the current session and prevent this partner from sending you future invites.")
+        }
+        .sheet(isPresented: $showingReportSheet) {
+            ReportConcernView()
+        }
     }
     
     private func presentShareSheet(customMessage: String? = nil) {

@@ -24,6 +24,7 @@ import GiftSuggestionsList from "@/components/datePlan/GiftSuggestionsList";
 import ConversationStartersList from "@/components/datePlan/ConversationStartersList";
 import PlaylistCollection from "@/components/playlist/PlaylistCollection";
 import SaveTheDateDialog from "@/components/datePlan/SaveTheDateDialog";
+import SaveDatePickerModal from "@/components/datePlan/SaveDatePickerModal";
 import PlaybookView from "@/components/playbook/PlaybookView";
 import { ErrorBoundary, SectionFallback } from "@/components/ui/error-boundary";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -33,7 +34,7 @@ const Dashboard = () => {
   const { isAdmin } = useIsAdmin();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { plans, savePlan, deletePlan, updatePlanStatus, ratePlan } = useDatePlans();
+  const { plans, savePlan, savePlanWithDate, deletePlan, updatePlanStatus, ratePlan } = useDatePlans();
   const { memories, uploadMemory, deleteMemory } = useDateMemories();
   const { savePreferences, getQuestionnaireDefaults, loading: prefsLoading } = useUserPreferences();
   const { 
@@ -67,6 +68,8 @@ const Dashboard = () => {
   const [photoPromptOpen, setPhotoPromptOpen] = useState(false);
   const [saveTheDateOpen, setSaveTheDateOpen] = useState(false);
   const [lastSavedPlan, setLastSavedPlan] = useState<typeof datePlans[0] | null>(null);
+  const [saveDatePickerOpen, setSaveDatePickerOpen] = useState(false);
+  const [pendingPlanToSave, setPendingPlanToSave] = useState<typeof datePlans[0] | null>(null);
   const [activeTab, setActiveTab] = useState("history");
   const [playbookOpen, setPlaybookOpen] = useState(false);
 
@@ -100,33 +103,36 @@ const Dashboard = () => {
     }
   };
 
-  const handleSavePlan = async () => {
+  const handleSavePlan = () => {
     const currentPlan = datePlans[selectedPlanIndex];
-    if (currentPlan) {
-      const saved = await savePlan(currentPlan);
-      if (saved) {
-        setSavedPlanIds(prev => new Set([...prev, selectedPlanIndex]));
-        // Show Save the Date dialog after successful save
-        setLastSavedPlan(currentPlan);
-        setSaveTheDateOpen(true);
-      }
+    if (!currentPlan) return;
+    // Open date picker — a date is required before the plan can be saved.
+    setPendingPlanToSave(currentPlan);
+    setSaveDatePickerOpen(true);
+  };
+
+  const handleConfirmSaveDate = async (plan: typeof datePlans[0], date: Date) => {
+    const saved = await savePlanWithDate(plan, date);
+    if (saved) {
+      setSavedPlanIds((prev) => new Set([...prev, selectedPlanIndex]));
+      setLastSavedPlan(plan);
+      setSaveTheDateOpen(true);
     }
+    setPendingPlanToSave(null);
   };
 
   const handleSaveAllPlans = async () => {
-    let successCount = 0;
-    for (let i = 0; i < datePlans.length; i++) {
-      if (!savedPlanIds.has(i)) {
-        const saved = await savePlan(datePlans[i]);
-        if (saved) {
-          successCount++;
-        }
-      }
-    }
+    const unsaved = datePlans
+      .map((plan, i) => ({ plan, i }))
+      .filter(({ i }) => !savedPlanIds.has(i));
+
+    const results = await Promise.all(unsaved.map(({ plan }) => savePlan(plan)));
+    const successCount = results.filter(Boolean).length;
+
     if (successCount > 0) {
       setAllPlansSaved(true);
       setSavedPlanIds(new Set(datePlans.map((_, i) => i)));
-      clearPendingPlans(); // Clear from localStorage since all are saved
+      clearPendingPlans();
       toast({
         title: `Saved ${successCount} plans! ✨`,
         description: "All date plan options have been saved to your collection.",
@@ -363,6 +369,19 @@ const Dashboard = () => {
         onOpenChange={setPhotoPromptOpen}
         onUpload={(file, caption) => uploadMemory(file, undefined, caption)}
       />
+
+      {/* Date picker — required before a plan can be saved */}
+      {pendingPlanToSave && (
+        <SaveDatePickerModal
+          open={saveDatePickerOpen}
+          onOpenChange={(open) => {
+            setSaveDatePickerOpen(open);
+            if (!open) setPendingPlanToSave(null);
+          }}
+          plan={pendingPlanToSave}
+          onConfirm={handleConfirmSaveDate}
+        />
+      )}
 
       {/* Save the Date Dialog - shows after saving a plan */}
       {lastSavedPlan && (
