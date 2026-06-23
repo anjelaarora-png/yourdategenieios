@@ -49,7 +49,7 @@ struct LockedPremiumTabPlaceholder: View {
                         }
                         .buttonStyle(.plain)
 
-                        Text("Then $4.99/month or $49.99/year · Cancel anytime")
+                        Text("Then $14.99/month or $99.99/year · Cancel anytime")
                             .font(Font.bodySans(12, weight: .regular))
                             .foregroundColor(Color.luxuryMuted)
                             .multilineTextAlignment(.center)
