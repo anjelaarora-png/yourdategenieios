@@ -222,6 +222,11 @@ struct LuxuryMainAppView: View {
                 onPlanDate: { coordinator.startDatePlanning(mode: .fresh) },
                 onReviveTonight: { _ in coordinator.startDatePlanning(mode: .fresh) }
             )
+        case .lowKey:
+            LowKeyDateView(
+                onChoose: { _ in coordinator.activeSheet = nil },
+                onClose: { coordinator.activeSheet = nil }
+            )
         case .explore:
             NavigationStack {
                 LuxuryExploreTabView()

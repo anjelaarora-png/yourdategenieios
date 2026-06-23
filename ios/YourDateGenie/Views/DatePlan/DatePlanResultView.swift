@@ -26,6 +26,9 @@ struct DatePlanResultView: View {
     @State private var reservableStopsForPicker: [DatePlanStop] = []
     @State private var platformPickerPayload: ReservationPlatformPickerPayload?
     @State private var showSaveDatePicker = false
+    // Screen 23 · paywall appears AFTER the user has seen their first result (spec §10), once, dismissible.
+    @State private var showPostResultPaywall = false
+    @AppStorage("hasSeenPostResultPaywall") private var hasSeenPostResultPaywall = false
     
     var body: some View {
         NavigationStack {
@@ -230,11 +233,27 @@ struct DatePlanResultView: View {
                 isSaved = true
             }
             mainPlanCardAppeared = true
+            maybePresentPostResultPaywall()
         }
         .sheet(item: $platformPickerPayload) { payload in
             ReservationPlatformPickerSheet(payload: payload) {
                 platformPickerPayload = nil
             }
+        }
+        .sheet(isPresented: $showPostResultPaywall) {
+            PremiumDatePlanPaywallView {
+                showPostResultPaywall = false
+            }
+        }
+    }
+
+    /// Show the paywall once, shortly after the first result renders, for non-subscribers.
+    /// The first full plan stays free; this is a soft, dismissible upsell after the payoff.
+    private func maybePresentPostResultPaywall() {
+        guard !isViewingMode, !access.isSubscribed, !hasSeenPostResultPaywall else { return }
+        hasSeenPostResultPaywall = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.1) {
+            showPostResultPaywall = true
         }
     }
     

@@ -89,7 +89,9 @@ struct LuxuryHomeTabView: View {
                 ScrollView(.vertical, showsIndicators: false) {
                     VStack(spacing: 28) {
                         headerSection
+                        proactiveNudgeSection
                         heroSection
+                        lowKeyLink
                         shortcutsCollapsibleSection
                         yourUpcomingDatesSection
                         dateExperiencesCollapsibleSection
@@ -240,6 +242,100 @@ struct LuxuryHomeTabView: View {
                 emptyHeroPlanCTA
             }
         }
+    }
+
+    // MARK: - Screen 10 entry · Low-key tonight link (subtle, non-gold to keep one gold action on Home)
+    private var lowKeyLink: some View {
+        Button {
+            coordinator.activeSheet = .lowKey
+        } label: {
+            HStack(spacing: 7) {
+                Image(systemName: "leaf.fill")
+                    .font(.system(size: 12, weight: .medium))
+                Text("Not up for going out? Keep it low-key tonight")
+                    .font(Font.bodySans(13, weight: .semibold))
+            }
+            .foregroundColor(Color.luxuryCreamMuted)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 12)
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(Color.luxuryGold.opacity(0.18), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, 20)
+    }
+
+    // MARK: - Screen 18 · Proactive nudge (uses important dates; dormant when none are near)
+    @ViewBuilder
+    private var proactiveNudgeSection: some View {
+        if let nudge = upcomingImportantDate {
+            Button {
+                coordinator.startDatePlanning(mode: .fresh)
+            } label: {
+                HStack(spacing: 12) {
+                    Text(nudge.emoji)
+                        .font(.system(size: 26))
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(nudge.title)
+                            .font(Font.bodySans(14, weight: .semibold))
+                            .foregroundColor(Color.luxuryCream)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Text(nudge.subtitle)
+                            .font(Font.bodySans(12, weight: .regular))
+                            .foregroundColor(Color.luxuryCreamMuted)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    Spacer(minLength: 8)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(Color.luxuryCreamMuted)
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 14)
+                .background(
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(Color.luxuryMaroon)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16)
+                                .stroke(Color.luxuryGold.opacity(0.25), lineWidth: 1)
+                        )
+                )
+            }
+            .buttonStyle(.plain)
+            .padding(.horizontal, 20)
+        }
+    }
+
+    private struct ImportantDateNudge {
+        let emoji: String
+        let title: String
+        let subtitle: String
+    }
+
+    /// Soonest important date within the next 45 days (today's captured set: the user's birthday).
+    /// Extend here as onboarding captures anniversary + partner birthday.
+    private var upcomingImportantDate: ImportantDateNudge? {
+        guard let dob = userProfileManager.currentUser?.dateOfBirth else { return nil }
+        guard let days = daysUntilNextAnnual(of: dob), days <= 45 else { return nil }
+        let whenText = days == 0 ? "today" : (days == 1 ? "tomorrow" : "in \(days) days")
+        return ImportantDateNudge(
+            emoji: "🎂",
+            title: "Your birthday is \(whenText)",
+            subtitle: "Plan something memorable — or send your partner a hint."
+        )
+    }
+
+    /// Days until the next anniversary of a date (ignoring year). Nil if it can't be computed.
+    private func daysUntilNextAnnual(of date: Date) -> Int? {
+        let cal = Calendar.current
+        let today = cal.startOfDay(for: Date())
+        let comps = cal.dateComponents([.month, .day], from: date)
+        guard let month = comps.month, let day = comps.day else { return nil }
+        var next = DateComponents(); next.month = month; next.day = day
+        guard let thisYear = cal.nextDate(after: today.addingTimeInterval(-1), matching: next, matchingPolicy: .nextTimePreservingSmallerComponents) else { return nil }
+        return cal.dateComponents([.day], from: today, to: cal.startOfDay(for: thisYear)).day
     }
 
     private func presentSwapSheet(for plan: DatePlan) {

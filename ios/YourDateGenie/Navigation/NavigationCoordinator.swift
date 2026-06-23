@@ -199,6 +199,7 @@ class NavigationCoordinator: ObservableObject {
         case explore
         case playbook
         case roseRewards
+        case lowKey
         case partnerPlanning
         case partnerJoin(sessionId: String, inviterName: String?)
         case planGenerating(sessionId: String, role: PartnerRole)
@@ -227,6 +228,7 @@ class NavigationCoordinator: ObservableObject {
             case .explore: return "explore"
             case .playbook: return "playbook"
             case .roseRewards: return "roseRewards"
+            case .lowKey: return "lowKey"
             case .partnerPlanning: return "partnerPlanning"
             case .partnerJoin(let sessionId, _): return "partnerJoin-\(sessionId)"
             case .planGenerating(let sessionId, _): return "planGenerating-\(sessionId)"
