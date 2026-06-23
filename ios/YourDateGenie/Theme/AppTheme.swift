@@ -22,7 +22,6 @@ extension Color {
     static let luxuryGold = accentGold
     static let luxuryGoldLight = Color(hex: "D4B896")
     static let luxuryGoldDark = Color(hex: "A68B5B")
-    static let tangerine = Color(hex: "E07C24")
     static let luxuryCream = textPrimary
     static let luxuryCreamMuted = Color(hex: "FAFAF8").opacity(0.65)
     static let luxuryMuted = Color(hex: "888888")
@@ -360,20 +359,7 @@ extension Font {
         bodySerif(size, weight: weight)
     }
     
-    // MARK: - Tangerine Font (marketing-only legacy)
-    /// Tangerine handwritten font — avoid on functional screens; use `displaySerif` instead.
-    @available(*, deprecated, message: "Use Font.displaySerif for in-app headers")
-    static func tangerine(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
-        let fontName: String
-        if weight == .bold {
-            fontName = "Tangerine-Bold"
-        } else {
-            fontName = "Tangerine-Regular"
-        }
-        return Font.custom(fontName, size: size)
-    }
-    
-    /// Special accent font — now maps to display serif (was Tangerine).
+    /// Special accent font — maps to display serif (legacy Tangerine fully removed in-app).
     static func special(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
         displaySerif(size, weight: weight)
     }

@@ -220,7 +220,7 @@ struct SavedPlaylistDetailView: View {
                 
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 20) {
-                        // Editable playlist title (Tangerine)
+                        // Editable playlist title (display serif)
                         VStack(spacing: 8) {
                             if isEditingTitle {
                                 HStack(spacing: 10) {

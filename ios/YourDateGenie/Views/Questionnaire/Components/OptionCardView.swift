@@ -1,6 +1,6 @@
 import SwiftUI
 
-// MARK: - Section Header (questionnaire questions in Tangerine)
+// MARK: - Section Header (questionnaire questions in display serif)
 struct SectionHeader: View {
     var emoji: String = ""
     let title: String
