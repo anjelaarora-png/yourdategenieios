@@ -320,7 +320,7 @@ struct LuxurySlideChaos: View {
                     .frame(width: 200, height: 340)
                     .overlay(
                         RoundedRectangle(cornerRadius: 36)
-                            .fill(Color(hex: "1a1a1a"))
+                            .fill(Color.backgroundPrimary)
                             .padding(5)
                     )
                     .overlay(

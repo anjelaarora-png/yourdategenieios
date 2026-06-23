@@ -407,7 +407,7 @@ struct DatePlanResultView: View {
                 
                 Text("Your Date Plan")
                     .font(Font.inter(14, weight: .semibold))
-                    .foregroundColor(Color(hex: "4A0E0E"))
+                    .foregroundColor(Color.accentMaroon)
             }
             
             Spacer()

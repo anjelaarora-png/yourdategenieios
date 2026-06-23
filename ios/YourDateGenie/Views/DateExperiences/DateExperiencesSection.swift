@@ -101,10 +101,10 @@ private extension View {
 private struct EventSkeletonCard: View {
     var body: some View {
         RoundedRectangle(cornerRadius: 18)
-            .fill(Color(hex: "5B0A0A").opacity(0.8))
+            .fill(Color.surfaceElevated.opacity(0.8))
             .overlay(
                 RoundedRectangle(cornerRadius: 18)
-                    .stroke(Color(hex: "E8C27D").opacity(0.2), lineWidth: 1)
+                    .stroke(Color.accentGold.opacity(0.2), lineWidth: 1)
             )
             .frame(width: 280, height: 160)
             .shimmer()
@@ -144,7 +144,7 @@ struct EventCardView: View {
             }
         }
         // Subtle gold glow
-        .shadow(color: Color(hex: "E8C27D").opacity(0.22), radius: 14, x: 0, y: 6)
+        .shadow(color: Color.accentGold.opacity(0.22), radius: 14, x: 0, y: 6)
     }
 
     private var cardContent: some View {
@@ -156,7 +156,7 @@ struct EventCardView: View {
                     img.resizable().aspectRatio(contentMode: .fill)
                 case .empty, .failure:
                     LinearGradient(
-                        colors: [Color(hex: "5B0A0A"), Color(hex: "7A0F0F")],
+                        colors: [Color.surfaceElevated, Color.backgroundPrimary],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
@@ -192,7 +192,7 @@ struct EventCardView: View {
 
                     Text("\(experience.formattedDate) · \(experience.location)")
                         .font(Font.bodySans(11, weight: .regular))
-                        .foregroundColor(Color(hex: "EADBC8"))
+                        .foregroundColor(Color.luxuryCream)
                         .lineLimit(1)
                 }
 
@@ -201,12 +201,12 @@ struct EventCardView: View {
                 // Bottom-right CTA
                 Text(experience.ctaLabel)
                     .font(Font.bodySans(12, weight: .semibold))
-                    .foregroundColor(Color(hex: "1A0A0A"))
+                    .foregroundColor(Color.backgroundPrimary)
                     .padding(.horizontal, 14)
                     .padding(.vertical, 7)
                     .background(
                         LinearGradient(
-                            colors: [Color(hex: "E8C27D"), Color(hex: "F3D9A4")],
+                            colors: [Color.accentGold, Color.luxuryGoldLight],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         )
@@ -220,19 +220,19 @@ struct EventCardView: View {
         .clipShape(RoundedRectangle(cornerRadius: 18))
         .overlay(
             RoundedRectangle(cornerRadius: 18)
-                .stroke(Color(hex: "E8C27D").opacity(0.25), lineWidth: 1)
+                .stroke(Color.accentGold.opacity(0.25), lineWidth: 1)
         )
         // Top-right badge
         .overlay(alignment: .topTrailing) {
             Text(experience.badgeLabel)
                 .font(Font.bodySans(10, weight: .semibold))
                 .tracking(0.8)
-                .foregroundColor(Color(hex: "1A0A0A"))
+                .foregroundColor(Color.backgroundPrimary)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 5)
                 .background(
                     LinearGradient(
-                        colors: [Color(hex: "E8C27D"), Color(hex: "F3D9A4")],
+                        colors: [Color.accentGold, Color.luxuryGoldLight],
                         startPoint: .leading,
                         endPoint: .trailing
                     )
@@ -336,12 +336,12 @@ struct DateExperiencesSection: View {
         VStack(spacing: 10) {
             Text("No date experiences yet ✨")
                 .font(Font.header(17, weight: .semibold))
-                .foregroundColor(Color(hex: "E8C27D"))
+                .foregroundColor(Color.accentGold)
                 .multilineTextAlignment(.center)
 
             Text("Check back soon for something special.")
                 .font(Font.bodySans(14, weight: .regular))
-                .foregroundColor(Color(hex: "EADBC8"))
+                .foregroundColor(Color.luxuryCream)
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
@@ -353,16 +353,16 @@ struct DateExperiencesSection: View {
         VStack(spacing: 12) {
             Image(systemName: "wifi.exclamationmark")
                 .font(.system(size: 28))
-                .foregroundColor(Color(hex: "E8C27D").opacity(0.7))
+                .foregroundColor(Color.accentGold.opacity(0.7))
 
             Text("Couldn't load experiences")
                 .font(Font.header(15, weight: .semibold))
-                .foregroundColor(Color(hex: "E8C27D"))
+                .foregroundColor(Color.accentGold)
                 .multilineTextAlignment(.center)
 
             Text("Check your connection and try again.")
                 .font(Font.bodySans(13, weight: .regular))
-                .foregroundColor(Color(hex: "EADBC8").opacity(0.8))
+                .foregroundColor(Color.luxuryCream.opacity(0.8))
                 .multilineTextAlignment(.center)
 
             Button {
@@ -374,12 +374,12 @@ struct DateExperiencesSection: View {
                     Text("Retry")
                         .font(Font.bodySans(13, weight: .semibold))
                 }
-                .foregroundColor(Color(hex: "1A0A0A"))
+                .foregroundColor(Color.backgroundPrimary)
                 .padding(.horizontal, 20)
                 .padding(.vertical, 10)
                 .background(
                     LinearGradient(
-                        colors: [Color(hex: "E8C27D"), Color(hex: "F3D9A4")],
+                        colors: [Color.accentGold, Color.luxuryGoldLight],
                         startPoint: .leading,
                         endPoint: .trailing
                     )
@@ -405,7 +405,7 @@ struct EventDetailView: View {
             ZStack(alignment: .top) {
                 // Background
                 LinearGradient(
-                    colors: [Color(hex: "5B0A0A"), Color(hex: "3A0606")],
+                    colors: [Color.surfaceElevated, Color.backgroundPrimary],
                     startPoint: .top,
                     endPoint: .bottom
                 )
@@ -427,11 +427,11 @@ struct EventDetailView: View {
                     } label: {
                         Image(systemName: "xmark")
                             .font(.system(size: 16, weight: .semibold))
-                            .foregroundColor(Color(hex: "E8C27D"))
+                            .foregroundColor(Color.accentGold)
                     }
                 }
             }
-            .toolbarBackground(Color(hex: "5B0A0A"), for: .navigationBar)
+            .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
         }
     }
@@ -446,7 +446,7 @@ struct EventDetailView: View {
                     img.resizable().aspectRatio(contentMode: .fill)
                 case .empty, .failure:
                     LinearGradient(
-                        colors: [Color(hex: "7A0F0F"), Color(hex: "5B0A0A")],
+                        colors: [Color.surfaceElevated, Color.backgroundPrimary],
                         startPoint: .top,
                         endPoint: .bottom
                     )
@@ -462,7 +462,7 @@ struct EventDetailView: View {
             LinearGradient(
                 gradient: Gradient(stops: [
                     .init(color: .clear, location: 0),
-                    .init(color: Color(hex: "5B0A0A").opacity(0.9), location: 1.0)
+                    .init(color: Color.backgroundPrimary.opacity(0.9), location: 1.0)
                 ]),
                 startPoint: .top,
                 endPoint: .bottom
@@ -485,22 +485,22 @@ struct EventDetailView: View {
             HStack(spacing: 16) {
                 Label(experience.formattedDate, systemImage: "calendar")
                     .font(Font.bodySans(13, weight: .medium))
-                    .foregroundColor(Color(hex: "EADBC8"))
+                    .foregroundColor(Color.luxuryCream)
 
                 Label(experience.location, systemImage: "location.fill")
                     .font(Font.bodySans(13, weight: .medium))
-                    .foregroundColor(Color(hex: "EADBC8"))
+                    .foregroundColor(Color.luxuryCream)
             }
 
             // Divider
             Rectangle()
-                .fill(Color(hex: "E8C27D").opacity(0.2))
+                .fill(Color.accentGold.opacity(0.2))
                 .frame(height: 1)
 
             // Description
             Text(experience.description)
                 .font(Font.bodySans(15, weight: .regular))
-                .foregroundColor(Color(hex: "EADBC8"))
+                .foregroundColor(Color.luxuryCream)
                 .lineSpacing(5)
                 .fixedSize(horizontal: false, vertical: true)
 
@@ -527,19 +527,19 @@ struct EventDetailView: View {
                 Text("Reserve Your Spot ✨")
                     .font(Font.bodySans(16, weight: .semibold))
             }
-            .foregroundColor(Color(hex: "1A0A0A"))
+            .foregroundColor(Color.backgroundPrimary)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 16)
             .background(
                 LinearGradient(
-                    colors: [Color(hex: "E8C27D"), Color(hex: "F3D9A4"), Color(hex: "E8C27D")],
+                    colors: [Color.accentGold, Color.luxuryGoldLight, Color.accentGold],
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )
             )
             .clipShape(Capsule())
             // Subtle gold glow
-            .shadow(color: Color(hex: "E8C27D").opacity(0.45), radius: 18, x: 0, y: 6)
+            .shadow(color: Color.accentGold.opacity(0.45), radius: 18, x: 0, y: 6)
         }
         .buttonStyle(.plain)
         .padding(.top, 4)

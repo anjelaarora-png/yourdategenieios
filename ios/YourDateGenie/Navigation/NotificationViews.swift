@@ -89,7 +89,7 @@ struct AppNotification: Identifiable, Equatable {
         case .weekendSuggestion:      return Color(hex: "87CEEB")
         case .newEvent:               return Color(hex: "FF8C42")
         case .partnerInvite:          return Color.luxuryGold
-        case .unsavedDateWaiting:     return Color(hex: "C9A84C")
+        case .unsavedDateWaiting:     return Color.accentGold
         case .memoryCapture:          return Color(hex: "E8A0BF")
         case .upcomingDate:           return Color.luxuryGoldLight
         case .dateMilestone:          return Color(hex: "FFD700")

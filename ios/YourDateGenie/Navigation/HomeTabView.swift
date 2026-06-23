@@ -633,11 +633,15 @@ struct LuxuryHomeTabView: View {
                         Text("Open Settings")
                             .font(Font.bodySans(13, weight: .semibold))
                     }
-                    .foregroundColor(Color.luxuryMaroon)
+                    .foregroundColor(Color.accentGold)
                     .padding(.horizontal, 20)
                     .padding(.vertical, 10)
-                    .background(LinearGradient.goldShimmer)
+                    .background(Color.accentMaroon)
                     .cornerRadius(12)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color.accentGold.opacity(0.3), lineWidth: 1)
+                    )
                 }
                 .buttonStyle(.plain)
             } else if trendingFetchFailed {
@@ -659,11 +663,15 @@ struct LuxuryHomeTabView: View {
                             Text("Try Again")
                                 .font(Font.bodySans(13, weight: .semibold))
                         }
-                        .foregroundColor(Color.luxuryMaroon)
+                        .foregroundColor(Color.accentGold)
                         .padding(.horizontal, 20)
                         .padding(.vertical, 10)
-                        .background(LinearGradient.goldShimmer)
+                        .background(Color.accentMaroon)
                         .cornerRadius(12)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(Color.accentGold.opacity(0.3), lineWidth: 1)
+                        )
                     }
                     .buttonStyle(.plain)
                 }
@@ -972,19 +980,23 @@ struct LuxuryHomeTabView: View {
                         HStack(spacing: 10) {
                             Image(systemName: "sparkles")
                                 .font(.system(size: 14))
-                                .foregroundColor(Color.luxuryMaroon)
+                                .foregroundColor(Color.accentGold)
                             Text("\(unsaved.count) date plans waiting to be saved")
                                 .font(Font.bodySans(13, weight: .semibold))
-                                .foregroundColor(Color.luxuryMaroon)
+                                .foregroundColor(Color.accentGold)
                             Spacer()
                             Image(systemName: "chevron.right")
                                 .font(.system(size: 12, weight: .semibold))
-                                .foregroundColor(Color.luxuryMaroon)
+                                .foregroundColor(Color.accentGold)
                         }
                         .padding(.horizontal, 16)
                         .padding(.vertical, 12)
-                        .background(LinearGradient.goldShimmer)
+                        .background(Color.accentMaroon)
                         .cornerRadius(14)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 14)
+                                .stroke(Color.accentGold.opacity(0.3), lineWidth: 1)
+                        )
                     }
                     .buttonStyle(.plain)
                     .padding(.horizontal, 20)

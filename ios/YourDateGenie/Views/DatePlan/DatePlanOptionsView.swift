@@ -647,7 +647,7 @@ struct DatePlanOptionsView: View {
                     Text(plan.estimatedCost)
                         .font(Font.bodySans(14, weight: .medium))
                 }
-                .foregroundColor(Color(hex: "4A0E0E"))
+                .foregroundColor(Color.accentMaroon)
                 .padding(.horizontal, 16)
                 .padding(.vertical, 10)
                 .background(Color.luxuryGold.opacity(0.2))

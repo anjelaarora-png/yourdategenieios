@@ -111,7 +111,7 @@ struct EventImportView: View {
         NavigationStack {
             ZStack {
                 LinearGradient(
-                    colors: [Color(hex: "3A0606"), Color(hex: "5B0A0A")],
+                    colors: [Color.backgroundPrimary, Color.surfaceElevated],
                     startPoint: .top,
                     endPoint: .bottom
                 )
@@ -140,10 +140,10 @@ struct EventImportView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancel") { dismiss() }
-                        .foregroundColor(Color(hex: "E8C27D"))
+                        .foregroundColor(Color.accentGold)
                 }
             }
-            .toolbarBackground(Color(hex: "3A0606"), for: .navigationBar)
+            .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .alert("Event Added ✨", isPresented: $viewModel.saveSuccess) {
                 Button("Done") {
@@ -166,7 +166,7 @@ struct EventImportView: View {
 
             Text("Paste any public Eventbrite link — title, date, location, and cover photo are filled in automatically.")
                 .font(Font.bodySans(14, weight: .regular))
-                .foregroundColor(Color(hex: "EADBC8"))
+                .foregroundColor(Color.luxuryCream)
                 .multilineTextAlignment(.center)
                 .lineSpacing(4)
         }
@@ -178,13 +178,13 @@ struct EventImportView: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Eventbrite URL")
                 .font(Font.bodySans(13, weight: .semibold))
-                .foregroundColor(Color(hex: "E8C27D"))
+                .foregroundColor(Color.accentGold)
 
             HStack(spacing: 10) {
                 TextField("https://www.eventbrite.com/e/...", text: $viewModel.urlText)
                     .font(Font.bodySans(14, weight: .regular))
                     .foregroundColor(.white)
-                    .tint(Color(hex: "E8C27D"))
+                    .tint(Color.accentGold)
                     .autocorrectionDisabled()
                     .textInputAutocapitalization(.never)
                     .keyboardType(.URL)
@@ -196,7 +196,7 @@ struct EventImportView: View {
                         viewModel.reset()
                     } label: {
                         Image(systemName: "xmark.circle.fill")
-                            .foregroundColor(Color(hex: "E8C27D").opacity(0.6))
+                            .foregroundColor(Color.accentGold.opacity(0.6))
                     }
                     .buttonStyle(.plain)
                 }
@@ -207,7 +207,7 @@ struct EventImportView: View {
             .clipShape(RoundedRectangle(cornerRadius: 12))
             .overlay(
                 RoundedRectangle(cornerRadius: 12)
-                    .stroke(Color(hex: "E8C27D").opacity(0.3), lineWidth: 1)
+                    .stroke(Color.accentGold.opacity(0.3), lineWidth: 1)
             )
 
             Button {
@@ -215,26 +215,26 @@ struct EventImportView: View {
             } label: {
                 HStack(spacing: 8) {
                     if viewModel.isPreviewing {
-                        ProgressView().tint(Color(hex: "1A0A0A")).scaleEffect(0.85)
+                        ProgressView().tint(Color.backgroundPrimary).scaleEffect(0.85)
                     } else {
                         Image(systemName: "wand.and.sparkles").font(.system(size: 15))
                     }
                     Text(viewModel.isPreviewing ? "Fetching..." : "Auto-Fill from Link")
                         .font(Font.bodySans(15, weight: .semibold))
                 }
-                .foregroundColor(Color(hex: "1A0A0A"))
+                .foregroundColor(Color.backgroundPrimary)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 14)
                 .background(
                     LinearGradient(
-                        colors: [Color(hex: "E8C27D"), Color(hex: "F3D9A4")],
+                        colors: [Color.accentGold, Color.luxuryGoldLight],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
                     .opacity(viewModel.isPreviewing || viewModel.urlText.isEmpty ? 0.5 : 1)
                 )
                 .clipShape(RoundedRectangle(cornerRadius: 14))
-                .shadow(color: Color(hex: "E8C27D").opacity(0.3), radius: 10, y: 4)
+                .shadow(color: Color.accentGold.opacity(0.3), radius: 10, y: 4)
             }
             .buttonStyle(.plain)
             .disabled(viewModel.isPreviewing || viewModel.urlText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
@@ -248,7 +248,7 @@ struct EventImportView: View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Preview")
                 .font(Font.bodySans(13, weight: .semibold))
-                .foregroundColor(Color(hex: "E8C27D"))
+                .foregroundColor(Color.accentGold)
 
             if !p.image_url.isEmpty {
                 AsyncImage(url: URL(string: p.image_url)) { phase in
@@ -256,11 +256,11 @@ struct EventImportView: View {
                     case .success(let img):
                         img.resizable().aspectRatio(contentMode: .fill)
                     case .empty:
-                        Color(hex: "5B0A0A")
-                            .overlay(ProgressView().tint(Color(hex: "E8C27D")))
+                        Color.surfaceElevated
+                            .overlay(ProgressView().tint(Color.accentGold))
                     case .failure:
-                        Color(hex: "5B0A0A")
-                            .overlay(Image(systemName: "photo").foregroundColor(Color(hex: "E8C27D").opacity(0.4)))
+                        Color.surfaceElevated
+                            .overlay(Image(systemName: "photo").foregroundColor(Color.accentGold.opacity(0.4)))
                     @unknown default:
                         EmptyView()
                     }
@@ -270,7 +270,7 @@ struct EventImportView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 14))
                 .overlay(
                     RoundedRectangle(cornerRadius: 14)
-                        .stroke(Color(hex: "E8C27D").opacity(0.2), lineWidth: 1)
+                        .stroke(Color.accentGold.opacity(0.2), lineWidth: 1)
                 )
             }
 
@@ -287,7 +287,7 @@ struct EventImportView: View {
             .clipShape(RoundedRectangle(cornerRadius: 14))
             .overlay(
                 RoundedRectangle(cornerRadius: 14)
-                    .stroke(Color(hex: "E8C27D").opacity(0.2), lineWidth: 1)
+                    .stroke(Color.accentGold.opacity(0.2), lineWidth: 1)
             )
 
             Button {
@@ -295,26 +295,26 @@ struct EventImportView: View {
             } label: {
                 HStack(spacing: 8) {
                     if viewModel.isSaving {
-                        ProgressView().tint(Color(hex: "1A0A0A")).scaleEffect(0.85)
+                        ProgressView().tint(Color.backgroundPrimary).scaleEffect(0.85)
                     } else {
                         Image(systemName: "checkmark.circle.fill").font(.system(size: 16))
                     }
                     Text(viewModel.isSaving ? "Saving..." : "Save to Date Experiences ✨")
                         .font(Font.bodySans(15, weight: .semibold))
                 }
-                .foregroundColor(Color(hex: "1A0A0A"))
+                .foregroundColor(Color.backgroundPrimary)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 16)
                 .background(
                     LinearGradient(
-                        colors: [Color(hex: "E8C27D"), Color(hex: "F3D9A4")],
+                        colors: [Color.accentGold, Color.luxuryGoldLight],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
                     .opacity(viewModel.isSaving ? 0.7 : 1)
                 )
                 .clipShape(Capsule())
-                .shadow(color: Color(hex: "E8C27D").opacity(0.4), radius: 14, y: 5)
+                .shadow(color: Color.accentGold.opacity(0.4), radius: 14, y: 5)
             }
             .buttonStyle(.plain)
             .disabled(viewModel.isSaving)
@@ -330,7 +330,7 @@ struct EventImportView: View {
                 .padding(.top, 1)
             Text(message)
                 .font(Font.bodySans(13, weight: .regular))
-                .foregroundColor(Color(hex: "EADBC8"))
+                .foregroundColor(Color.luxuryCream)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(14)
@@ -349,13 +349,13 @@ struct EventImportView: View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: icon)
                 .font(.system(size: 13))
-                .foregroundColor(Color(hex: "E8C27D"))
+                .foregroundColor(Color.accentGold)
                 .frame(width: 18)
                 .padding(.top, 1)
             VStack(alignment: .leading, spacing: 2) {
                 Text(label)
                     .font(Font.bodySans(11, weight: .semibold))
-                    .foregroundColor(Color(hex: "E8C27D").opacity(0.8))
+                    .foregroundColor(Color.accentGold.opacity(0.8))
                 Text(value)
                     .font(Font.bodySans(13, weight: .regular))
                     .foregroundColor(.white)
