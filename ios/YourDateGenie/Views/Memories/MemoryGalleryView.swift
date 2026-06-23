@@ -113,13 +113,13 @@ struct MemoryGalleryView: View {
             VStack(spacing: 16) {
                 HStack(spacing: 6) {
                     Text("Your")
-                        .font(Font.header(24, weight: .regular))
+                        .font(Font.displaySerif(24, weight: .regular))
                         .foregroundColor(Color.luxuryCream)
                     Text("love story")
                         .font(Font.bodySerif(26, weight: .regular))
                         .foregroundColor(Color.accentGold)
                     Text("begins here")
-                        .font(Font.header(24, weight: .regular))
+                        .font(Font.displaySerif(24, weight: .regular))
                         .foregroundColor(Color.luxuryCream)
                 }
                 .multilineTextAlignment(.center)
@@ -168,7 +168,7 @@ struct MemoryGalleryView: View {
             
             HStack(spacing: 6) {
                 Text("Our")
-                    .font(Font.header(30, weight: .regular))
+                    .font(Font.displaySerif(30, weight: .regular))
                     .foregroundColor(Color.luxuryCream)
                 Text("Memories")
                     .font(Font.bodySerif(32, weight: .regular))

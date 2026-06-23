@@ -60,7 +60,7 @@ struct ConversationStartersView: View {
                             .padding(.bottom, 2)
                         HStack(alignment: .firstTextBaseline, spacing: 4) {
                             Text("Find the tip made for ")
-                                .font(Font.header(22, weight: .regular))
+                                .font(Font.displaySerif(22, weight: .regular))
                                 .foregroundColor(Color.luxuryCream)
                             Text("you")
                                 .font(Font.bodySerif(24, weight: .regular))
@@ -141,7 +141,7 @@ struct ConversationStartersView: View {
 
                 HStack(alignment: .firstTextBaseline, spacing: 4) {
                     Text("Find the tip made for ")
-                        .font(Font.header(26, weight: .regular))
+                        .font(Font.displaySerif(26, weight: .regular))
                         .foregroundColor(Color.luxuryCream)
                     Text("you")
                         .font(Font.bodySerif(28, weight: .regular))
