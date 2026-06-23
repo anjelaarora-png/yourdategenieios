@@ -574,6 +574,12 @@ final class PartnerSessionManager: ObservableObject {
         result.additionalNotes       = [a.additionalNotes, b.additionalNotes].filter { !$0.isEmpty }.joined(separator: " ")
         result.userGender            = a.userGender.isEmpty ? b.userGender : a.userGender
         result.partnerGender         = a.partnerGender.isEmpty ? b.partnerGender : a.partnerGender
+        // Love languages map naturally to the two partners: A = the planning user, B = the partner.
+        // Carry both so the AI tailors gestures to each person (see generate-date-plan prompt).
+        let aLove = a.loveLanguageRaws ?? []
+        let bLove = b.loveLanguageRaws ?? []
+        result.loveLanguageRaws        = aLove.isEmpty ? a.partnerLoveLanguageRaws : aLove
+        result.partnerLoveLanguageRaws = bLove.isEmpty ? (b.partnerLoveLanguageRaws ?? a.partnerLoveLanguageRaws) : bLove
         result.wantGiftSuggestions   = a.wantGiftSuggestions || b.wantGiftSuggestions
         result.giftRecipient         = a.giftRecipient.isEmpty ? b.giftRecipient : a.giftRecipient
         result.partnerInterests      = Array(Set(a.partnerInterests + b.partnerInterests)).sorted()
