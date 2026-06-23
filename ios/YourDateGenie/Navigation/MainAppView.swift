@@ -216,6 +216,12 @@ struct LuxuryMainAppView: View {
             PlaybookView()
                 .environmentObject(coordinator)
                 .environmentObject(access)
+        case .roseRewards:
+            RoseRewardsView(
+                partnerName: nil,
+                onPlanDate: { coordinator.startDatePlanning(mode: .fresh) },
+                onReviveTonight: { _ in coordinator.startDatePlanning(mode: .fresh) }
+            )
         case .explore:
             NavigationStack {
                 LuxuryExploreTabView()

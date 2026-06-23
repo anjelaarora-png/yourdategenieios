@@ -95,6 +95,10 @@ struct LuxuryProfileTabView: View {
                                 }
                             }
                             Divider().background(Color.white.opacity(0.06))
+                            LuxuryProfileMenuItem(icon: "leaf.fill", title: "Your Journey") {
+                                coordinator.activeSheet = .roseRewards
+                            }
+                            Divider().background(Color.white.opacity(0.06))
                             LuxuryProfileMenuItem(icon: "heart.fill", title: "Preferences") {
                                 coordinator.startEditPreferencesOnly()
                             }
