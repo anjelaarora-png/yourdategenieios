@@ -190,7 +190,8 @@ enum CalendarService {
     }
     
     /// Build start and end dates from the plan's first stop timeSlot and totalDuration.
-    private static func eventTimes(for plan: DatePlan, on date: Date) -> (start: Date, end: Date) {
+    /// Internal so the Google Calendar path can produce identical event timing.
+    static func eventTimes(for plan: DatePlan, on date: Date) -> (start: Date, end: Date) {
         let cal = Calendar.current
         var startComps = cal.dateComponents([.year, .month, .day], from: date)
         
@@ -240,7 +241,8 @@ enum CalendarService {
         return Int(num * 60)
     }
     
-    private static func eventNotes(from plan: DatePlan) -> String {
+    /// Internal so the Google Calendar path can build identical event notes.
+    static func eventNotes(from plan: DatePlan) -> String {
         var lines = [plan.tagline]
         for (i, stop) in plan.stops.enumerated() {
             lines.append("\(i + 1). \(stop.timeSlot) – \(stop.name) (\(stop.duration))")
