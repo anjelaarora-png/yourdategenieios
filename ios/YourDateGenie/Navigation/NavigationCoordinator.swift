@@ -747,6 +747,28 @@ class NavigationCoordinator: ObservableObject {
         savePlan(planned)
     }
 
+    /// Persist an in-place edit to an existing plan (e.g. a swapped stop) to the local stores
+    /// AND the cloud (`public.date_plans`) so it survives a reload. Uses "saved" status when the
+    /// plan has a scheduled date, "draft" otherwise.
+    func persistEditedPlan(_ plan: DatePlan) {
+        var didFind = false
+        if let idx = savedPlans.firstIndex(where: { $0.id == plan.id }) {
+            savedPlans[idx] = plan
+            didFind = true
+        } else if let idx = generatedPlans.firstIndex(where: { $0.id == plan.id }) {
+            generatedPlans[idx] = plan
+            didFind = true
+        } else if let idx = experiencesWaiting.firstIndex(where: { $0.id == plan.id }) {
+            experiencesWaiting[idx] = plan
+            didFind = true
+        }
+        currentDatePlan = plan
+        guard didFind else { return }
+        saveState()
+        let status = plan.scheduledDate != nil ? "saved" : "draft"
+        Task { await uploadPlanToCloud(plan, status: status) }
+    }
+
     /// Update the scheduled date for a saved plan (e.g. after adding to calendar).
     func updateScheduledDate(for planId: UUID, date: Date) {
         guard let idx = savedPlans.firstIndex(where: { $0.id == planId }) else { return }

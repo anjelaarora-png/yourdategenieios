@@ -245,6 +245,10 @@ struct SwapStopAlternative: Identifiable {
     let address: String
     let detail: String
     let isCurrent: Bool
+    var placeId: String? = nil
+    var latitude: Double? = nil
+    var longitude: Double? = nil
+    var imageUrl: String? = nil
 }
 
 enum SwapStopLogic {
@@ -259,9 +263,10 @@ enum SwapStopLogic {
         return plan.stops.isEmpty ? nil : 0
     }
 
-    static func alternatives(for stop: DatePlanStop) -> [SwapStopAlternative] {
+    /// The "keep current" row, always shown first.
+    static func currentAlternative(for stop: DatePlanStop) -> SwapStopAlternative {
         let area = MapURLHelper.cityStateOrRegionFromAddress(stop.address)
-        let current = SwapStopAlternative(
+        return SwapStopAlternative(
             id: "current",
             name: stop.name,
             venueType: stop.venueType.isEmpty ? "Restaurant" : stop.venueType,
@@ -269,6 +274,32 @@ enum SwapStopLogic {
             detail: formattedDetail(venueType: stop.venueType, address: stop.address, tag: "current"),
             isCurrent: true
         )
+    }
+
+    /// Map a real Google Places result into a swap alternative, carrying place_id/coords/photo
+    /// so the swapped stop stays verified and routable.
+    static func alternative(from place: GooglePlacesService.PlaceSearchResult, venueType: String, index: Int) -> SwapStopAlternative {
+        var parts: [String] = []
+        if !venueType.isEmpty { parts.append(venueType) }
+        if let rating = place.rating { parts.append(String(format: "%.1f★", rating)) }
+        if !place.address.isEmpty { parts.append(place.address) }
+        return SwapStopAlternative(
+            id: place.placeId.isEmpty ? "alt-\(index)" : place.placeId,
+            name: place.name,
+            venueType: venueType,
+            address: place.address,
+            detail: parts.joined(separator: " · "),
+            isCurrent: false,
+            placeId: place.placeId.isEmpty ? nil : place.placeId,
+            latitude: place.latitude,
+            longitude: place.longitude,
+            imageUrl: place.photoUrl
+        )
+    }
+
+    /// Heuristic fallback list used only when Google Places returns nothing (e.g. key not configured).
+    static func alternatives(for stop: DatePlanStop) -> [SwapStopAlternative] {
+        let current = currentAlternative(for: stop)
         let placeholders: [(String, String, String, String)] = [
             ("Minetta Tavern", "Steakhouse", "113 MacDougal St", "Reservation recommended"),
             ("Joe's Pizza", "Casual", "7 Carmine St", "Walk-in · casual backup"),
@@ -304,6 +335,9 @@ struct SwapStopSheet: View {
     var onSelect: (SwapStopAlternative) -> Void
     @Environment(\.dismiss) private var dismiss
 
+    @State private var alternatives: [SwapStopAlternative] = []
+    @State private var isLoading = true
+
     private var stop: DatePlanStop {
         plan.stops[stopIndex]
     }
@@ -331,7 +365,18 @@ struct SwapStopSheet: View {
                 .padding(.top, 4)
                 .padding(.bottom, 16)
 
-            ForEach(SwapStopLogic.alternatives(for: stop)) { option in
+            if isLoading {
+                HStack(spacing: 8) {
+                    ProgressView().tint(Color.luxuryMuted)
+                    Text("Finding nearby spots…")
+                        .font(Font.bodySans(12, weight: .regular))
+                        .foregroundColor(Color.luxuryMuted)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.vertical, 12)
+            }
+
+            ForEach(alternatives) { option in
                 Button {
                     onSelect(option)
                     dismiss()
@@ -370,6 +415,22 @@ struct SwapStopSheet: View {
         .padding(.bottom, 24)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(Color.surfaceElevated)
+        .task(id: stop.id) { await loadAlternatives() }
+    }
+
+    /// Load real nearby alternatives from Google Places; fall back to the heuristic list
+    /// only when Places returns nothing so the sheet always offers options.
+    private func loadAlternatives() async {
+        let current = SwapStopLogic.currentAlternative(for: stop)
+        let venueLabel = stop.venueType.isEmpty ? "Restaurant" : stop.venueType
+        let real = (try? await GooglePlacesService.shared.fetchSwapAlternatives(for: stop, limit: 3)) ?? []
+        let mapped = real.enumerated().map { idx, place in
+            SwapStopLogic.alternative(from: place, venueType: venueLabel, index: idx)
+        }
+        await MainActor.run {
+            alternatives = mapped.isEmpty ? SwapStopLogic.alternatives(for: stop) : ([current] + mapped)
+            isLoading = false
+        }
     }
 }
 
@@ -390,7 +451,12 @@ extension DatePlan {
             travelTimeFromPrevious: old.travelTimeFromPrevious,
             travelDistanceFromPrevious: old.travelDistanceFromPrevious,
             travelMode: old.travelMode,
-            address: alternative.address
+            validated: alternative.placeId != nil ? true : old.validated,
+            placeId: alternative.placeId ?? old.placeId,
+            address: alternative.address,
+            latitude: alternative.latitude ?? old.latitude,
+            longitude: alternative.longitude ?? old.longitude,
+            imageUrl: alternative.imageUrl ?? old.imageUrl
         )
         var newStops = stops
         newStops[index] = newStop

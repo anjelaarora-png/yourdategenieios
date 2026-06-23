@@ -500,6 +500,60 @@ class GooglePlacesService {
         return TrendingPlacesPage(places: Array(result.prefix(20)), nextPageToken: nil)
     }
     
+    /// Fetch real alternative venues near an existing stop for the "Swap stop" sheet.
+    /// Searches Google Places for similar venue types anchored on the stop's coordinates
+    /// (falling back to its city/region), and returns up to `limit` results excluding the
+    /// current venue. Empty array when Places isn't configured — callers should fall back
+    /// to a heuristic list so the sheet is never blank.
+    func fetchSwapAlternatives(for stop: DatePlanStop, limit: Int = 3) async throws -> [PlaceSearchResult] {
+        guard Config.isGooglePlacesConfigured else { return [] }
+
+        let venueType = stop.venueType.trimmingCharacters(in: .whitespacesAndNewlines)
+        let terms = venueType.isEmpty ? "restaurant dining" : venueType
+
+        var bias: (lat: Double, lon: Double)?
+        if let lat = stop.latitude, let lon = stop.longitude, lat != 0 || lon != 0 {
+            bias = (lat, lon)
+        }
+        let area = MapURLHelper.cityStateOrRegionFromAddress(stop.address)
+        if bias == nil, !area.isEmpty, let geo = try? await geocodeAddress(area) {
+            bias = (geo.latitude, geo.longitude)
+        }
+
+        // With coordinates, let location+radius anchor the search; otherwise append the area name.
+        let query = bias != nil ? terms : (area.isEmpty ? terms : "\(terms) \(area)")
+        guard let encodedQuery = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) else { return [] }
+
+        var urlString = "\(Config.googlePlacesEndpoint)/textsearch/json?query=\(encodedQuery)"
+        if let b = bias {
+            urlString += "&location=\(b.lat),\(b.lon)&radius=8000"
+        }
+        urlString += "&key=\(Config.googlePlacesAPIKey)"
+        guard let url = URL(string: urlString) else { return [] }
+
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 10
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else { return [] }
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let results = json["results"] as? [[String: Any]] else { return [] }
+
+        let currentName = stop.name.lowercased()
+        var places: [PlaceSearchResult] = []
+        for result in results {
+            guard let place = parsePlaceResult(from: result) else { continue }
+            if place.name.lowercased() == currentName { continue }
+            places.append(place)
+        }
+        let sorted = places.sorted { a, b in
+            let ra = a.rating ?? 0, rb = b.rating ?? 0
+            if ra != rb { return ra > rb }
+            return (a.userRatingsTotal ?? 0) > (b.userRatingsTotal ?? 0)
+        }
+        return Array(sorted.prefix(limit))
+    }
+
     /// Heuristic: address contains city name (or known variation) or place is within maxDistanceKm of city center. Reject e.g. Spain when user asked Chennai.
     private func isAddressInCity(_ address: String, city: String, placeLat: Double, placeLon: Double, cityCenter: (lat: Double, lon: Double)?, maxDistanceKm: Double = 80) -> Bool {
         let addressLower = address.lowercased()

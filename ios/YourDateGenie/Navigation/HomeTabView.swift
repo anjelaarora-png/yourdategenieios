@@ -347,18 +347,8 @@ struct LuxuryHomeTabView: View {
         guard !alternative.isCurrent else { return }
         let updated = plan.replacingStop(at: stopIndex, with: alternative)
         heroPlanOverride = updated
-        persistHeroPlanEdit(updated)
-    }
-
-    private func persistHeroPlanEdit(_ plan: DatePlan) {
-        if let idx = coordinator.savedPlans.firstIndex(where: { $0.id == plan.id }) {
-            coordinator.savedPlans[idx] = plan
-        } else if let idx = coordinator.generatedPlans.firstIndex(where: { $0.id == plan.id }) {
-            coordinator.generatedPlans[idx] = plan
-        } else if let idx = coordinator.experiencesWaiting.firstIndex(where: { $0.id == plan.id }) {
-            coordinator.experiencesWaiting[idx] = plan
-        }
-        coordinator.currentDatePlan = plan
+        // Persist locally + to Supabase so the swapped stop survives reload.
+        coordinator.persistEditedPlan(updated)
     }
 
     private var emptyHeroPlanCTA: some View {
