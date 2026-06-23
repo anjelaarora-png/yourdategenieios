@@ -8,6 +8,7 @@ import { enrichPlanPresentation } from "./planPresentation.ts";
 import { enrichGiftImages } from "../_shared/linkPreview.ts";
 import { requireAuthenticatedUser } from "../_shared/jwtAuth.ts";
 import { checkRateLimit } from "../_shared/rateLimit.ts";
+import { filterHardNoStops } from "./hardNos.ts";
 
 const MIN_VALIDATED_STOPS_PER_PLAN = 2;
 const RATE_LIMIT_MAX = 20;
@@ -142,6 +143,29 @@ serve(async (req) => {
     }
     
     console.log(`[Parse] Plans received: ${plans.length}, Stops counts: ${plans.map((p: any) => p.stops?.length || 0).join(', ')}`);
+
+    // HARD FILTER: never surface a stop that conflicts with a stated dealbreaker.
+    // The prompt already instructs the model to avoid these; this enforces it.
+    const hardNos: string[] = Array.isArray(preferences.hardNos) ? preferences.hardNos : [];
+    if (hardNos.length > 0) {
+      let removed = 0;
+      for (const plan of plans) {
+        removed += filterHardNoStops(plan, hardNos);
+      }
+      if (removed > 0) {
+        console.log(`[HardNo] Removed ${removed} stop(s) violating hard-nos: ${hardNos.join(", ")}`);
+      }
+      // Drop any plan left with no stops after hard-no removal.
+      const survivingPlans = plans.filter((p: any) => Array.isArray(p.stops) && p.stops.length > 0);
+      if (survivingPlans.length === 0) {
+        return jsonResponse(422, {
+          error:
+            "We couldn't build a plan that avoids all your dealbreakers. Please try again or relax a hard-no.",
+        });
+      }
+      plans.length = 0;
+      plans.push(...survivingPlans);
+    }
 
     // Validate venues using Google Places API if available
     const city = preferences.city || preferences.location || "";

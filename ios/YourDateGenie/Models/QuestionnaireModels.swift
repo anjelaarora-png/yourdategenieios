@@ -37,8 +37,10 @@ struct QuestionnaireData: Codable {
     // Step 6: Relationship Enhancers (and settings: gender)
     var userGender: String
     var partnerGender: String
-    /// Raw values of `LoveLanguage` — synced with profile / settings. Optional for backward-compatible decoding.
+    /// Raw values of `LoveLanguage` for the planning user — synced with profile / settings. Optional for backward-compatible decoding.
     var loveLanguageRaws: [String]?
+    /// Raw values of the partner's `LoveLanguage` — used so the AI tailors to BOTH partners. Optional for backward-compatible decoding.
+    var partnerLoveLanguageRaws: [String]?
     var wantGiftSuggestions: Bool
     var giftRecipient: String
     var partnerInterests: [String]
@@ -73,6 +75,7 @@ struct QuestionnaireData: Codable {
         userGender: String = "",
         partnerGender: String = "",
         loveLanguageRaws: [String]? = nil,
+        partnerLoveLanguageRaws: [String]? = nil,
         wantGiftSuggestions: Bool = false,
         giftRecipient: String = "",
         partnerInterests: [String] = [],
@@ -106,6 +109,7 @@ struct QuestionnaireData: Codable {
         self.userGender = userGender
         self.partnerGender = partnerGender
         self.loveLanguageRaws = loveLanguageRaws
+        self.partnerLoveLanguageRaws = partnerLoveLanguageRaws
         self.wantGiftSuggestions = wantGiftSuggestions
         self.giftRecipient = giftRecipient
         self.partnerInterests = partnerInterests

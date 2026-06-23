@@ -1022,6 +1022,9 @@ class UserProfileManager: ObservableObject {
         data.userGender = prefs.gender.rawValue
         data.partnerGender = prefs.partnerGender.rawValue
         data.loveLanguageRaws = prefs.loveLanguages.map(\.rawValue)
+        if !prefs.partnerLoveLanguages.isEmpty {
+            data.partnerLoveLanguageRaws = prefs.partnerLoveLanguages.map(\.rawValue)
+        }
         // Relationship context
         if !prefs.relationshipStage.isEmpty { data.relationshipStage = prefs.relationshipStage }
         if !prefs.conversationTopics.isEmpty { data.conversationTopics = prefs.conversationTopics }

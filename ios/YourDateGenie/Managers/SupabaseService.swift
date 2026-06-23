@@ -1149,8 +1149,17 @@ final class SupabaseService: ObservableObject {
 
         // Encode QuestionnaireData → wrap in { "preferences": {...} }
         let preferencesData = try encoder.encode(preferences)
-        guard let preferencesJson = try JSONSerialization.jsonObject(with: preferencesData) as? [String: Any] else {
+        guard var preferencesJson = try JSONSerialization.jsonObject(with: preferencesData) as? [String: Any] else {
             throw SupabaseError.invalidResponse
+        }
+        // Send love languages under the canonical keys the Edge Function prompt reads
+        // (user + partner), so both partners' love languages tailor the plan. hardNos
+        // already ships under "hardNos" and is enforced as a hard filter server-side.
+        if let user = preferences.loveLanguageRaws, !user.isEmpty {
+            preferencesJson["userLoveLanguages"] = user
+        }
+        if let partner = preferences.partnerLoveLanguageRaws, !partner.isEmpty {
+            preferencesJson["partnerLoveLanguages"] = partner
         }
         request.httpBody = try JSONSerialization.data(withJSONObject: ["preferences": preferencesJson])
 
@@ -1222,7 +1231,9 @@ final class SupabaseService: ObservableObject {
         existingGiftNames: [String] = [],
         count: Int = 6,
         recipient: String? = nil,
-        giftStyle: [String]? = nil
+        giftStyle: [String]? = nil,
+        loveLanguages: [String]? = nil,
+        hardNos: [String]? = nil
     ) async throws -> [GiftSuggestion] {
         try? await refreshRestAuthFromSDK()
         let urlString = baseURL.hasSuffix("/") ? "\(baseURL)functions/v1/generate-more-gifts" : "\(baseURL)/functions/v1/generate-more-gifts"
@@ -1251,6 +1262,12 @@ final class SupabaseService: ObservableObject {
         }
         if let style = giftStyle, !style.isEmpty {
             body["giftStyle"] = style
+        }
+        if let loveLanguages = loveLanguages, !loveLanguages.isEmpty {
+            body["loveLanguages"] = loveLanguages
+        }
+        if let hardNos = hardNos, !hardNos.isEmpty {
+            body["hardNos"] = hardNos
         }
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
         let (data, response) = try await session.data(for: request)

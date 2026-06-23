@@ -66,6 +66,8 @@ serve(async (req) => {
       giftStyle,
       favoriteBrandsOrStores,
       recipientSizes,
+      // Hard dealbreakers — never suggest a gift that involves these
+      hardNos,
     } = await req.json();
 
     const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
@@ -81,6 +83,13 @@ serve(async (req) => {
         ? purchasedGiftNames.join(", ")
         : "";
     const giftCount = Math.min(Math.max(Number(count) || 3, 1), 6);
+
+    const hardNoList: string[] = Array.isArray(hardNos)
+      ? hardNos.map((h: any) => String(h).trim()).filter(Boolean)
+      : [];
+    const hardNoLine = hardNoList.length > 0
+      ? `\n🚫 ABSOLUTE HARD NO'S (NEVER suggest a gift that involves, themes around, or requires any of these): ${hardNoList.join(", ")}. This is a hard filter — re-check every suggestion against this list before returning.`
+      : "";
 
     const userLocation = location || city || "";
     const userCountry = (country || "").toLowerCase();
@@ -129,6 +138,7 @@ CRITICAL — PERSONALIZATION: Use EVERY detail in the Context below. When the us
 CRITICAL — NO REPEATS: Do NOT suggest the same or very similar gifts to those listed below. Each suggestion must be clearly different in type, retailer, or category. Vary product types and stores.
 
 Context:${contextSection}
+${hardNoLine}
 
 ${existingGiftNames !== "none" ? `ALREADY SUGGESTED (do NOT suggest these or very similar items again): ${existingGiftNames}` : ""}
 ${purchasedNames ? `\nALREADY BOUGHT (do NOT suggest these again): ${purchasedNames}` : ""}
@@ -224,7 +234,26 @@ Generate exactly ${giftCount} gifts. Every gift must have: name, description, pr
     }
 
     const parsed = JSON.parse(toolCall.function.arguments);
-    const gifts = Array.isArray(parsed.gifts) ? parsed.gifts : [];
+    let gifts = Array.isArray(parsed.gifts) ? parsed.gifts : [];
+
+    // HARD FILTER: drop any gift that references a stated dealbreaker.
+    if (hardNoList.length > 0) {
+      const needles = hardNoList.flatMap((h) => {
+        const k = h.toLowerCase();
+        return Array.from(new Set([k, ...k.split(/[\s,/]+/).filter((w) => w.length >= 3)]));
+      });
+      const before = gifts.length;
+      gifts = gifts.filter((g: any) => {
+        const hay = [g?.name, g?.description, g?.whyItFits, g?.whereToBuy]
+          .filter((s: any) => typeof s === "string")
+          .join(" ")
+          .toLowerCase();
+        return !needles.some((n) => n && hay.includes(n));
+      });
+      if (before !== gifts.length) {
+        console.log(`[generate-more-gifts] Hard-no filter removed ${before - gifts.length} gift(s)`);
+      }
+    }
     const isUK = userCountry === "uk" || userCountry === "united kingdom" || locationHint.toLowerCase().includes("uk");
     const amazonBase = isUK ? "https://www.amazon.co.uk/s?k=" : "https://www.amazon.com/s?k=";
     for (const g of gifts) {

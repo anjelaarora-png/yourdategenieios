@@ -95,6 +95,9 @@ export interface QuestionnaireData {
   partnerIdentity?: string;
   userLoveLanguages?: string[];
   partnerLoveLanguages?: string[];
+  /** iOS transport fallbacks for love languages (LoveLanguage rawValues). */
+  loveLanguageRaws?: string[];
+  partnerLoveLanguageRaws?: string[];
   wantGiftSuggestions?: boolean;
   giftRecipient?: string;
   giftRecipientNotes?: string;
@@ -211,11 +214,18 @@ const getGiftRecipientLabel = (recipient: string): string => {
 
 const getLoveLanguageLabels = (languages: string[]): string => {
   const labels: Record<string, string> = {
+    // Short forms (web client)
     words: "Words of Affirmation",
     acts: "Acts of Service",
     gifts: "Receiving Gifts",
     time: "Quality Time",
     touch: "Physical Touch",
+    // Hyphenated forms (iOS LoveLanguage rawValues)
+    "words-of-affirmation": "Words of Affirmation",
+    "acts-of-service": "Acts of Service",
+    "receiving-gifts": "Receiving Gifts",
+    "quality-time": "Quality Time",
+    "physical-touch": "Physical Touch",
   };
   return languages.map(l => labels[l] || l).join(", ");
 };
@@ -259,6 +269,16 @@ const getSmokingActivitiesLabel = (activities: string[]): string => {
 
 export const buildPrompt = (data: QuestionnaireData): string => {
   const isSoloDate = data.dateType === "solo";
+
+  // Love languages may arrive as userLoveLanguages/partnerLoveLanguages (web) or as
+  // loveLanguageRaws/partnerLoveLanguageRaws (iOS transport). Normalize both here.
+  const userLoveLanguages = (data.userLoveLanguages && data.userLoveLanguages.length > 0)
+    ? data.userLoveLanguages
+    : (data.loveLanguageRaws ?? []);
+  const partnerLoveLanguages = (data.partnerLoveLanguages && data.partnerLoveLanguages.length > 0)
+    ? data.partnerLoveLanguages
+    : (data.partnerLoveLanguageRaws ?? []);
+  data = { ...data, userLoveLanguages, partnerLoveLanguages };
   
   const activities = data.activityPreferences && data.activityPreferences.length > 0
     ? data.activityPreferences.join(", ")
@@ -278,7 +298,8 @@ export const buildPrompt = (data: QuestionnaireData): string => {
     : "";
 
   const hardNos = data.hardNos && data.hardNos.length > 0
-    ? `Absolutely avoid: ${data.hardNos.join(", ")}.`
+    ? `🚫 HARD NO'S — ABSOLUTE DEAL BREAKERS (NON-NEGOTIABLE): ${data.hardNos.join(", ")}.
+DO NOT include ANY venue, activity, food, or experience that involves, centers on, or exposes the couple to ANY of these. This is a hard filter, not a preference — a single violation makes the entire plan unusable. If an otherwise-good venue conflicts with a hard-no, replace it with one that does not. Re-read every stop against this list before returning.`
     : "";
 
   const accessibilityNeeds = data.accessibilityNeeds && data.accessibilityNeeds.length > 0 && 

@@ -940,6 +940,12 @@ struct GiftFinderView: View {
         var existingNames = gifts.map(\.name)
         let boughtNames = giftStore.purchasedGiftNames
         existingNames = Array(Set(existingNames + boughtNames))
+        // Pass love languages (dedicated field) and the user's hard-nos so the gift
+        // service tailors style and never suggests a dealbreaker item.
+        let loveLanguageRaws = selectedLoveLanguages.isEmpty
+            ? (UserProfileManager.shared.currentUser?.preferences.loveLanguages.map(\.rawValue) ?? [])
+            : selectedLoveLanguages.map(\.rawValue)
+        let hardNos = UserProfileManager.shared.currentUser?.preferences.hardNos ?? []
         Task {
             do {
                 let result = try await SupabaseService.shared.generateMoreGifts(
@@ -952,7 +958,9 @@ struct GiftFinderView: View {
                     existingGiftNames: existingNames,
                     count: 6,
                     recipient: recipient.isEmpty ? nil : recipient,
-                    giftStyle: style
+                    giftStyle: style,
+                    loveLanguages: loveLanguageRaws.isEmpty ? nil : loveLanguageRaws,
+                    hardNos: hardNos.isEmpty ? nil : hardNos
                 )
                 await MainActor.run {
                     self.gifts = result
