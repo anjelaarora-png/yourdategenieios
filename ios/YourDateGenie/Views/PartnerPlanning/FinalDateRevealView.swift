@@ -440,6 +440,16 @@ struct FinalDateRevealView: View {
         isConfirming = true
         PartnerSessionManager.shared.transitionPhase(to: .finalized, triggeredBy: "user")
         let chosenDate = chosenDate(for: plan)
+        // Persist the matched night server-side so the partner's device schedules the SAME evening.
+        if let sessionId = PartnerSessionManager.shared.sessionId {
+            let label = PartnerSessionManager.shared.inviteInfo?.proposedDateTimes?
+                .first(where: { Calendar.current.isDate($0.date, inSameDayAs: chosenDate) })?.timeLabel
+            Task {
+                try? await SupabaseService.shared.updatePartnerSessionMatchedNight(
+                    sessionId: sessionId, date: chosenDate, label: label
+                )
+            }
+        }
         Task {
             let result = await CalendarService.addDatePlan(plan, on: chosenDate, withReminders: true)
             let synced: Bool

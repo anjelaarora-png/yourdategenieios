@@ -904,6 +904,12 @@ struct DBPartnerSession: Codable, Identifiable {
     var notes: String?
     /// Server-authoritative phase string — decode as PlanPhase.
     var phase: String?
+    /// Each partner's device-calendar free-evening candidates (EventKit). Used to compute mutually-free nights.
+    var inviterFreeSlots: [DBFreeSlot]?
+    var partnerFreeSlots: [DBFreeSlot]?
+    /// The agreed/chosen date for the confirmed plan. Each device writes THIS night to its own calendar.
+    var matchedNight: Date?
+    var matchedNightLabel: String?
     var createdAt: Date
     var updatedAt: Date
 
@@ -925,9 +931,19 @@ struct DBPartnerSession: Codable, Identifiable {
         case inviterPlannedDates = "inviter_planned_dates"
         case notes
         case phase
+        case inviterFreeSlots = "inviter_free_slots"
+        case partnerFreeSlots = "partner_free_slots"
+        case matchedNight      = "matched_night"
+        case matchedNightLabel = "matched_night_label"
         case createdAt        = "created_at"
         case updatedAt        = "updated_at"
     }
+}
+
+/// A single free-evening candidate exchanged between partners for mutual free/busy.
+struct DBFreeSlot: Codable, Equatable {
+    var date: Date
+    var label: String
 }
 
 // MARK: - Option Rankings

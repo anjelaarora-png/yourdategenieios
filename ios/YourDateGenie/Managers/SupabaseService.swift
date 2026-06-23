@@ -862,6 +862,34 @@ final class SupabaseService: ObservableObject {
         }
     }
 
+    // MARK: - Calendar sync (EventKit mutual free/busy + matched night)
+
+    /// Uploads this device's free-evening candidates (from EventKit) for the given role,
+    /// so the other partner's device can intersect them into mutually-free nights.
+    func updatePartnerSessionFreeSlots(sessionId: String, role: PartnerRole, slots: [DBFreeSlot]) async throws {
+        guard let session: DBPartnerSession = try await getPartnerSession(sessionId: sessionId) else { return }
+        var updated = session
+        switch role {
+        case .inviter: updated.inviterFreeSlots = slots
+        case .partner: updated.partnerFreeSlots = slots
+        }
+        updated.updatedAt = Date()
+        let enc = sessionId.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? sessionId
+        _ = try await update(table: "partner_sessions", data: updated, column: "session_id", value: enc)
+    }
+
+    /// Persists the agreed/chosen date for the confirmed plan. Each partner's app reads this
+    /// and writes the SAME night to its own device calendar (one device can't write a remote calendar).
+    func updatePartnerSessionMatchedNight(sessionId: String, date: Date, label: String?) async throws {
+        guard let session: DBPartnerSession = try await getPartnerSession(sessionId: sessionId) else { return }
+        var updated = session
+        updated.matchedNight = date
+        updated.matchedNightLabel = label
+        updated.updatedAt = Date()
+        let enc = sessionId.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? sessionId
+        _ = try await update(table: "partner_sessions", data: updated, column: "session_id", value: enc)
+    }
+
     /// Updates partner_user_id and partner_name when a partner joins.
     func updatePartnerSessionPartnerIdentity(sessionId: String, partnerUserId: UUID?, partnerName: String?) async throws {
         var updates: [String: Any] = ["updated_at": ISO8601DateFormatter().string(from: Date())]

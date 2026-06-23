@@ -1130,10 +1130,11 @@ struct PartnerPlanningSheetView: View {
         }
     }
 
-    /// Scan the local calendar and turn free evenings into proposed slots (screen 11b).
+    /// Scan the local calendar (EventKit), upload this device's free slots, and intersect with
+    /// the partner's so proposed slots are nights BOTH are free (screen 11b).
     private func syncCalendar() async {
         calendarSyncState = .scanning
-        let result = await CalendarService.findFreeEvenings(count: 3)
+        let result = await partnerManager.syncAndComputeFreeEvenings(count: 3)
         switch result {
         case .success(let evenings):
             await MainActor.run {

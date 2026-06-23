@@ -61,8 +61,11 @@ enum CalendarService {
     /// Scans the user's calendar for evenings with no conflicting events over the
     /// next `daysAhead` days and returns up to `count` free evenings.
     ///
-    /// This reads only the *local* device calendar. True cross-device "both partners
-    /// free" detection requires a backend free/busy exchange — see Backend follow-ups.
+    /// This reads the *local* device calendar via real EventKit free/busy. For "both
+    /// partners free" we exchange each side's candidates through the server
+    /// (`partner_sessions.inviter_free_slots` / `partner_free_slots`) and intersect with
+    /// `mutualFreeEvenings(...)`. One device can only read/write its own calendar, so the
+    /// intersection is computed from the uploaded slots — never by reading a remote calendar.
     static func findFreeEvenings(
         count: Int = 3,
         daysAhead: Int = 21,
@@ -114,6 +117,15 @@ enum CalendarService {
         }
 
         return .success(freeEvenings)
+    }
+
+    /// Intersect this device's free evenings with the partner's uploaded free slots so
+    /// only nights BOTH are free survive. Matches on calendar day (evening hour is fixed).
+    static func mutualFreeEvenings(local: [FreeEvening], partnerSlots: [DBFreeSlot]) -> [FreeEvening] {
+        guard !partnerSlots.isEmpty else { return local }
+        let cal = Calendar.current
+        let partnerDays = Set(partnerSlots.map { cal.startOfDay(for: $0.date) })
+        return local.filter { partnerDays.contains(cal.startOfDay(for: $0.date)) }
     }
 
     /// Compact label like "Thu 12th".

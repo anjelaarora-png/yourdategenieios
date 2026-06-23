@@ -335,31 +335,37 @@ class NavigationCoordinator: ObservableObject {
         }
     }
 
-    /// Partner-device flow: ensure the winning plan + selection are loaded, then present screen 16.
+    /// Partner-device flow: ensure the winning plan + selection are loaded, read the night the
+    /// inviter matched on (server-stored), apply it to the plan, then present screen 16. The
+    /// partner's app writes that SAME night to its OWN device calendar (no remote calendar write).
     func loadFinalizedPlanAndShowPartnerReceives() {
         let inviterName = PartnerSessionManager.shared.inviterName
-        if let plan = finalizedWinningPlan() {
-            presentPartnerReceivesPlan(plan: plan, inviterName: inviterName)
-            return
-        }
-        guard let rowId = PartnerSessionManager.shared.activeSessionRowId else { return }
+        let sessionId = PartnerSessionManager.shared.sessionId
         Task {
-            do {
-                let planRows = try await SupabaseService.shared.getPartnerSessionPlans(partnerSessionId: rowId)
+            // Load plans + selection if not already cached on this device.
+            if generatedPlans.isEmpty, let rowId = PartnerSessionManager.shared.activeSessionRowId {
+                let planRows = (try? await SupabaseService.shared.getPartnerSessionPlans(partnerSessionId: rowId)) ?? []
                 let plans = planRows.map(\.planJson)
-                let selection = try await SupabaseService.shared.getFinalOptionSelection(partnerSessionId: rowId)
+                let selection = try? await SupabaseService.shared.getFinalOptionSelection(partnerSessionId: rowId)
                 await MainActor.run {
                     if !plans.isEmpty {
                         generatedPlans = plans
                         generatedPlansSelectedIndex = 0
                         currentDatePlan = plans.first
                     }
-                    if let selection = selection { finalOptionSelection = selection }
-                    if let plan = finalizedWinningPlan() {
-                        presentPartnerReceivesPlan(plan: plan, inviterName: inviterName)
-                    }
+                    if let selection = selection ?? nil { finalOptionSelection = selection }
                 }
-            } catch { }
+            }
+            // Read the matched night the inviter persisted so both partners schedule the same evening.
+            var matchedNight: Date?
+            if let sessionId, let session = try? await SupabaseService.shared.getPartnerSession(sessionId: sessionId) {
+                matchedNight = session.matchedNight
+            }
+            await MainActor.run {
+                guard var plan = finalizedWinningPlan() else { return }
+                if let matchedNight { plan.scheduledDate = matchedNight }
+                presentPartnerReceivesPlan(plan: plan, inviterName: inviterName)
+            }
         }
     }
 

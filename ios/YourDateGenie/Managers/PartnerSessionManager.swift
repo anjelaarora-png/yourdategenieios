@@ -529,6 +529,35 @@ final class PartnerSessionManager: ObservableObject {
         }
     }
 
+    // MARK: - Calendar: mutual free/busy (EventKit)
+
+    /// Scans THIS device's calendar (real EventKit free/busy), uploads its free-evening
+    /// candidates to the server for the current role, then intersects with the partner's
+    /// uploaded slots so the returned evenings are ones BOTH partners are free. Falls back
+    /// to the local-only list when there's no session or the partner hasn't synced yet.
+    func syncAndComputeFreeEvenings(count: Int = 3) async -> CalendarService.FreeEveningResult {
+        // Scan a broad window so the cross-partner intersection has options to choose from.
+        let scan = await CalendarService.findFreeEvenings(count: 12, daysAhead: 28)
+        guard case .success(let local) = scan else { return scan }
+
+        let role = currentRole ?? .inviter
+        guard let sid = sessionId else {
+            return .success(Array(local.prefix(count)))
+        }
+
+        let slots = local.map { DBFreeSlot(date: $0.date, label: $0.label) }
+        try? await SupabaseService.shared.updatePartnerSessionFreeSlots(sessionId: sid, role: role, slots: slots)
+
+        if let session = try? await SupabaseService.shared.getPartnerSession(sessionId: sid) {
+            let partnerSlots = (role == .inviter)
+                ? (session.partnerFreeSlots ?? [])
+                : (session.inviterFreeSlots ?? [])
+            let mutual = CalendarService.mutualFreeEvenings(local: local, partnerSlots: partnerSlots)
+            return .success(Array(mutual.prefix(count)))
+        }
+        return .success(Array(local.prefix(count)))
+    }
+
     // MARK: - Merge
 
     func mergedQuestionnaireData() -> QuestionnaireData? {
