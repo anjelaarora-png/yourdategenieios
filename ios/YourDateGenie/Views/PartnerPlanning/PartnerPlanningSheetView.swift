@@ -957,7 +957,7 @@ struct PartnerPlanningSheetView: View {
     /// Selecting Google triggers an incremental scope request; if denied it reverts to Apple.
     private var calendarProviderPicker: some View {
         HStack(spacing: 8) {
-            ForEach(CalendarProvider.allCases) { provider in
+            ForEach(CalendarProvider.selectableCases) { provider in
                 Button {
                     Task { await switchCalendarProvider(to: provider) }
                 } label: {
@@ -1103,25 +1103,47 @@ struct PartnerPlanningSheetView: View {
 
     private var calendarDeniedCard: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Calendar access is off")
+            Text(calendarSync.provider == .google ? "Google Calendar isn't connected" : "Calendar access is off")
                 .font(Font.bodySans(13, weight: .semibold))
                 .foregroundColor(Color.textPrimary)
-            Text("Turn on Calendar access in Settings to auto-find free nights, or pick times manually below.")
+            Text(
+                calendarSync.provider == .google
+                    ? "Connect Google Calendar to auto-find free nights, or pick times manually below."
+                    : "Turn on Calendar access in Settings to auto-find free nights, or pick times manually below."
+            )
                 .font(Font.bodySans(12, weight: .regular))
                 .foregroundColor(Color.textPrimary.opacity(0.55))
-            Button {
-                if let url = URL(string: UIApplication.openSettingsURLString) {
-                    UIApplication.shared.open(url)
+            if calendarSync.provider == .google {
+                Button {
+                    Task {
+                        await calendarSync.selectGoogleCalendar()
+                        calendarSyncState = .idle
+                        await syncCalendar()
+                    }
+                } label: {
+                    Text("Connect Google Calendar")
+                        .font(Font.bodySans(13, weight: .semibold))
+                        .foregroundColor(Color.textPrimary)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 9)
+                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.textPrimary.opacity(0.3), lineWidth: 1))
                 }
-            } label: {
-                Text("Open Settings")
-                    .font(Font.bodySans(13, weight: .semibold))
-                    .foregroundColor(Color.textPrimary)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 9)
-                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.textPrimary.opacity(0.3), lineWidth: 1))
+                .buttonStyle(.plain)
+            } else {
+                Button {
+                    if let url = URL(string: UIApplication.openSettingsURLString) {
+                        UIApplication.shared.open(url)
+                    }
+                } label: {
+                    Text("Open Settings")
+                        .font(Font.bodySans(13, weight: .semibold))
+                        .foregroundColor(Color.textPrimary)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 9)
+                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.textPrimary.opacity(0.3), lineWidth: 1))
+                }
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(14)

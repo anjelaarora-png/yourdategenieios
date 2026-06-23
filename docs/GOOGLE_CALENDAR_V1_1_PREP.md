@@ -1,6 +1,12 @@
 # Google Calendar — v1.1 Enablement Runbook
 
-**Status:** Google Calendar is built but **feature-gated OFF for v1** (Apple Calendar / EventKit only).
+> **⏸️ PAUSED — circle back when ready (2026-06-23)**  
+> OAuth **sensitive-scope verification is not submitted yet** — blocked on **demo video** (required for production; not needed for test users only).  
+> **When you return:** (1) record 2–4 min unlisted YouTube per shot list in §2 below, (2) paste Additional info (~1000 chars — see chat), (3) submit verification in OAuth consent screen.  
+> **Done:** Privacy policy updated for Google Calendar + Limited Use (2026-06-23).  
+> **Until then:** keep consent screen in **Testing**, use **Test users** only, ship v1 with Apple Calendar for everyone — Google Calendar works only for test Gmail accounts.
+
+**Status:** Google Calendar is **enabled in code** (`Config.isGoogleCalendarEnabled = true`). OAuth sensitive-scope verification may still be required for users outside your Google Cloud test-user list.
 **Why:** The Google Calendar scopes we need (`calendar.readonly`, `calendar.events`) are **sensitive scopes**. Exposing them to real users before Google completes sensitive-scope verification risks both Google OAuth review enforcement and Apple App Store review problems. Base Google **sign-in** (auth-only) is unaffected and stays on in v1.
 
 This document is the precise "do this to turn it on" runbook for v1.1. Do **not** flip the flag until every CONSOLE and PRIVACY/LEGAL step below is complete.
@@ -13,7 +19,7 @@ There is a single source-of-truth flag.
 
 - **File:** `ios/YourDateGenie/Config.swift`
 - **Symbol:** `Config.isGoogleCalendarEnabled`
-- **Current value:** `false`
+- **Current value:** `true`
 - **To enable:** change it to `true` (one-line change).
 
 ```swift
@@ -90,15 +96,11 @@ Before verification completes you can fully test the path without exposing it to
 
 ## 3. Privacy / Legal
 
-Do not flip the flag until these are live:
+**Privacy policy:** ✅ Updated live (2026-06-23) — Google Calendar usage + Limited Use for verification. Confirm the URL on the OAuth consent screen matches the published page (e.g. `https://yourdategenie.com/privacy-policy`).
 
-- **Privacy Policy update:** Add a section describing Google Calendar data usage:
-  - what we access (primary calendar free/busy times; we create date-night events),
-  - that access is **per-device and user-initiated** (incremental opt-in),
-  - that we do **not** store Google tokens or calendar data on our servers,
-  - how to revoke (Google Account → Security → Third-party access, and disconnecting in-app).
-- **App Store privacy nutrition label:** Re-evaluate the "App Privacy" answers in App Store Connect. Accessing calendar data and creating events may require declaring a data type (e.g. *Other User Content* / calendar usage) and its use ("App Functionality"), and whether it is linked to identity. Since data stays on-device and is not sent to our servers, declare accordingly — but it must be reviewed and likely updated from the v1 (Apple-only) answers.
-- **Google API Services User Data Policy — "Limited Use":** The privacy policy (or app) must include an affirmative **Limited Use** compliance statement: Google user data is used only to provide/improve the user-facing calendar features, is not transferred except as necessary for those features, is not used for ads, and humans don't read it except with consent / for security / to comply with law. Google reviewers look for this verbatim-style commitment.
+Still to do before public Google Calendar (non–test users):
+
+- **App Store privacy nutrition label:** Re-evaluate App Privacy in App Store Connect when Google Calendar ships broadly — calendar/event data used for app functionality; declare that it stays on-device / is not sent to your servers if accurate.
 
 ---
 

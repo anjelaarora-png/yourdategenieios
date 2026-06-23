@@ -24,6 +24,14 @@ enum CalendarProvider: String, CaseIterable, Identifiable {
         case .google: return "Google"
         }
     }
+
+    /// Providers shown in pickers — Google only when the feature flag and Sign-In are configured.
+    static var selectableCases: [CalendarProvider] {
+        guard Config.isGoogleCalendarEnabled, Config.isGoogleSignInConfigured else {
+            return [.apple]
+        }
+        return allCases
+    }
 }
 
 // MARK: - Calendar Sync Manager
@@ -91,7 +99,7 @@ final class CalendarSyncManager: ObservableObject {
         eveningStartHour: Int = 18,
         eveningEndHour: Int = 22
     ) async -> CalendarService.FreeEveningResult {
-        switch provider {
+        switch effectiveProvider {
         case .apple:
             return await CalendarService.findFreeEvenings(
                 count: count,
@@ -110,11 +118,21 @@ final class CalendarSyncManager: ObservableObject {
     }
 
     func addDatePlan(_ plan: DatePlan, on date: Date, withReminders: Bool = true) async -> CalendarService.AddResult {
-        switch provider {
+        switch effectiveProvider {
         case .apple:
             return await CalendarService.addDatePlan(plan, on: date, withReminders: withReminders)
         case .google:
             return await GoogleCalendarService.addDatePlan(plan, on: date, withReminders: withReminders)
         }
+    }
+
+    /// Resolves the backend to use, falling back to Apple when Google isn't available.
+    private var effectiveProvider: CalendarProvider {
+        guard provider == .google,
+              Config.isGoogleCalendarEnabled,
+              Config.isGoogleSignInConfigured else {
+            return .apple
+        }
+        return provider
     }
 }

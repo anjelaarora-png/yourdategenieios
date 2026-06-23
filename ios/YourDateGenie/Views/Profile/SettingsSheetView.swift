@@ -6,8 +6,11 @@ struct SettingsSheetView: View {
     @EnvironmentObject var coordinator: NavigationCoordinator
     @ObservedObject private var profileManager = UserProfileManager.shared
     @ObservedObject private var purchases = PurchaseManager.shared
+    @ObservedObject private var calendarSync = CalendarSyncManager.shared
     @State private var preferredMapsApp: String = UserDefaults.standard.string(forKey: "dateGenie_preferredMapsApp") ?? "apple"
     @State private var showMapsPicker = false
+    @State private var showCalendarPicker = false
+    @State private var isConnectingGoogleCalendar = false
     @State private var showEditAccount = false
     @State private var showSubscriptionOffer = false
     @AppStorage("hasSeenHomeTutorial") private var hasSeenHomeTutorial = false
@@ -239,6 +242,39 @@ struct SettingsSheetView: View {
                                 .padding(.vertical, 4)
                             }
                             .buttonStyle(.plain)
+
+                            if Config.isGoogleCalendarEnabled {
+                                Button {
+                                    showCalendarPicker = true
+                                } label: {
+                                    HStack(spacing: 14) {
+                                        Image(systemName: "calendar")
+                                            .font(.system(size: 18))
+                                            .foregroundColor(Color.luxuryGold)
+                                            .frame(width: 28)
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text("Calendar for date nights")
+                                                .font(Font.bodySans(15, weight: .medium))
+                                                .foregroundColor(Color.luxuryCream)
+                                            Text(calendarSync.provider.displayName)
+                                                .font(Font.bodySans(12, weight: .regular))
+                                                .foregroundColor(Color.luxuryMuted)
+                                        }
+                                        Spacer()
+                                        if isConnectingGoogleCalendar {
+                                            ProgressView()
+                                                .tint(Color.luxuryGold)
+                                        } else {
+                                            Image(systemName: "chevron.right")
+                                                .font(.system(size: 12))
+                                                .foregroundColor(Color.luxuryMuted)
+                                        }
+                                    }
+                                    .padding(.vertical, 4)
+                                }
+                                .buttonStyle(.plain)
+                                .disabled(isConnectingGoogleCalendar)
+                            }
                             
                             SettingsRow(
                                 icon: "bell.fill",
@@ -449,6 +485,23 @@ struct SettingsSheetView: View {
                 Button("Cancel", role: .cancel) {}
             } message: {
                 Text("Trending places and map links will open in this app.")
+            }
+            .confirmationDialog("Calendar for date nights", isPresented: $showCalendarPicker) {
+                Button("Apple Calendar") {
+                    calendarSync.selectAppleCalendar()
+                }
+                if Config.isGoogleSignInConfigured {
+                    Button("Google Calendar") {
+                        isConnectingGoogleCalendar = true
+                        Task {
+                            await calendarSync.selectGoogleCalendar()
+                            isConnectingGoogleCalendar = false
+                        }
+                    }
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("Free-evening detection and adding plans to your calendar use this choice. Google Calendar asks for permission the first time.")
             }
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
