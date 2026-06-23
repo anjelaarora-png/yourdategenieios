@@ -253,7 +253,7 @@ struct DatePlanOptionsView: View {
                 
                 Button {
                     Task {
-                        let result = await CalendarService.addDatePlan(plan, on: calendarDate)
+                        let result = await CalendarSyncManager.shared.addDatePlan(plan, on: calendarDate)
                         await MainActor.run {
                             switch result {
                             case .success:

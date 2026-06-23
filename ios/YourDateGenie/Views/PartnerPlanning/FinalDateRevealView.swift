@@ -451,7 +451,7 @@ struct FinalDateRevealView: View {
             }
         }
         Task {
-            let result = await CalendarService.addDatePlan(plan, on: chosenDate, withReminders: true)
+            let result = await CalendarSyncManager.shared.addDatePlan(plan, on: chosenDate, withReminders: true)
             let synced: Bool
             if case .success = result { synced = true } else { synced = false }
             var finalized = plan

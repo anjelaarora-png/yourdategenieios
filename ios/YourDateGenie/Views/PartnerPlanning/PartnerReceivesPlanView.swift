@@ -287,7 +287,7 @@ struct PartnerReceivesPlanView: View {
         calendarState = .adding
         let date = plan.scheduledDate ?? fallbackDate()
         Task {
-            let result = await CalendarService.addDatePlan(plan, on: date, withReminders: true)
+            let result = await CalendarSyncManager.shared.addDatePlan(plan, on: date, withReminders: true)
             await MainActor.run {
                 switch result {
                 case .success:

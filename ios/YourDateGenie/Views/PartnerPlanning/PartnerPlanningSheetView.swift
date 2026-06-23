@@ -8,6 +8,8 @@ struct PartnerPlanningSheetView: View {
     @EnvironmentObject private var access: AccessManager
     @StateObject private var partnerManager = PartnerSessionManager.shared
     @StateObject private var userProfileManager = UserProfileManager.shared
+    @StateObject private var calendarSync = CalendarSyncManager.shared
+    @State private var isSwitchingCalendarProvider = false
     
     @State private var partnerName = ""
     @State private var partnerEmail = ""
@@ -922,6 +924,8 @@ struct PartnerPlanningSheetView: View {
                 .font(Font.bodySans(14, weight: .regular))
                 .foregroundColor(Color.textPrimary.opacity(0.6))
 
+            calendarProviderPicker
+
             calendarStatusRow
 
             switch calendarSyncState {
@@ -944,13 +948,56 @@ struct PartnerPlanningSheetView: View {
         }
     }
 
+    /// Opt-in segmented control to choose Apple (EventKit, default) or Google Calendar.
+    /// Selecting Google triggers an incremental scope request; if denied it reverts to Apple.
+    private var calendarProviderPicker: some View {
+        HStack(spacing: 8) {
+            ForEach(CalendarProvider.allCases) { provider in
+                Button {
+                    Task { await switchCalendarProvider(to: provider) }
+                } label: {
+                    Text(provider.shortName)
+                        .font(Font.bodySans(12, weight: .semibold))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                        .background(calendarSync.provider == provider ? Color.accentMaroon : Color.white.opacity(0.05))
+                        .foregroundColor(calendarSync.provider == provider ? Color.textPrimary : Color.textPrimary.opacity(0.55))
+                        .cornerRadius(9)
+                }
+                .buttonStyle(.plain)
+                .disabled(isSwitchingCalendarProvider)
+            }
+        }
+        .padding(3)
+        .background(Color.surfaceElevated)
+        .cornerRadius(12)
+    }
+
+    /// Switches the calendar backend, requesting Google scopes when needed, then re-scans.
+    private func switchCalendarProvider(to provider: CalendarProvider) async {
+        guard provider != calendarSync.provider, !isSwitchingCalendarProvider else { return }
+        isSwitchingCalendarProvider = true
+        defer { isSwitchingCalendarProvider = false }
+
+        switch provider {
+        case .apple:
+            calendarSync.selectAppleCalendar()
+        case .google:
+            // Reverts to Apple internally if the user cancels or denies calendar scopes.
+            await calendarSync.selectGoogleCalendar()
+        }
+
+        calendarSyncState = .idle
+        await syncCalendar()
+    }
+
     /// "Your calendar" status row (partner calendar shown as pending until they accept).
     private var calendarStatusRow: some View {
         VStack(spacing: 9) {
             calendarRow(
                 initial: String((userProfileManager.currentUser?.firstName ?? "You").prefix(1)).uppercased(),
                 name: "Your calendar",
-                subtitle: "Apple Calendar",
+                subtitle: calendarSync.provider.displayName,
                 isSynced: calendarSyncState == .synced || calendarSyncState == .noneFree
             )
             calendarRow(

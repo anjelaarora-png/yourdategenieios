@@ -537,7 +537,8 @@ final class PartnerSessionManager: ObservableObject {
     /// to the local-only list when there's no session or the partner hasn't synced yet.
     func syncAndComputeFreeEvenings(count: Int = 3) async -> CalendarService.FreeEveningResult {
         // Scan a broad window so the cross-partner intersection has options to choose from.
-        let scan = await CalendarService.findFreeEvenings(count: 12, daysAhead: 28)
+        // Routed through CalendarSyncManager so the user's chosen backend (Apple/Google) is used.
+        let scan = await CalendarSyncManager.shared.findFreeEvenings(count: 12, daysAhead: 28)
         guard case .success(let local) = scan else { return scan }
 
         let role = currentRole ?? .inviter
