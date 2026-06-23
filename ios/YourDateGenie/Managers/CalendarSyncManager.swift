@@ -43,6 +43,13 @@ final class CalendarSyncManager: ObservableObject {
     }
 
     private init() {
+        // When the Google Calendar feature is disabled (v1), force Apple regardless of any
+        // stored preference so a stale `calendarProvider = google` in UserDefaults can never
+        // reactivate the Google path. See Config.isGoogleCalendarEnabled.
+        guard Config.isGoogleCalendarEnabled else {
+            self.provider = .apple
+            return
+        }
         let stored = UserDefaults.standard.string(forKey: Self.providerKey)
         self.provider = stored.flatMap(CalendarProvider.init(rawValue:)) ?? .apple
     }
@@ -50,8 +57,15 @@ final class CalendarSyncManager: ObservableObject {
     /// Switch to Google Calendar, requesting calendar scopes interactively. Reverts to Apple
     /// if the user cancels or scopes are denied so we never claim Google access we don't have.
     /// Returns the provider actually in effect afterwards.
+    ///
+    /// No-op when `Config.isGoogleCalendarEnabled` is false: stays on Apple and requests no
+    /// Google calendar scopes, guaranteeing v1 never touches the sensitive-scope path.
     @discardableResult
     func selectGoogleCalendar() async -> CalendarProvider {
+        guard Config.isGoogleCalendarEnabled else {
+            provider = .apple
+            return provider
+        }
         let connected = await GoogleCalendarService.connect()
         provider = connected ? .google : .apple
         return provider

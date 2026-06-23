@@ -65,6 +65,22 @@ struct Config {
         !googleIOSClientID.isEmpty && googleIOSClientID.hasSuffix(".apps.googleusercontent.com")
     }
 
+    // MARK: - Google Calendar feature flag (v1.1 gate)
+    // Single source of truth controlling whether Google Calendar is a user-facing calendar
+    // provider. MUST stay `false` for v1: the Google sensitive calendar scopes
+    // (calendar.readonly / calendar.events) are NOT verified yet, and shipping the path
+    // before verification risks App Store + Google OAuth review problems.
+    //
+    // When false: the app behaves Apple-Calendar-only (EventKit). The provider picker is
+    // hidden, the stored provider preference is forced to `.apple`, and no Google calendar
+    // scopes are ever requested during normal usage. Base Google SIGN-IN (auth) is unaffected.
+    //
+    // To enable in v1.1: flip this to `true` (one-line change). The Google code in
+    // GoogleCalendarService / CalendarSyncManager is fully compiled and reachable behind it.
+    // Before flipping, complete the Google sensitive-scope verification and the privacy /
+    // console steps documented in docs/GOOGLE_CALENDAR_V1_1_PREP.md.
+    static let isGoogleCalendarEnabled = false
+
     // MARK: - Firebase (business partner listings only)
     // iOS uses Firebase solely to write the `business_listings` collection (project
     // `your-date-genie`). Configuration ships as GoogleService-Info.plist in the app bundle.

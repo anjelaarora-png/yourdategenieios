@@ -924,7 +924,12 @@ struct PartnerPlanningSheetView: View {
                 .font(Font.bodySans(14, weight: .regular))
                 .foregroundColor(Color.textPrimary.opacity(0.6))
 
-            calendarProviderPicker
+            // Google Calendar is gated off for v1 (Apple-only). When the feature flag is
+            // false the picker is hidden and the step behaves as EventKit-only; the "Your
+            // calendar" row reads "Apple Calendar" because the provider is forced to .apple.
+            if Config.isGoogleCalendarEnabled {
+                calendarProviderPicker
+            }
 
             calendarStatusRow
 
