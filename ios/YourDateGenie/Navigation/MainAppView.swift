@@ -263,9 +263,12 @@ struct LuxuryMainAppView: View {
                     .environmentObject(coordinator)
                     .environmentObject(access)
             }
-        case .partnerReceivesPlan:
-            // Wired to PartnerReceivesPlanView in the next chunk (screen 16).
-            EmptyView()
+        case .partnerReceivesPlan(let plan, let inviterName):
+            NavigationStack {
+                PartnerReceivesPlanView(plan: plan, inviterName: inviterName)
+                    .environmentObject(coordinator)
+                    .environmentObject(access)
+            }
         case .authRequired:
             AuthenticationView(onDismiss: { coordinator.dismissAuthRequiredSheet() }, allowSkipToExplore: false)
                 .environmentObject(coordinator)

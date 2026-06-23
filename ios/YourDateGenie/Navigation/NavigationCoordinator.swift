@@ -320,9 +320,53 @@ class NavigationCoordinator: ObservableObject {
             break
         case .finalOptionSelected:
             loadFinalOptionAndShowReveal()
+        case .finalized:
+            // The inviter locked in the date. On the partner's device, surface the
+            // "your partner planned a date for you" delight screen (screen 16).
+            if PartnerSessionManager.shared.currentRole == .partner {
+                loadFinalizedPlanAndShowPartnerReceives()
+            }
         default:
             break
         }
+    }
+
+    /// Partner-device flow: ensure the winning plan + selection are loaded, then present screen 16.
+    func loadFinalizedPlanAndShowPartnerReceives() {
+        let inviterName = PartnerSessionManager.shared.inviterName
+        if let plan = finalizedWinningPlan() {
+            presentPartnerReceivesPlan(plan: plan, inviterName: inviterName)
+            return
+        }
+        guard let rowId = PartnerSessionManager.shared.activeSessionRowId else { return }
+        Task {
+            do {
+                let planRows = try await SupabaseService.shared.getPartnerSessionPlans(partnerSessionId: rowId)
+                let plans = planRows.map(\.planJson)
+                let selection = try await SupabaseService.shared.getFinalOptionSelection(partnerSessionId: rowId)
+                await MainActor.run {
+                    if !plans.isEmpty {
+                        generatedPlans = plans
+                        generatedPlansSelectedIndex = 0
+                        currentDatePlan = plans.first
+                    }
+                    if let selection = selection { finalOptionSelection = selection }
+                    if let plan = finalizedWinningPlan() {
+                        presentPartnerReceivesPlan(plan: plan, inviterName: inviterName)
+                    }
+                }
+            } catch { }
+        }
+    }
+
+    /// Resolve the winning plan from the final selection (1-indexed), falling back to the first option.
+    private func finalizedWinningPlan() -> DatePlan? {
+        guard let sel = finalOptionSelection,
+              sel.winningPlanIndex >= 1,
+              sel.winningPlanIndex - 1 < generatedPlans.count else {
+            return generatedPlans.first
+        }
+        return generatedPlans[sel.winningPlanIndex - 1]
     }
 
     private func loadPartnerPlansAndShowRanking() {
