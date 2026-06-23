@@ -203,6 +203,8 @@ class NavigationCoordinator: ObservableObject {
         case planGenerating(sessionId: String, role: PartnerRole)
         case partnerRanking
         case finalDateReveal
+        case lockedIn(plan: DatePlan, calendarSynced: Bool)
+        case partnerReceivesPlan(plan: DatePlan, inviterName: String?)
         case authRequired(PlanIntent)
 
         var id: String {
@@ -228,6 +230,8 @@ class NavigationCoordinator: ObservableObject {
             case .planGenerating(let sessionId, _): return "planGenerating-\(sessionId)"
             case .partnerRanking: return "partnerRanking"
             case .finalDateReveal: return "finalDateReveal"
+            case .lockedIn(let plan, _): return "lockedIn-\(plan.id)"
+            case .partnerReceivesPlan(let plan, _): return "partnerReceivesPlan-\(plan.id)"
             case .authRequired(let intent): return "authRequired-\(intent)"
             }
         }
@@ -599,6 +603,16 @@ class NavigationCoordinator: ObservableObject {
 
     func showPartnerPlanning() {
         activeSheet = .partnerPlanning
+    }
+
+    /// Present the locked-in confirmation (screen 15) after a partner plan is confirmed + calendar-synced.
+    func presentLockedIn(plan: DatePlan, calendarSynced: Bool) {
+        activeSheet = .lockedIn(plan: plan, calendarSynced: calendarSynced)
+    }
+
+    /// Present the partner-receives-plan delight screen (screen 16) on the partner's device.
+    func presentPartnerReceivesPlan(plan: DatePlan, inviterName: String?) {
+        activeSheet = .partnerReceivesPlan(plan: plan, inviterName: inviterName)
     }
 
     /// Load most recent plan and show result (for "Reuse Last Plan" from partner sheet).

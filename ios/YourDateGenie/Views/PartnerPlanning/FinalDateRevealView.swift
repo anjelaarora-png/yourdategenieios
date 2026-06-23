@@ -446,10 +446,8 @@ struct FinalDateRevealView: View {
             if case .success = result { synced = true } else { synced = false }
             var finalized = plan
             finalized.scheduledDate = chosenDate
-            _ = finalized
             await MainActor.run {
                 isConfirming = false
-                coordinator.dismissToHome()
                 NotificationManager.shared.addNotification(AppNotification(
                     type: .planConfirmed,
                     title: "Your date plan is confirmed.",
@@ -458,6 +456,8 @@ struct FinalDateRevealView: View {
                         : "Make it magical — it's all planned out.",
                     timestamp: Date()
                 ))
+                // Route to the locked-in confirmation (screen 15) with the synced state.
+                coordinator.presentLockedIn(plan: finalized, calendarSynced: synced)
             }
         }
     }

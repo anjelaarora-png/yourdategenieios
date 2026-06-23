@@ -257,6 +257,15 @@ struct LuxuryMainAppView: View {
                     .environmentObject(coordinator)
                     .environmentObject(access)
             }
+        case .lockedIn(let plan, let calendarSynced):
+            NavigationStack {
+                LockedInView(plan: plan, calendarSynced: calendarSynced)
+                    .environmentObject(coordinator)
+                    .environmentObject(access)
+            }
+        case .partnerReceivesPlan:
+            // Wired to PartnerReceivesPlanView in the next chunk (screen 16).
+            EmptyView()
         case .authRequired:
             AuthenticationView(onDismiss: { coordinator.dismissAuthRequiredSheet() }, allowSkipToExplore: false)
                 .environmentObject(coordinator)
