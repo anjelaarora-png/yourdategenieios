@@ -10,7 +10,7 @@ struct LockedPremiumTabPlaceholder: View {
 
     var body: some View {
         ZStack {
-            Color.luxuryMaroon
+            Color.backgroundPrimary
                 .ignoresSafeArea()
 
             ScrollView(showsIndicators: false) {
@@ -21,8 +21,7 @@ struct LockedPremiumTabPlaceholder: View {
                             .foregroundStyle(LinearGradient.goldShimmer)
 
                         Text(title)
-                            .font(Font.tangerine(28, weight: .bold))
-                            .italic()
+                            .font(Font.displaySerif(24, weight: .bold))
                             .foregroundColor(Color.luxuryGold)
                             .multilineTextAlignment(.center)
 

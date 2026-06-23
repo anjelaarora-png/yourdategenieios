@@ -1,5 +1,6 @@
 import AuthenticationServices
 import CryptoKit
+import GoogleSignIn
 import SwiftUI
 
 // MARK: - SocialAuthService
@@ -97,30 +98,82 @@ final class SocialAuthService: NSObject, ObservableObject {
         controller.performRequests()
     }
 
-    // MARK: - Sign in with Google
+    // MARK: - Sign in with Google (native)
 
-    /// Launches Google OAuth via Supabase's PKCE helper. The SDK opens its own
-    /// `ASWebAuthenticationSession`, exchanges the returned `?code=…` for a session, and updates
-    /// the shared client before this call returns.
+    /// Presents the NATIVE Google account sheet (GoogleSignIn SDK) and exchanges the returned ID
+    /// token for a Supabase session. Unlike the old web `signInWithOAuth` flow, nothing routes
+    /// through `supabase.co`, so the user sees "Your Date Genie" instead of the project URL.
+    ///
+    /// The GoogleSignIn iOS SDK doesn't expose a nonce on its sign-in API; the ID token is still
+    /// verified by Google's signature and its audience (the iOS client ID) on the Supabase side.
     func signInWithGoogle() {
         guard !isLoading else { return }
+
+        guard Config.isGoogleSignInConfigured else {
+            error = NSError(
+                domain: "SocialAuthService",
+                code: -10,
+                userInfo: [NSLocalizedDescriptionKey: "Google Sign-In isn't configured yet. Add GOOGLE_IOS_CLIENT_ID and GOOGLE_REVERSED_CLIENT_ID to Secrets.xcconfig and rebuild."]
+            )
+            return
+        }
+
+        guard let presenter = Self.topViewController() else {
+            AppLogger.error("Sign in with Google: no presenting view controller", category: .auth)
+            return
+        }
+
+        // Ensure the SDK has a client ID even if Info.plist auto-read is unavailable.
+        if GIDSignIn.sharedInstance.configuration == nil {
+            GIDSignIn.sharedInstance.configuration = GIDConfiguration(clientID: Config.googleIOSClientID)
+        }
+
         isLoading = true
+
         Task { @MainActor in
             defer { self.isLoading = false }
             do {
-                _ = try await SupabaseService.shared.signInWithGoogle()
+                let result = try await GIDSignIn.sharedInstance.signIn(withPresenting: presenter)
+
+                guard let idToken = result.user.idToken?.tokenString else {
+                    throw NSError(
+                        domain: "SocialAuthService",
+                        code: -11,
+                        userInfo: [NSLocalizedDescriptionKey: "Google sign in did not return an ID token."]
+                    )
+                }
+                let accessToken = result.user.accessToken.tokenString
+
+                _ = try await SupabaseService.shared.signInWithGoogleIdToken(
+                    idToken: idToken,
+                    accessToken: accessToken
+                )
                 await UserProfileManager.shared.refreshAfterSocialSignIn()
             } catch {
+                // User dismissed the native sheet — don't surface that as an error.
                 let nsError = error as NSError
-                // User cancelled the web sheet — don't show an error alert for that.
-                let cancelled = nsError.domain == ASWebAuthenticationSessionErrorDomain
-                    && nsError.code == ASWebAuthenticationSessionError.canceledLogin.rawValue
+                let cancelled = nsError.domain == kGIDSignInErrorDomain
+                    && nsError.code == GIDSignInError.canceled.rawValue
                 if !cancelled {
                     self.error = error
                     AppLogger.error("Sign in with Google failed: \(error)", category: .auth)
                 }
             }
         }
+    }
+
+    /// Walks the active window's presented chain to find a controller suitable for presenting the
+    /// Google sheet from. Returns nil if there is no foreground window scene yet.
+    static func topViewController() -> UIViewController? {
+        let keyWindow = UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap { $0.windows }
+            .first { $0.isKeyWindow }
+        var top = keyWindow?.rootViewController
+        while let presented = top?.presentedViewController {
+            top = presented
+        }
+        return top
     }
 }
 

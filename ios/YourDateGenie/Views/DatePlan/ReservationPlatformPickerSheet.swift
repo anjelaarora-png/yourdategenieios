@@ -126,7 +126,7 @@ struct ReservationPlatformPickerSheet: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color.luxuryMaroon.ignoresSafeArea()
+                Color.backgroundPrimary.ignoresSafeArea()
                 ScrollView {
                     VStack(alignment: .leading, spacing: 20) {
                         Text("Book via a reservation platform or call the restaurant directly.")
@@ -159,7 +159,7 @@ struct ReservationPlatformPickerSheet: View {
             .toolbar {
                 ToolbarItem(placement: .principal) {
                     Text("Reserve")
-                        .font(Font.tangerine(36, weight: .bold))
+                        .font(Font.displaySerif(22, weight: .bold))
                         .foregroundColor(Color.luxuryGold)
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -167,7 +167,7 @@ struct ReservationPlatformPickerSheet: View {
                         .foregroundColor(Color.luxuryGold)
                 }
             }
-            .toolbarBackground(Color.luxuryMaroon, for: .navigationBar)
+            .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
         }
     }

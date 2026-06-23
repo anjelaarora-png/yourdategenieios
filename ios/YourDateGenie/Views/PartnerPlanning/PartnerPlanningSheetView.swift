@@ -31,6 +31,18 @@ struct PartnerPlanningSheetView: View {
     @State private var showingUnlinkConfirmation = false
     @State private var showingReportSheet = false
 
+    // Calendar sync (screen 11b)
+    @State private var calendarSyncState: CalendarSyncState = .idle
+    @State private var freeEvenings: [CalendarService.FreeEvening] = []
+
+    private enum CalendarSyncState: Equatable {
+        case idle
+        case scanning
+        case synced
+        case noneFree
+        case denied
+    }
+
     private enum PlanTogetherMainTab: String, CaseIterable {
         case invite = "Invite"
         case pending = "Pending"
@@ -66,12 +78,8 @@ struct PartnerPlanningSheetView: View {
 
     var body: some View {
         ZStack {
-            Color.luxuryMaroon
+            Color.backgroundPrimary
                 .ignoresSafeArea()
-            
-            FloatingParticlesView()
-                .ignoresSafeArea()
-                .opacity(0.6)
             
             if showingPlanFlow {
                 VStack(spacing: 0) {
@@ -167,7 +175,7 @@ struct PartnerPlanningSheetView: View {
                 }
             }
         }
-        .toolbarBackground(Color.luxuryMaroon, for: .navigationBar)
+        .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
         .onAppear {
             if partnerManager.sessionId == nil {
@@ -215,71 +223,64 @@ struct PartnerPlanningSheetView: View {
         }
     }
     
-    // MARK: - Header (Tangerine style)
+    // MARK: - Header (Charcoal Maroon — serif title in cream)
 
     private var headerSection: some View {
         VStack(spacing: 8) {
-            Text("Plan Together")
-                .font(Font.tangerine(36, weight: .bold))
-                .italic()
-                .foregroundColor(Color.luxuryGold)
-            Text("Invite your partner to plan a date")
-                .font(Font.headerItalic(16))
-                .foregroundColor(Color.luxuryCreamMuted)
+            Text("Plan it together")
+                .font(Font.displaySerif(32, weight: .bold))
+                .foregroundColor(Color.textPrimary)
+            Text("Invite your partner to plan a date you'll both love")
+                .font(Font.bodySans(14, weight: .regular))
+                .foregroundColor(Color.textPrimary.opacity(0.6))
+                .multilineTextAlignment(.center)
         }
+        .frame(maxWidth: .infinity)
     }
 
     // MARK: - Plan Together hub (get-started landing)
     private var planTogetherHubContent: some View {
         VStack(alignment: .leading, spacing: 24) {
             Text("Get started on your next date together")
-                .font(Font.tangerine(42, weight: .bold))
-                .italic()
-                .foregroundColor(Color.luxuryGold)
+                .font(Font.displaySerif(26, weight: .bold))
+                .foregroundColor(Color.textPrimary)
                 .padding(.horizontal, 4)
                 .fixedSize(horizontal: false, vertical: true)
 
-            Text("Add your preferences, pick a time, then send your partner a link. We'll merge your vibes and create a plan you'll both love.")
+            Text("Sync your calendar, pick a time, then send your partner a link. We'll merge your vibes and create a plan you'll both love.")
                 .font(Font.bodySans(15, weight: .regular))
-                .foregroundColor(Color.luxuryCreamMuted)
+                .foregroundColor(Color.textPrimary.opacity(0.6))
                 .padding(.horizontal, 4)
                 .padding(.top, -4)
 
+            // Single gold CTA for this screen.
             Button {
                 showingPlanFlow = true
                 planStep = 1
             } label: {
-                HStack(spacing: 16) {
-                    ZStack {
-                        Circle()
-                            .stroke(Color.luxuryGold.opacity(0.5), lineWidth: 1.5)
-                            .frame(width: 48, height: 48)
-                        Image(systemName: "heart.circle.fill")
-                            .font(Font.bodySans(22, weight: .medium))
-                            .foregroundColor(Color.luxuryGold)
-                    }
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Generate a new date together")
-                            .font(Font.bodySans(18, weight: .semibold))
-                            .foregroundColor(Color.luxuryCream)
-                        Text("Three quick steps — details, time, then invite.")
-                            .font(Font.bodySans(14, weight: .regular))
-                            .foregroundColor(Color.luxuryCreamMuted)
-                    }
+                HStack(spacing: 8) {
+                    Image(systemName: "heart.circle.fill")
+                        .font(Font.bodySans(18, weight: .semibold))
+                    Text("Plan a date together")
+                        .font(Font.bodySans(16, weight: .semibold))
                     Spacer()
-                    Image(systemName: "chevron.right")
+                    Image(systemName: "arrow.right")
                         .font(Font.bodySans(14, weight: .semibold))
-                        .foregroundColor(Color.luxuryGold)
                 }
-                .padding(18)
-                .background(Color.luxuryMaroonLight.opacity(0.9))
-                .cornerRadius(20)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 20)
-                        .stroke(Color.luxuryGold.opacity(0.4), lineWidth: 1)
-                )
+                .foregroundColor(Color.backgroundPrimary)
+                .padding(.horizontal, 18)
+                .padding(.vertical, 16)
+                .frame(maxWidth: .infinity)
+                .background(Color.accentGold)
+                .cornerRadius(14)
             }
             .buttonStyle(ScaleButtonStyle())
+
+            Text("Three quick steps — details, sync a time, then invite.")
+                .font(Font.bodySans(13, weight: .regular))
+                .foregroundColor(Color.textPrimary.opacity(0.5))
+                .padding(.horizontal, 4)
+                .padding(.top, -8)
 
             if showPhaseBanner { phaseBanner }
             hubPendingSection
@@ -339,23 +340,23 @@ struct PartnerPlanningSheetView: View {
 
     private var hubPendingSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Pending invites")
-                .font(Font.tangerine(26, weight: .bold))
-                .italic()
-                .foregroundColor(Color.luxuryGold)
+            Text("PENDING INVITES")
+                .font(Font.bodySans(12, weight: .semibold))
+                .tracking(1.5)
+                .foregroundColor(Color.accentGold)
                 .padding(.top, 8)
             if sessionsLoading && pendingSessions.isEmpty && !isWaitingForPartner {
                 HStack {
                     Spacer()
                     ProgressView()
-                        .tint(Color.luxuryGold)
+                        .tint(Color.textPrimary.opacity(0.7))
                     Spacer()
                 }
                 .padding(.vertical, 16)
             } else if hubPendingDisplayItems.isEmpty {
                 Text("No pending invites.")
                     .font(Font.bodySans(14, weight: .regular))
-                    .foregroundColor(Color.luxuryCreamMuted)
+                    .foregroundColor(Color.textPrimary.opacity(0.55))
                     .padding(.horizontal, 4)
                     .padding(.bottom, 4)
             } else {
@@ -368,22 +369,22 @@ struct PartnerPlanningSheetView: View {
                             HStack(spacing: 12) {
                                 Image(systemName: "clock.badge.questionmark")
                                     .font(.system(size: 20))
-                                    .foregroundColor(Color.luxuryGold)
+                                    .foregroundColor(Color.textPrimary.opacity(0.7))
                                 VStack(alignment: .leading, spacing: 4) {
                                     Text("Waiting for \(item.waitingForName)")
                                         .font(Font.bodySans(15, weight: .semibold))
-                                        .foregroundColor(Color.luxuryCream)
+                                        .foregroundColor(Color.textPrimary)
                                     Text(item.statusLabel)
                                         .font(Font.bodySans(12, weight: .regular))
-                                        .foregroundColor(Color.luxuryCreamMuted)
+                                        .foregroundColor(Color.textPrimary.opacity(0.6))
                                     Text("Invite sent \(hubSessionDateString(item.date))")
                                         .font(Font.bodySans(11, weight: .regular))
-                                        .foregroundColor(Color.luxuryCreamMuted.opacity(0.9))
+                                        .foregroundColor(Color.textPrimary.opacity(0.45))
                                 }
                                 Spacer()
                                 Image(systemName: "chevron.right")
                                     .font(.system(size: 12, weight: .medium))
-                                    .foregroundColor(Color.luxuryGold.opacity(0.8))
+                                    .foregroundColor(Color.textPrimary.opacity(0.4))
                             }
                         }
                         .buttonStyle(.plain)
@@ -396,21 +397,27 @@ struct PartnerPlanningSheetView: View {
                         } label: {
                             Text("Cancel")
                                 .font(Font.bodySans(12, weight: .semibold))
-                                .foregroundColor(Color.luxuryCreamMuted)
+                                .foregroundColor(Color.textPrimary.opacity(0.7))
                                 .padding(.horizontal, 10)
                                 .padding(.vertical, 6)
-                                .background(Color.luxuryMaroonLight.opacity(0.8))
+                                .background(Color.white.opacity(0.06))
                                 .cornerRadius(8)
                         }
                         .buttonStyle(.plain)
                     }
                     .padding(16)
-                    .background(Color.luxuryMaroonLight.opacity(0.6))
+                    .background(Color.surfaceElevated)
                     .cornerRadius(12)
                     .overlay(
                         RoundedRectangle(cornerRadius: 12)
-                            .stroke(Color.luxuryGold.opacity(0.25), lineWidth: 1)
+                            .stroke(Color.white.opacity(0.06), lineWidth: 1)
                     )
+                    .overlay(alignment: .leading) {
+                        RoundedRectangle(cornerRadius: 1.5)
+                            .fill(Color.accentMaroon)
+                            .frame(width: 3)
+                            .padding(.vertical, 10)
+                    }
                 }
             }
         }
@@ -418,23 +425,23 @@ struct PartnerPlanningSheetView: View {
 
     private var hubPastDatesSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Past dates together")
-                .font(Font.tangerine(26, weight: .bold))
-                .italic()
-                .foregroundColor(Color.luxuryGold)
+            Text("PAST DATES TOGETHER")
+                .font(Font.bodySans(12, weight: .semibold))
+                .tracking(1.5)
+                .foregroundColor(Color.accentGold)
                 .padding(.top, 16)
             if sessionsLoading && pastSessions.isEmpty {
                 HStack {
                     Spacer()
                     ProgressView()
-                        .tint(Color.luxuryGold)
+                        .tint(Color.textPrimary.opacity(0.7))
                     Spacer()
                 }
                 .padding(.vertical, 16)
             } else if pastSessions.isEmpty {
                 Text("Plans you created together will appear here.")
                     .font(Font.bodySans(14, weight: .regular))
-                    .foregroundColor(Color.luxuryCreamMuted)
+                    .foregroundColor(Color.textPrimary.opacity(0.55))
                     .padding(.horizontal, 4)
                     .padding(.bottom, 4)
             } else {
@@ -446,27 +453,33 @@ struct PartnerPlanningSheetView: View {
                         HStack(spacing: 12) {
                             Image(systemName: "heart.circle.fill")
                                 .font(.system(size: 20))
-                                .foregroundColor(Color.luxuryGold)
+                                .foregroundColor(Color.accentMaroon)
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("Date plan together")
                                     .font(Font.bodySans(15, weight: .semibold))
-                                    .foregroundColor(Color.luxuryCream)
+                                    .foregroundColor(Color.textPrimary)
                                 Text("Invite sent \(hubSessionDateString(session.createdAt))")
                                     .font(Font.bodySans(12, weight: .regular))
-                                    .foregroundColor(Color.luxuryCreamMuted)
+                                    .foregroundColor(Color.textPrimary.opacity(0.6))
                             }
                             Spacer()
                             Image(systemName: "chevron.right")
                                 .font(.system(size: 12, weight: .medium))
-                                .foregroundColor(Color.luxuryGold.opacity(0.8))
+                                .foregroundColor(Color.textPrimary.opacity(0.4))
                         }
                         .padding(16)
-                        .background(Color.luxuryMaroonLight.opacity(0.6))
+                        .background(Color.surfaceElevated)
                         .cornerRadius(12)
                         .overlay(
                             RoundedRectangle(cornerRadius: 12)
-                                .stroke(Color.luxuryGold.opacity(0.25), lineWidth: 1)
+                                .stroke(Color.white.opacity(0.06), lineWidth: 1)
                         )
+                        .overlay(alignment: .leading) {
+                            RoundedRectangle(cornerRadius: 1.5)
+                                .fill(Color.accentMaroon)
+                                .frame(width: 3)
+                                .padding(.vertical, 10)
+                        }
                     }
                     .buttonStyle(.plain)
                 }
@@ -485,20 +498,21 @@ struct PartnerPlanningSheetView: View {
 
     private var phaseBanner: some View {
         let phase = partnerManager.currentPhase
+        let hasAction = (phase == .optionsReadyForRanking || phase == .finalOptionSelected)
         return HStack(spacing: 10) {
             Image(systemName: phaseBannerIcon(phase))
                 .font(.system(size: 14))
-                .foregroundColor(Color.luxuryGold)
+                .foregroundColor(Color.accentMaroon)
             VStack(alignment: .leading, spacing: 2) {
                 Text(phase.displayLabel)
                     .font(Font.bodySans(13, weight: .semibold))
-                    .foregroundColor(Color.luxuryCream)
+                    .foregroundColor(Color.textPrimary)
                 Text(phaseBannerSubtitle(phase))
                     .font(Font.bodySans(12, weight: .regular))
-                    .foregroundColor(Color.luxuryCreamMuted)
+                    .foregroundColor(Color.textPrimary.opacity(0.6))
             }
             Spacer()
-            if phase == .optionsReadyForRanking || phase == .finalOptionSelected {
+            if hasAction {
                 Button {
                     if phase == .optionsReadyForRanking {
                         coordinator.activeSheet = .partnerRanking
@@ -508,10 +522,10 @@ struct PartnerPlanningSheetView: View {
                 } label: {
                     Text(phase == .finalOptionSelected ? "Reveal" : "Rank")
                         .font(Font.bodySans(12, weight: .bold))
-                        .foregroundColor(Color.luxuryMaroon)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(LinearGradient.goldShimmer)
+                        .foregroundColor(Color.backgroundPrimary)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 7)
+                        .background(Color.accentGold)
                         .cornerRadius(8)
                 }
                 .buttonStyle(.plain)
@@ -521,9 +535,9 @@ struct PartnerPlanningSheetView: View {
             }
         }
         .padding(14)
-        .background(Color.luxuryMaroonLight.opacity(0.7))
+        .background(Color.surfaceElevated)
         .cornerRadius(14)
-        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.luxuryGold.opacity(0.3), lineWidth: 1))
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.06), lineWidth: 1))
     }
 
     private func phaseBannerIcon(_ phase: PlanPhase) -> String {
@@ -584,7 +598,7 @@ struct PartnerPlanningSheetView: View {
     private var planStepLabelForCurrentStep: String {
         switch planStep {
         case 1: return "DETAILS"
-        case 2: return "DATE & TIME"
+        case 2: return "SYNC CALENDAR"
         case 3: return "INVITE"
         default: return ""
         }
@@ -627,7 +641,7 @@ struct PartnerPlanningSheetView: View {
         }
         .padding(.vertical, 16)
         .background(
-            Color.luxuryMaroon
+            Color.backgroundPrimary
                 .shadow(color: Color.black.opacity(0.3), radius: 10, y: -5)
         )
     }
@@ -799,7 +813,7 @@ struct PartnerPlanningSheetView: View {
             HStack {
                 Text("Preferences from your profile")
                     .font(Font.bodySans(13, weight: .medium))
-                    .foregroundColor(Color.luxuryCreamMuted)
+                    .foregroundColor(Color.textPrimary.opacity(0.6))
                 Spacer()
                 Button {
                     coordinator.dismissSheet()
@@ -808,8 +822,9 @@ struct PartnerPlanningSheetView: View {
                     }
                 } label: {
                     Text("Edit in profile")
-                        .font(Font.bodySans(13, weight: .medium))
-                        .foregroundColor(Color.luxuryGold)
+                        .font(Font.bodySans(13, weight: .semibold))
+                        .foregroundColor(Color.textPrimary)
+                        .underline()
                 }
                 .buttonStyle(.plain)
             }
@@ -819,17 +834,17 @@ struct PartnerPlanningSheetView: View {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Anything special? (e.g. 3-month anniversary)")
                     .font(Font.bodySans(12, weight: .medium))
-                    .foregroundColor(Color.luxuryGold.opacity(0.9))
-                TextField("", text: $specialNotes, prompt: Text("Optional").foregroundColor(Color.luxuryMuted.opacity(0.6)))
+                    .foregroundColor(Color.textPrimary.opacity(0.6))
+                TextField("", text: $specialNotes, prompt: Text("Optional").foregroundColor(Color.textPrimary.opacity(0.35)))
                     .font(Font.bodySans(15, weight: .regular))
-                    .foregroundColor(Color.luxuryCream)
+                    .foregroundColor(Color.textPrimary)
                     .padding(.horizontal, 14)
                     .padding(.vertical, 12)
-                    .background(Color.luxuryMaroonLight)
+                    .background(Color.surfaceElevated)
                     .cornerRadius(12)
                     .overlay(
                         RoundedRectangle(cornerRadius: 12)
-                            .stroke(Color.luxuryGold.opacity(0.25), lineWidth: 1)
+                            .stroke(Color.white.opacity(0.08), lineWidth: 1)
                     )
             }
         }
@@ -891,81 +906,251 @@ struct PartnerPlanningSheetView: View {
             )
         }
         .padding(16)
-        .background(Color.luxuryMaroonLight.opacity(0.4))
+        .background(Color.surfaceElevated)
         .cornerRadius(16)
         .overlay(
             RoundedRectangle(cornerRadius: 16)
-                .stroke(Color.luxuryGold.opacity(0.2), lineWidth: 1)
+                .stroke(Color.white.opacity(0.06), lineWidth: 1)
         )
     }
 
-    // MARK: - Date & time tab (3 proposed options)
+    // MARK: - Sync calendar tab (screen 11b — find nights you're both free)
 
     private var dateTimeTabContent: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            Text("Proposed date & time options")
-                .font(Font.bodySans(13, weight: .medium))
-                .foregroundColor(Color.luxuryGold)
+        VStack(alignment: .leading, spacing: 18) {
+            Text("I'll check your calendar and find evenings you're both free.")
+                .font(Font.bodySans(14, weight: .regular))
+                .foregroundColor(Color.textPrimary.opacity(0.6))
 
-            VStack(alignment: .leading, spacing: 10) {
-                HStack(spacing: 8) {
-                    ForEach(Array(proposedDateTimes.enumerated()), id: \.offset) { _, slot in
-                        Text(slot.timeLabel)
-                            .font(Font.bodySans(14, weight: .medium))
-                            .foregroundColor(Color.luxuryCream)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 8)
-                            .background(Color.luxuryMaroonLight.opacity(0.8))
-                            .cornerRadius(10)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 10)
-                                    .stroke(Color.luxuryGold.opacity(0.3), lineWidth: 1)
-                            )
-                    }
-                    Button {
-                        showChangeTimes.toggle()
-                    } label: {
-                        Text("Change times")
-                            .font(Font.bodySans(13, weight: .medium))
-                            .foregroundColor(Color.luxuryGold)
-                    }
-                    .buttonStyle(.plain)
+            calendarStatusRow
+
+            switch calendarSyncState {
+            case .idle, .scanning:
+                calendarScanningCard
+            case .synced:
+                freeEveningsCard
+            case .noneFree:
+                noFreeEveningsCard
+            case .denied:
+                calendarDeniedCard
+            }
+
+            manualTimesSection
+        }
+        .task(id: planStep == 2) {
+            if planStep == 2, calendarSyncState == .idle {
+                await syncCalendar()
+            }
+        }
+    }
+
+    /// "Your calendar" status row (partner calendar shown as pending until they accept).
+    private var calendarStatusRow: some View {
+        VStack(spacing: 9) {
+            calendarRow(
+                initial: String((userProfileManager.currentUser?.firstName ?? "You").prefix(1)).uppercased(),
+                name: "Your calendar",
+                subtitle: "Apple Calendar",
+                isSynced: calendarSyncState == .synced || calendarSyncState == .noneFree
+            )
+            calendarRow(
+                initial: String((partnerName.isEmpty ? "Partner" : partnerName).prefix(1)).uppercased(),
+                name: partnerName.isEmpty ? "Partner's calendar" : "\(partnerName)'s calendar",
+                subtitle: "Syncs when they accept",
+                isSynced: false
+            )
+        }
+    }
+
+    private func calendarRow(initial: String, name: String, subtitle: String, isSynced: Bool) -> some View {
+        HStack(spacing: 10) {
+            ZStack {
+                Circle().fill(Color.accentMaroon.opacity(0.5)).frame(width: 32, height: 32)
+                Text(initial)
+                    .font(Font.bodySans(13, weight: .semibold))
+                    .foregroundColor(Color.textPrimary)
+            }
+            VStack(alignment: .leading, spacing: 2) {
+                Text(name)
+                    .font(Font.bodySans(13, weight: .medium))
+                    .foregroundColor(Color.textPrimary)
+                Text(subtitle)
+                    .font(Font.bodySans(11, weight: .regular))
+                    .foregroundColor(Color.textPrimary.opacity(0.45))
+            }
+            Spacer()
+            if isSynced {
+                Text("✓ synced")
+                    .font(Font.bodySans(11, weight: .semibold))
+                    .foregroundColor(Color.luxurySuccess)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(Color.luxurySuccess.opacity(0.12))
+                    .cornerRadius(20)
+            } else {
+                Text("pending")
+                    .font(Font.bodySans(11, weight: .regular))
+                    .foregroundColor(Color.textPrimary.opacity(0.45))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(Color.white.opacity(0.05))
+                    .cornerRadius(20)
+            }
+        }
+        .padding(12)
+        .background(Color.surfaceElevated)
+        .cornerRadius(14)
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.06), lineWidth: 1))
+    }
+
+    private var calendarScanningCard: some View {
+        HStack(spacing: 12) {
+            ProgressView().tint(Color.textPrimary.opacity(0.7))
+            Text("Scanning your calendar for free evenings…")
+                .font(Font.bodySans(13, weight: .regular))
+                .foregroundColor(Color.textPrimary.opacity(0.6))
+            Spacer()
+        }
+        .padding(14)
+        .background(Color.surfaceElevated)
+        .cornerRadius(14)
+    }
+
+    /// Populated state — gold-bordered cream card listing free evenings.
+    private var freeEveningsCard: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("✨ You're both free \(freeEvenings.count) evening\(freeEvenings.count == 1 ? "" : "s")")
+                .font(Font.bodySans(13, weight: .semibold))
+                .foregroundColor(Color.textOnCard)
+            Text(freeEvenings.map(\.label).joined(separator: " · "))
+                .font(Font.bodySans(12, weight: .regular))
+                .foregroundColor(Color.textMutedOnCard)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(14)
+        .background(Color.creamCard)
+        .cornerRadius(14)
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.accentGold, lineWidth: 1))
+    }
+
+    private var noFreeEveningsCard: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("No fully-free evenings in the next 3 weeks")
+                .font(Font.bodySans(13, weight: .semibold))
+                .foregroundColor(Color.textPrimary)
+            Text("Pick times manually below — we'll still plan around them.")
+                .font(Font.bodySans(12, weight: .regular))
+                .foregroundColor(Color.textPrimary.opacity(0.55))
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(14)
+        .background(Color.surfaceElevated)
+        .cornerRadius(14)
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.06), lineWidth: 1))
+    }
+
+    private var calendarDeniedCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Calendar access is off")
+                .font(Font.bodySans(13, weight: .semibold))
+                .foregroundColor(Color.textPrimary)
+            Text("Turn on Calendar access in Settings to auto-find free nights, or pick times manually below.")
+                .font(Font.bodySans(12, weight: .regular))
+                .foregroundColor(Color.textPrimary.opacity(0.55))
+            Button {
+                if let url = URL(string: UIApplication.openSettingsURLString) {
+                    UIApplication.shared.open(url)
                 }
-                if showChangeTimes {
-                    VStack(alignment: .leading, spacing: 12) {
-                        ForEach(Array(proposedDateTimes.enumerated()), id: \.offset) { index, _ in
-                            HStack(spacing: 12) {
-                                DatePicker("", selection: Binding(
-                                    get: { proposedDateTimes[index].date },
-                                    set: { newDate in
-                                        var slot = proposedDateTimes[index]
-                                        slot.date = newDate
-                                        proposedDateTimes[index] = slot
-                                    }
-                                ), displayedComponents: .date)
-                                    .datePickerStyle(.compact)
-                                    .tint(Color.luxuryGold)
-                                TextField("Label", text: Binding(
-                                    get: { proposedDateTimes[index].timeLabel },
-                                    set: { newLabel in
-                                        var slot = proposedDateTimes[index]
-                                        slot.timeLabel = newLabel
-                                        proposedDateTimes[index] = slot
-                                    }
-                                ))
-                                    .font(Font.bodySans(14, weight: .regular))
-                                    .foregroundColor(Color.luxuryCream)
-                                    .frame(width: 80)
-                                    .padding(.horizontal, 10)
-                                    .padding(.vertical, 8)
-                                    .background(Color.luxuryMaroonLight)
-                                    .cornerRadius(8)
-                            }
+            } label: {
+                Text("Open Settings")
+                    .font(Font.bodySans(13, weight: .semibold))
+                    .foregroundColor(Color.textPrimary)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 9)
+                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.textPrimary.opacity(0.3), lineWidth: 1))
+            }
+            .buttonStyle(.plain)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(14)
+        .background(Color.surfaceElevated)
+        .cornerRadius(14)
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.06), lineWidth: 1))
+    }
+
+    private var manualTimesSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Button {
+                withAnimation { showChangeTimes.toggle() }
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "slider.horizontal.3")
+                        .font(.system(size: 12, weight: .medium))
+                    Text(showChangeTimes ? "Hide manual times" : "Adjust times manually")
+                        .font(Font.bodySans(13, weight: .medium))
+                }
+                .foregroundColor(Color.textPrimary.opacity(0.75))
+            }
+            .buttonStyle(.plain)
+
+            if showChangeTimes {
+                VStack(alignment: .leading, spacing: 12) {
+                    ForEach(Array(proposedDateTimes.enumerated()), id: \.offset) { index, _ in
+                        HStack(spacing: 12) {
+                            DatePicker("", selection: Binding(
+                                get: { proposedDateTimes[index].date },
+                                set: { newDate in
+                                    var slot = proposedDateTimes[index]
+                                    slot.date = newDate
+                                    proposedDateTimes[index] = slot
+                                }
+                            ), displayedComponents: .date)
+                                .datePickerStyle(.compact)
+                                .tint(Color.accentGold)
+                            TextField("Label", text: Binding(
+                                get: { proposedDateTimes[index].timeLabel },
+                                set: { newLabel in
+                                    var slot = proposedDateTimes[index]
+                                    slot.timeLabel = newLabel
+                                    proposedDateTimes[index] = slot
+                                }
+                            ))
+                                .font(Font.bodySans(14, weight: .regular))
+                                .foregroundColor(Color.textPrimary)
+                                .frame(width: 90)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 8)
+                                .background(Color.surfaceElevated)
+                                .cornerRadius(8)
                         }
                     }
-                    .padding(.vertical, 8)
+                }
+                .padding(.vertical, 4)
+            }
+        }
+    }
+
+    /// Scan the local calendar and turn free evenings into proposed slots (screen 11b).
+    private func syncCalendar() async {
+        calendarSyncState = .scanning
+        let result = await CalendarService.findFreeEvenings(count: 3)
+        switch result {
+        case .success(let evenings):
+            await MainActor.run {
+                if evenings.isEmpty {
+                    calendarSyncState = .noneFree
+                } else {
+                    freeEvenings = evenings
+                    proposedDateTimes = evenings.map {
+                        PartnerSessionManager.ProposedDateTime(date: $0.date, timeLabel: $0.label)
+                    }
+                    calendarSyncState = .synced
                 }
             }
+        case .denied:
+            await MainActor.run { calendarSyncState = .denied }
+        case .failed:
+            await MainActor.run { calendarSyncState = .noneFree }
         }
     }
 
@@ -982,7 +1167,7 @@ struct PartnerPlanningSheetView: View {
 
             Text("Share the link via Messages, WhatsApp, or any app — no email required.")
                 .font(Font.bodySans(13, weight: .regular))
-                .foregroundColor(Color.luxuryCreamMuted)
+                .foregroundColor(Color.textPrimary.opacity(0.6))
 
             PartnerInviteTextField(
                 title: "Partner name (optional)",
@@ -993,51 +1178,35 @@ struct PartnerPlanningSheetView: View {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Message to include (optional)")
                     .font(Font.bodySans(13, weight: .medium))
-                    .foregroundColor(Color.luxuryGold)
+                    .foregroundColor(Color.textPrimary.opacity(0.6))
                 HStack(alignment: .top, spacing: 12) {
                     Image(systemName: "message.fill")
-                        .foregroundColor(Color.luxuryGold.opacity(0.7))
+                        .foregroundColor(Color.textPrimary.opacity(0.5))
                         .frame(width: 20)
                     TextField("", text: $partnerMessage, axis: .vertical)
                         .font(Font.bodySans(16, weight: .regular))
-                        .foregroundColor(Color.luxuryCream)
+                        .foregroundColor(Color.textPrimary)
                         .lineLimit(2...4)
                         .padding(.vertical, 8)
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 14)
-                .background(Color.luxuryMaroonLight)
+                .background(Color.surfaceElevated)
                 .cornerRadius(12)
                 .overlay(
                     RoundedRectangle(cornerRadius: 12)
-                        .stroke(partnerMessage.isEmpty ? Color.luxuryGold.opacity(0.2) : Color.luxuryGold.opacity(0.5), lineWidth: 1)
+                        .stroke(Color.white.opacity(0.08), lineWidth: 1)
                 )
             }
 
-            Button {
-                sendInviteAndShare()
-            } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: "square.and.arrow.up")
-                        .font(.system(size: 18))
-                    Text("Share invite link")
-                        .font(Font.bodySans(16, weight: .semibold))
-                }
-                .foregroundColor(Color.luxuryMaroon)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 16)
-                .background(LinearGradient.goldShimmer)
-                .cornerRadius(16)
-                .shadow(color: Color.luxuryGold.opacity(0.35), radius: 12, y: 4)
-            }
-            .buttonStyle(.plain)
-
+            // Primary gold CTA for this step lives in the bottom bar.
             Button {
                 startNewInvite()
             } label: {
-                Text("New invite")
+                Text("Start a new invite")
                     .font(Font.bodySans(13, weight: .medium))
-                    .foregroundColor(Color.luxuryGold.opacity(0.9))
+                    .foregroundColor(Color.textPrimary.opacity(0.7))
+                    .underline()
             }
             .buttonStyle(.plain)
         }
@@ -1227,45 +1396,44 @@ struct PartnerPlanningSheetView: View {
                 return name.isEmpty ? "your partner" : name
             }()
             Text(waitingTitleForPhase(partnerDisplayName))
-                .font(Font.tangerine(24, weight: .bold))
-                .italic()
-                .foregroundColor(Color.luxuryGold)
+                .font(Font.displaySerif(24, weight: .bold))
+                .foregroundColor(Color.textPrimary)
                 .multilineTextAlignment(.center)
             Text(waitingSubtitleForPhase)
                 .font(Font.bodySans(13, weight: .regular))
-                .foregroundColor(Color.luxuryCreamMuted)
+                .foregroundColor(Color.textPrimary.opacity(0.6))
                 .multilineTextAlignment(.center)
             
             Circle()
-                .stroke(Color.luxuryGold, lineWidth: 2)
+                .stroke(Color.accentMaroon, lineWidth: 2)
                 .frame(width: 60, height: 60)
                 .overlay(
                     Image(systemName: "person.fill")
                         .font(.system(size: 24))
-                        .foregroundColor(Color.luxuryGold.opacity(0.6))
+                        .foregroundColor(Color.textPrimary.opacity(0.5))
                 )
             
             if canSendReminder {
+                // Single gold action for this state.
                 Button {
                     DispatchQueue.main.async {
                         presentShareSheet()
                     }
                 } label: {
-                    Text("Send a Reminder")
-                        .font(Font.bodySans(14, weight: .semibold))
-                        .foregroundColor(Color.luxuryGold)
+                    Text("Send a reminder")
+                        .font(Font.bodySans(15, weight: .semibold))
+                        .foregroundColor(Color.backgroundPrimary)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 14)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 14)
-                                .stroke(Color.luxuryGold, lineWidth: 1.5)
-                        )
+                        .background(Color.accentGold)
+                        .cornerRadius(14)
                 }
                 .buttonStyle(.plain)
+                .padding(.horizontal, 24)
             } else {
                 Text(reminderCountdown.isEmpty ? "You can send a reminder in 24 hours." : reminderCountdown)
                     .font(Font.bodySans(13, weight: .regular))
-                    .foregroundColor(Color.luxuryCreamMuted)
+                    .foregroundColor(Color.textPrimary.opacity(0.55))
             }
             
             Button {
@@ -1278,8 +1446,9 @@ struct PartnerPlanningSheetView: View {
                 }
             } label: {
                 Text("Fill my preferences")
-                    .font(Font.bodySans(14, weight: .semibold))
-                    .foregroundColor(Color.luxuryGold)
+                    .font(Font.bodySans(14, weight: .medium))
+                    .foregroundColor(Color.textPrimary.opacity(0.8))
+                    .underline()
             }
             .buttonStyle(.plain)
 
@@ -1288,8 +1457,9 @@ struct PartnerPlanningSheetView: View {
                 viewingPendingSessionId = nil
             } label: {
                 Text("Send another invite")
-                    .font(Font.bodySans(14, weight: .semibold))
-                    .foregroundColor(Color.luxuryGold)
+                    .font(Font.bodySans(14, weight: .medium))
+                    .foregroundColor(Color.textPrimary.opacity(0.8))
+                    .underline()
             }
             .buttonStyle(.plain)
 
@@ -1299,13 +1469,13 @@ struct PartnerPlanningSheetView: View {
             } label: {
                 Text("Cancel this invite")
                     .font(Font.bodySans(13, weight: .medium))
-                    .foregroundColor(Color.luxuryCreamMuted)
+                    .foregroundColor(Color.textPrimary.opacity(0.5))
             }
             .buttonStyle(.plain)
 
             // MARK: Safety (Apple §1.2)
             Divider()
-                .background(Color.luxuryGold.opacity(0.15))
+                .background(Color.white.opacity(0.1))
                 .padding(.horizontal, 40)
                 .padding(.top, 8)
 
@@ -1331,10 +1501,10 @@ struct PartnerPlanningSheetView: View {
         .frame(maxWidth: .infinity)
         .background(
             RoundedRectangle(cornerRadius: 20)
-                .fill(Color.luxuryMaroonLight.opacity(0.5))
+                .fill(Color.surfaceElevated)
                 .overlay(
                     RoundedRectangle(cornerRadius: 20)
-                        .stroke(Color.luxuryGold.opacity(0.25), lineWidth: 1)
+                        .stroke(Color.white.opacity(0.06), lineWidth: 1)
                 )
         )
         .alert("Block & Unlink Partner?", isPresented: $showingUnlinkConfirmation) {
@@ -1418,12 +1588,11 @@ private struct InvitedSuccessCelebrationView: View {
                 VStack(spacing: 24) {
                     Spacer()
                     Text("Invited!")
-                        .font(Font.tangerine(52, weight: .bold))
-                        .italic()
-                        .foregroundColor(Color.luxuryGold)
+                        .font(Font.displaySerif(48, weight: .bold))
+                        .foregroundColor(Color.textPrimary)
                     Text("Your partner can open the link to add their preferences.")
                         .font(Font.bodySans(15, weight: .regular))
-                        .foregroundColor(Color.luxuryCreamMuted)
+                        .foregroundColor(Color.textPrimary.opacity(0.6))
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, 24)
                     Button {
@@ -1431,12 +1600,11 @@ private struct InvitedSuccessCelebrationView: View {
                     } label: {
                         Text("Done")
                             .font(Font.bodySans(16, weight: .semibold))
-                            .foregroundColor(Color.luxuryMaroon)
+                            .foregroundColor(Color.backgroundPrimary)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 16)
-                            .background(LinearGradient.goldShimmer)
+                            .background(Color.accentGold)
                             .cornerRadius(16)
-                            .shadow(color: Color.luxuryGold.opacity(0.35), radius: 12, y: 4)
                     }
                     .buttonStyle(.plain)
                     .padding(.horizontal, 40)
@@ -1512,23 +1680,23 @@ private struct PartnerInviteTextField: View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title)
                 .font(Font.bodySans(13, weight: .medium))
-                .foregroundColor(Color.luxuryGold)
+                .foregroundColor(Color.textPrimary.opacity(0.6))
             HStack(spacing: 12) {
                 Image(systemName: icon)
-                    .foregroundColor(Color.luxuryGold.opacity(0.7))
+                    .foregroundColor(Color.textPrimary.opacity(0.5))
                     .frame(width: 20)
-                TextField("", text: $text, prompt: Text(placeholder).foregroundColor(Color.luxuryMuted.opacity(0.6)))
+                TextField("", text: $text, prompt: Text(placeholder).foregroundColor(Color.textPrimary.opacity(0.35)))
                     .font(Font.bodySans(16, weight: .regular))
-                    .foregroundColor(Color.luxuryCream)
+                    .foregroundColor(Color.textPrimary)
                     .keyboardType(keyboardType)
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 14)
-            .background(Color.luxuryMaroonLight)
+            .background(Color.surfaceElevated)
             .cornerRadius(12)
             .overlay(
                 RoundedRectangle(cornerRadius: 12)
-                    .stroke(text.isEmpty ? Color.luxuryGold.opacity(0.2) : Color.luxuryGold.opacity(0.5), lineWidth: 1)
+                    .stroke(Color.white.opacity(text.isEmpty ? 0.08 : 0.16), lineWidth: 1)
             )
         }
     }
@@ -1566,7 +1734,7 @@ struct WaitingRingView: View {
 
 #Preview("Waiting ring") {
     ZStack {
-        Color.luxuryMaroon.ignoresSafeArea()
+        Color.backgroundPrimary.ignoresSafeArea()
         WaitingRingView()
     }
 }
@@ -1580,17 +1748,17 @@ private struct PartnerTutorialBannerView: View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
                 Image(systemName: "person.2.fill")
-                    .foregroundColor(Color.luxuryGold)
+                    .foregroundColor(Color.accentMaroon)
                 Text("How Partner Planning works")
                     .font(Font.bodySans(15, weight: .semibold))
-                    .foregroundColor(Color.luxuryCream)
+                    .foregroundColor(Color.textPrimary)
                 Spacer()
                 Button(action: onDismiss) {
                     Image(systemName: "xmark")
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(Color.luxuryMuted)
+                        .foregroundColor(Color.textPrimary.opacity(0.5))
                         .frame(width: 28, height: 28)
-                        .background(Color.luxuryMaroonLight)
+                        .background(Color.white.opacity(0.06))
                         .clipShape(Circle())
                 }
                 .buttonStyle(.plain)
@@ -1604,9 +1772,9 @@ private struct PartnerTutorialBannerView: View {
             }
         }
         .padding(16)
-        .background(Color.luxuryGold.opacity(0.08))
+        .background(Color.surfaceElevated)
         .cornerRadius(14)
-        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.luxuryGold.opacity(0.3), lineWidth: 1))
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.08), lineWidth: 1))
         .transition(.opacity.combined(with: .move(edge: .top)))
     }
 }
@@ -1617,14 +1785,14 @@ private struct TutorialStep: View {
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
             ZStack {
-                Circle().fill(Color.luxuryGold).frame(width: 22, height: 22)
+                Circle().fill(Color.accentMaroon).frame(width: 22, height: 22)
                 Text(number)
                     .font(Font.bodySans(12, weight: .bold))
-                    .foregroundColor(Color.luxuryMaroon)
+                    .foregroundColor(Color.textPrimary)
             }
             Text(text)
                 .font(Font.bodySans(14, weight: .regular))
-                .foregroundColor(Color.luxuryCreamMuted)
+                .foregroundColor(Color.textPrimary.opacity(0.6))
             Spacer()
         }
     }

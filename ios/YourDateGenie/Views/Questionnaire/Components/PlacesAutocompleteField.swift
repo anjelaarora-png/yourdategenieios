@@ -204,7 +204,7 @@ struct PlacesAutocompleteField: View {
 
 #Preview {
     ZStack {
-        Color.luxuryMaroon.ignoresSafeArea()
+        Color.backgroundPrimary.ignoresSafeArea()
         PlacesAutocompleteField(
             placeholder: "City or neighborhood",
             text: .constant(""),

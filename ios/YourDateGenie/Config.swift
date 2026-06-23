@@ -52,6 +52,27 @@ struct Config {
         return raw.trimmingCharacters(in: .whitespacesAndNewlines)
     }()
     
+    // MARK: - Google Sign-In (native)
+    // Native Google sign-in uses the iOS OAuth client ID (type "iOS" in Google Cloud).
+    // Set GOOGLE_IOS_CLIENT_ID + GOOGLE_REVERSED_CLIENT_ID in Secrets.xcconfig; the SDK reads
+    // GIDClientID from Info.plist and the reversed ID is registered as a URL scheme.
+    // The resulting Google ID token is exchanged for a Supabase session (signInWithIdToken).
+    static let googleIOSClientID: String = {
+        resolvedPlistString(key: "GIDClientID", placeholderSuffix: ".apps.googleusercontent.com")
+    }()
+
+    static var isGoogleSignInConfigured: Bool {
+        !googleIOSClientID.isEmpty && googleIOSClientID.hasSuffix(".apps.googleusercontent.com")
+    }
+
+    // MARK: - Firebase (business partner listings only)
+    // iOS uses Firebase solely to write the `business_listings` collection (project
+    // `your-date-genie`). Configuration ships as GoogleService-Info.plist in the app bundle.
+    // Couple app data stays on Supabase.
+    static var isFirebaseConfigured: Bool {
+        Bundle.main.path(forResource: "GoogleService-Info", ofType: "plist") != nil
+    }
+
     // MARK: - Configuration Validation
 
     static var isGooglePlacesConfigured: Bool {

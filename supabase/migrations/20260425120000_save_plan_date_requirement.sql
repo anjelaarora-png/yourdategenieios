@@ -11,31 +11,29 @@
 
 -- ─── 1. Backfill existing rows ────────────────────────────────────────────────
 
--- "generated" without a date → draft (never had a date picked)
+-- "generated" without a date → draft
 update public.date_plans
 set status = 'draft'
 where status = 'generated'
-  and (date_scheduled is null or date_scheduled = '');
+  and date_scheduled is null;
 
--- "generated" with a date → saved (date was already set somewhere)
+-- "generated" with a date → saved
 update public.date_plans
 set status = 'saved'
 where status = 'generated'
-  and date_scheduled is not null
-  and date_scheduled <> '';
+  and date_scheduled is not null;
 
--- "planned" (iOS legacy) with a date → saved
+-- "planned" with a date → saved
 update public.date_plans
 set status = 'saved'
 where status = 'planned'
-  and date_scheduled is not null
-  and date_scheduled <> '';
+  and date_scheduled is not null;
 
 -- "planned" without a date → draft
 update public.date_plans
 set status = 'draft'
 where status = 'planned'
-  and (date_scheduled is null or date_scheduled = '');
+  and date_scheduled is null;
 
 -- ─── 2. Check constraint ──────────────────────────────────────────────────────
 -- A plan cannot have status='saved' without a planned date.

@@ -8,7 +8,7 @@ struct GiftsTabView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color.luxuryMaroon
+                Color.backgroundPrimary
                     .ignoresSafeArea()
                 
                 ScrollView(.vertical, showsIndicators: false) {
@@ -25,11 +25,11 @@ struct GiftsTabView: View {
             .toolbar {
                 ToolbarItem(placement: .principal) {
                     Text("Gifts")
-                        .font(Font.tangerine(28, weight: .bold))
-                        .foregroundColor(Color.luxuryGold)
+                        .font(Font.bodySerif(22, weight: .regular))
+                        .foregroundColor(Color.accentGold)
                 }
             }
-            .toolbarBackground(Color.luxuryMaroon, for: .navigationBar)
+            .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
         }
     }
@@ -37,9 +37,8 @@ struct GiftsTabView: View {
     private var headerSection: some View {
         VStack(spacing: 8) {
             Text("Gifts")
-                .font(Font.tangerine(52, weight: .bold))
-                .italic()
-                .foregroundColor(Color.luxuryGold)
+                .font(Font.bodySerif(32, weight: .regular))
+                .foregroundColor(Color.accentGold)
             
             Text("Find, save, and track gifts for your person")
                 .font(Font.bodySans(15, weight: .regular))
@@ -51,9 +50,8 @@ struct GiftsTabView: View {
     private var findGiftsSection: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text("Find Gifts")
-                .font(Font.tangerine(28, weight: .bold))
-                .italic()
-                .foregroundColor(Color.luxuryGold)
+                .font(Font.bodySerif(20, weight: .regular))
+                .foregroundColor(Color.accentGold)
                 .padding(.horizontal, 20)
             
             Button {
@@ -97,9 +95,8 @@ struct GiftsTabView: View {
     private var savedGiftsSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Saved Gifts")
-                .font(Font.tangerine(28, weight: .bold))
-                .italic()
-                .foregroundColor(Color.luxuryGold)
+                .font(Font.bodySerif(20, weight: .regular))
+                .foregroundColor(Color.accentGold)
                 .padding(.horizontal, 20)
             
             if giftStore.savedOnly.isEmpty {
@@ -127,9 +124,8 @@ struct GiftsTabView: View {
     private var boughtGiftsSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Bought Gifts")
-                .font(Font.tangerine(28, weight: .bold))
-                .italic()
-                .foregroundColor(Color.luxuryGold)
+                .font(Font.bodySerif(20, weight: .regular))
+                .foregroundColor(Color.accentGold)
                 .padding(.horizontal, 20)
             
             if giftStore.boughtOnly.isEmpty {

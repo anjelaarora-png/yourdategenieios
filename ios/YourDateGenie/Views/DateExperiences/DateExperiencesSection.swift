@@ -278,13 +278,11 @@ struct DateExperiencesSection: View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 6) {
                 Text("Happening")
-                    .font(Font.tangerine(32, weight: .bold))
-                    .italic()
+                    .font(Font.displaySerif(24, weight: .bold))
                     .foregroundColor(Color.luxuryGold)
                 Text("Near You")
-                    .font(Font.tangerine(32, weight: .bold))
-                    .italic()
-                    .foregroundColor(Color.luxuryGold)
+                    .font(Font.displaySerif(24, weight: .bold))
+                    .foregroundColor(Color.luxuryCream)
             }
 
             Text("Live events & experiences within 60 miles")

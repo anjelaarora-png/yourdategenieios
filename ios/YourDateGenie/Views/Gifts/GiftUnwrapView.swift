@@ -145,7 +145,7 @@ struct GiftUnwrapView: View {
 
 #Preview {
     ZStack {
-        Color.luxuryMaroon.ignoresSafeArea()
+        Color.backgroundPrimary.ignoresSafeArea()
         GiftUnwrapView()
     }
 }

@@ -23,7 +23,7 @@ struct QuestionnaireView: View {
         NavigationStack {
             ZStack {
                 // Luxurious background
-                Color.luxuryMaroon
+                Color.backgroundPrimary
                     .ignoresSafeArea()
                 
                 if isGenerating {
@@ -67,9 +67,8 @@ struct QuestionnaireView: View {
                 if !isGenerating {
                     ToolbarItem(placement: .principal) {
                         Text(viewModel.stepTitle)
-                            .font(Font.tangerine(24, weight: .bold))
-                            .italic()
-                            .foregroundColor(Color.luxuryGold)
+                            .font(Font.bodySerif(20, weight: .regular))
+                            .foregroundColor(Color.accentGold)
                     }
                     ToolbarItem(placement: .navigationBarTrailing) {
                         Button {
@@ -96,7 +95,7 @@ struct QuestionnaireView: View {
                     }
                 }
             }
-            .toolbarBackground(Color.luxuryMaroon, for: .navigationBar)
+            .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .sheet(isPresented: $showPremiumPaywall) {
                 PremiumDatePlanPaywallView {
@@ -298,7 +297,7 @@ struct QuestionnaireView: View {
         .padding(.horizontal, 20)
         .padding(.vertical, 16)
         .background(
-            Color.luxuryMaroon
+            Color.backgroundPrimary
                 .shadow(color: Color.black.opacity(0.3), radius: 10, y: -5)
         )
         } // end outer VStack

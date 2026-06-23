@@ -21,7 +21,7 @@ struct BigGiftUnwrapView: View {
     var body: some View {
         GeometryReader { geo in
             ZStack {
-                Color.luxuryMaroon
+                Color.backgroundPrimary
                     .ignoresSafeArea()
                 
                 // Confetti
@@ -132,8 +132,8 @@ struct BigGiftUnwrapView: View {
                     Spacer()
                     
                     Text("Find the perfect gift")
-                        .font(Font.tangerine(32, weight: .bold))
-                        .foregroundColor(Color.luxuryCream)
+                        .font(Font.bodySerif(24, weight: .regular))
+                        .foregroundColor(Color.textPrimary)
                         .multilineTextAlignment(.center)
                         .opacity(titleOpacity)
                         .scaleEffect(titleScale)

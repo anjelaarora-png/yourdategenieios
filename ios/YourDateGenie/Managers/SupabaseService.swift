@@ -228,6 +228,31 @@ final class SupabaseService: ObservableObject {
         return mapToSupabaseUser(session.user, defaultName: nil)
     }
 
+    /// Exchanges a native Google ID token (from the GoogleSignIn SDK) for a Supabase session via the
+    /// SAME client used for every other auth operation. This replaces the web `signInWithOAuth` flow
+    /// so users never see a `supabase.co` browser prompt — the native Google sheet shows the app name
+    /// instead. The token's audience is the iOS OAuth client ID, which must be listed under the
+    /// Supabase Google provider's "Authorized Client IDs".
+    @MainActor
+    func signInWithGoogleIdToken(idToken: String, accessToken: String?, nonce: String? = nil) async throws -> SupabaseUser {
+        await setLoading(true)
+        defer { Task { await setLoading(false) } }
+
+        let session = try await supabaseClient.auth.signInWithIdToken(
+            credentials: OpenIDConnectCredentials(
+                provider: .google,
+                idToken: idToken,
+                accessToken: accessToken,
+                nonce: nonce
+            )
+        )
+        await syncSessionFromSDK(session)
+        if !isAuthenticated {
+            throw SupabaseError.authFailed("Sign in with Google did not complete.")
+        }
+        return mapToSupabaseUser(session.user, defaultName: nil)
+    }
+
     /// Sign out (uses Supabase SDK)
     ///
     /// Clears auth state in three steps:

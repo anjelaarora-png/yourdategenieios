@@ -21,6 +21,9 @@ const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
 const Terms = lazy(() => import("./pages/Terms"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const Waitlist = lazy(() => import("./pages/Waitlist"));
+const ForBusiness = lazy(() => import("./pages/ForBusiness"));
+const BusinessLogin = lazy(() => import("./pages/BusinessLogin"));
+const BusinessPartnerPortal = lazy(() => import("./pages/BusinessPartnerPortal"));
 
 // Optimized QueryClient configuration for reliability and iOS WebView stability
 const queryClient = new QueryClient({
@@ -76,6 +79,9 @@ const App = () => (
             <Route path="/privacy" element={<PrivacyPolicy />} />
             <Route path="/terms" element={<Terms />} />
             <Route path="/waitlist" element={<Waitlist />} />
+            <Route path="/for-business" element={<ForBusiness />} />
+            <Route path="/for-business/login" element={<BusinessLogin />} />
+            <Route path="/for-business/apply" element={<BusinessPartnerPortal />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

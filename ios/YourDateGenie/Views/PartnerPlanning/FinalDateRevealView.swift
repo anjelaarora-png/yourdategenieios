@@ -37,8 +37,7 @@ struct FinalDateRevealView: View {
 
     var body: some View {
         ZStack {
-            Color.luxuryMaroon.ignoresSafeArea()
-            FloatingParticlesView().ignoresSafeArea().opacity(0.5)
+            Color.backgroundPrimary.ignoresSafeArea()
 
             // Confetti layer (decorative, skipped when Reduce Motion is on)
             if !reduceMotion {
@@ -93,7 +92,7 @@ struct FinalDateRevealView: View {
                 }
             }
         }
-        .toolbarBackground(Color.luxuryMaroon, for: .navigationBar)
+        .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
         .onAppear {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
@@ -131,17 +130,15 @@ struct FinalDateRevealView: View {
         VStack(spacing: 10) {
             Image(systemName: "star.circle.fill")
                 .font(.system(size: 36))
-                .foregroundColor(Color.luxuryGold)
-                .shadow(color: Color.luxuryGold.opacity(0.5), radius: 12)
+                .foregroundColor(Color.accentMaroon)
 
-            Text("Your Perfect Date")
-                .font(Font.tangerine(48, weight: .bold))
-                .italic()
-                .foregroundColor(Color.luxuryGold)
+            Text("Your perfect date")
+                .font(Font.displaySerif(38, weight: .bold))
+                .foregroundColor(Color.textPrimary)
 
             Text("Based on both your preferences and rankings")
                 .font(Font.bodySans(14, weight: .regular))
-                .foregroundColor(Color.luxuryCreamMuted)
+                .foregroundColor(Color.textPrimary.opacity(0.6))
                 .multilineTextAlignment(.center)
         }
         .padding(.top, 8)
@@ -158,13 +155,19 @@ struct FinalDateRevealView: View {
         .padding(20)
         .background(
             RoundedRectangle(cornerRadius: 20)
-                .fill(Color.luxuryMaroonLight)
-                .shadow(color: Color.luxuryGold.opacity(0.2), radius: 20, y: 6)
+                .fill(Color.surfaceElevated)
+                .shadow(color: Color.black.opacity(0.3), radius: 16, y: 6)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 20)
-                .stroke(Color.luxuryGold.opacity(0.5), lineWidth: 1.5)
+                .stroke(Color.white.opacity(0.08), lineWidth: 1)
         )
+        .overlay(alignment: .leading) {
+            RoundedRectangle(cornerRadius: 2)
+                .fill(Color.accentMaroon)
+                .frame(width: 4)
+                .padding(.vertical, 2)
+        }
     }
 
     private func winnerCardHeader(plan: DatePlan) -> some View {
@@ -174,16 +177,15 @@ struct FinalDateRevealView: View {
                     HStack(spacing: 6) {
                         Image(systemName: "crown.fill")
                             .font(.system(size: 12))
-                            .foregroundColor(Color.luxuryGold)
+                            .foregroundColor(Color.accentMaroon)
                         Text("CHOSEN FOR YOU BOTH")
                             .font(Font.bodySans(10, weight: .bold))
                             .tracking(2)
-                            .foregroundColor(Color.luxuryGold.opacity(0.8))
+                            .foregroundColor(Color.textPrimary.opacity(0.7))
                     }
                     Text(plan.title)
-                        .font(Font.tangerine(32, weight: .bold))
-                        .italic()
-                        .foregroundColor(Color.luxuryCream)
+                        .font(Font.displaySerif(28, weight: .bold))
+                        .foregroundColor(Color.textPrimary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer()
@@ -191,7 +193,7 @@ struct FinalDateRevealView: View {
             if !plan.tagline.isEmpty {
                 Text(plan.tagline)
                     .font(Font.bodySans(14, weight: .regular))
-                    .foregroundColor(Color.luxuryCreamMuted)
+                    .foregroundColor(Color.textPrimary.opacity(0.6))
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
@@ -204,21 +206,21 @@ struct FinalDateRevealView: View {
                 Text("YOUR EVENING")
                     .font(Font.bodySans(10, weight: .bold))
                     .tracking(2)
-                    .foregroundColor(Color.luxuryGold.opacity(0.7))
+                    .foregroundColor(Color.textPrimary.opacity(0.5))
                 ForEach(plan.stops.prefix(4), id: \.name) { stop in
                     HStack(alignment: .top, spacing: 10) {
                         Circle()
-                            .fill(Color.luxuryGold)
+                            .fill(Color.accentMaroon)
                             .frame(width: 6, height: 6)
                             .padding(.top, 5)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(stop.name)
                                 .font(Font.bodySans(14, weight: .semibold))
-                                .foregroundColor(Color.luxuryCream)
+                                .foregroundColor(Color.textPrimary)
                             if !stop.description.isEmpty {
                                 Text(stop.description)
                                     .font(Font.bodySans(12, weight: .regular))
-                                    .foregroundColor(Color.luxuryCreamMuted)
+                                    .foregroundColor(Color.textPrimary.opacity(0.6))
                                     .lineLimit(2)
                             }
                         }
@@ -226,7 +228,7 @@ struct FinalDateRevealView: View {
                 }
             }
             .padding(14)
-            .background(Color.luxuryMaroon.opacity(0.5))
+            .background(Color.black.opacity(0.2))
             .cornerRadius(12)
         }
     }
@@ -240,12 +242,12 @@ struct FinalDateRevealView: View {
                     ForEach(hints, id: \.self) { hint in
                         Text(hint)
                             .font(Font.bodySans(11, weight: .semibold))
-                            .foregroundColor(Color.luxuryGold)
+                            .foregroundColor(Color.textPrimary.opacity(0.8))
                             .padding(.horizontal, 10)
                             .padding(.vertical, 4)
-                            .background(Color.luxuryGold.opacity(0.12))
+                            .background(Color.white.opacity(0.06))
                             .cornerRadius(10)
-                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.luxuryGold.opacity(0.3), lineWidth: 1))
+                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.12), lineWidth: 1))
                     }
                 }
             }
@@ -260,24 +262,24 @@ struct FinalDateRevealView: View {
                 HStack(alignment: .top, spacing: 12) {
                     Image(systemName: "sparkles")
                         .font(.system(size: 16))
-                        .foregroundColor(Color.luxuryGold)
+                        .foregroundColor(Color.accentMaroon)
                         .padding(.top, 2)
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Why this plan")
                             .font(Font.bodySans(11, weight: .bold))
                             .tracking(1.5)
-                            .foregroundColor(Color.luxuryGold.opacity(0.8))
+                            .foregroundColor(Color.textPrimary.opacity(0.6))
                             .textCase(.uppercase)
                         Text(reason)
                             .font(Font.bodySans(13, weight: .regular))
-                            .foregroundColor(Color.luxuryCreamMuted)
+                            .foregroundColor(Color.textPrimary.opacity(0.6))
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
                 .padding(16)
-                .background(Color.luxuryMaroonLight.opacity(0.6))
+                .background(Color.surfaceElevated)
                 .cornerRadius(14)
-                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.luxuryGold.opacity(0.2), lineWidth: 1))
+                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.06), lineWidth: 1))
             }
         }
     }
@@ -286,31 +288,30 @@ struct FinalDateRevealView: View {
 
     private func actionsSection(plan: DatePlan) -> some View {
         VStack(spacing: 12) {
-            // Primary CTA
+            // Single gold action for this screen.
             Button {
                 confirmPlan(plan)
             } label: {
                 HStack(spacing: 8) {
                     if isConfirming {
-                        ProgressView().tint(Color.luxuryMaroon)
+                        ProgressView().tint(Color.backgroundPrimary)
                     } else {
-                        Image(systemName: "heart.circle.fill")
+                        Image(systemName: "calendar.badge.checkmark")
                             .font(.system(size: 18))
-                        Text("Confirm This Plan")
+                        Text("Lock it in")
                             .font(Font.bodySans(16, weight: .semibold))
                     }
                 }
-                .foregroundColor(Color.luxuryMaroon)
+                .foregroundColor(Color.backgroundPrimary)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 16)
-                .background(LinearGradient.goldShimmer)
+                .background(Color.accentGold)
                 .cornerRadius(16)
-                .shadow(color: Color.luxuryGold.opacity(0.4), radius: 12, y: 4)
             }
             .buttonStyle(.plain)
             .disabled(isConfirming)
 
-            // Secondary row
+            // Secondary row (no gold — ghost / muted)
             HStack(spacing: 12) {
                 Button {
                     savePlanForLater(plan)
@@ -318,13 +319,13 @@ struct FinalDateRevealView: View {
                     HStack(spacing: 6) {
                         Image(systemName: "bookmark.fill")
                             .font(.system(size: 14))
-                        Text("Save for Later")
+                        Text("Save for later")
                             .font(Font.bodySans(14, weight: .semibold))
                     }
-                    .foregroundColor(Color.luxuryGold)
+                    .foregroundColor(Color.textPrimary)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 13)
-                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.luxuryGold, lineWidth: 1.5))
+                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.textPrimary.opacity(0.3), lineWidth: 1.5))
                 }
                 .buttonStyle(.plain)
 
@@ -337,10 +338,10 @@ struct FinalDateRevealView: View {
                         Text("Regenerate")
                             .font(Font.bodySans(14, weight: .semibold))
                     }
-                    .foregroundColor(Color.luxuryCreamMuted)
+                    .foregroundColor(Color.textPrimary.opacity(0.6))
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 13)
-                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.luxuryCreamMuted.opacity(0.4), lineWidth: 1))
+                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.textPrimary.opacity(0.25), lineWidth: 1))
                 }
                 .buttonStyle(.plain)
             }
@@ -357,16 +358,16 @@ struct FinalDateRevealView: View {
                 HStack {
                     Text("Backup option")
                         .font(Font.bodySans(13, weight: .semibold))
-                        .foregroundColor(Color.luxuryCreamMuted)
+                        .foregroundColor(Color.textPrimary.opacity(0.6))
                     Spacer()
                     Image(systemName: showRunnerUp ? "chevron.up" : "chevron.down")
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(Color.luxuryCreamMuted)
+                        .foregroundColor(Color.textPrimary.opacity(0.6))
                 }
                 .padding(14)
-                .background(Color.luxuryMaroonLight.opacity(0.4))
+                .background(Color.surfaceElevated)
                 .cornerRadius(12)
-                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.luxuryGold.opacity(0.15), lineWidth: 1))
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.06), lineWidth: 1))
             }
             .buttonStyle(.plain)
 
@@ -374,18 +375,18 @@ struct FinalDateRevealView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     Text(plan.title)
                         .font(Font.bodySans(15, weight: .semibold))
-                        .foregroundColor(Color.luxuryCream)
+                        .foregroundColor(Color.textPrimary)
                     if !plan.tagline.isEmpty {
                         Text(plan.tagline)
                             .font(Font.bodySans(13, weight: .regular))
-                            .foregroundColor(Color.luxuryCreamMuted)
+                            .foregroundColor(Color.textPrimary.opacity(0.6))
                             .lineLimit(3)
                     }
                 }
                 .padding(14)
-                .background(Color.luxuryMaroonLight.opacity(0.3))
+                .background(Color.surfaceElevated.opacity(0.6))
                 .cornerRadius(12)
-                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.luxuryGold.opacity(0.15), lineWidth: 1))
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.06), lineWidth: 1))
                 .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
@@ -393,10 +394,10 @@ struct FinalDateRevealView: View {
 
     private var loadingState: some View {
         VStack(spacing: 16) {
-            ProgressView().tint(Color.luxuryGold)
+            ProgressView().tint(Color.textPrimary.opacity(0.7))
             Text("Loading your final plan…")
                 .font(Font.bodySans(14, weight: .regular))
-                .foregroundColor(Color.luxuryCreamMuted)
+                .foregroundColor(Color.textPrimary.opacity(0.6))
         }
         .padding(.top, 60)
     }
@@ -405,25 +406,24 @@ struct FinalDateRevealView: View {
         VStack(spacing: 16) {
             Image(systemName: "wifi.exclamationmark")
                 .font(.system(size: 32))
-                .foregroundColor(Color.luxuryGold.opacity(0.7))
+                .foregroundColor(Color.textPrimary.opacity(0.5))
             Text("Couldn't load your date plan")
-                .font(Font.tangerine(28, weight: .bold))
-                .italic()
-                .foregroundColor(Color.luxuryGold)
+                .font(Font.displaySerif(26, weight: .bold))
+                .foregroundColor(Color.textPrimary)
                 .multilineTextAlignment(.center)
             Text("Check your connection and try again, or go back and retry.")
                 .font(Font.bodySans(14, weight: .regular))
-                .foregroundColor(Color.luxuryCreamMuted)
+                .foregroundColor(Color.textPrimary.opacity(0.6))
                 .multilineTextAlignment(.center)
             Button {
                 coordinator.dismissSheet()
             } label: {
-                Text("Go Back")
+                Text("Go back")
                     .font(Font.bodySans(15, weight: .semibold))
-                    .foregroundColor(Color.luxuryMaroon)
+                    .foregroundColor(Color.backgroundPrimary)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
-                    .background(LinearGradient.goldShimmer)
+                    .background(Color.accentGold)
                     .cornerRadius(14)
             }
             .buttonStyle(.plain)
@@ -434,22 +434,43 @@ struct FinalDateRevealView: View {
 
     // MARK: - Actions
 
+    /// Confirm the winning plan: write it to the calendar with reminders (screen 11f),
+    /// finalize the session, then route to the "locked in" confirmation (screen 15).
     private func confirmPlan(_ plan: DatePlan) {
         isConfirming = true
         PartnerSessionManager.shared.transitionPhase(to: .finalized, triggeredBy: "user")
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-            isConfirming = false
-            coordinator.dismissSheet()
-            coordinator.currentDatePlan = plan
-            coordinator.generatedPlans = [plan]
-            coordinator.activeSheet = .datePlanOptions
-            NotificationManager.shared.addNotification(AppNotification(
-                type: .planConfirmed,
-                title: "Your date plan is confirmed.",
-                message: "Make it magical — it's all planned out.",
-                timestamp: Date()
-            ))
+        let chosenDate = chosenDate(for: plan)
+        Task {
+            let result = await CalendarService.addDatePlan(plan, on: chosenDate, withReminders: true)
+            let synced: Bool
+            if case .success = result { synced = true } else { synced = false }
+            var finalized = plan
+            finalized.scheduledDate = chosenDate
+            _ = finalized
+            await MainActor.run {
+                isConfirming = false
+                coordinator.dismissToHome()
+                NotificationManager.shared.addNotification(AppNotification(
+                    type: .planConfirmed,
+                    title: "Your date plan is confirmed.",
+                    message: synced
+                        ? "It's on your calendar — reminders set for you both."
+                        : "Make it magical — it's all planned out.",
+                    timestamp: Date()
+                ))
+            }
         }
+    }
+
+    /// Resolve the evening the couple matched on, falling back to the first proposed slot.
+    private func chosenDate(for plan: DatePlan) -> Date {
+        if let scheduled = plan.scheduledDate { return scheduled }
+        if let proposed = PartnerSessionManager.shared.inviteInfo?.proposedDateTimes?.first?.date {
+            return proposed
+        }
+        let cal = Calendar.current
+        let nextSat = cal.nextDate(after: Date(), matching: DateComponents(weekday: 7), matchingPolicy: .nextTime) ?? Date()
+        return cal.date(bySettingHour: 19, minute: 0, second: 0, of: nextSat) ?? nextSat
     }
 
     private func savePlanForLater(_ plan: DatePlan) {

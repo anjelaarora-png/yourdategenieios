@@ -20,7 +20,7 @@ struct EditAccountSheetView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color.luxuryMaroon
+                Color.backgroundPrimary
                     .ignoresSafeArea()
 
                 ScrollView {
@@ -66,7 +66,7 @@ struct EditAccountSheetView: View {
             }
             .navigationTitle("Edit Account")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(Color.luxuryMaroon, for: .navigationBar)
+            .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar {

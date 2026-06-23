@@ -32,10 +32,10 @@ struct HeroView: View {
             .overlay(
                 LinearGradient(
                     gradient: Gradient(colors: [
-                        Color.luxuryMaroon.opacity(0.3),
-                        Color.luxuryMaroon.opacity(0.5),
-                        Color.luxuryMaroon.opacity(0.9),
-                        Color.luxuryMaroon
+                        Color.backgroundPrimary.opacity(0.3),
+                        Color.backgroundPrimary.opacity(0.5),
+                        Color.backgroundPrimary.opacity(0.9),
+                        Color.backgroundPrimary
                     ]),
                     startPoint: .top,
                     endPoint: .bottom
@@ -67,8 +67,7 @@ struct HeroView: View {
                     
                     HStack(spacing: 6) {
                         Text("planned")
-                            .font(Font.tangerine(52, weight: .bold))
-                            .italic()
+                            .font(Font.displaySerif(52, weight: .bold))
                             .foregroundStyle(LinearGradient.goldShimmer)
                         Text("for you.")
                             .font(Font.header(36, weight: .regular))
@@ -110,9 +109,8 @@ struct HeroView: View {
                     Text("Join 500+ couples planning")
                         .font(Font.bodySans(12, weight: .regular))
                         .foregroundColor(Color.luxuryMuted)
-                    Text("magical")
-                        .font(Font.tangerine(24, weight: .bold))
-                        .italic()
+                    Text("memorable")
+                        .font(Font.displaySerif(24, weight: .bold))
                         .foregroundColor(Color.luxuryGold)
                     Text("dates")
                         .font(Font.bodySans(12, weight: .regular))

@@ -26,12 +26,8 @@ struct PartnerJoinView: View {
 
     var body: some View {
         ZStack {
-            Color.luxuryMaroon
+            Color.backgroundPrimary
                 .ignoresSafeArea()
-
-            FloatingParticlesView()
-                .ignoresSafeArea()
-                .opacity(0.6)
 
             if !userProfileManager.isLoggedIn {
                 // Partner must be signed in before they can contribute preferences
@@ -62,7 +58,7 @@ struct PartnerJoinView: View {
                 }
             }
         }
-        .toolbarBackground(Color.luxuryMaroon, for: .navigationBar)
+        .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
     }
 
@@ -70,16 +66,15 @@ struct PartnerJoinView: View {
         VStack(spacing: 24) {
             Image(systemName: "lock.circle.fill")
                 .font(.system(size: 52))
-                .foregroundColor(Color.luxuryGold)
+                .foregroundColor(Color.accentMaroon)
 
             VStack(spacing: 8) {
                 Text("Sign in to join")
-                    .font(Font.tangerine(36, weight: .bold))
-                    .italic()
-                    .foregroundColor(Color.luxuryGold)
+                    .font(Font.displaySerif(30, weight: .bold))
+                    .foregroundColor(Color.textPrimary)
                 Text("You need an account to contribute your preferences to this date plan.")
                     .font(Font.bodySans(14, weight: .regular))
-                    .foregroundColor(Color.luxuryCreamMuted)
+                    .foregroundColor(Color.textPrimary.opacity(0.6))
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 8)
             }
@@ -90,14 +85,13 @@ struct PartnerJoinView: View {
                     coordinator.activeSheet = .authRequired(.fresh)
                 }
             } label: {
-                Text("Sign In / Create Account")
+                Text("Sign in / Create account")
                     .font(Font.bodySans(16, weight: .semibold))
-                    .foregroundColor(Color.luxuryMaroon)
+                    .foregroundColor(Color.backgroundPrimary)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 16)
-                    .background(LinearGradient.goldShimmer)
+                    .background(Color.accentGold)
                     .cornerRadius(16)
-                    .shadow(color: Color.luxuryGold.opacity(0.35), radius: 12, y: 4)
             }
             .buttonStyle(.plain)
             .padding(.horizontal, 24)
@@ -110,11 +104,10 @@ struct PartnerJoinView: View {
         VStack(spacing: 10) {
             Image(systemName: "heart.circle.fill")
                 .font(.system(size: 32))
-                .foregroundColor(Color.luxuryGold)
+                .foregroundColor(Color.accentMaroon)
             Text(displayTitle)
-                .font(Font.tangerine(24, weight: .bold))
-                .italic()
-                .foregroundColor(Color.luxuryGold)
+                .font(Font.displaySerif(24, weight: .bold))
+                .foregroundColor(Color.textPrimary)
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
@@ -133,22 +126,22 @@ struct PartnerJoinView: View {
         VStack(alignment: .leading, spacing: 24) {
             Text("We've used your saved preferences.")
                 .font(Font.bodySans(15, weight: .regular))
-                .foregroundColor(Color.luxuryCreamMuted)
+                .foregroundColor(Color.textPrimary.opacity(0.6))
 
             VStack(alignment: .leading, spacing: 8) {
                 Text("Anything to add? (optional)")
                     .font(Font.bodySans(12, weight: .medium))
-                    .foregroundColor(Color.luxuryGold.opacity(0.9))
-                TextField("", text: $partnerNote, prompt: Text("e.g. Rooftop preferred").foregroundColor(Color.luxuryMuted.opacity(0.6)))
+                    .foregroundColor(Color.textPrimary.opacity(0.6))
+                TextField("", text: $partnerNote, prompt: Text("e.g. Rooftop preferred").foregroundColor(Color.textPrimary.opacity(0.35)))
                     .font(Font.bodySans(15, weight: .regular))
-                    .foregroundColor(Color.luxuryCream)
+                    .foregroundColor(Color.textPrimary)
                     .padding(.horizontal, 14)
                     .padding(.vertical, 12)
-                    .background(Color.luxuryMaroonLight)
+                    .background(Color.surfaceElevated)
                     .cornerRadius(12)
                     .overlay(
                         RoundedRectangle(cornerRadius: 12)
-                            .stroke(Color.luxuryGold.opacity(0.25), lineWidth: 1)
+                            .stroke(Color.white.opacity(0.08), lineWidth: 1)
                     )
             }
 
@@ -161,12 +154,11 @@ struct PartnerJoinView: View {
                     Text("I'm in")
                         .font(Font.bodySans(16, weight: .semibold))
                 }
-                .foregroundColor(Color.luxuryMaroon)
+                .foregroundColor(Color.backgroundPrimary)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 16)
-                .background(LinearGradient.goldShimmer)
+                .background(Color.accentGold)
                 .cornerRadius(16)
-                .shadow(color: Color.luxuryGold.opacity(0.35), radius: 12, y: 4)
             }
             .buttonStyle(.plain)
         }
@@ -177,7 +169,7 @@ struct PartnerJoinView: View {
         VStack(alignment: .leading, spacing: 20) {
             Text("Add your preferences so we can plan something you'll both love.")
                 .font(Font.bodySans(15, weight: .regular))
-                .foregroundColor(Color.luxuryCreamMuted)
+                .foregroundColor(Color.textPrimary.opacity(0.6))
 
             Button {
                 access.require(.datePlan) {
@@ -195,12 +187,11 @@ struct PartnerJoinView: View {
                     Text("Add my preferences")
                         .font(Font.bodySans(16, weight: .semibold))
                 }
-                .foregroundColor(Color.luxuryMaroon)
+                .foregroundColor(Color.backgroundPrimary)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 16)
-                .background(LinearGradient.goldShimmer)
+                .background(Color.accentGold)
                 .cornerRadius(16)
-                .shadow(color: Color.luxuryGold.opacity(0.35), radius: 12, y: 4)
             }
             .buttonStyle(.plain)
         }

@@ -15,9 +15,8 @@ struct SectionHeader: View {
                 }
                 
                 Text(title)
-                    .font(Font.tangerine(30, weight: .bold))
-                    .italic()
-                    .foregroundColor(Color.luxuryGold)
+                    .font(Font.bodySerif(22, weight: .regular))
+                    .foregroundColor(Color.accentGold)
             }
             
             if let subtitle = subtitle {
@@ -294,7 +293,7 @@ struct ToggleOptionCard: View {
 // MARK: - Preview
 #Preview {
     ZStack {
-        Color.luxuryMaroon.ignoresSafeArea()
+        Color.backgroundPrimary.ignoresSafeArea()
         
         ScrollView {
             VStack(spacing: 20) {

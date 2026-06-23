@@ -24,7 +24,7 @@ struct SettingsSheetView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color.luxuryMaroon
+                Color.backgroundPrimary
                     .ignoresSafeArea()
 
                 ScrollView {
@@ -284,12 +284,6 @@ struct SettingsSheetView: View {
                         .padding(18)
                         .luxuryCard()
 
-                        // MARK: - Support & Safety (Apple §1.2)
-                        Text("Support & safety")
-                            .font(Font.bodySans(14, weight: .medium))
-                            .foregroundColor(Color.luxuryCreamMuted)
-                            .padding(.horizontal, 4)
-
                         // MARK: - Legal (Apple §3.1.2 + §5.1.1)
                         Text("Legal")
                             .font(Font.bodySans(14, weight: .medium))
@@ -346,6 +340,12 @@ struct SettingsSheetView: View {
                         }
                         .padding(18)
                         .luxuryCard()
+
+                        // MARK: - Support & Safety (Apple §1.2)
+                        Text("Support & safety")
+                            .font(Font.bodySans(14, weight: .medium))
+                            .foregroundColor(Color.luxuryCreamMuted)
+                            .padding(.horizontal, 4)
 
                         VStack(spacing: 12) {
                             if let contactURL = URL(string: "mailto:hello@yourdategenie.com") {
@@ -452,7 +452,7 @@ struct SettingsSheetView: View {
             }
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(Color.luxuryMaroon, for: .navigationBar)
+            .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar {

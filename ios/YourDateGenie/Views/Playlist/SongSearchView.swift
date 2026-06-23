@@ -14,7 +14,7 @@ struct SongSearchView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color.luxuryMaroon.ignoresSafeArea()
+                Color.backgroundPrimary.ignoresSafeArea()
                 
                 VStack(spacing: 0) {
                     HStack(spacing: 12) {
@@ -96,7 +96,7 @@ struct SongSearchView: View {
                         .foregroundColor(Color.luxuryGold)
                 }
             }
-            .toolbarBackground(Color.luxuryMaroon, for: .navigationBar)
+            .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
         }
     }

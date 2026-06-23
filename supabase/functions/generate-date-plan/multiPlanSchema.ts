@@ -20,8 +20,8 @@ export const multiDatePlanTool = {
                 type: "string",
                 description: "Short label like 'Classic Romance', 'Adventure', 'Cozy & Intimate'",
               },
-              title: { type: "string", description: "Magical, cinematic 2-6 word title evoking MOOD or ATMOSPHERE of this specific plan. NEVER use lazy generic titles like 'Mediterranean Evening', 'Italian Night', or '[Cuisine] + [generic word]'. NEVER use generic phrases like 'Date Night' or 'Evening Out'. Cuisine/cultural words ARE allowed if used creatively and poetically (e.g. 'Mediterranean Moonlight', 'Saffron & Slow Jazz', 'Spice, Stars & You'). Each plan's title must feel completely different. Examples: 'Velvet & City Lights', 'The Midnight Detour', 'Salt Air & Starlight', 'Candlelight & Conspiracy', 'Stolen Kisses Open Sky', 'Mediterranean Moonlight'" },
-              tagline: { type: "string", description: "Romantic one-liner that sets the scene; this is where you can mention cuisine or neighborhood (NOT the title)" },
+              title: { type: "string", description: "Creative 3-7 word title that hints at the actual itinerary (e.g. 'Gallery Hop & Candlelit Pasta', 'Rooftop Jazz, Then Gelato'). Must tell the user what they're walking into, not just mood. NEVER lazy titles like 'Italian Night' or 'Date Night' alone." },
+              tagline: { type: "string", description: "Romantic one-liner; may include a short itinerary hint like 'Wine bar → trattoria → skyline views'" },
               totalDuration: {
                 type: "string",
                 description: "Total time like '3-4 hours'",

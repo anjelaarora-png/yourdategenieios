@@ -37,6 +37,10 @@ export const Events = {
   /** Fire once when the pricing section enters the viewport. */
   pricingViewed: () => trackEvent("Pricing Viewed"),
 
+  /** Fire after successful business / venue listing form submission. */
+  businessListingSignup: (source: string, venueType: string) =>
+    trackEvent("Business Listing Signup", { source, venueType }),
+
   /** Fire on clicks to IG, TikTok, or other external social links. */
   externalLinkClick: (destination: string) =>
     trackEvent("External Link Click", { destination }),

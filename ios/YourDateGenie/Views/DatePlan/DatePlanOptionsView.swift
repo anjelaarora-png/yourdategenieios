@@ -42,7 +42,7 @@ struct DatePlanOptionsView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color.luxuryMaroon
+                Color.backgroundPrimary
                     .ignoresSafeArea()
                 
                 VStack(spacing: 0) {
@@ -166,7 +166,7 @@ struct DatePlanOptionsView: View {
                     }
                 }
             }
-            .toolbarBackground(Color.luxuryMaroon, for: .navigationBar)
+            .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .safeAreaInset(edge: .bottom) {
                 if !isOnRegeneratePage {
@@ -291,7 +291,7 @@ struct DatePlanOptionsView: View {
             }
             .padding(.top, 24)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Color.luxuryMaroon)
+            .background(Color.backgroundPrimary)
             .navigationTitle("Add to Calendar")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -302,7 +302,7 @@ struct DatePlanOptionsView: View {
                     .foregroundColor(Color.luxuryGold)
                 }
             }
-            .toolbarBackground(Color.luxuryMaroon, for: .navigationBar)
+            .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
         }
     }
     
@@ -378,9 +378,8 @@ struct DatePlanOptionsView: View {
                         endPoint: .bottomTrailing
                     ))
                 Text("Want different options?")
-                    .font(Font.tangerine(28, weight: .bold))
-                    .italic()
-                    .foregroundColor(Color.luxuryGold)
+                    .font(Font.bodySerif(22, weight: .regular))
+                    .foregroundColor(Color.accentGold)
                     .multilineTextAlignment(.center)
                 Text("Get three new date plans with the same preferences.")
                     .font(Font.bodySans(16, weight: .regular))
@@ -499,7 +498,7 @@ struct DatePlanOptionsView: View {
         }
         .padding(.vertical, 12)
         .frame(minHeight: 120)
-        .background(Color.luxuryMaroon)
+        .background(Color.backgroundPrimary)
         .contentShape(Rectangle())
         .overlay(alignment: .bottom) {
             if !hasSwipedOptions && plans.count > 1 {
@@ -562,7 +561,7 @@ struct DatePlanOptionsView: View {
         .padding(.horizontal, 20)
         .padding(.vertical, 16)
         .background(
-            Color.luxuryMaroon
+            Color.backgroundPrimary
                 .shadow(color: Color.black.opacity(0.3), radius: 20, y: -5)
                 .ignoresSafeArea()
         )
@@ -598,9 +597,8 @@ struct DatePlanOptionsView: View {
             }
             VStack(spacing: 8) {
                 Text("Adding the finishing touches")
-                    .font(Font.tangerine(24, weight: .bold))
-                    .italic()
-                    .foregroundColor(Color.luxuryGold)
+                    .font(Font.bodySerif(18, weight: .regular))
+                    .foregroundColor(Color.accentGold)
                 Text("Your date is almost ready")
                     .font(Font.bodySans(13, weight: .regular))
                     .foregroundColor(Color.luxuryMuted)
@@ -620,9 +618,8 @@ struct DatePlanOptionsView: View {
         VStack(spacing: 16) {
             VStack(spacing: 8) {
                 Text(plan.title)
-                    .font(Font.tangerine(42, weight: .bold))
-                    .italic()
-                    .foregroundColor(Color(hex: "3D2C2C"))
+                    .font(Font.bodySerif(28, weight: .regular))
+                    .foregroundColor(Color.textOnCard)
                     .multilineTextAlignment(.center)
                 
                 Text(plan.tagline)

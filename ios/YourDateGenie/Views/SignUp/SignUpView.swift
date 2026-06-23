@@ -8,11 +8,11 @@ struct SignUpView: View {
     
     var body: some View {
         ZStack {
-            Color.luxuryMaroon
+            Color.backgroundPrimary
                 .ignoresSafeArea()
             
             RadialGradient.goldGlow
-                .opacity(0.15)
+                .opacity(0.1)
                 .ignoresSafeArea()
             
             VStack(spacing: 0) {
@@ -60,7 +60,7 @@ struct SignUpView: View {
             
             VStack(spacing: 8) {
                 Text("Create Your Account")
-                    .font(Font.tangerine(34, weight: .bold))
+                    .font(Font.bodySerif(34, weight: .bold))
                     .italic()
                     .foregroundColor(Color.luxuryGold)
                 HStack(spacing: 4) {
@@ -68,7 +68,7 @@ struct SignUpView: View {
                         .font(Font.bodySans(14, weight: .regular))
                         .foregroundColor(Color.luxuryCreamMuted)
                     Text("magical")
-                        .font(Font.tangerine(26, weight: .bold))
+                        .font(Font.bodySerif(26, weight: .bold))
                         .italic()
                         .foregroundColor(Color.luxuryGold)
                     Text(" dates")
@@ -128,7 +128,7 @@ struct SignUpView: View {
         .padding(.horizontal, 20)
         .padding(.vertical, 16)
         .background(
-            Color.luxuryMaroon
+            Color.backgroundPrimary
                 .shadow(color: Color.black.opacity(0.3), radius: 10, y: -5)
         )
     }
@@ -204,7 +204,7 @@ struct SignUpBasicInfoStep: View {
                         .font(Font.header(20, weight: .regular))
                         .foregroundColor(Color.luxuryCream)
                     Text("yourself")
-                        .font(Font.tangerine(32, weight: .bold))
+                        .font(Font.bodySerif(32, weight: .bold))
                         .italic()
                         .foregroundColor(Color.luxuryGold)
                 }
@@ -255,7 +255,7 @@ struct SignUpContactStep: View {
                         .font(Font.header(20, weight: .regular))
                         .foregroundColor(Color.luxuryCream)
                     Text("reach you?")
-                        .font(Font.tangerine(32, weight: .bold))
+                        .font(Font.bodySerif(32, weight: .bold))
                         .italic()
                         .foregroundColor(Color.luxuryGold)
                 }
@@ -307,7 +307,7 @@ struct SignUpLocationStep: View {
                         .font(Font.header(20, weight: .regular))
                         .foregroundColor(Color.luxuryCream)
                     Text("based?")
-                        .font(Font.tangerine(32, weight: .bold))
+                        .font(Font.bodySerif(32, weight: .bold))
                         .italic()
                         .foregroundColor(Color.luxuryGold)
                 }
@@ -478,7 +478,7 @@ struct BirthdayPickerSheet: View {
     
     var body: some View {
         ZStack {
-            Color.luxuryMaroon
+            Color.backgroundPrimary
                 .ignoresSafeArea()
             
             VStack(spacing: 20) {

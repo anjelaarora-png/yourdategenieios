@@ -36,7 +36,7 @@ struct LoveNoteGeneratorView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color.luxuryMaroon
+                Color.backgroundPrimary
                     .ignoresSafeArea()
 
                 ScrollView(.vertical, showsIndicators: false) {
@@ -57,7 +57,7 @@ struct LoveNoteGeneratorView: View {
                     .padding(.bottom, 120)
                 }
             }
-            .toolbarBackground(Color.luxuryMaroon, for: .navigationBar)
+            .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") {
@@ -164,11 +164,11 @@ struct LoveNoteGeneratorView: View {
                             .font(.system(size: 22))
                             .foregroundColor(Color.luxuryGold)
                         Text("Saved")
-                            .font(Font.tangerine(28, weight: .bold))
+                            .font(Font.bodySerif(28, weight: .bold))
                             .italic()
                             .foregroundColor(Color.luxuryGold)
                         Text("Love Notes")
-                            .font(Font.tangerine(28, weight: .bold))
+                            .font(Font.bodySerif(28, weight: .bold))
                             .italic()
                             .foregroundColor(Color.luxuryGold)
                     }
@@ -192,13 +192,12 @@ struct LoveNoteGeneratorView: View {
 
     private var headerSection: some View {
         VStack(spacing: 10) {
-            Text("Write a Love Note")
-                .font(Font.tangerine(44, weight: .bold))
-                .italic()
-                .foregroundColor(Color.luxuryGold)
+            Text("Draft a note")
+                .font(Font.bodySerif(28, weight: .regular))
+                .foregroundColor(Color.accentGold)
                 .multilineTextAlignment(.center)
 
-            Text("Write your feelings, pick a style to rewrite, then save as a love letter to send.")
+            Text("Write your feelings, pick a style to rewrite, then save as a note to send.")
                 .font(Font.bodySans(15, weight: .regular))
                 .foregroundColor(Color.luxuryCreamMuted)
                 .multilineTextAlignment(.center)
@@ -210,11 +209,11 @@ struct LoveNoteGeneratorView: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 6) {
                 Text("Need")
-                    .font(Font.tangerine(28, weight: .bold))
+                    .font(Font.bodySerif(28, weight: .bold))
                     .italic()
                     .foregroundColor(Color.luxuryGold)
                 Text("inspiration?")
-                    .font(Font.tangerine(28, weight: .bold))
+                    .font(Font.bodySerif(28, weight: .bold))
                     .italic()
                     .foregroundColor(Color.luxuryGold)
             }
@@ -248,11 +247,11 @@ struct LoveNoteGeneratorView: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 6) {
                 Text("Your")
-                    .font(Font.tangerine(28, weight: .bold))
+                    .font(Font.bodySerif(28, weight: .bold))
                     .italic()
                     .foregroundColor(Color.luxuryGold)
                 Text("words")
-                    .font(Font.tangerine(28, weight: .bold))
+                    .font(Font.bodySerif(28, weight: .bold))
                     .italic()
                     .foregroundColor(Color.luxuryGold)
             }
@@ -284,11 +283,11 @@ struct LoveNoteGeneratorView: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 6) {
                 Text("Sign")
-                    .font(Font.tangerine(28, weight: .bold))
+                    .font(Font.bodySerif(28, weight: .bold))
                     .italic()
                     .foregroundColor(Color.luxuryGold)
                 Text("as")
-                    .font(Font.tangerine(28, weight: .bold))
+                    .font(Font.bodySerif(28, weight: .bold))
                     .italic()
                     .foregroundColor(Color.luxuryGold)
             }
@@ -310,11 +309,11 @@ struct LoveNoteGeneratorView: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 6) {
                 Text("Rewrite")
-                    .font(Font.tangerine(28, weight: .bold))
+                    .font(Font.bodySerif(28, weight: .bold))
                     .italic()
                     .foregroundColor(Color.luxuryGold)
                 Text("style")
-                    .font(Font.tangerine(28, weight: .bold))
+                    .font(Font.bodySerif(28, weight: .bold))
                     .italic()
                     .foregroundColor(Color.luxuryGold)
             }
@@ -413,11 +412,11 @@ struct LoveNoteGeneratorView: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 6) {
                 Text("Love letter")
-                    .font(Font.tangerine(28, weight: .bold))
+                    .font(Font.bodySerif(28, weight: .bold))
                     .italic()
                     .foregroundColor(Color.luxuryGold)
                 Text("preview")
-                    .font(Font.tangerine(28, weight: .bold))
+                    .font(Font.bodySerif(28, weight: .bold))
                     .italic()
                     .foregroundColor(Color.luxuryGold)
             }
@@ -446,11 +445,11 @@ struct LoveNoteGeneratorView: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 6) {
                 Text("Save")
-                    .font(Font.tangerine(28, weight: .bold))
+                    .font(Font.bodySerif(28, weight: .bold))
                     .italic()
                     .foregroundColor(Color.luxuryGold)
                 Text("or send")
-                    .font(Font.tangerine(28, weight: .bold))
+                    .font(Font.bodySerif(28, weight: .bold))
                     .italic()
                     .foregroundColor(Color.luxuryGold)
             }
@@ -680,7 +679,7 @@ struct SavedLoveNoteDetailSheet: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color.luxuryMaroon
+                Color.backgroundPrimary
                     .ignoresSafeArea()
                 ScrollView(.vertical, showsIndicators: false) {
                     VStack(spacing: 24) {
@@ -731,7 +730,7 @@ struct SavedLoveNoteDetailSheet: View {
             }
             .navigationTitle("Saved love note")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(Color.luxuryMaroon, for: .navigationBar)
+            .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") {
@@ -843,7 +842,7 @@ struct LoveLetterCardView: View {
                         ))
                     Spacer()
                     Text(signOffLine)
-                        .font(Font.tangerine(28, weight: .bold))
+                        .font(Font.bodySerif(28, weight: .bold))
                         .italic()
                         .foregroundColor(Color.luxuryMaroon.opacity(0.9))
                 }

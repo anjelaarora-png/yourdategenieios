@@ -115,8 +115,7 @@ struct Step6ExtrasView: View {
                         // Partner Interests
                         VStack(alignment: .leading, spacing: 8) {
                             Text("What are they into?")
-                                .font(Font.tangerine(22, weight: .bold))
-                                .italic()
+                                .font(Font.displaySerif(22, weight: .bold))
                                 .foregroundColor(Color.luxuryGold)
                             
                             FlowLayout(spacing: 8) {
@@ -162,8 +161,7 @@ struct Step6ExtrasView: View {
                         // Relationship Stage
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Relationship stage")
-                                .font(Font.tangerine(22, weight: .bold))
-                                .italic()
+                                .font(Font.displaySerif(22, weight: .bold))
                                 .foregroundColor(Color.luxuryGold)
                             
                             FlowLayout(spacing: 8) {
@@ -183,8 +181,7 @@ struct Step6ExtrasView: View {
                         // Conversation Topics
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Topics you'd like to explore")
-                                .font(Font.tangerine(22, weight: .bold))
-                                .italic()
+                                .font(Font.displaySerif(22, weight: .bold))
                                 .foregroundColor(Color.luxuryGold)
                             
                             FlowLayout(spacing: 8) {
@@ -248,5 +245,5 @@ struct Step6ExtrasView: View {
 
 #Preview {
     Step6ExtrasView(data: .constant(QuestionnaireData()))
-        .background(Color.luxuryMaroon)
+        .background(Color.backgroundPrimary)
 }

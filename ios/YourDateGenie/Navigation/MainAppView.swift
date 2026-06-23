@@ -10,98 +10,29 @@ struct LuxuryMainAppView: View {
     @State private var undoTimer: Timer?
     
     var body: some View {
-        TabView(selection: $coordinator.currentTab) {
-            LuxuryHomeTabView()
-                .tabItem {
-                    Label(NavigationCoordinator.Tab.home.tabBarTitle, systemImage: NavigationCoordinator.Tab.home.icon)
-                }
-                .tag(NavigationCoordinator.Tab.home)
-            
+        ZStack(alignment: .bottom) {
+            Color.backgroundPrimary
+                .ignoresSafeArea()
+
             Group {
-                if access.canAccess(.loveNotes) {
-                    LoveNoteGeneratorView()
-                } else {
-                    LockedPremiumTabPlaceholder(
-                        feature: .loveNotes,
-                        title: "Love Notes",
-                        subtitle: "Write heartfelt notes and AI-enhanced messages for your partner."
-                    )
+                switch coordinator.currentTab {
+                case .home:
+                    LuxuryHomeTabView()
+                case .dates:
+                    DatesTabView()
+                case .convo:
+                    ConvoTabView()
+                case .you:
+                    LuxuryProfileTabView()
                 }
             }
-            .tabItem {
-                Label(NavigationCoordinator.Tab.loveNote.tabBarTitle, systemImage: NavigationCoordinator.Tab.loveNote.icon)
-            }
-            .tag(NavigationCoordinator.Tab.loveNote)
-            
-            Group {
-                if access.canAccess(.gifting) {
-                    GiftsTabView()
-                } else {
-                    LockedPremiumTabPlaceholder(
-                        feature: .gifting,
-                        title: "Gifts",
-                        subtitle: "Discover thoughtful gift ideas tailored to your dates."
-                    )
-                }
-            }
-            .tabItem {
-                Label(NavigationCoordinator.Tab.gifts.tabBarTitle, systemImage: NavigationCoordinator.Tab.gifts.icon)
-            }
-            .tag(NavigationCoordinator.Tab.gifts)
-            
-            Group {
-                if access.canAccess(.memory) {
-                    MemoriesTabView()
-                } else {
-                    LockedPremiumTabPlaceholder(
-                        feature: .memory,
-                        title: "Memories",
-                        subtitle: "Save photos and moments from your dates in one place."
-                    )
-                }
-            }
-            .tabItem {
-                Label(NavigationCoordinator.Tab.memories.tabBarTitle, systemImage: NavigationCoordinator.Tab.memories.icon)
-            }
-            .tag(NavigationCoordinator.Tab.memories)
-            
-            LuxuryProfileTabView()
-                .tabItem {
-                    Label(NavigationCoordinator.Tab.profile.tabBarTitle, systemImage: NavigationCoordinator.Tab.profile.icon)
-                }
-                .tag(NavigationCoordinator.Tab.profile)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .tint(Color.luxuryGold)
-        .onAppear {
-            let appearance = UITabBarAppearance()
-            appearance.configureWithOpaqueBackground()
-            appearance.backgroundColor = UIColor(Color.luxuryMaroon)
-            
-            let paragraphStyle = NSMutableParagraphStyle()
-            paragraphStyle.lineBreakMode = .byTruncatingTail
-            paragraphStyle.alignment = .center
-            let font = UIFont.systemFont(ofSize: 10, weight: .medium)
-            let normalAttrs: [NSAttributedString.Key: Any] = [
-                .foregroundColor: UIColor(Color.luxuryMuted),
-                .paragraphStyle: paragraphStyle,
-                .font: font
-            ]
-            let selectedAttrs: [NSAttributedString.Key: Any] = [
-                .foregroundColor: UIColor(Color.luxuryGold),
-                .paragraphStyle: paragraphStyle,
-                .font: font
-            ]
-            appearance.stackedLayoutAppearance.normal.iconColor = UIColor(Color.luxuryMuted)
-            appearance.stackedLayoutAppearance.normal.titleTextAttributes = normalAttrs
-            appearance.stackedLayoutAppearance.selected.iconColor = UIColor(Color.luxuryGold)
-            appearance.stackedLayoutAppearance.selected.titleTextAttributes = selectedAttrs
-            appearance.inlineLayoutAppearance.normal.titleTextAttributes = normalAttrs
-            appearance.inlineLayoutAppearance.selected.titleTextAttributes = selectedAttrs
-            appearance.compactInlineLayoutAppearance.normal.titleTextAttributes = normalAttrs
-            appearance.compactInlineLayoutAppearance.selected.titleTextAttributes = selectedAttrs
-            
-            UITabBar.appearance().standardAppearance = appearance
-            UITabBar.appearance().scrollEdgeAppearance = appearance
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            LuxuryTabBar(selectedTab: $coordinator.currentTab) {
+                coordinator.startDatePlanning()
+            }
         }
         .sheet(item: $coordinator.activeSheet) { sheet in
             sheetContent(for: sheet)
@@ -207,6 +138,28 @@ struct LuxuryMainAppView: View {
                 .environmentObject(coordinator)
                 .environmentObject(access)
             }
+        case .gifts:
+            NavigationStack {
+                Group {
+                    if access.canAccess(.gifting) {
+                        GiftsTabView()
+                    } else {
+                        LockedPremiumTabPlaceholder(
+                            feature: .gifting,
+                            title: "Gifts",
+                            subtitle: "Discover thoughtful gift ideas tailored to your dates."
+                        )
+                    }
+                }
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Button("Done") { coordinator.dismissSheet() }
+                            .foregroundColor(Color.luxuryGold)
+                    }
+                }
+            }
+            .environmentObject(coordinator)
+            .environmentObject(access)
         case .giftFinder(let datePlan, let dateLocation):
             GiftFinderView(datePlan: datePlan, dateLocation: dateLocation)
         case .playlist(let title, let planId):

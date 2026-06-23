@@ -2,17 +2,67 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     match /waitlist/{doc} {
-      // Anyone can create a new entry. Required: email, fullName, city, source, createdAt.
-      // Optional: phone, partnerEmail, userAgent.
+      // Anyone can create a new entry. Required: email, source, createdAt.
+      // Optional (validated only if present): fullName, city, phone, partnerEmail, userAgent.
+      // NOTE: email-only entries come from the exit-intent popup (source: "exit_popup").
+      // The full waitlist form additionally sends fullName + city.
       allow create: if request.resource.data.email is string
                     && request.resource.data.email.matches('.+@.+\\..+')
-                    && request.resource.data.fullName is string
-                    && request.resource.data.fullName.size() >= 1
+                    && request.resource.data.source is string
+                    && request.resource.data.source.size() >= 1
+                    && request.resource.data.createdAt == request.time
+                    && (!('fullName' in request.resource.data)
+                        || (request.resource.data.fullName is string
+                            && request.resource.data.fullName.size() >= 1))
+                    && (!('city' in request.resource.data)
+                        || (request.resource.data.city is string
+                            && request.resource.data.city.size() >= 1));
+      // No client-side reads, updates, or deletes
+      allow read, update, delete: if false;
+    }
+    match /business_listings/{docId} {
+      allow create: if !exists(/databases/$(database)/documents/business_listings/$(docId))
+                    && request.resource.data.email == docId
+                    && request.resource.data.businessName is string
+                    && request.resource.data.businessName.size() >= 1
+                    && request.resource.data.contactName is string
+                    && request.resource.data.contactName.size() >= 1
+                    && request.resource.data.email is string
+                    && request.resource.data.email.matches('.+@.+\\..+')
+                    && request.resource.data.phone is string
+                    && request.resource.data.phone.size() >= 7
+                    && request.resource.data.streetAddress is string
+                    && request.resource.data.streetAddress.size() >= 3
                     && request.resource.data.city is string
                     && request.resource.data.city.size() >= 1
+                    && request.resource.data.state is string
+                    && request.resource.data.state.size() >= 2
+                    && request.resource.data.venueCategory is string
+                    && request.resource.data.venueType is string
+                    && request.resource.data.aboutVenue is string
+                    && request.resource.data.aboutVenue.size() >= 10
+                    && request.resource.data.coupleExperience is string
+                    && request.resource.data.coupleExperience.size() >= 10
+                    && request.resource.data.promotionInterest is string
+                    && request.resource.data.budgetRange is string
                     && request.resource.data.source is string
-                    && request.resource.data.createdAt == request.time;
-      // No client-side reads, updates, or deletes
+                    && request.resource.data.status == 'new'
+                    && request.resource.data.applicationType == 'advertising'
+                    && request.resource.data.createdAt == request.time
+                    && (
+                      request.resource.data.venueCategory != 'other'
+                      || (
+                        request.resource.data.venueCategoryOther is string
+                        && request.resource.data.venueCategoryOther.size() >= 2
+                      )
+                    )
+                    && (
+                      request.resource.data.promotionInterest != 'other'
+                      || (
+                        request.resource.data.promotionOther is string
+                        && request.resource.data.promotionOther.size() >= 2
+                      )
+                    );
       allow read, update, delete: if false;
     }
   }

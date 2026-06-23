@@ -1,3 +1,4 @@
+import GoogleSignIn
 import SwiftUI
 
 @main
@@ -19,6 +20,7 @@ struct YourDateGenieApp: App {
                 .environmentObject(PurchaseManager.shared)
                 .environmentObject(AccessManager.shared)
                 .onAppear {
+                    FirebaseBootstrap.configureIfNeeded()
                     PurchaseManager.shared.checkSubscriptionOnAppLaunch()
                     notificationManager.requestAuthorization()
                     validateConfiguration()
@@ -28,6 +30,10 @@ struct YourDateGenieApp: App {
                     // Forward to the Supabase Auth SDK first so it can exchange PKCE codes or set
                     // implicit-flow tokens before any navigation side-effects run.
                     print("[Auth] onOpenURL received: \(url.absoluteString)")
+                    // GoogleSignIn redirects (reversed-client-ID scheme) are consumed by the SDK.
+                    if GIDSignIn.sharedInstance.handle(url) {
+                        return
+                    }
                     supabase.handle(url)
                     handleDeepLink(url)
                 }

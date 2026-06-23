@@ -23,13 +23,13 @@ CRITICAL RULES:
 8. Include the FULL ADDRESS with city and state abbreviation for every venue
 
 **PLAN TITLES — NON-NEGOTIABLE:**
-- Each title must be magical and cinematic — it should capture the MOOD or EMOTIONAL EXPERIENCE of the plan, like a song or movie title for that night.
-- NEVER produce a lazy title that is just "[Cuisine] + [generic word]" — e.g. "Mediterranean Evening", "Italian Night", "Japanese Dinner" are all forbidden.
-- NEVER use generic phrases: "Date Night", "Evening Out", "Romantic Evening", "Dinner Date".
-- Cuisine/cultural words ARE allowed only when used poetically alongside an evocative word — e.g. "Mediterranean Moonlight", "Saffron & Slow Jazz", "Spice, Stars & You" ✅
-- All 3 titles MUST feel completely different from each other — different structure, different emotion, different vibe.
-- Great title formulas: "Velvet & City Lights" / "The Midnight Detour" / "Salt Air & Starlight" / "Candlelight & Conspiracy" / "Stolen Kisses, Open Sky" / "Follow the Lanterns" / "One Wild Beautiful Night"
-- Put cuisine/neighborhood details in the tagline, NOT the title.
+- Each title must be creative AND descriptive — the user should know the vibe AND what they're walking into (venues/experiences), not just a mood word.
+- Use evocative language PLUS 1–2 itinerary anchors (e.g. "Gallery Hop & Candlelit Pasta", "Rooftop Jazz, Then Gelato", "Park Stroll → Wine Bar Secrets").
+- NEVER produce a lazy title that is only "[Cuisine] + [generic word]" — e.g. "Mediterranean Evening", "Italian Night" are forbidden unless paired with a specific experience anchor.
+- NEVER use generic phrases alone: "Date Night", "Evening Out", "Romantic Evening".
+- All 3 titles MUST feel completely different — different structure, different anchor stops, different vibe.
+- Put extra venue detail in the tagline as a short "Drinks → Dinner → Skyline" style hint when helpful.
+- Great title formulas: "Velvet Pasta & City Lights" / "The Gallery-to-Rooftop Route" / "Salt Air, Sushi & Starlight" / "Follow the Lanterns to Late Dessert"
 
 IMPORTANT: The "stops" array is the MOST CRITICAL part of each plan. Never return empty stops!`;
 

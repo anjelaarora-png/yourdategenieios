@@ -24,7 +24,7 @@ struct SavedPlaylistsView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color.luxuryMaroon.ignoresSafeArea()
+                Color.backgroundPrimary.ignoresSafeArea()
                 
                 if storage.playlists.isEmpty {
                     emptyState
@@ -44,7 +44,7 @@ struct SavedPlaylistsView: View {
             .toolbar {
                 ToolbarItem(placement: .principal) {
                     Text("Your Playlists")
-                        .font(Font.tangerine(26, weight: .bold))
+                        .font(Font.bodySerif(26, weight: .bold))
                         .foregroundColor(Color.luxuryGold)
                 }
                 ToolbarItem(placement: .cancellationAction) {
@@ -52,7 +52,7 @@ struct SavedPlaylistsView: View {
                         .foregroundColor(Color.luxuryGold)
                 }
             }
-            .toolbarBackground(Color.luxuryMaroon, for: .navigationBar)
+            .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .sheet(item: $selectedPlaylist) { playlist in
                 SavedPlaylistDetailView(
@@ -98,7 +98,7 @@ struct SavedPlaylistsView: View {
             HStack(spacing: 6) {
                 Text(vibeEmojis[section.genre] ?? "🎵")
                 Text(genreLabels[section.genre] ?? section.genre.capitalized)
-                    .font(Font.tangerine(22, weight: .bold))
+                    .font(Font.bodySerif(22, weight: .bold))
                     .foregroundColor(Color.luxuryMuted)
             }
             .padding(.horizontal, 20)
@@ -112,7 +112,7 @@ struct SavedPlaylistsView: View {
                             .font(.system(size: 28))
                         VStack(alignment: .leading, spacing: 2) {
                             Text(p.name)
-                                .font(Font.tangerine(22, weight: .bold))
+                                .font(Font.bodySerif(22, weight: .bold))
                                 .foregroundColor(Color.luxuryCream)
                                 .lineLimit(1)
                             Text("From: \(p.datePlanTitle)")
@@ -216,7 +216,7 @@ struct SavedPlaylistDetailView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color.luxuryMaroon.ignoresSafeArea()
+                Color.backgroundPrimary.ignoresSafeArea()
                 
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 20) {
@@ -225,7 +225,7 @@ struct SavedPlaylistDetailView: View {
                             if isEditingTitle {
                                 HStack(spacing: 10) {
                                     TextField("Playlist name", text: $editingTitleText)
-                                        .font(Font.tangerine(26, weight: .bold))
+                                        .font(Font.bodySerif(26, weight: .bold))
                                         .foregroundColor(Color.luxuryCream)
                                         .padding(.horizontal, 14)
                                         .padding(.vertical, 10)
@@ -253,7 +253,7 @@ struct SavedPlaylistDetailView: View {
                                     } label: {
                                         HStack(spacing: 8) {
                                             Text(displayedPlaylist.name)
-                                                .font(Font.tangerine(28, weight: .bold))
+                                                .font(Font.bodySerif(28, weight: .bold))
                                                 .foregroundColor(Color.luxuryGold)
                                                 .multilineTextAlignment(.center)
                                             Image(systemName: "pencil.circle")
@@ -334,7 +334,7 @@ struct SavedPlaylistDetailView: View {
             .toolbar {
                 ToolbarItem(placement: .principal) {
                     Text(displayedPlaylist.name)
-                        .font(Font.tangerine(24, weight: .bold))
+                        .font(Font.bodySerif(24, weight: .bold))
                         .foregroundColor(Color.luxuryGold)
                         .lineLimit(1)
                 }
@@ -343,7 +343,7 @@ struct SavedPlaylistDetailView: View {
                         .foregroundColor(Color.luxuryGold)
                 }
             }
-            .toolbarBackground(Color.luxuryMaroon, for: .navigationBar)
+            .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .sheet(isPresented: $showAddSong) {
                 SongSearchView(title: "Add Song") { title, artist in

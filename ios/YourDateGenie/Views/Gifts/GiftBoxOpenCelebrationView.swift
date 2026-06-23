@@ -92,7 +92,7 @@ struct GiftBoxOpenCelebrationView: View {
                         .foregroundColor(Color.luxuryCream)
                 }
                 .padding(24)
-                .background(Color.luxuryMaroon)
+                .background(Color.surfaceElevated)
                 .cornerRadius(20)
                 .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.luxuryGold.opacity(0.5), lineWidth: 1))
                 .shadow(color: .black.opacity(0.4), radius: 20, x: 0, y: 10)

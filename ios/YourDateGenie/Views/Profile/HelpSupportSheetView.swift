@@ -32,7 +32,7 @@ struct HelpSupportSheetView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color.luxuryMaroon.ignoresSafeArea()
+                Color.backgroundPrimary.ignoresSafeArea()
                 ScrollView(showsIndicators: false) {
                     VStack(alignment: .leading, spacing: 24) {
                         VStack(alignment: .leading, spacing: 4) {
@@ -84,7 +84,7 @@ struct HelpSupportSheetView: View {
             }
             .navigationTitle("Help & Support")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(Color.luxuryMaroon, for: .navigationBar)
+            .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {

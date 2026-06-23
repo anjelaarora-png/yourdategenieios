@@ -28,8 +28,7 @@ struct PartnerRankingView: View {
 
     var body: some View {
         ZStack {
-            Color.luxuryMaroon.ignoresSafeArea()
-            FloatingParticlesView().ignoresSafeArea().opacity(0.4)
+            Color.backgroundPrimary.ignoresSafeArea()
 
             if rankSubmitted {
                 rankSubmittedView
@@ -51,7 +50,7 @@ struct PartnerRankingView: View {
                 }
             }
         }
-        .toolbarBackground(Color.luxuryMaroon, for: .navigationBar)
+        .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
         .onChange(of: partnerManager.currentPhase) { phase in
             if phase == .finalOptionSelected {
@@ -88,13 +87,12 @@ struct PartnerRankingView: View {
 
     private var headerSection: some View {
         VStack(spacing: 8) {
-            Text("Rank Your Options")
-                .font(Font.tangerine(40, weight: .bold))
-                .italic()
-                .foregroundColor(Color.luxuryGold)
+            Text("Pick your favorite")
+                .font(Font.displaySerif(32, weight: .bold))
+                .foregroundColor(Color.textPrimary)
             Text("Your picks are private until you both submit")
                 .font(Font.bodySans(14, weight: .regular))
-                .foregroundColor(Color.luxuryCreamMuted)
+                .foregroundColor(Color.textPrimary.opacity(0.6))
                 .multilineTextAlignment(.center)
         }
     }
@@ -103,17 +101,17 @@ struct PartnerRankingView: View {
         HStack(spacing: 6) {
             Image(systemName: "lock.fill")
                 .font(.system(size: 11))
-                .foregroundColor(Color.luxuryGold)
+                .foregroundColor(Color.textPrimary.opacity(0.7))
             Text("Rankings revealed only after both submit")
                 .font(Font.bodySans(11, weight: .semibold))
-                .foregroundColor(Color.luxuryGold.opacity(0.85))
+                .foregroundColor(Color.textPrimary.opacity(0.7))
                 .tracking(0.5)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 7)
-        .background(Color.luxuryGold.opacity(0.1))
+        .background(Color.white.opacity(0.05))
         .cornerRadius(20)
-        .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.luxuryGold.opacity(0.3), lineWidth: 1))
+        .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.white.opacity(0.1), lineWidth: 1))
     }
 
     private var rankingInstructions: some View {
@@ -158,7 +156,7 @@ struct PartnerRankingView: View {
             if !allRanked && !plans.isEmpty {
                 Text("Rank all \(plans.count) options to continue")
                     .font(Font.bodySans(12, weight: .regular))
-                    .foregroundColor(Color.luxuryCreamMuted)
+                    .foregroundColor(Color.textPrimary.opacity(0.55))
             }
             Button {
                 guard allRanked else { return }
@@ -167,23 +165,22 @@ struct PartnerRankingView: View {
                 Group {
                     if isSubmitting {
                         ProgressView()
-                            .tint(Color.luxuryMaroon)
+                            .tint(Color.backgroundPrimary)
                             .accessibilityLabel("Submitting rankings")
                     } else {
                         HStack(spacing: 8) {
                             Image(systemName: "checkmark.circle.fill")
                                 .font(.system(size: 18))
-                            Text(allRanked ? "Submit My Rankings" : "Rank all options first")
+                            Text(allRanked ? "Submit my rankings" : "Rank all options first")
                                 .font(Font.bodySans(16, weight: .semibold))
                         }
                     }
                 }
-                .foregroundColor(allRanked ? Color.luxuryMaroon : Color.luxuryCreamMuted)
+                .foregroundColor(allRanked ? Color.backgroundPrimary : Color.textPrimary.opacity(0.55))
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 16)
-                .background(allRanked ? LinearGradient.goldShimmer : LinearGradient(colors: [Color.luxuryMaroonLight], startPoint: .leading, endPoint: .trailing))
+                .background(allRanked ? Color.accentGold : Color.surfaceElevated)
                 .cornerRadius(16)
-                .shadow(color: allRanked ? Color.luxuryGold.opacity(0.35) : Color.clear, radius: 12, y: 4)
             }
             .buttonStyle(.plain)
             .disabled(!allRanked || isSubmitting)
@@ -197,7 +194,7 @@ struct PartnerRankingView: View {
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 16)
-        .background(Color.luxuryMaroon.shadow(color: Color.black.opacity(0.3), radius: 10, y: -5))
+        .background(Color.backgroundPrimary.shadow(color: Color.black.opacity(0.3), radius: 10, y: -5))
     }
 
     // MARK: - Submitted / waiting state
@@ -208,23 +205,22 @@ struct PartnerRankingView: View {
 
             ZStack {
                 Circle()
-                    .stroke(Color.luxuryGold.opacity(0.2), lineWidth: 1)
+                    .stroke(Color.accentMaroon.opacity(0.4), lineWidth: 1)
                     .frame(width: 100, height: 100)
                 Image(systemName: "checkmark.circle.fill")
                     .font(.system(size: 44))
-                    .foregroundColor(Color.luxuryGold)
+                    .foregroundColor(Color.accentMaroon)
             }
 
             VStack(spacing: 12) {
                 Text("Your rankings are in.")
-                    .font(Font.tangerine(38, weight: .bold))
-                    .italic()
-                    .foregroundColor(Color.luxuryGold)
+                    .font(Font.displaySerif(30, weight: .bold))
+                    .foregroundColor(Color.textPrimary)
                 Text(partnerManager.currentPhase == .finalOptionSelected
                      ? "The final plan has been chosen — reveal it now."
                      : "Waiting for your partner to rank their options.")
                     .font(Font.bodySans(15, weight: .regular))
-                    .foregroundColor(Color.luxuryCreamMuted)
+                    .foregroundColor(Color.textPrimary.opacity(0.6))
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 32)
             }
@@ -240,15 +236,14 @@ struct PartnerRankingView: View {
                     HStack(spacing: 8) {
                         Image(systemName: "star.circle.fill")
                             .font(.system(size: 18))
-                        Text("Reveal Your Date Plan")
+                        Text("Reveal your date plan")
                             .font(Font.bodySans(16, weight: .semibold))
                     }
-                    .foregroundColor(Color.luxuryMaroon)
+                    .foregroundColor(Color.backgroundPrimary)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 16)
-                    .background(LinearGradient.goldShimmer)
+                    .background(Color.accentGold)
                     .cornerRadius(16)
-                    .shadow(color: Color.luxuryGold.opacity(0.35), radius: 12, y: 4)
                 }
                 .buttonStyle(.plain)
                 .padding(.horizontal, 32)

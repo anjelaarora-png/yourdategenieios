@@ -31,7 +31,7 @@ struct DatePlanResultView: View {
         NavigationStack {
             ZStack {
                 // Background
-                Color.luxuryMaroon
+                Color.backgroundPrimary
                     .ignoresSafeArea()
                 
                 VStack(spacing: 0) {
@@ -122,7 +122,7 @@ struct DatePlanResultView: View {
                     }
                 }
             }
-            .toolbarBackground(Color.luxuryMaroon, for: .navigationBar)
+            .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .safeAreaInset(edge: .bottom) {
                 bottomActionBar
@@ -161,7 +161,7 @@ struct DatePlanResultView: View {
         .sheet(isPresented: $showReserveVenuePicker) {
             NavigationStack {
                 ZStack {
-                    Color.luxuryMaroon.ignoresSafeArea()
+                    Color.backgroundPrimary.ignoresSafeArea()
                     List {
                         ForEach(reservableStopsForPicker) { stop in
                             ReservationPlatformActionRow(
@@ -184,15 +184,15 @@ struct DatePlanResultView: View {
                 .toolbar {
                     ToolbarItem(placement: .principal) {
                         Text("Reserve")
-                            .font(Font.tangerine(22, weight: .bold))
-                            .foregroundColor(Color.luxuryGold)
+                            .font(Font.bodySerif(18, weight: .regular))
+                            .foregroundColor(Color.accentGold)
                     }
                     ToolbarItem(placement: .navigationBarTrailing) {
                         Button("Cancel") { showReserveVenuePicker = false }
                             .foregroundColor(Color.luxuryGold)
                     }
                 }
-                .toolbarBackground(Color.luxuryMaroon, for: .navigationBar)
+                .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
                 .toolbarBackground(.visible, for: .navigationBar)
             }
         }
@@ -291,7 +291,7 @@ struct DatePlanResultView: View {
             }
             .padding(.top, 24)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Color.luxuryMaroon)
+            .background(Color.backgroundPrimary)
             .navigationTitle("Add to Calendar")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -302,7 +302,7 @@ struct DatePlanResultView: View {
                     .foregroundColor(Color.luxuryGold)
                 }
             }
-            .toolbarBackground(Color.luxuryMaroon, for: .navigationBar)
+            .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
         }
     }
     
@@ -719,7 +719,7 @@ struct DatePlanResultView: View {
                 
                 QuickActionButton(icon: "camera.fill", label: "Photo", isLocked: !access.canAccess(.memory)) {
                     access.require(.memory) {
-                        coordinator.currentTab = .memories
+                        coordinator.isShowingMemoryCapture = true
                     }
                 }
             }
@@ -773,7 +773,7 @@ struct DatePlanResultView: View {
         .padding(.horizontal, 20)
         .padding(.vertical, 16)
         .background(
-            Color.luxuryMaroon
+            Color.backgroundPrimary
                 .shadow(color: Color.black.opacity(0.3), radius: 20, y: -5)
                 .ignoresSafeArea()
         )

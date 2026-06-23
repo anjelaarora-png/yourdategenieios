@@ -178,7 +178,7 @@ struct PlaylistWidgetView: View {
     var body: some View {
         NavigationStack {
             ZStack(alignment: .top) {
-                Color.luxuryMaroon
+                Color.backgroundPrimary
                     .ignoresSafeArea()
                 
                 if let currentPlaylist = playlist {
@@ -230,7 +230,7 @@ struct PlaylistWidgetView: View {
                     .foregroundColor(Color.luxuryGold)
                 }
             }
-            .toolbarBackground(Color.luxuryMaroon, for: .navigationBar)
+            .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .sheet(isPresented: $showSavedPlaylists) {
                 SavedPlaylistsView()
@@ -299,7 +299,7 @@ struct PlaylistWidgetView: View {
                     MusicRecordAnimationView(size: 100, showNotes: true)
                     
                     Text("Create Your Soundtrack")
-                        .font(Font.tangerine(42, weight: .bold))
+                        .font(Font.bodySerif(28, weight: .regular))
                         .foregroundColor(Color.luxuryGold)
                     
                     Text("Curated for your moment — pick a vibe and we’ll set the mood.")

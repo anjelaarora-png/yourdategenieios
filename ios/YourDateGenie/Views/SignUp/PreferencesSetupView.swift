@@ -7,7 +7,7 @@ struct PreferencesSetupView: View {
     
     var body: some View {
         ZStack {
-            Color.luxuryMaroon
+            Color.backgroundPrimary
                 .ignoresSafeArea()
             
             RadialGradient.goldGlow
@@ -56,8 +56,7 @@ struct PreferencesSetupView: View {
                     .font(Font.header(24, weight: .regular))
                     .foregroundColor(Color.luxuryCream)
                 Text("Preferences")
-                    .font(Font.tangerine(42, weight: .bold))
-                    .italic()
+                    .font(Font.displaySerif(42, weight: .bold))
                     .foregroundColor(Color.luxuryGold)
             }
             
@@ -114,7 +113,7 @@ struct PreferencesSetupView: View {
         .padding(.horizontal, 20)
         .padding(.vertical, 16)
         .background(
-            Color.luxuryMaroon
+            Color.backgroundPrimary
                 .shadow(color: Color.black.opacity(0.3), radius: 10, y: -5)
         )
     }
@@ -189,8 +188,7 @@ struct PreferencesPersonalStep: View {
                         .font(Font.header(20, weight: .regular))
                         .foregroundColor(Color.luxuryCream)
                     Text("your partner")
-                        .font(Font.tangerine(32, weight: .bold))
-                        .italic()
+                        .font(Font.displaySerif(32, weight: .bold))
                         .foregroundColor(Color.luxuryGold)
                 }
                 
@@ -257,8 +255,7 @@ struct PreferencesActivitiesStep: View {
             VStack(alignment: .leading, spacing: 24) {
                 HStack(spacing: 6) {
                     Text("Favorite")
-                        .font(Font.tangerine(32, weight: .bold))
-                        .italic()
+                        .font(Font.displaySerif(32, weight: .bold))
                         .foregroundColor(Color.luxuryGold)
                     Text("Activities")
                         .font(Font.header(20, weight: .regular))
@@ -321,8 +318,7 @@ struct PreferencesLocationStep: View {
             VStack(alignment: .leading, spacing: 24) {
                 HStack(spacing: 6) {
                     Text("Default")
-                        .font(Font.tangerine(32, weight: .bold))
-                        .italic()
+                        .font(Font.displaySerif(32, weight: .bold))
                         .foregroundColor(Color.luxuryGold)
                     Text("location settings")
                         .font(Font.header(20, weight: .regular))
@@ -397,8 +393,7 @@ struct PreferencesCuisineStep: View {
                         .font(Font.header(20, weight: .regular))
                         .foregroundColor(Color.luxuryCream)
                     Text("Drinks")
-                        .font(Font.tangerine(32, weight: .bold))
-                        .italic()
+                        .font(Font.displaySerif(32, weight: .bold))
                         .foregroundColor(Color.luxuryGold)
                 }
                 
@@ -479,8 +474,7 @@ struct PreferencesAccessibilityStep: View {
                         .font(Font.header(20, weight: .regular))
                         .foregroundColor(Color.luxuryCream)
                     Text("Accessibility")
-                        .font(Font.tangerine(32, weight: .bold))
-                        .italic()
+                        .font(Font.displaySerif(32, weight: .bold))
                         .foregroundColor(Color.luxuryGold)
                 }
                 

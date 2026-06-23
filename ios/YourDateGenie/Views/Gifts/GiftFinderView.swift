@@ -112,7 +112,7 @@ struct GiftFinderView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color.luxuryMaroon
+                Color.backgroundPrimary
                     .ignoresSafeArea()
                 
                 if showUnwrapAnimation {
@@ -151,8 +151,8 @@ struct GiftFinderView: View {
             .toolbar {
                 ToolbarItem(placement: .principal) {
                     Text("Gift Finder")
-                        .font(Font.tangerine(24, weight: .bold))
-                        .foregroundColor(Color.luxuryGold)
+                        .font(Font.bodySerif(18, weight: .regular))
+                        .foregroundColor(Color.accentGold)
                 }
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Close") {
@@ -162,7 +162,7 @@ struct GiftFinderView: View {
                     .foregroundColor(Color.luxuryGold)
                 }
             }
-            .toolbarBackground(Color.luxuryMaroon, for: .navigationBar)
+            .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .onAppear {
                 prefillFromProfile()
@@ -244,8 +244,8 @@ struct GiftFinderView: View {
             }
             
             Text("Find the Perfect Gift")
-                .font(Font.tangerine(42, weight: .bold))
-                .foregroundColor(Color.luxuryGold)
+                .font(Font.bodySerif(28, weight: .regular))
+                .foregroundColor(Color.accentGold)
             
             Text("Discover gifts from stores near your date")
                 .font(Font.bodySans(15, weight: .regular))
@@ -356,8 +356,8 @@ struct GiftFinderView: View {
                     .font(.system(size: 12))
                     .foregroundColor(Color.luxuryGold)
                 Text("Your date: \(plan.title)")
-                    .font(Font.tangerine(18, weight: .bold))
-                    .foregroundColor(Color.luxuryGold)
+                    .font(Font.bodySerif(15, weight: .regular))
+                    .foregroundColor(Color.accentGold)
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
@@ -392,9 +392,8 @@ struct GiftFinderView: View {
                     Image(systemName: "person.fill")
                         .foregroundColor(Color.luxuryGold)
                     Text("Who is this for?")
-                        .font(Font.tangerine(28, weight: .bold))
-                        .italic()
-                        .foregroundColor(Color.luxuryGold)
+                        .font(Font.bodySerif(20, weight: .regular))
+                        .foregroundColor(Color.accentGold)
                 }
                 
                 ScrollView(.horizontal, showsIndicators: false) {
@@ -417,9 +416,8 @@ struct GiftFinderView: View {
                     Image(systemName: "heart.fill")
                         .foregroundColor(Color.luxuryGold)
                     Text("What's the occasion? *")
-                        .font(Font.tangerine(28, weight: .bold))
-                        .italic()
-                        .foregroundColor(Color.luxuryGold)
+                        .font(Font.bodySerif(20, weight: .regular))
+                        .foregroundColor(Color.accentGold)
                 }
                 
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
@@ -441,9 +439,8 @@ struct GiftFinderView: View {
                     Image(systemName: "dollarsign.circle")
                         .foregroundColor(Color.luxuryGold)
                     Text("Your budget")
-                        .font(Font.tangerine(28, weight: .bold))
-                        .italic()
-                        .foregroundColor(Color.luxuryGold)
+                        .font(Font.bodySerif(20, weight: .regular))
+                        .foregroundColor(Color.accentGold)
                 }
                 
                 ScrollView(.horizontal, showsIndicators: false) {
@@ -466,9 +463,8 @@ struct GiftFinderView: View {
                     Image(systemName: "sparkle")
                         .foregroundColor(Color.luxuryGold)
                     Text("Style or vibe (optional)")
-                        .font(Font.tangerine(28, weight: .bold))
-                        .italic()
-                        .foregroundColor(Color.luxuryGold)
+                        .font(Font.bodySerif(20, weight: .regular))
+                        .foregroundColor(Color.accentGold)
                 }
                 
                 ScrollView(.horizontal, showsIndicators: false) {
@@ -506,9 +502,8 @@ struct GiftFinderView: View {
                     Image(systemName: "sparkles")
                         .foregroundColor(Color.luxuryGold)
                     Text("Their interests (optional)")
-                        .font(Font.tangerine(28, weight: .bold))
-                        .italic()
-                        .foregroundColor(Color.luxuryGold)
+                        .font(Font.bodySerif(20, weight: .regular))
+                        .foregroundColor(Color.accentGold)
                 }
                 
                 TextField("e.g., cooking, travel, photography, books...", text: $interests)
@@ -530,9 +525,8 @@ struct GiftFinderView: View {
                     Image(systemName: "text.bubble")
                         .foregroundColor(Color.luxuryGold)
                     Text("Anything else we should know?")
-                        .font(Font.tangerine(28, weight: .bold))
-                        .italic()
-                        .foregroundColor(Color.luxuryGold)
+                        .font(Font.bodySerif(20, weight: .regular))
+                        .foregroundColor(Color.accentGold)
                 }
                 
                 TextEditor(text: $additionalNotes)
@@ -575,7 +569,7 @@ struct GiftFinderView: View {
                         Image(systemName: "sparkles")
                             .foregroundColor(Color.luxuryGold)
                         Text("Find Gift Ideas")
-                            .font(Font.tangerine(28, weight: .bold))
+                            .font(Font.bodySerif(18, weight: .regular))
                     }
                 }
                 .frame(maxWidth: .infinity)
@@ -598,8 +592,8 @@ struct GiftFinderView: View {
                             .font(.system(size: 18))
                             .foregroundColor(Color.luxuryGold)
                         Text("Couldn't load gift ideas from the server")
-                            .font(Font.tangerine(20, weight: .bold))
-                            .foregroundColor(Color.luxuryGold)
+                            .font(Font.bodySerif(16, weight: .regular))
+                            .foregroundColor(Color.accentGold)
                     }
                     Text("Check your connection and tap Try again to get AI-powered suggestions.")
                         .font(Font.inter(12, weight: .regular))
@@ -636,9 +630,8 @@ struct GiftFinderView: View {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(filteredGifts.isEmpty && giftLoadError != nil ? "Gift ideas" : "\(filteredGifts.count) gift ideas")
-                        .font(Font.tangerine(28, weight: .bold))
-                        .italic()
-                        .foregroundColor(Color.luxuryGold)
+                        .font(Font.bodySerif(20, weight: .regular))
+                        .foregroundColor(Color.accentGold)
                     
                     Text(effectiveLocation.isEmpty ? "With stores near you" : "With stores near \(effectiveLocationDisplay)")
                         .font(Font.inter(12, weight: .regular))
@@ -699,9 +692,8 @@ struct GiftFinderView: View {
             // Result filters (budget)
             VStack(alignment: .leading, spacing: 10) {
                 Text("Filter by budget")
-                    .font(Font.tangerine(28, weight: .bold))
-                    .italic()
-                    .foregroundColor(Color.luxuryGold)
+                    .font(Font.bodySerif(20, weight: .regular))
+                    .foregroundColor(Color.accentGold)
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
                         FilterChip(title: "All", isSelected: resultBudgetFilter.isEmpty) {
@@ -757,7 +749,7 @@ struct GiftFinderView: View {
                         Image(systemName: "sparkles")
                             .foregroundColor(Color.luxuryGold)
                         Text("Get More Ideas")
-                            .font(Font.tangerine(20, weight: .bold))
+                            .font(Font.bodySerif(16, weight: .regular))
                     }
                 }
                 .frame(maxWidth: .infinity)
@@ -776,9 +768,8 @@ struct GiftFinderView: View {
                     .font(.system(size: 14))
                     .foregroundColor(Color.luxuryGold)
                 Text(effectiveLocation.isEmpty ? "Find Stores Near You" : "Find Stores Near Your Date")
-                    .font(Font.tangerine(28, weight: .bold))
-                    .italic()
-                    .foregroundColor(Color.luxuryGold)
+                    .font(Font.bodySerif(20, weight: .regular))
+                    .foregroundColor(Color.accentGold)
             }
             .padding(.horizontal, 20)
             
@@ -800,8 +791,8 @@ struct GiftFinderView: View {
                         .font(.system(size: 14))
                         .foregroundColor(Color.luxuryGold)
                     Text("View All Gift Shops on Map")
-                        .font(Font.tangerine(22, weight: .bold))
-                        .foregroundColor(Color.luxuryGold)
+                        .font(Font.bodySerif(17, weight: .regular))
+                        .foregroundColor(Color.accentGold)
                     Image(systemName: "arrow.up.right")
                         .font(.system(size: 12))
                         .foregroundColor(Color.luxuryGold)

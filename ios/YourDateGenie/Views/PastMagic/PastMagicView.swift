@@ -8,7 +8,7 @@ struct PastMagicView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color.luxuryMaroon
+                Color.backgroundPrimary
                     .ignoresSafeArea()
 
                 if coordinator.pastPlans.isEmpty {
@@ -35,7 +35,7 @@ struct PastMagicView: View {
             }
             .navigationTitle("Past Dates")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(Color.luxuryMaroon, for: .navigationBar)
+            .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar {

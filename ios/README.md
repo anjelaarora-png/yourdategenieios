@@ -79,19 +79,29 @@ CREATE POLICY "Users can update own data" ON users
 
 ## Configuration
 
-### Environment Variables
+**Full integration map:** [`docs/API_KEYS_SETUP.md`](../docs/API_KEYS_SETUP.md) (OpenAI, Google Places, Last.fm, OpenTable/Resy, Apple/Google login).
 
-Set the following environment variables in your scheme or Info.plist:
+### iOS secrets (`Secrets.xcconfig`)
 
 | Variable | Description |
 |----------|-------------|
 | `SUPABASE_URL` | Your Supabase project URL |
 | `SUPABASE_ANON_KEY` | Your Supabase anon/public key |
-| `GOOGLE_PLACES_API_KEY` | Google API key for address autocomplete, place details, and geocoding. Enable **Places API** (autocomplete + details) and **Geocoding API** in Google Cloud Console. |
+| `GOOGLE_PLACES_API_KEY` | Google API key for address autocomplete, place details, and geocoding. Enable **Places API** and **Geocoding API** in Google Cloud Console. |
 
-> **Note:** `OPENAI_API_KEY` is no longer required in the iOS app. All AI calls (date plan generation, gift suggestions, love note rewriting) are now routed through Supabase Edge Functions. Set `OPENAI_API_KEY` (or `LOVABLE_API_KEY`) as a Supabase secret instead — see [Supabase Edge Function secrets](https://supabase.com/docs/guides/functions/secrets).
+> **Not in iOS:** `OPENAI_API_KEY` and `LASTFM_API_KEY` live in **Supabase Edge Function secrets** only (`supabase/secrets.example`). iOS calls `generate-date-plan`, `generate-more-gifts`, `rewrite-love-note`, and `generate-playlist` through `SupabaseService`.
+
+> **OpenTable / Resy:** No API keys — reservation links come from AI + Google Places website detection; iOS opens URLs in Safari.
 
 See `Secrets.xcconfig.example` for a template.
+
+### Social login (Supabase Dashboard — manual)
+
+| Provider | iOS code | Dashboard |
+|----------|----------|-----------|
+| Apple | `SocialAuthService` + `YourDateGenie.entitlements` | Auth → Providers → Apple |
+| Google | `SupabaseService.signInWithGoogle()` PKCE | Auth → Providers → Google |
+| Redirect | `yourdategenie://auth-callback` in `Info.plist` | Auth → URL configuration → Redirect URLs |
 
 ### Adding to Info.plist
 

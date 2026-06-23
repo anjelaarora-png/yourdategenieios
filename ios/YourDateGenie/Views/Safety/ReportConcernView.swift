@@ -36,7 +36,7 @@ struct ReportConcernView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color.luxuryMaroon.ignoresSafeArea()
+                Color.backgroundPrimary.ignoresSafeArea()
 
                 if didSucceed {
                     successView
@@ -46,7 +46,7 @@ struct ReportConcernView: View {
             }
             .navigationTitle("Report a Concern")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(Color.luxuryMaroon, for: .navigationBar)
+            .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar {

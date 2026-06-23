@@ -29,8 +29,7 @@ struct PlanGeneratingView: View {
 
     var body: some View {
         ZStack {
-            Color.luxuryMaroon.ignoresSafeArea()
-            FloatingParticlesView().ignoresSafeArea().opacity(0.5)
+            Color.backgroundPrimary.ignoresSafeArea()
 
             VStack(spacing: 40) {
                 Spacer()
@@ -76,7 +75,7 @@ struct PlanGeneratingView: View {
             Circle()
                 .fill(
                     RadialGradient(
-                        colors: [Color.luxuryGold.opacity(0.9), Color.luxuryGold.opacity(0.3)],
+                        colors: [Color.accentGold.opacity(0.9), Color.accentGold.opacity(0.3)],
                         center: .center,
                         startRadius: 10,
                         endRadius: 50
@@ -86,7 +85,7 @@ struct PlanGeneratingView: View {
                 .overlay(
                     Image(systemName: "heart.fill")
                         .font(.system(size: 28, weight: .medium))
-                        .foregroundColor(Color.luxuryMaroon)
+                        .foregroundColor(Color.backgroundPrimary)
                 )
 
             // Shimmer arc
@@ -102,15 +101,14 @@ struct PlanGeneratingView: View {
 
     private var progressText: some View {
         VStack(spacing: 16) {
-            Text("Creating your options")
-                .font(Font.tangerine(38, weight: .bold))
-                .italic()
-                .foregroundColor(Color.luxuryGold)
+            Text("Crafting your evening…")
+                .font(Font.displaySerif(32, weight: .bold))
+                .foregroundColor(Color.textPrimary)
                 .multilineTextAlignment(.center)
 
             Text(progressMessages[messageIndex] + String(repeating: ".", count: dotCount))
                 .font(Font.bodySans(15, weight: .regular))
-                .foregroundColor(Color.luxuryCreamMuted)
+                .foregroundColor(Color.textPrimary.opacity(0.6))
                 .multilineTextAlignment(.center)
                 .animation(.easeInOut(duration: 0.3), value: messageIndex)
                 .frame(minHeight: 24)
@@ -122,22 +120,22 @@ struct PlanGeneratingView: View {
     private var phaseStatusPill: some View {
         HStack(spacing: 8) {
             Circle()
-                .fill(Color.luxuryGold)
+                .fill(Color.accentGold)
                 .frame(width: 6, height: 6)
                 .opacity(Double((dotCount % 3) + 1) / 3.0)
             Text(partnerManager.currentPhase.displayLabel)
                 .font(Font.bodySans(12, weight: .semibold))
                 .tracking(1.5)
-                .foregroundColor(Color.luxuryGold.opacity(0.8))
+                .foregroundColor(Color.textPrimary.opacity(0.7))
                 .textCase(.uppercase)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
-        .background(Color.luxuryMaroonLight.opacity(0.6))
+        .background(Color.surfaceElevated)
         .cornerRadius(20)
         .overlay(
             RoundedRectangle(cornerRadius: 20)
-                .stroke(Color.luxuryGold.opacity(0.2), lineWidth: 1)
+                .stroke(Color.white.opacity(0.08), lineWidth: 1)
         )
     }
 

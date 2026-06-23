@@ -1,3 +1,4 @@
+import GoogleSignIn
 import UIKit
 
 /// UIKit application delegate, wired into the SwiftUI lifecycle via `@UIApplicationDelegateAdaptor`.
@@ -44,6 +45,10 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         options: [UIApplication.OpenURLOptionsKey: Any] = [:]
     ) -> Bool {
         print("[Auth] AppDelegate open URL: \(url.absoluteString)")
+        // Let GoogleSignIn claim its own redirect (reversed-client-ID scheme) first.
+        if GIDSignIn.sharedInstance.handle(url) {
+            return true
+        }
         SupabaseService.shared.handle(url)
         return true
     }

@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { CheckCircle, Loader2, ArrowRight, Heart } from 'lucide-react'
 import { useWaitlist } from '@/hooks/useWaitlist'
 import { cn } from '@/lib/utils'
+import { Events } from '@/lib/analytics'
 
 interface WaitlistFormProps {
   source: string
@@ -24,6 +25,13 @@ export function WaitlistForm({
   const [partnerEmail, setPartnerEmail] = useState('')
   const [showPartner, setShowPartner] = useState(false)
   const { status, errorMessage, submit } = useWaitlist()
+  const trackedFormStart = useRef(false)
+
+  const trackFormStart = () => {
+    if (trackedFormStart.current) return
+    trackedFormStart.current = true
+    Events.waitlistFormStarted(source)
+  }
 
   if (status === 'success') {
     return (
@@ -77,6 +85,7 @@ export function WaitlistForm({
           required
           value={fullName}
           onChange={(e) => setFullName(e.target.value)}
+          onFocus={trackFormStart}
           placeholder="Your full name"
           disabled={isSubmitting}
           className={inputClass}

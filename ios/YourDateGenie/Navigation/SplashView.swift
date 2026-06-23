@@ -8,11 +8,11 @@ struct LuxurySplashView: View {
     
     var body: some View {
         ZStack {
-            Color.luxuryMaroon
+            Color.backgroundPrimary
                 .ignoresSafeArea()
             
             RadialGradient.goldGlow
-                .opacity(0.4)
+                .opacity(0.25)
                 .scaleEffect(1.5)
             
             VStack(spacing: 24) {
@@ -29,9 +29,8 @@ struct LuxurySplashView: View {
                             .font(Font.header(18, weight: .regular))
                             .foregroundColor(Color.luxuryCreamMuted)
                         Text("planned")
-                            .font(Font.tangerine(28, weight: .bold))
-                            .italic()
-                            .foregroundColor(Color.luxuryGold)
+                            .font(Font.bodySerif(28, weight: .regular))
+                            .foregroundColor(Color.accentGold)
                         Text("for you.")
                             .font(Font.header(18, weight: .regular))
                             .foregroundColor(Color.luxuryCreamMuted)

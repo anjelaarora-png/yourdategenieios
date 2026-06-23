@@ -109,7 +109,7 @@ private struct NoteView: View {
 
 #Preview {
     ZStack {
-        Color.luxuryMaroon.ignoresSafeArea()
+        Color.backgroundPrimary.ignoresSafeArea()
         MusicRecordAnimationView(size: 88, showNotes: true)
     }
 }

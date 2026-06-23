@@ -129,7 +129,7 @@ struct RouteMapView: View {
                 .padding(.top, 16)
             }
         }
-        .background(Color.luxuryMaroon)
+        .background(Color.backgroundPrimary)
         .onAppear {
             updateRegionFromStops()
             resolveMissingCoordinates()

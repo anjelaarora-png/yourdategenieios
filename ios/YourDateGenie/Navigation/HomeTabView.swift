@@ -30,14 +30,41 @@ struct LuxuryHomeTabView: View {
     @State private var showMapsAppPicker = false
     @State private var pendingPlaceForMaps: GooglePlacesService.PlaceSearchResult?
 
-    // Section collapse states — persisted across launches
-    @AppStorage("home_upcoming_expanded") private var upcomingExpanded = true
-    @AppStorage("home_experiences_expanded") private var dateExperiencesExpanded = true
-    @AppStorage("home_trending_expanded") private var trendingExpanded = true
-    @AppStorage("home_story_expanded") private var storyExpanded = true
+    // Section collapse states — Shortcuts expanded by default; others collapsed
+    @AppStorage("home_shortcuts_expanded") private var shortcutsExpanded = true
+    @AppStorage("home_upcoming_expanded") private var upcomingExpanded = false
+    @AppStorage("home_experiences_expanded") private var dateExperiencesExpanded = false
+    @AppStorage("home_trending_expanded") private var trendingExpanded = false
+    @AppStorage("home_story_expanded") private var storyExpanded = false
     // Upcoming Dates: show first 3, tap to expand
     // Sheet for reviewing > 3 unsaved plans
     @State private var showUnsavedPlansSheet = false
+    @State private var heroPlanOverride: DatePlan?
+    @State private var swapContext: SwapStopContext?
+
+    private var heroPlan: DatePlan? {
+        if let tonight = planForTonight { return tonight }
+        let sortedSaved = coordinator.savedPlans.sorted {
+            ($0.scheduledDate ?? $0.createdAt) < ($1.scheduledDate ?? $1.createdAt)
+        }
+        if let first = sortedSaved.first { return first }
+        return allUnsavedPlans.first
+    }
+
+    private var heroPlanIsUnsaved: Bool {
+        guard let plan = heroPlan else { return false }
+        return allUnsavedPlans.contains(where: { $0.id == plan.id })
+    }
+
+    private var partnerDisplayName: String? {
+        let name = PartnerSessionManager.shared.inviteInfo?.partnerName
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return name.isEmpty ? nil : name
+    }
+
+    private var displayHeroPlan: DatePlan? {
+        heroPlanOverride ?? heroPlan
+    }
 
     private var planForTonight: DatePlan? {
         let calendar = Calendar.current
@@ -56,20 +83,14 @@ struct LuxuryHomeTabView: View {
     var body: some View {
         NavigationStack(path: $coordinator.navigationPath) {
             ZStack {
-                Color.luxuryMaroon
+                Color.backgroundPrimary
                     .ignoresSafeArea()
-                
-                if !reduceMotion && !ProcessInfo.processInfo.isLowPowerModeEnabled {
-                    FloatingParticlesView()
-                        .ignoresSafeArea()
-                        .opacity(0.6)
-                }
                 
                 ScrollView(.vertical, showsIndicators: false) {
                     VStack(spacing: 28) {
                         headerSection
                         heroSection
-                        quickActionsSection
+                        shortcutsCollapsibleSection
                         yourUpcomingDatesSection
                         dateExperiencesCollapsibleSection
                         trendingInYourAreaSection
@@ -127,6 +148,16 @@ struct LuxuryHomeTabView: View {
             .sheet(isPresented: $showUnsavedPlansSheet) {
                 unsavedPlansSheet
             }
+            .sheet(item: $swapContext) { context in
+                SwapStopSheet(plan: context.plan, stopIndex: context.stopIndex) { alternative in
+                    applySwap(alternative, to: context.plan, stopIndex: context.stopIndex)
+                }
+                .presentationDetents([.medium])
+                .presentationDragIndicator(.visible)
+            }
+            .onChange(of: heroPlan?.id) { _, _ in
+                heroPlanOverride = nil
+            }
             .alert("Calendar", isPresented: $showCalendarAlert) {
                 Button("OK") { calendarMessage = nil }
             } message: {
@@ -148,7 +179,7 @@ struct LuxuryHomeTabView: View {
                     NotificationBellButton(notificationManager: notificationManager)
                 }
             }
-            .toolbarBackground(Color.luxuryMaroon, for: .navigationBar)
+            .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .sheet(isPresented: $notificationManager.showNotificationsSheet) {
                 NotificationsSheetView(notificationManager: notificationManager)
@@ -159,16 +190,16 @@ struct LuxuryHomeTabView: View {
     private var headerSection: some View {
         VStack(spacing: 8) {
             Text(greetingLine1)
-                .font(Font.tangerine(46, weight: .bold))
-                .italic()
-                .foregroundColor(Color.luxuryGold)
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: .infinity)
+                .font(Font.bodySerif(22, weight: .regular))
+                .foregroundColor(Color.textPrimary)
+                .multilineTextAlignment(.leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
             
             Text(greetingLine2)
                 .font(Font.bodySans(13, weight: .regular))
                 .foregroundColor(Color.luxuryCreamMuted)
-                .multilineTextAlignment(.center)
+                .multilineTextAlignment(.leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
         .frame(maxWidth: .infinity)
         .padding(.horizontal, 20)
@@ -189,72 +220,112 @@ struct LuxuryHomeTabView: View {
     }
     
     private var greetingLine2: String {
-        if planForTonight != nil {
-            let d = planForTonight!.scheduledDate ?? Date()
-            let formatter = DateFormatter()
-            formatter.dateFormat = "EEEE"
-            let day = formatter.string(from: d)
-            return "Your \(day) night plan is ready."
+        if heroPlan != nil {
+            return "Tonight's plan is ready for review."
         }
-        return "Ready to surprise your partner tonight?"
+        return "One tap to a finished plan your partner will love."
     }
     
     private var heroSection: some View {
+        Group {
+            if let plan = displayHeroPlan {
+                ItineraryHeroCard(
+                    plan: plan,
+                    partnerName: partnerDisplayName,
+                    onApprove: { approveHeroPlan(plan) },
+                    onSwap: { presentSwapSheet(for: plan) },
+                    onView: { openHeroPlan(plan) }
+                )
+            } else {
+                emptyHeroPlanCTA
+            }
+        }
+    }
+
+    private func presentSwapSheet(for plan: DatePlan) {
+        guard let stopIndex = SwapStopLogic.dinnerStopIndex(in: plan) else { return }
+        swapContext = SwapStopContext(plan: plan, stopIndex: stopIndex)
+    }
+
+    private func applySwap(_ alternative: SwapStopAlternative, to plan: DatePlan, stopIndex: Int) {
+        guard !alternative.isCurrent else { return }
+        let updated = plan.replacingStop(at: stopIndex, with: alternative)
+        heroPlanOverride = updated
+        persistHeroPlanEdit(updated)
+    }
+
+    private func persistHeroPlanEdit(_ plan: DatePlan) {
+        if let idx = coordinator.savedPlans.firstIndex(where: { $0.id == plan.id }) {
+            coordinator.savedPlans[idx] = plan
+        } else if let idx = coordinator.generatedPlans.firstIndex(where: { $0.id == plan.id }) {
+            coordinator.generatedPlans[idx] = plan
+        } else if let idx = coordinator.experiencesWaiting.firstIndex(where: { $0.id == plan.id }) {
+            coordinator.experiencesWaiting[idx] = plan
+        }
+        coordinator.currentDatePlan = plan
+    }
+
+    private var emptyHeroPlanCTA: some View {
         let showUseLast = LastQuestionnaireStore.hasLastData || coordinator.hasCompletedPreferences
         let showResume = QuestionnaireProgressStore.hasValidProgress
-        let hasPlanTonight = planForTonight != nil
-        
+
         return VStack(spacing: 16) {
             Button {
-                if hasPlanTonight, let plan = planForTonight {
-                    coordinator.currentDatePlan = plan
-                    coordinator.activeSheet = .datePlanResult
-                } else {
-                    coordinator.startDatePlanning(mode: .fresh)
-                }
+                coordinator.startDatePlanning(mode: .fresh)
             } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: "sparkles")
-                        .font(.system(size: 18))
-                    Text(hasPlanTonight ? "View Date Plan" : "Plan My Next Date")
-                        .font(Font.bodySans(16, weight: .semibold))
-                }
-                .foregroundColor(Color.luxuryMaroon)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 16)
-                .background(LinearGradient.goldShimmer)
-                .cornerRadius(16)
-                .shadow(color: Color.luxuryGold.opacity(0.35), radius: 12, y: 4)
+                Text("Plan My Next Date")
+                    .font(Font.bodySans(16, weight: .semibold))
+                    .foregroundColor(Color.backgroundPrimary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 16)
+                    .background(Color.accentGold)
+                    .cornerRadius(16)
             }
             .buttonStyle(.plain)
-            
+
             if !access.isSubscribed && access.freePlansRemaining > 0 {
-                HStack(spacing: 4) {
-                    Image(systemName: "sparkles")
-                        .font(.system(size: 11))
-                    Text(access.freePlansRemaining == AccessManager.freePlanLimit
-                         ? "\(access.freePlansRemaining) free date plans included — no card needed"
-                         : "\(access.freePlansRemaining) free plan remaining · subscribe for unlimited")
-                        .font(Font.bodySans(12, weight: .regular))
-                }
-                .foregroundColor(Color.luxuryGold.opacity(0.8))
-                .multilineTextAlignment(.center)
+                Text(access.freePlansRemaining == AccessManager.freePlanLimit
+                     ? "\(access.freePlansRemaining) free date plans included — no card needed"
+                     : "\(access.freePlansRemaining) free plan remaining · subscribe for unlimited")
+                    .font(Font.bodySans(12, weight: .regular))
+                    .foregroundColor(Color.accentGold.opacity(0.85))
+                    .multilineTextAlignment(.center)
             }
 
-            if (showUseLast || showResume) && !hasPlanTonight {
+            if showUseLast || showResume {
                 Button {
                     coordinator.startDatePlanning(mode: showResume ? .resume : .useLast)
                 } label: {
                     Text("or reuse your last plan")
                         .font(Font.bodySans(13, weight: .semibold))
-                        .italic()
-                        .foregroundColor(Color.luxuryGold)
+                        .foregroundColor(Color.accentGold)
                         .underline()
                 }
                 .buttonStyle(.plain)
             }
         }
         .padding(.horizontal, 20)
+    }
+
+    private func openHeroPlan(_ plan: DatePlan) {
+        coordinator.currentDatePlan = plan
+        if heroPlanIsUnsaved,
+           coordinator.generatedPlans.contains(where: { $0.id == plan.id }),
+           let idx = coordinator.generatedPlans.firstIndex(where: { $0.id == plan.id }) {
+            coordinator.generatedPlansSelectedIndex = idx
+            coordinator.activeSheet = .datePlanOptions
+        } else {
+            coordinator.activeSheet = .datePlanResult
+        }
+    }
+
+    private func approveHeroPlan(_ plan: DatePlan) {
+        if heroPlanIsUnsaved {
+            coordinator.savePlan(plan)
+        } else {
+            planForCalendar = plan
+            calendarDate = plan.scheduledDate ?? Date()
+        }
     }
     
     /// Key used to refetch trending when location (starting point or city) becomes available or changes.
@@ -369,33 +440,24 @@ struct LuxuryHomeTabView: View {
             } label: {
                 HStack(spacing: 8) {
                     VStack(alignment: .leading, spacing: 4) {
-                        HStack(spacing: 6) {
-                            Image(systemName: "map")
-                                .font(.system(size: 20))
-                                .foregroundColor(Color.luxuryGold)
-                            Text("Local")
-                                .font(Font.tangerine(32, weight: .bold))
-                                .italic()
-                                .foregroundColor(Color.luxuryGold)
-                            Text("Gems")
-                                .font(Font.tangerine(32, weight: .bold))
-                                .italic()
-                                .foregroundColor(Color.luxuryGold)
-                        }
+                        Text("NEAR YOU")
+                            .font(Font.bodySans(13, weight: .semibold))
+                            .tracking(1.2)
+                            .foregroundColor(Color.accentGold)
                         Text("Top-rated spots handpicked for your next date")
-                            .font(Font.bodySans(13, weight: .regular))
-                            .foregroundColor(Color.luxuryCreamMuted)
+                            .font(Font.bodySans(11, weight: .regular))
+                            .foregroundColor(Color.textPrimary.opacity(0.5))
                     }
                     Spacer(minLength: 8)
                     Button { coordinator.showExplore() } label: {
-                        Image(systemName: "sparkles")
-                            .font(.system(size: 18))
-                            .foregroundColor(Color.luxuryGold)
+                        Image(systemName: "map")
+                            .font(.system(size: 16))
+                            .foregroundColor(Color.accentGold)
                     }
                     .buttonStyle(.plain)
                     Image(systemName: trendingExpanded ? "chevron.up" : "chevron.down")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundColor(Color.luxuryGold.opacity(0.7))
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(Color.accentGold.opacity(0.7))
                 }
             }
             .buttonStyle(.plain)
@@ -551,7 +613,7 @@ struct LuxuryHomeTabView: View {
 
         return Button(action: tapAction) {
             HStack(spacing: 0) {
-                // Gold left accent bar
+                // Gold left accent bar → maroon on cream-card rows stays gold for now in list rows
                 LinearGradient.goldShimmer
                     .frame(width: 3)
                     .cornerRadius(1.5)
@@ -716,7 +778,7 @@ struct LuxuryHomeTabView: View {
             }
             .padding(.top, 24)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Color.luxuryMaroon)
+            .background(Color.backgroundPrimary)
             .navigationTitle("Add to Calendar")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -727,7 +789,7 @@ struct LuxuryHomeTabView: View {
                     .foregroundColor(Color.luxuryGold)
                 }
             }
-            .toolbarBackground(Color.luxuryMaroon, for: .navigationBar)
+            .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
         }
     }
     
@@ -778,30 +840,30 @@ struct LuxuryHomeTabView: View {
                 HStack(spacing: 8) {
                     VStack(alignment: .leading, spacing: 4) {
                         HStack(spacing: 8) {
-                            Text("Your Upcoming Dates")
-                                .font(Font.tangerine(32, weight: .bold))
-                                .italic()
-                                .foregroundColor(Color.luxuryGold)
+                            Text("UPCOMING")
+                                .font(Font.bodySans(13, weight: .semibold))
+                                .tracking(1.2)
+                                .foregroundColor(Color.accentGold)
                             if badgeCount > 0 {
                                 Text("\(badgeCount)")
                                     .font(Font.bodySans(11, weight: .bold))
-                                    .foregroundColor(Color.luxuryMaroon)
+                                    .foregroundColor(Color.backgroundPrimary)
                                     .padding(.horizontal, 7)
                                     .padding(.vertical, 3)
-                                    .background(Color.luxuryGold)
+                                    .background(Color.accentGold)
                                     .clipShape(Capsule())
                             }
                         }
                         Text(isMultiCity
                              ? "\(cityGroups.count) cities · tap a plan to view"
-                             : "Tap a plan to view or add to your calendar")
-                            .font(Font.bodySans(13, weight: .regular))
-                            .foregroundColor(Color.luxuryCreamMuted)
+                             : "Saved plans · tap to view or add to calendar")
+                            .font(Font.bodySans(11, weight: .regular))
+                            .foregroundColor(Color.textPrimary.opacity(0.5))
                     }
                     Spacer()
                     Image(systemName: upcomingExpanded ? "chevron.up" : "chevron.down")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundColor(Color.luxuryGold.opacity(0.7))
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(Color.accentGold.opacity(0.7))
                 }
             }
             .buttonStyle(.plain)
@@ -972,7 +1034,7 @@ struct LuxuryHomeTabView: View {
                 }
                 .padding(.bottom, 40)
             }
-            .background(Color.luxuryMaroon)
+            .background(Color.backgroundPrimary)
             .navigationTitle("Plans Waiting to be Saved")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -981,7 +1043,7 @@ struct LuxuryHomeTabView: View {
                         .foregroundColor(Color.luxuryGold)
                 }
             }
-            .toolbarBackground(Color.luxuryMaroon, for: .navigationBar)
+            .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
         }
     }
@@ -1004,24 +1066,18 @@ struct LuxuryHomeTabView: View {
             } label: {
                 HStack(spacing: 8) {
                     VStack(alignment: .leading, spacing: 2) {
-                        HStack(spacing: 6) {
-                            Text("Happening")
-                                .font(Font.tangerine(32, weight: .bold))
-                                .italic()
-                                .foregroundColor(Color.luxuryGold)
-                            Text("Near You")
-                                .font(Font.tangerine(32, weight: .bold))
-                                .italic()
-                                .foregroundColor(Color.luxuryGold)
-                        }
+                        Text("HAPPENING NEAR YOU")
+                            .font(Font.bodySans(13, weight: .semibold))
+                            .tracking(1.2)
+                            .foregroundColor(Color.accentGold)
                         Text("Live events & experiences within 60 miles")
-                            .font(Font.bodySans(13, weight: .regular))
-                            .foregroundColor(Color.luxuryCreamMuted)
+                            .font(Font.bodySans(11, weight: .regular))
+                            .foregroundColor(Color.textPrimary.opacity(0.5))
                     }
                     Spacer()
                     Image(systemName: dateExperiencesExpanded ? "chevron.up" : "chevron.down")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundColor(Color.luxuryGold.opacity(0.7))
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(Color.accentGold.opacity(0.7))
                 }
             }
             .buttonStyle(.plain)
@@ -1034,79 +1090,75 @@ struct LuxuryHomeTabView: View {
         }
     }
     
-    private var quickActionsSection: some View {
-        VStack(spacing: 16) {
-            HStack(spacing: 6) {
-                Text("Quick")
-                    .font(Font.tangerine(34, weight: .bold))
-                    .italic()
-                    .foregroundColor(Color.luxuryGold)
-                Text("Magic")
-                    .font(Font.tangerine(34, weight: .bold))
-                    .italic()
-                    .foregroundColor(Color.luxuryGold)
-            }
-            .frame(maxWidth: .infinity)
+    private var shortcutsCollapsibleSection: some View {
+        CollapsibleHomeSection(
+            title: "Shortcuts",
+            subtitle: "Quick tools for your date",
+            isExpanded: $shortcutsExpanded
+        ) {
+            shortcutsGridContent
+                .padding(.top, 14)
+        }
+    }
 
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 12) {
-                    LuxuryQuickTile(icon: "gift", title: "Gift Finder", color: Color.luxuryGold, isLocked: !access.canAccess(.gifting)) {
-                        access.require(.gifting) {
-                            coordinator.showGiftFinder(
-                                datePlan: coordinator.currentDatePlan,
-                                dateLocation: coordinator.currentDatePlan?.stops.first?.address
-                            )
-                        }
+    private var shortcutsGridContent: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 12) {
+                LuxuryQuickTile(icon: "gift", title: "Gift Finder", color: Color.accentGold, isLocked: !access.canAccess(.gifting)) {
+                    access.require(.gifting) {
+                        coordinator.showGiftFinder(
+                            datePlan: coordinator.currentDatePlan,
+                            dateLocation: coordinator.currentDatePlan?.stops.first?.address
+                        )
                     }
-                    LuxuryQuickTile(icon: "music.note.list", title: "Date Playlist", color: Color.luxuryGoldLight, isLocked: !access.canAccess(.playlist)) {
-                        access.require(.playlist) {
-                            coordinator.showPlaylist(for: coordinator.currentDatePlan?.title ?? "Date Night", planId: coordinator.currentDatePlan?.id)
-                        }
+                }
+                LuxuryQuickTile(icon: "music.note.list", title: "Date Playlist", color: Color.luxuryGoldLight, isLocked: !access.canAccess(.playlist)) {
+                    access.require(.playlist) {
+                        coordinator.showPlaylist(for: coordinator.currentDatePlan?.title ?? "Date Night", planId: coordinator.currentDatePlan?.id)
                     }
-                    LuxuryQuickTile(icon: "bubble.left.and.bubble.right", title: "Convo Starters", color: Color.luxuryGold, isLocked: !access.canAccess(.conversation)) {
-                        access.require(.conversation) {
-                            coordinator.showConversationStarters()
-                        }
+                }
+                LuxuryQuickTile(icon: "bubble.left.and.bubble.right", title: "Convo Cues", color: Color.accentGold, isLocked: !access.canAccess(.conversation)) {
+                    access.require(.conversation) {
+                        coordinator.showConversationStarters()
                     }
-                    LuxuryQuickTile(icon: "person.2.fill", title: "Plan Together", color: Color.luxuryGold, isLocked: !access.canAccess(.datePlan)) {
-                        access.require(.datePlan) {
-                            coordinator.showPartnerPlanning()
-                        }
+                }
+                LuxuryQuickTile(icon: "person.2.fill", title: "Plan Together", color: Color.accentGold, isLocked: !access.canAccess(.datePlan)) {
+                    access.require(.datePlan) {
+                        coordinator.showPartnerPlanning()
                     }
-                    LuxuryQuickTile(icon: "clock", title: "Past Dates", color: Color.luxuryGoldLight, isLocked: false) {
-                        coordinator.showPastMagic()
-                    }
-                    LuxuryQuickTile(icon: "map", title: "Journey Map", color: Color.luxuryGoldLight, isLocked: !access.canAccess(.datePlan)) {
-                        access.require(.datePlan) {
-                            let allPastStops = coordinator.pastPlans.flatMap { $0.stops }
-                            if !allPastStops.isEmpty {
-                                coordinator.activeSheet = .routeMap(stops: allPastStops, startingPoint: nil, showRouteLine: false)
-                            } else if let plan = coordinator.currentDatePlan, !plan.stops.isEmpty {
-                                coordinator.activeSheet = .routeMap(stops: plan.stops, startingPoint: plan.startingPoint)
-                            } else {
-                                coordinator.activeSheet = .routeMap(stops: [], startingPoint: nil, showRouteLine: false)
-                            }
-                        }
-                    }
-                    LuxuryQuickTile(icon: "heart", title: "Share Joy", color: Color.luxuryGoldLight, isLocked: !access.canAccess(.datePlan)) {
-                        access.require(.datePlan) {
-                            if let plan = coordinator.currentDatePlan {
-                                coordinator.activeSheet = .partnerShare(plan: plan)
-                            }
-                        }
-                    }
-                    LuxuryQuickTile(icon: "book.closed", title: "Date Tips", color: Color.luxuryGold, isLocked: !access.canAccess(.datingTips)) {
-                        access.require(.datingTips) {
-                            coordinator.showPlaybook()
+                }
+                LuxuryQuickTile(icon: "clock", title: "Past Dates", color: Color.luxuryGoldLight, isLocked: false) {
+                    coordinator.showPastMagic()
+                }
+                LuxuryQuickTile(icon: "map", title: "Journey Map", color: Color.luxuryGoldLight, isLocked: !access.canAccess(.datePlan)) {
+                    access.require(.datePlan) {
+                        let allPastStops = coordinator.pastPlans.flatMap { $0.stops }
+                        if !allPastStops.isEmpty {
+                            coordinator.activeSheet = .routeMap(stops: allPastStops, startingPoint: nil, showRouteLine: false)
+                        } else if let plan = coordinator.currentDatePlan, !plan.stops.isEmpty {
+                            coordinator.activeSheet = .routeMap(stops: plan.stops, startingPoint: plan.startingPoint)
+                        } else {
+                            coordinator.activeSheet = .routeMap(stops: [], startingPoint: nil, showRouteLine: false)
                         }
                     }
                 }
-                .padding(.horizontal, 20)
+                LuxuryQuickTile(icon: "heart", title: "Send to partner", color: Color.luxuryGoldLight, isLocked: !access.canAccess(.datePlan)) {
+                    access.require(.datePlan) {
+                        if let plan = heroPlan ?? coordinator.currentDatePlan {
+                            coordinator.activeSheet = .partnerShare(plan: plan)
+                        }
+                    }
+                }
+                LuxuryQuickTile(icon: "book.closed", title: "Date Tips", color: Color.accentGold, isLocked: !access.canAccess(.datingTips)) {
+                    access.require(.datingTips) {
+                        coordinator.showPlaybook()
+                    }
+                }
             }
+            .padding(.horizontal, 20)
         }
     }
-    
-    
+
     // MARK: - Your Relationship Story
     private var relationshipStorySection: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -1125,18 +1177,18 @@ struct LuxuryHomeTabView: View {
             } label: {
                 HStack(spacing: 8) {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Your Relationship Story")
-                            .font(Font.tangerine(32, weight: .bold))
-                            .italic()
-                            .foregroundColor(Color.luxuryGold)
+                        Text("YOUR STORY")
+                            .font(Font.bodySans(13, weight: .semibold))
+                            .tracking(1.2)
+                            .foregroundColor(Color.accentGold)
                         Text("Your journey together at a glance")
-                            .font(Font.bodySans(13, weight: .regular))
-                            .foregroundColor(Color.luxuryCreamMuted)
+                            .font(Font.bodySans(11, weight: .regular))
+                            .foregroundColor(Color.textPrimary.opacity(0.5))
                     }
                     Spacer()
                     Image(systemName: storyExpanded ? "chevron.up" : "chevron.down")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundColor(Color.luxuryGold.opacity(0.7))
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(Color.accentGold.opacity(0.7))
                 }
             }
             .buttonStyle(.plain)
@@ -1166,7 +1218,7 @@ struct LuxuryHomeTabView: View {
                 
                 Button {
                     access.require(.memory) {
-                        coordinator.currentTab = .memories
+                        coordinator.showMemoryGallery = true
                     }
                 } label: {
                     VStack(spacing: 6) {
@@ -1359,82 +1411,6 @@ private struct LuxuryUnifiedDateCard: View {
             .clipShape(RoundedRectangle(cornerRadius: 20))
         }
         .buttonStyle(.plain)
-    }
-}
-
-// MARK: - Floating Particles View
-struct FloatingParticlesView: View {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var particles: [Particle] = []
-    @State private var particleTimer: Timer?
-
-    struct Particle: Identifiable {
-        let id = UUID()
-        var x: CGFloat
-        var y: CGFloat
-        var size: CGFloat
-        var opacity: Double
-        var speed: Double
-    }
-    
-    var body: some View {
-        if reduceMotion {
-            Color.clear
-                .accessibilityHidden(true)
-        } else {
-            GeometryReader { geometry in
-                ZStack {
-                    ForEach(particles) { particle in
-                        Image(systemName: "sparkle")
-                            .font(.system(size: particle.size))
-                            .foregroundColor(Color.luxuryGold)
-                            .opacity(particle.opacity)
-                            .position(x: particle.x, y: particle.y)
-                    }
-                }
-                .accessibilityHidden(true)
-                .onAppear {
-                    if particles.isEmpty {
-                        createParticles(in: geometry.size)
-                    }
-                    if particleTimer == nil {
-                        startAnimating(in: geometry.size)
-                    }
-                }
-                .onDisappear {
-                    particleTimer?.invalidate()
-                    particleTimer = nil
-                }
-            }
-        }
-    }
-    
-    private func createParticles(in size: CGSize) {
-        particles = (0..<15).map { _ in
-            Particle(
-                x: CGFloat.random(in: 0...size.width),
-                y: CGFloat.random(in: 0...size.height),
-                size: CGFloat.random(in: 6...14),
-                opacity: Double.random(in: 0.1...0.4),
-                speed: Double.random(in: 20...60)
-            )
-        }
-    }
-    
-    private func startAnimating(in size: CGSize) {
-        particleTimer = Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { _ in
-            withAnimation(.easeInOut(duration: 3)) {
-                for i in particles.indices {
-                    particles[i].y -= CGFloat(particles[i].speed)
-                    particles[i].opacity = Double.random(in: 0.1...0.4)
-                    
-                    if particles[i].y < -20 {
-                        particles[i].y = size.height + 20
-                        particles[i].x = CGFloat.random(in: 0...size.width)
-                    }
-                }
-            }
-        }
     }
 }
 

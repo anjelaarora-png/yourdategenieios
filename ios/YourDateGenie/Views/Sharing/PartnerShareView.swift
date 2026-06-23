@@ -12,7 +12,7 @@ struct PartnerShareView: View {
         NavigationStack {
             ZStack {
                 // Luxurious background
-                Color.luxuryMaroon
+                Color.backgroundPrimary
                     .ignoresSafeArea()
                 
                 ScrollView(showsIndicators: false) {
@@ -199,7 +199,7 @@ struct PartnerShareView: View {
                     .foregroundColor(Color.luxuryGold)
                 }
             }
-            .toolbarBackground(Color.luxuryMaroon, for: .navigationBar)
+            .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
         }
     }

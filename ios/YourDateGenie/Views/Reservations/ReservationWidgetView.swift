@@ -158,7 +158,7 @@ struct ReservationWidgetView: View {
         NavigationStack {
             ZStack {
                 // Luxurious background
-                Color.luxuryMaroon
+                Color.backgroundPrimary
                     .ignoresSafeArea()
                 
                 if showConfirmation {
@@ -178,7 +178,7 @@ struct ReservationWidgetView: View {
                     .foregroundColor(Color.luxuryGold)
                 }
             }
-            .toolbarBackground(Color.luxuryMaroon, for: .navigationBar)
+            .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
         }
     }

@@ -4,17 +4,39 @@ import { buildPrompt } from "./prompt.ts";
 import { generateMultipleDatePlans } from "./multiPlanAi.ts";
 import { validateAllStops, geocodeAddress } from "./places.ts";
 import { getDirections, toGoogleTravelMode, toAppTravelMode } from "./directions.ts";
+import { enrichPlanPresentation } from "./planPresentation.ts";
+import { enrichGiftImages } from "../_shared/linkPreview.ts";
+import { requireAuthenticatedUser } from "../_shared/jwtAuth.ts";
+import { checkRateLimit } from "../_shared/rateLimit.ts";
 
-function jsonResponse(status: number, body: unknown) {
+const MIN_VALIDATED_STOPS_PER_PLAN = 2;
+const RATE_LIMIT_MAX = 20;
+const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000;
+
+function jsonResponse(status: number, body: unknown, extraHeaders: Record<string, string> = {}) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    headers: { ...corsHeaders, "Content-Type": "application/json", ...extraHeaders },
   });
 }
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
+  }
+
+  const user = requireAuthenticatedUser(req.headers.get("Authorization"));
+  if (!user) {
+    return jsonResponse(401, { error: "Sign in required to generate date plans." });
+  }
+
+  const rate = checkRateLimit(`generate-date-plan:${user.sub}`, RATE_LIMIT_MAX, RATE_LIMIT_WINDOW_MS);
+  if (!rate.allowed) {
+    return jsonResponse(
+      429,
+      { error: "You've reached the hourly plan limit. Try again soon or upgrade to Premium." },
+      rate.retryAfterSec ? { "Retry-After": String(rate.retryAfterSec) } : {},
+    );
   }
 
   try {
@@ -167,7 +189,7 @@ serve(async (req) => {
     }
 
     // Ensure all plans have required fields. Stops = itinerary venues only (step 1 = first venue, not starting point).
-    const sanitizedPlans = plans.map((plan: any) => ({
+    let sanitizedPlans = plans.map((plan: any) => ({
       ...plan,
       title: plan.title || "Your Date Plan",
       tagline: plan.tagline || "A special experience awaits",
@@ -185,6 +207,31 @@ serve(async (req) => {
       giftSuggestions: Array.isArray(plan.giftSuggestions) ? plan.giftSuggestions : [],
       conversationStarters: Array.isArray(plan.conversationStarters) ? plan.conversationStarters : [],
     }));
+
+    if (GOOGLE_PLACES_API_KEY && city) {
+      sanitizedPlans = sanitizedPlans.filter((plan: any) => {
+        const validatedCount = (plan.stops || []).filter((s: any) => s?.validated).length;
+        if (validatedCount >= MIN_VALIDATED_STOPS_PER_PLAN) return true;
+        console.warn(
+          `[Validation] Dropping plan "${plan.title}" — only ${validatedCount} verified stops (need ${MIN_VALIDATED_STOPS_PER_PLAN})`,
+        );
+        return false;
+      });
+
+      if (sanitizedPlans.length === 0) {
+        return jsonResponse(422, {
+          error:
+            "We couldn't verify enough real, open venues for your area. Please try again or adjust your city/radius.",
+        });
+      }
+    }
+
+    for (const plan of sanitizedPlans) {
+      enrichPlanPresentation(plan);
+      if (Array.isArray(plan.giftSuggestions) && plan.giftSuggestions.length > 0) {
+        plan.giftSuggestions = await enrichGiftImages(plan.giftSuggestions);
+      }
+    }
 
     // Set starting point separately for route map; do NOT add it as step 1 of the itinerary.
     const startingAddress = preferences.startingAddress?.trim();

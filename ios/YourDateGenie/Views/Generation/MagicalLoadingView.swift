@@ -43,7 +43,7 @@ struct MagicalLoadingView: View {
     
     @State private var confettiPieces: [LoadingConfettiPiece] = []
     @State private var petalPositions: [CGPoint] = []
-    @State private var sparkleOpacity: [Double] = Array(repeating: 0.3, count: 20)
+    @State private var sparkleOpacity: [Double] = Array(repeating: 0.3, count: 6)
     @State private var sparklePositions: [CGPoint] = []
     @State private var glowOpacity: Double = 0
     @State private var glowScale: CGFloat = 0.4
@@ -82,10 +82,10 @@ struct MagicalLoadingView: View {
     var body: some View {
         GeometryReader { geo in
             ZStack {
-                Color.luxuryMaroon
+                Color.backgroundPrimary
                     .ignoresSafeArea()
                 
-                // 1. Confetti
+                // 1. Confetti (reduced for concierge-style loading)
                 ForEach(confettiPieces) { piece in
                     LoadingConfettiShape(style: piece.style)
                         .fill(piece.color)
@@ -95,8 +95,8 @@ struct MagicalLoadingView: View {
                         .opacity(piece.opacity)
                 }
                 
-                // 2. Floating petals
-                ForEach(0..<8, id: \.self) { index in
+                // 2. Floating petals (minimal)
+                ForEach(0..<3, id: \.self) { index in
                     RosePetal()
                         .fill(
                             LinearGradient(
@@ -119,8 +119,8 @@ struct MagicalLoadingView: View {
                         )
                 }
                 
-                // 3. Golden sparkles
-                ForEach(0..<20, id: \.self) { index in
+                // 3. Golden sparkles (minimal)
+                ForEach(0..<6, id: \.self) { index in
                     if index < sparklePositions.count {
                         Image(systemName: "sparkle")
                             .font(.system(size: [10, 12, 14, 16][index % 4]))
@@ -152,13 +152,13 @@ struct MagicalLoadingView: View {
                     ScrollView(showsIndicators: false) {
                         VStack(spacing: 12) {
                             Text("Crafting your date plan")
-                                .font(Font.tangerine(44, weight: .bold))
-                                .foregroundStyle(LinearGradient.goldShimmer)
+                                .font(Font.bodySerif(28, weight: .regular))
+                                .foregroundColor(Color.accentGold)
                                 .multilineTextAlignment(.center)
                                 .opacity(titleOpacity)
                                 .scaleEffect(titleScale)
                             
-                            Text("Hidden gems & perfect timing")
+                            Text("Checking venues, timing, and your preferences")
                                 .font(Font.inter(15, weight: .regular))
                                 .foregroundColor(Color.luxuryCreamMuted)
                                 .opacity(titleOpacity)
@@ -191,7 +191,7 @@ struct MagicalLoadingView: View {
                             }
                             .opacity(titleOpacity)
                             
-                            Text("Magic takes a moment")
+                            Text("This usually takes under a minute")
                                 .font(Font.inter(11, weight: .regular))
                                 .foregroundColor(Color.luxuryMuted)
                                 .opacity(titleOpacity)
@@ -208,7 +208,7 @@ struct MagicalLoadingView: View {
             let size = UIScreen.main.bounds.size
             spawnConfetti(in: size)
             animateConfetti(delay: 0.3)
-            petalPositions = (0..<8).map { _ in
+            petalPositions = (0..<3).map { _ in
                 CGPoint(
                     x: CGFloat.random(in: 50...(size.width - 50)),
                     y: CGFloat.random(in: 100...(size.height - 100))
@@ -216,7 +216,7 @@ struct MagicalLoadingView: View {
             }
             // Keep sparkles in upper area so they don't cover the text block
             let sparkleMaxY = size.height * 0.38
-            sparklePositions = (0..<20).map { _ in
+            sparklePositions = (0..<6).map { _ in
                 CGPoint(
                     x: CGFloat.random(in: 20...(size.width - 20)),
                     y: CGFloat.random(in: 60...(sparkleMaxY))
@@ -238,7 +238,7 @@ struct MagicalLoadingView: View {
             Color.luxuryGoldDark
         ]
         var pieces: [LoadingConfettiPiece] = []
-        for i in 0..<36 {
+        for i in 0..<12 {
             let angle = Double(i) * 10 * .pi / 180
             let dist: CGFloat = CGFloat.random(in: 50...100)
             pieces.append(LoadingConfettiPiece(
@@ -512,7 +512,7 @@ struct GenerationErrorView: View {
     
     var body: some View {
         ZStack {
-            Color.luxuryMaroon
+            Color.backgroundPrimary
                 .ignoresSafeArea()
             
             VStack(spacing: 32) {

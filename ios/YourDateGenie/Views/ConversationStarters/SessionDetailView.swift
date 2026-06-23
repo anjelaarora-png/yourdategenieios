@@ -18,7 +18,7 @@ struct SessionDetailView: View {
 
     var body: some View {
         ZStack {
-            Color.luxuryMaroon
+            Color.backgroundPrimary
                 .ignoresSafeArea()
 
             VStack(alignment: .leading, spacing: 0) {

@@ -55,7 +55,7 @@ struct LuxuryExploreTabView: View {
     var body: some View {
         GeometryReader { geo in
             ZStack {
-                Color.luxuryMaroon
+                Color.backgroundPrimary
                     .ignoresSafeArea()
                 
                 ScrollView(.vertical, showsIndicators: false) {
@@ -68,9 +68,8 @@ struct LuxuryExploreTabView: View {
                                     .multilineTextAlignment(.center)
                                     .frame(maxWidth: .infinity)
                                 Text(preferredCity)
-                                    .font(Font.tangerine(26, weight: .bold))
-                                    .italic()
-                                    .foregroundColor(Color.luxuryGold)
+                                    .font(Font.bodySerif(22, weight: .regular))
+                                    .foregroundColor(Color.accentGold)
                                     .multilineTextAlignment(.center)
                                     .lineLimit(2)
                                     .minimumScaleFactor(0.6)
@@ -92,9 +91,8 @@ struct LuxuryExploreTabView: View {
                             // Pick a category — isolated so horizontal scroll/taps don’t hit results below
                             VStack(alignment: .leading, spacing: 12) {
                                 Text("Pick a category")
-                                    .font(Font.tangerine(32, weight: .bold))
-                                    .italic()
-                                    .foregroundColor(Color.luxuryGold)
+                                    .font(Font.bodySerif(20, weight: .regular))
+                                    .foregroundColor(Color.accentGold)
                                     .padding(.horizontal, 20)
                                 
                                 ScrollView(.horizontal, showsIndicators: true) {
@@ -138,11 +136,11 @@ struct LuxuryExploreTabView: View {
                                 }
                                 .scrollBounceBehavior(.automatic)
                                 .frame(maxWidth: .infinity)
-                                .background(Color.luxuryMaroon)
+                                .background(Color.backgroundPrimary)
                             }
                             .frame(maxWidth: .infinity)
                             .padding(.bottom, 20)
-                            .background(Color.luxuryMaroon)
+                            .background(Color.backgroundPrimary)
                             .zIndex(1)
                             
                             // Category results list — clear gap so chips scroll doesn’t hit first card
@@ -268,7 +266,7 @@ struct LuxuryExploreTabView: View {
                     .scrollBounceBehavior(.basedOnSize)
             }
         }
-        .toolbarBackground(Color.luxuryMaroon, for: .navigationBar)
+        .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
         .onAppear {
             Task { await loadRecommendedPlaces() }
             Task { await loadExplorePlaces() }

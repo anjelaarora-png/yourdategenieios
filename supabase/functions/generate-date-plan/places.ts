@@ -3,6 +3,8 @@
 interface PlaceValidationResult {
   isValid: boolean;
   isPermanentlyClosed?: boolean;
+  isTemporarilyClosed?: boolean;
+  rejectReason?: string;
   officialName?: string; // The verified name from Google Maps
   placeId?: string;
   formattedAddress?: string;
@@ -12,10 +14,142 @@ interface PlaceValidationResult {
   phoneNumber?: string;
   openingHours?: string[];
   businessStatus?: string;
+  googleTypes?: string[];
   /** Photo URL from Google Business Profile (Place Details photos) for cards and lists. */
   imageUrl?: string;
   /** Reservation platforms detected from the venue's website URL (e.g. ["opentable", "resy"]). */
   reservationPlatforms?: string[];
+}
+
+/** Google place types that must never appear on a date itinerary. */
+const DISALLOWED_PLACE_TYPES = new Set([
+  "storage",
+  "moving_company",
+  "car_dealer",
+  "car_repair",
+  "car_wash",
+  "electrician",
+  "general_contractor",
+  "insurance_agency",
+  "lawyer",
+  "local_government_office",
+  "locksmith",
+  "plumber",
+  "real_estate_agency",
+  "roofing_contractor",
+  "accounting",
+  "post_office",
+  "fire_station",
+  "police",
+  "funeral_home",
+  "cemetery",
+  "hospital",
+  "doctor",
+  "dentist",
+  "veterinary_care",
+  "gas_station",
+  "parking",
+  "warehouse",
+  "storage",
+]);
+
+const SUSPICIOUS_VENUE_NAME =
+  /\b(storage|warehouse|u-?haul|self[\s-]?storage|industrial|wholesale|distribution|fulfillment|logistics|freight|depot|mini[\s-]?storage)\b/i;
+
+const VENUE_TYPE_KEYWORDS: Record<string, string[]> = {
+  restaurant: ["restaurant", "food", "cafe", "bar", "bakery", "meal_takeaway", "meal_delivery", "night_club"],
+  dining: ["restaurant", "food", "cafe", "bar", "bakery", "meal_takeaway"],
+  dinner: ["restaurant", "food", "cafe", "bar", "bakery"],
+  bar: ["bar", "night_club", "restaurant", "food", "cafe"],
+  cafe: ["cafe", "bakery", "restaurant", "food"],
+  coffee: ["cafe", "bakery", "restaurant", "food"],
+  park: ["park", "natural_feature", "campground", "tourist_attraction"],
+  museum: ["museum", "art_gallery", "tourist_attraction", "point_of_interest"],
+  gallery: ["art_gallery", "museum", "tourist_attraction", "point_of_interest"],
+  theater: ["movie_theater", "performing_arts_theater", "tourist_attraction", "point_of_interest"],
+  theatre: ["movie_theater", "performing_arts_theater", "tourist_attraction", "point_of_interest"],
+  rooftop: ["bar", "restaurant", "night_club", "tourist_attraction", "point_of_interest"],
+  shop: ["store", "shopping_mall", "clothing_store", "book_store", "jewelry_store", "home_goods_store", "tourist_attraction"],
+  market: ["store", "shopping_mall", "supermarket", "tourist_attraction", "point_of_interest"],
+};
+
+const GENERIC_DATE_TYPES = new Set([
+  "point_of_interest",
+  "establishment",
+  "tourist_attraction",
+  "premise",
+  "food",
+]);
+
+function normalizeVenueTypeKey(venueType: string): string {
+  return venueType.trim().toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ");
+}
+
+function expectedGoogleTypes(venueType: string): string[] | null {
+  const key = normalizeVenueTypeKey(venueType);
+  if (!key) return null;
+  for (const [needle, types] of Object.entries(VENUE_TYPE_KEYWORDS)) {
+    if (key.includes(needle)) return types;
+  }
+  return null;
+}
+
+function hasDisallowedPlaceType(types: string[] | undefined): boolean {
+  if (!types?.length) return false;
+  return types.some((t) => DISALLOWED_PLACE_TYPES.has(t));
+}
+
+function placeTypesMatchVenue(googleTypes: string[] | undefined, venueType: string): boolean {
+  if (!googleTypes?.length) return true; // Can't verify — allow if nothing else failed
+  if (hasDisallowedPlaceType(googleTypes)) return false;
+
+  const expected = expectedGoogleTypes(venueType);
+  if (!expected) return true;
+
+  const typeSet = new Set(googleTypes);
+  if (expected.some((t) => typeSet.has(t))) return true;
+
+  // Allow generic POI only when no disallowed types and venue type is broad (e.g. "Experience")
+  if (googleTypes.some((t) => GENERIC_DATE_TYPES.has(t)) && !hasDisallowedPlaceType(googleTypes)) {
+    return true;
+  }
+
+  return false;
+}
+
+function tokenizeName(name: string): Set<string> {
+  const stopWords = new Set(["the", "and", "bar", "restaurant", "cafe", "grill", "kitchen", "house"]);
+  return new Set(
+    name
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, " ")
+      .split(/\s+/)
+      .filter((w) => w.length > 2 && !stopWords.has(w)),
+  );
+}
+
+function namesLikelyMatch(aiName: string, googleName: string): boolean {
+  const ai = aiName.trim();
+  const google = googleName.trim();
+  if (!ai || !google) return true;
+
+  const aiLower = ai.toLowerCase();
+  const googleLower = google.toLowerCase();
+  if (googleLower.includes(aiLower) || aiLower.includes(googleLower)) return true;
+
+  const aiTokens = tokenizeName(ai);
+  const googleTokens = tokenizeName(google);
+  if (aiTokens.size === 0 || googleTokens.size === 0) return true;
+
+  let overlap = 0;
+  for (const token of aiTokens) {
+    if (googleTokens.has(token)) overlap++;
+  }
+  return overlap / Math.min(aiTokens.size, googleTokens.size) >= 0.34;
+}
+
+function hasSuspiciousVenueName(...names: string[]): boolean {
+  return names.some((n) => n && SUSPICIOUS_VENUE_NAME.test(n));
 }
 
 interface Stop {
@@ -217,7 +351,8 @@ export async function validateVenue(
   venueName: string,
   city: string,
   apiKey: string,
-  cityCenter?: CityCenter
+  cityCenter?: CityCenter,
+  venueType?: string,
 ): Promise<PlaceValidationResult> {
   // Input validation
   if (!venueName || typeof venueName !== 'string' || venueName.trim() === '') {
@@ -240,7 +375,7 @@ export async function validateVenue(
     const sanitizedVenue = venueName.trim().slice(0, 200); // Limit length
     const sanitizedCity = city.trim().slice(0, 100);
     const query = encodeURIComponent(`${sanitizedVenue} ${sanitizedCity}`);
-    let findUrl = `https://maps.googleapis.com/maps/api/place/findplacefromtext/json?input=${query}&inputtype=textquery&fields=place_id,name,formatted_address,geometry,business_status&key=${apiKey}`;
+    let findUrl = `https://maps.googleapis.com/maps/api/place/findplacefromtext/json?input=${query}&inputtype=textquery&fields=place_id,name,formatted_address,geometry,business_status,types&key=${apiKey}`;
     if (cityCenter && Number.isFinite(cityCenter.latitude) && Number.isFinite(cityCenter.longitude)) {
       const radiusM = 50000; // 50 km - prefer results near the city
       findUrl += `&locationbias=circle:${radiusM}@${cityCenter.latitude},${cityCenter.longitude}`;
@@ -269,96 +404,144 @@ export async function validateVenue(
     
     if (findData.status !== "OK" || !findData.candidates?.length) {
       console.log(`[Places API] No candidates found for: ${venueName}`);
-      return { isValid: false };
+      return { isValid: false, rejectReason: "not_found" };
     }
 
-    const place = findData.candidates[0];
-    const placeId = place.place_id;
-    const officialName = place.name; // Get the official name from Google
-    const formattedAddress = place.formatted_address;
-    const businessStatus = place.business_status;
-    const placeLat = place.geometry?.location?.lat;
-    const placeLon = place.geometry?.location?.lng;
-    console.log(`[Places API] Found: "${officialName}" at "${formattedAddress}" (searched: "${venueName}"), placeId: ${placeId}, status: ${businessStatus}`);
+    for (const candidate of findData.candidates.slice(0, 3)) {
+      const place = candidate;
+      const placeId = place.place_id;
+      const officialName = place.name;
+      const formattedAddress = place.formatted_address;
+      const businessStatus = place.business_status;
+      const candidateTypes: string[] = Array.isArray(place.types) ? place.types : [];
+      const placeLat = place.geometry?.location?.lat;
+      const placeLon = place.geometry?.location?.lng;
+      console.log(`[Places API] Candidate: "${officialName}" at "${formattedAddress}" (searched: "${venueName}"), types: ${candidateTypes.join(",")}`);
 
-    // CRITICAL: Verify the venue is actually in the requested city (reject e.g. Dubai when user asked Chennai)
-    const inLocation = isAddressInLocation(
-      formattedAddress,
-      city,
-      placeLat,
-      placeLon,
-      cityCenter?.latitude,
-      cityCenter?.longitude,
-      150
-    );
-    if (!inLocation) {
-      console.log(`[Places API] WRONG LOCATION! Venue "${officialName}" at "${formattedAddress}" is not in "${city}"`);
-      return { isValid: false };
-    }
-
-    // Check if permanently closed
-    if (businessStatus === "CLOSED_PERMANENTLY") {
-      console.log(`[Places API] Venue is PERMANENTLY CLOSED: ${officialName}`);
-      return { isValid: false, isPermanentlyClosed: true };
-    }
-
-    // Step 2: Get place details (website, phone, hours, photos, official name for confirmation)
-    const detailsUrl = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=name,website,formatted_phone_number,opening_hours,business_status,photos&key=${apiKey}`;
-    
-    const detailsResponse = await fetch(detailsUrl);
-    let websiteUrl: string | undefined;
-    let phoneNumber: string | undefined;
-    let openingHours: string[] | undefined;
-    let imageUrl: string | undefined;
-    let confirmedName = officialName; // Use the name from find, but details can override
-
-    if (detailsResponse.ok) {
-      const detailsData = await detailsResponse.json();
-      console.log(`[Places API] Details response status: ${detailsData.status}`);
-      if (detailsData.status === "OK" && detailsData.result) {
-        // Double-check business status from details
-        if (detailsData.result.business_status === "CLOSED_PERMANENTLY") {
-          console.log(`[Places API] Venue confirmed PERMANENTLY CLOSED from details: ${venueName}`);
-          return { isValid: false, isPermanentlyClosed: true };
-        }
-        
-        // Use the name from details if available (most authoritative)
-        if (detailsData.result.name) {
-          confirmedName = detailsData.result.name;
-        }
-        
-        websiteUrl = detailsData.result.website;
-        phoneNumber = detailsData.result.formatted_phone_number;
-        openingHours = detailsData.result.opening_hours?.weekday_text;
-        // Build photo URL from first Google Business Profile photo (Place Photos API)
-        const photos = detailsData.result.photos;
-        if (Array.isArray(photos) && photos.length > 0 && photos[0].photo_reference) {
-          const ref = encodeURIComponent(photos[0].photo_reference);
-          imageUrl = `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=${ref}&key=${apiKey}`;
-          console.log(`[Places API] Photo URL set for "${confirmedName}"`);
-        }
-        console.log(`[Places API] Details for "${confirmedName}": website=${websiteUrl}, phone=${phoneNumber}, hours=${openingHours?.length || 0} entries, photo=${!!imageUrl}`);
+      if (hasSuspiciousVenueName(venueName, officialName)) {
+        console.log(`[Places API] Rejected suspicious name: "${officialName}"`);
+        continue;
       }
-    } else {
-      console.error("[Places API] Details fetch failed:", detailsResponse.status);
+
+      if (businessStatus === "CLOSED_PERMANENTLY") {
+        console.log(`[Places API] Venue is PERMANENTLY CLOSED: ${officialName}`);
+        continue;
+      }
+      if (businessStatus === "CLOSED_TEMPORARILY") {
+        console.log(`[Places API] Venue is TEMPORARILY CLOSED: ${officialName}`);
+        continue;
+      }
+
+      if (hasDisallowedPlaceType(candidateTypes)) {
+        console.log(`[Places API] Rejected disallowed types for "${officialName}": ${candidateTypes.join(",")}`);
+        continue;
+      }
+
+      if (venueType && !placeTypesMatchVenue(candidateTypes, venueType)) {
+        console.log(`[Places API] Types mismatch for "${officialName}" vs venueType "${venueType}"`);
+        continue;
+      }
+
+      if (!namesLikelyMatch(venueName, officialName)) {
+        console.log(`[Places API] Name mismatch: searched "${venueName}" vs Google "${officialName}"`);
+        continue;
+      }
+
+      const inLocation = isAddressInLocation(
+        formattedAddress,
+        city,
+        placeLat,
+        placeLon,
+        cityCenter?.latitude,
+        cityCenter?.longitude,
+        150,
+      );
+      if (!inLocation) {
+        console.log(`[Places API] WRONG LOCATION! Venue "${officialName}" at "${formattedAddress}" is not in "${city}"`);
+        continue;
+      }
+
+      const detailsUrl = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=name,website,formatted_phone_number,opening_hours,business_status,photos,types,formatted_address,geometry&key=${apiKey}`;
+
+      const detailsResponse = await fetch(detailsUrl);
+      let websiteUrl: string | undefined;
+      let phoneNumber: string | undefined;
+      let openingHours: string[] | undefined;
+      let imageUrl: string | undefined;
+      let confirmedName = officialName;
+      let googleTypes = candidateTypes;
+
+      if (detailsResponse.ok) {
+        const detailsData = await detailsResponse.json();
+        console.log(`[Places API] Details response status: ${detailsData.status}`);
+        if (detailsData.status === "OK" && detailsData.result) {
+          if (detailsData.result.business_status === "CLOSED_PERMANENTLY") {
+            console.log(`[Places API] Venue confirmed PERMANENTLY CLOSED from details: ${venueName}`);
+            continue;
+          }
+          if (detailsData.result.business_status === "CLOSED_TEMPORARILY") {
+            console.log(`[Places API] Venue confirmed TEMPORARILY CLOSED from details: ${venueName}`);
+            continue;
+          }
+
+          if (detailsData.result.name) {
+            confirmedName = detailsData.result.name;
+          }
+
+          googleTypes = Array.isArray(detailsData.result.types) ? detailsData.result.types : googleTypes;
+          if (hasDisallowedPlaceType(googleTypes)) {
+            console.log(`[Places API] Details rejected disallowed types for "${confirmedName}"`);
+            continue;
+          }
+          if (venueType && !placeTypesMatchVenue(googleTypes, venueType)) {
+            console.log(`[Places API] Details types mismatch for "${confirmedName}" vs "${venueType}"`);
+            continue;
+          }
+          if (hasSuspiciousVenueName(confirmedName)) {
+            console.log(`[Places API] Details rejected suspicious name: "${confirmedName}"`);
+            continue;
+          }
+          if (!namesLikelyMatch(venueName, confirmedName)) {
+            console.log(`[Places API] Details name mismatch: "${venueName}" vs "${confirmedName}"`);
+            continue;
+          }
+
+          websiteUrl = detailsData.result.website;
+          phoneNumber = detailsData.result.formatted_phone_number;
+          openingHours = detailsData.result.opening_hours?.weekday_text;
+          const photos = detailsData.result.photos;
+          if (Array.isArray(photos) && photos.length > 0 && photos[0].photo_reference) {
+            const ref = encodeURIComponent(photos[0].photo_reference);
+            imageUrl = `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=${ref}&key=${apiKey}`;
+            console.log(`[Places API] Photo URL set for "${confirmedName}"`);
+          }
+          console.log(`[Places API] Details for "${confirmedName}": website=${websiteUrl}, phone=${phoneNumber}, hours=${openingHours?.length || 0} entries, photo=${!!imageUrl}`);
+        }
+      } else {
+        console.error("[Places API] Details fetch failed:", detailsResponse.status);
+      }
+
+      const reservationPlatforms = detectReservationPlatforms(websiteUrl);
+
+      return {
+        isValid: true,
+        officialName: confirmedName,
+        placeId: placeId,
+        formattedAddress: place.formatted_address,
+        latitude: place.geometry?.location?.lat,
+        longitude: place.geometry?.location?.lng,
+        websiteUrl,
+        phoneNumber,
+        openingHours,
+        businessStatus,
+        googleTypes,
+        imageUrl,
+        reservationPlatforms: reservationPlatforms.length > 0 ? reservationPlatforms : undefined,
+      };
     }
 
-    const reservationPlatforms = detectReservationPlatforms(websiteUrl);
-
-    return {
-      isValid: true,
-      officialName: confirmedName,
-      placeId: placeId,
-      formattedAddress: place.formatted_address,
-      latitude: place.geometry?.location?.lat,
-      longitude: place.geometry?.location?.lng,
-      websiteUrl,
-      phoneNumber,
-      openingHours,
-      businessStatus,
-      imageUrl,
-      reservationPlatforms: reservationPlatforms.length > 0 ? reservationPlatforms : undefined,
-    };
+    console.log(`[Places API] All candidates rejected for: ${venueName}`);
+    return { isValid: false, rejectReason: "failed_validation" };
   } catch (error) {
     console.error("[Places API] Error validating venue:", error);
     return { isValid: false };
@@ -405,11 +588,22 @@ async function searchVenueByType(
       return { isValid: false };
     }
     
-    // Find a place that's operational (not closed)
-    const operationalPlace = data.results.find((p: any) => 
-      p.business_status !== "CLOSED_PERMANENTLY" && 
-      p.business_status !== "CLOSED_TEMPORARILY"
-    ) || data.results[0];
+    // Find operational places that match the expected venue category
+    const operationalPlace = data.results.find((p: any) => {
+      if (p.business_status === "CLOSED_PERMANENTLY" || p.business_status === "CLOSED_TEMPORARILY") {
+        return false;
+      }
+      if (hasSuspiciousVenueName(p.name || "")) return false;
+      const types: string[] = Array.isArray(p.types) ? p.types : [];
+      if (hasDisallowedPlaceType(types)) return false;
+      if (venueType && !placeTypesMatchVenue(types, venueType)) return false;
+      return true;
+    });
+    
+    if (!operationalPlace) {
+      console.log(`[Places API] No suitable results for venue type: ${venueType} in ${city}`);
+      return { isValid: false };
+    }
     
     const place = operationalPlace;
     const placeId = place.place_id;
@@ -419,7 +613,7 @@ async function searchVenueByType(
     }
     
     // Get details for the place (include photos for card images)
-    const detailsUrl = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=name,website,formatted_phone_number,opening_hours,business_status,formatted_address,geometry,photos&key=${apiKey}`;
+    const detailsUrl = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=name,website,formatted_phone_number,opening_hours,business_status,formatted_address,geometry,photos,types&key=${apiKey}`;
     const detailsResponse = await fetch(detailsUrl);
     
     let websiteUrl: string | undefined;
@@ -437,7 +631,20 @@ async function searchVenueByType(
         if (detailsData.result.business_status === "CLOSED_PERMANENTLY") {
           return { isValid: false, isPermanentlyClosed: true };
         }
+        if (detailsData.result.business_status === "CLOSED_TEMPORARILY") {
+          return { isValid: false, isTemporarilyClosed: true };
+        }
         officialName = detailsData.result.name || officialName;
+        if (hasSuspiciousVenueName(officialName)) {
+          return { isValid: false, rejectReason: "suspicious_name" };
+        }
+        const detailTypes: string[] = Array.isArray(detailsData.result.types) ? detailsData.result.types : [];
+        if (hasDisallowedPlaceType(detailTypes)) {
+          return { isValid: false, rejectReason: "disallowed_type" };
+        }
+        if (venueType && !placeTypesMatchVenue(detailTypes, venueType)) {
+          return { isValid: false, rejectReason: "type_mismatch" };
+        }
         formattedAddress = detailsData.result.formatted_address || formattedAddress;
         websiteUrl = detailsData.result.website;
         phoneNumber = detailsData.result.formatted_phone_number;
@@ -479,6 +686,7 @@ async function searchVenueByType(
       phoneNumber,
       openingHours,
       imageUrl,
+      googleTypes: Array.isArray(place.types) ? place.types : undefined,
     };
   } catch (error) {
     console.error("[Places API] Fallback search error:", error);
@@ -508,7 +716,7 @@ async function validateVenueWithRetry(
         console.log(`[Places API] Retry attempt ${attempt} for: ${venueName}`);
       }
       
-      const result = await validateVenue(venueName, city, apiKey, cityCenter);
+      const result = await validateVenue(venueName, city, apiKey, cityCenter, venueType);
       if (result.isValid) {
         return result;
       }
@@ -569,16 +777,23 @@ export async function validateAllStops(
   if (skipped > 0) console.warn(`[Validation] Skipped ${skipped} stops with invalid names`);
 
   async function validateOne(stop: Stop): Promise<Stop | null> {
+    const { imageUrl: _aiImageUrl, ...stopWithoutAiImage } = stop;
     try {
-      const result = await validateVenueWithRetry(stop.name, stop.venueType || "", city, apiKey, cityCenter);
+      const result = await validateVenueWithRetry(
+        stop.name,
+        stop.venueType || "",
+        city,
+        apiKey,
+        cityCenter,
+      );
 
-      if (result.isPermanentlyClosed) {
-        console.log(`[Validation] Excluding permanently closed venue: ${stop.name}`);
+      if (result.isPermanentlyClosed || result.isTemporarilyClosed) {
+        console.log(`[Validation] Excluding closed venue: ${stop.name}`);
         return null;
       }
       if (!result.isValid) {
-        console.log(`[Validation] Including unverified venue: ${stop.name}`);
-        return { ...stop, validated: false };
+        console.log(`[Validation] Excluding unverified venue (failed triple-check): ${stop.name}`);
+        return null;
       }
 
       const originalName = stop.name;
@@ -596,7 +811,7 @@ export async function validateAllStops(
       })();
 
       return {
-        ...stop,
+        ...stopWithoutAiImage,
         name: updatedName,
         validated: true,
         placeId: result.placeId,
@@ -606,12 +821,12 @@ export async function validateAllStops(
         websiteUrl: result.websiteUrl ?? stop.websiteUrl,
         phoneNumber: result.phoneNumber ?? stop.phoneNumber,
         openingHours: result.openingHours ?? stop.openingHours,
-        imageUrl: result.imageUrl ?? stop.imageUrl,
+        imageUrl: result.imageUrl,
         reservationPlatforms: mergedPlatforms,
       };
     } catch (err) {
       console.error(`[Validation] Unexpected error validating ${stop.name}:`, err);
-      return { ...stop, validated: false };
+      return null;
     }
   }
 
@@ -632,5 +847,4 @@ export async function validateAllStops(
     ...stop,
     order: index + 1,
   }));
-}
 }

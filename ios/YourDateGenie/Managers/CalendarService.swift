@@ -12,6 +12,22 @@ enum CalendarService {
         case denied
         case failed(String)
     }
+
+    /// Outcome of scanning the calendar for mutually-free evenings.
+    enum FreeEveningResult {
+        case success([FreeEvening])
+        case denied
+        case failed(String)
+    }
+
+    /// A single evening slot the user has no conflicting events in.
+    struct FreeEvening: Identifiable, Equatable {
+        let id = UUID()
+        /// The evening start moment (date + evening start hour).
+        let date: Date
+        /// Short label, e.g. "Thu 12th".
+        let label: String
+    }
     
     /// Request calendar access. Call before adding events.
     static func requestAccess() async -> Bool {
@@ -30,10 +46,103 @@ enum CalendarService {
     static var authorizationStatus: EKAuthorizationStatus {
         EKEventStore.authorizationStatus(for: .event)
     }
+
+    /// Whether the user has previously granted calendar access (avoids re-prompting).
+    static var hasCalendarAccess: Bool {
+        if #available(iOS 17.0, *) {
+            return authorizationStatus == .fullAccess
+        } else {
+            return authorizationStatus == .authorized
+        }
+    }
+
+    // MARK: - Free-busy detection (Plan Together · screen 11b)
+
+    /// Scans the user's calendar for evenings with no conflicting events over the
+    /// next `daysAhead` days and returns up to `count` free evenings.
+    ///
+    /// This reads only the *local* device calendar. True cross-device "both partners
+    /// free" detection requires a backend free/busy exchange — see Backend follow-ups.
+    static func findFreeEvenings(
+        count: Int = 3,
+        daysAhead: Int = 21,
+        eveningStartHour: Int = 18,
+        eveningEndHour: Int = 22
+    ) async -> FreeEveningResult {
+        let granted: Bool
+        if #available(iOS 17.0, *) {
+            granted = (try? await store.requestFullAccessToEvents()) ?? false
+        } else {
+            granted = await withCheckedContinuation { cont in
+                store.requestAccess(to: .event) { ok, _ in cont.resume(returning: ok) }
+            }
+        }
+        guard granted else { return .denied }
+
+        let cal = Calendar.current
+        let now = Date()
+        let startOfToday = cal.startOfDay(for: now)
+        guard let rangeEnd = cal.date(byAdding: .day, value: daysAhead, to: startOfToday) else {
+            return .failed("Couldn't compute date range")
+        }
+
+        let predicate = store.predicateForEvents(withStart: startOfToday, end: rangeEnd, calendars: nil)
+        let events = store.events(matching: predicate)
+
+        var freeEvenings: [FreeEvening] = []
+        for offset in 1...daysAhead {
+            guard freeEvenings.count < count,
+                  let day = cal.date(byAdding: .day, value: offset, to: startOfToday) else { continue }
+
+            var startComps = cal.dateComponents([.year, .month, .day], from: day)
+            startComps.hour = eveningStartHour
+            startComps.minute = 0
+            var endComps = startComps
+            endComps.hour = eveningEndHour
+
+            guard let eveningStart = cal.date(from: startComps),
+                  let eveningEnd = cal.date(from: endComps) else { continue }
+
+            let hasConflict = events.contains { event in
+                guard !event.isAllDay else { return false }
+                return event.startDate < eveningEnd && event.endDate > eveningStart
+            }
+
+            if !hasConflict {
+                freeEvenings.append(FreeEvening(date: eveningStart, label: shortLabel(for: eveningStart)))
+            }
+        }
+
+        return .success(freeEvenings)
+    }
+
+    /// Compact label like "Thu 12th".
+    private static func shortLabel(for date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "EEE"
+        let weekday = formatter.string(from: date)
+        let day = Calendar.current.component(.day, from: date)
+        return "\(weekday) \(day)\(ordinalSuffix(day))"
+    }
+
+    private static func ordinalSuffix(_ day: Int) -> String {
+        switch day % 100 {
+        case 11, 12, 13: return "th"
+        default:
+            switch day % 10 {
+            case 1: return "st"
+            case 2: return "nd"
+            case 3: return "rd"
+            default: return "th"
+            }
+        }
+    }
     
     /// Add a single calendar event for the date plan on the given date.
     /// Uses the first stop's time slot and the plan's total duration to set start/end.
-    static func addDatePlan(_ plan: DatePlan, on date: Date) async -> AddResult {
+    /// When `withReminders` is true, sets alarms 1 day and 2 hours before (screen 11f).
+    static func addDatePlan(_ plan: DatePlan, on date: Date, withReminders: Bool = true) async -> AddResult {
         let granted: Bool
         if #available(iOS 17.0, *) {
             granted = (try? await store.requestFullAccessToEvents()) ?? false
@@ -53,6 +162,12 @@ enum CalendarService {
         event.startDate = start
         event.endDate = end
         event.isAllDay = false
+
+        if withReminders {
+            // Gentle nudges for both partners: the night before + a couple hours before.
+            event.addAlarm(EKAlarm(relativeOffset: -86_400))
+            event.addAlarm(EKAlarm(relativeOffset: -7_200))
+        }
         
         do {
             try store.save(event, span: .thisEvent)

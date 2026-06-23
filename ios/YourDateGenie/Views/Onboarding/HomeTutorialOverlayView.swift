@@ -67,7 +67,7 @@ struct HomeTutorialOverlayView: View {
                     .padding(.horizontal, 24)
                 }
                 .padding(.vertical, 32)
-                .background(Color.luxuryMaroon)
+                .background(Color.surfaceElevated)
                 .clipShape(HTRoundedCorner(radius: 24, corners: [.topLeft, .topRight]))
             }
             .ignoresSafeArea(edges: .bottom)

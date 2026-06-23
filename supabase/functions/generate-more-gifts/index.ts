@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { enrichGiftImages } from "../_shared/linkPreview.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -235,6 +236,8 @@ Generate exactly ${giftCount} gifts. Every gift must have: name, description, pr
         delete g.imageUrl;
       }
     }
+
+    await enrichGiftImages(gifts);
     console.log("[generate-more-gifts] Generated", gifts.length, "gifts");
     return jsonResponse(200, { gifts });
   } catch (error) {

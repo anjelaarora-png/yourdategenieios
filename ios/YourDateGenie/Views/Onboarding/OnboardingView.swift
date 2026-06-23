@@ -7,12 +7,12 @@ struct MobileOnboardingView: View {
     @State private var showContent = false
     @State private var hasSwipedOnce = false
     
-    private let totalSlides = 4
+    private let totalSlides = 6
     
     var body: some View {
         ZStack {
             // Luxurious background
-            Color.luxuryMaroon
+            Color.backgroundPrimary
                 .ignoresSafeArea()
             
             // Subtle gold vignette
@@ -72,6 +72,7 @@ struct MobileOnboardingView: View {
                 .foregroundColor(Color.luxuryMuted.opacity(0.7))
                 .opacity(hasSwipedOnce ? 0 : 1)
                 .animation(.easeOut(duration: 0.4), value: hasSwipedOnce)
+                .hintPulse()
                 .padding(.bottom, 8)
                 
                 // Main content
@@ -82,8 +83,12 @@ struct MobileOnboardingView: View {
                         .tag(1)
                     LuxurySlideItinerary(showContent: showContent)
                         .tag(2)
-                    LuxurySlideGetStarted(showContent: showContent)
+                    LuxurySlideHomeFlow(showContent: showContent)
                         .tag(3)
+                    LuxurySlideExtras(showContent: showContent)
+                        .tag(4)
+                    LuxurySlideGetStarted(showContent: showContent)
+                        .tag(5)
                 }
                 .tabViewStyle(.page(indexDisplayMode: .never))
                 .animation(.easeInOut(duration: 0.3), value: currentSlide)
@@ -92,7 +97,7 @@ struct MobileOnboardingView: View {
                 VStack(spacing: 12) {
                     // Free vs paid disclosure on last slide
                     if currentSlide == totalSlides - 1 {
-                        Text("Free plan included • Premium unlocks Love Notes, Gifts & Memories")
+                        Text("About 2 minutes · skip anything you want")
                             .font(Font.bodySans(13, weight: .regular))
                             .foregroundColor(Color.luxuryCreamMuted)
                             .multilineTextAlignment(.center)
@@ -124,6 +129,7 @@ struct MobileOnboardingView: View {
                         .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(LuxuryGoldButtonStyle())
+                    .pulseGlow()
                     
                     if currentSlide < totalSlides - 1 {
                         Button {
@@ -181,6 +187,7 @@ struct LuxurySlideWelcome: View {
                         image
                             .resizable()
                             .aspectRatio(contentMode: .fill)
+                            .kenBurns(maxScale: 1.06, duration: 10)
                     case .empty, .failure:
                         Rectangle()
                             .fill(Color.luxuryMaroonLight)
@@ -234,9 +241,10 @@ struct LuxurySlideWelcome: View {
                     
                     HStack(spacing: 6) {
                         Text("planned")
-                            .font(Font.tangerine(48, weight: .bold))
+                            .font(Font.bodySerif(48, weight: .bold))
                             .italic()
                             .foregroundStyle(LinearGradient.goldShimmer)
+                            .goldShimmer()
                         Text("for you.")
                             .font(Font.header(32, weight: .regular))
                             .foregroundColor(Color.luxuryCream)
@@ -247,7 +255,7 @@ struct LuxurySlideWelcome: View {
                 .animation(.easeOut(duration: 0.5).delay(0.4), value: showContent)
                 
                 // Description
-                Text("Tell us what you love. We'll create a complete evening — venues, timing, and all the details.")
+                Text("Tell us what you love once. We build a complete evening — venues, timing, route & every detail handled.")
                     .font(Font.bodySans(15, weight: .regular))
                     .foregroundColor(Color.luxuryCreamMuted)
                     .multilineTextAlignment(.center)
@@ -255,6 +263,15 @@ struct LuxurySlideWelcome: View {
                     .padding(.horizontal, 20)
                     .opacity(showContent ? 1 : 0)
                     .animation(.easeOut(duration: 0.5).delay(0.5), value: showContent)
+
+                // Reassurance pills
+                HStack(spacing: 8) {
+                    OnboardingPill(text: "Real venues")
+                    OnboardingPill(text: "Full itinerary")
+                    OnboardingPill(text: "Every detail handled")
+                }
+                .opacity(showContent ? 1 : 0)
+                .animation(.easeOut(duration: 0.5).delay(0.65), value: showContent)
             }
             .padding(.top, -20)
             
@@ -285,9 +302,10 @@ struct LuxurySlideChaos: View {
                         .font(Font.header(26, weight: .regular))
                         .foregroundColor(Color.luxuryCream)
                     Text("No plan.")
-                        .font(Font.tangerine(40, weight: .bold))
+                        .font(Font.bodySerif(40, weight: .bold))
                         .italic()
                         .foregroundColor(Color.luxuryGold)
+                        .goldShimmer()
                 }
             }
             .padding(.top, 12)
@@ -425,7 +443,7 @@ struct LuxurySlideChaos: View {
                         .font(Font.bodySans(15, weight: .regular))
                         .foregroundColor(Color.luxuryCreamMuted)
                     Text("who has time?")
-                        .font(Font.tangerine(28, weight: .bold))
+                        .font(Font.bodySerif(28, weight: .bold))
                         .italic()
                         .foregroundColor(Color.luxuryGold)
                 }
@@ -448,20 +466,23 @@ struct LuxurySlideItinerary: View {
         VStack(spacing: 0) {
             // Header
             VStack(spacing: 6) {
-                SectionLabel(text: "What you get", color: Color.luxuryMuted)
+                SectionLabel(text: "Your night, planned", color: Color.luxuryMuted)
                 
                 HStack(spacing: 6) {
-                    Text("A")
+                    Text("Ready on")
                         .font(Font.header(26, weight: .regular))
                         .foregroundColor(Color.luxuryCream)
-                    Text("complete")
-                        .font(Font.tangerine(40, weight: .bold))
+                    Text("Home")
+                        .font(Font.bodySerif(40, weight: .bold))
                         .italic()
                         .foregroundColor(Color.luxuryGold)
-                    Text("date plan")
-                        .font(Font.header(26, weight: .regular))
-                        .foregroundColor(Color.luxuryCream)
+                        .goldShimmer()
                 }
+
+                Text("Real venues · verified · timing & route included")
+                    .font(Font.bodySans(12, weight: .regular))
+                    .foregroundColor(Color.luxuryMuted)
+                    .multilineTextAlignment(.center)
             }
             .padding(.top, 12)
             .opacity(showContent ? 1 : 0)
@@ -474,7 +495,7 @@ struct LuxurySlideItinerary: View {
                     VStack(alignment: .leading, spacing: 4) {
                         HStack(spacing: 4) {
                             Text("Romantic")
-                                .font(Font.tangerine(28, weight: .bold))
+                                .font(Font.bodySerif(28, weight: .bold))
                                 .italic()
                                 .foregroundColor(Color.luxuryGold)
                             Text("Italian Night")
@@ -482,7 +503,7 @@ struct LuxurySlideItinerary: View {
                                 .foregroundColor(Color.luxuryGold)
                         }
                         
-                        Text("Saturday · 3 stops · ~$150")
+                        Text("Sat · 3 stops · ~$150")
                             .font(Font.bodySans(12, weight: .regular))
                             .foregroundColor(Color.luxuryMuted)
                     }
@@ -497,9 +518,9 @@ struct LuxurySlideItinerary: View {
                 VStack(spacing: 0) {
                     OnboardingItineraryStop(
                         time: "7:00 PM",
-                        name: "Wine Bar",
-                        emoji: "??",
-                        tip: "Start with Italian reds",
+                        name: "Wine bar",
+                        emoji: "🍷",
+                        tip: "start with reds",
                         isActive: timelineProgress >= 0,
                         showContent: showContent,
                         delay: 0.3
@@ -508,8 +529,8 @@ struct LuxurySlideItinerary: View {
                     OnboardingItineraryStop(
                         time: "8:30 PM",
                         name: "Trattoria",
-                        emoji: "??",
-                        tip: "Try the truffle pasta",
+                        emoji: "🍝",
+                        tip: "truffle pasta",
                         isActive: timelineProgress >= 0.5,
                         showContent: showContent,
                         delay: 0.5
@@ -518,8 +539,8 @@ struct LuxurySlideItinerary: View {
                     OnboardingItineraryStop(
                         time: "10:30 PM",
                         name: "Rooftop",
-                        emoji: "??",
-                        tip: "Nightcap under stars",
+                        emoji: "🌃",
+                        tip: "nightcap",
                         isActive: timelineProgress >= 1.0,
                         showContent: showContent,
                         delay: 0.7,
@@ -531,9 +552,9 @@ struct LuxurySlideItinerary: View {
                 // Features
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 10) {
-                        OnboardingFeatureBadge(text: "Directions")
-                        OnboardingFeatureBadge(text: "Tips")
-                        OnboardingFeatureBadge(text: "Gifts")
+                        OnboardingFeatureBadge(text: "Reserve")
+                        OnboardingFeatureBadge(text: "Route")
+                        OnboardingFeatureBadge(text: "Share")
                         OnboardingFeatureBadge(text: "Playlist")
                     }
                     .padding(.horizontal, 18)
@@ -543,6 +564,7 @@ struct LuxurySlideItinerary: View {
                 .animation(.easeOut(duration: 0.4).delay(0.9), value: showContent)
             }
             .luxuryCard()
+            .cardShine(delay: 1.0)
             .padding(.horizontal, 24)
             .padding(.top, 20)
             .opacity(showContent ? 1 : 0)
@@ -607,7 +629,7 @@ struct OnboardingItineraryStop: View {
                     .foregroundColor(Color.luxuryCream)
                 
                 Text(tip)
-                    .font(Font.tangerine(20, weight: .bold))
+                    .font(Font.bodySerif(20, weight: .bold))
                     .italic()
                     .foregroundColor(Color.luxuryMuted)
             }
@@ -639,7 +661,378 @@ struct OnboardingFeatureBadge: View {
     }
 }
 
-// MARK: - Slide 4: Get Started
+/// Small reassurance pill used on the welcome slide (Real venues · Full itinerary · …).
+struct OnboardingPill: View {
+    let text: String
+
+    var body: some View {
+        Text(text)
+            .font(Font.bodySans(10, weight: .medium))
+            .foregroundColor(Color.luxuryGold)
+            .lineLimit(1)
+            .minimumScaleFactor(0.8)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(Color.luxuryGold.opacity(0.1))
+            .clipShape(Capsule())
+            .overlay(
+                Capsule().stroke(Color.luxuryGold.opacity(0.22), lineWidth: 1)
+            )
+    }
+}
+
+// MARK: - Slide 4: Home flow (interactive — tap to lock in)
+/// Ports the prototype's interactive "How Home works" tutorial: a planned date card appears,
+/// the user taps the gold "Lock it in" CTA, the card flips to a confirmed/green state and the
+/// action chips (Reserve · Route · Text plan · Calendar) pop in with a staggered spring.
+/// Auto-plays once on appear so non-tappers still see the payoff; tapping the button again replays.
+struct LuxurySlideHomeFlow: View {
+    let showContent: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var locked = false
+    @State private var userInteracted = false
+
+    private let actions: [(emoji: String, label: String)] = [
+        ("🍽", "Reserve"),
+        ("🗺", "Route"),
+        ("💬", "Text plan"),
+        ("📅", "Calendar")
+    ]
+
+    var body: some View {
+        VStack(spacing: 0) {
+            header
+                .padding(.top, 12)
+                .opacity(showContent ? 1 : 0)
+                .animation(.easeOut(duration: 0.4), value: showContent)
+
+            // Planned-date card
+            VStack(spacing: 0) {
+                AsyncImage(url: URL(string: "https://images.unsplash.com/photo-1481931098730-318b6f776db0?w=600&h=320&fit=crop")) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .kenBurns(maxScale: 1.06, duration: 11)
+                    case .empty, .failure:
+                        Rectangle().fill(Color.luxuryMaroonLight)
+                    @unknown default:
+                        EmptyView()
+                    }
+                }
+                .frame(height: 100)
+                .clipped()
+
+                VStack(alignment: .leading, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Tonight · for you & Maya")
+                            .font(Font.bodySans(11, weight: .medium))
+                            .foregroundColor(Color.luxuryMuted)
+                        Text("Pasta · gallery · gelato")
+                            .font(Font.header(16, weight: .bold))
+                            .foregroundColor(Color.luxuryCream)
+                        Text("romantic · ~$90 · 7–11 PM")
+                            .font(Font.bodySans(11, weight: .regular))
+                            .foregroundColor(Color.luxuryMuted.opacity(0.8))
+                    }
+
+                    lockButton
+
+                    // Payoff zone — lives INSIDE the card so it can't be pushed below the
+                    // clipped TabView page. Fixed height keeps the card from jumping between
+                    // states. Idle: tap hint. Locked: the four action chips pop in (staggered).
+                    ZStack {
+                        Text("↑ Tap the gold button")
+                            .font(Font.bodySans(11, weight: .medium))
+                            .foregroundColor(Color.luxuryGold.opacity(0.85))
+                            .opacity(locked ? 0 : 1)
+                            .hintPulse()
+
+                        actionChips
+                            .opacity(locked ? 1 : 0)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 74)
+                }
+                .padding(16)
+            }
+            .luxuryCard()
+            .cardShine(delay: 1.6)
+            .padding(.horizontal, 24)
+            .padding(.top, 18)
+            .opacity(showContent ? 1 : 0)
+            .offset(y: showContent ? 0 : 30)
+            .animation(.easeOut(duration: 0.5).delay(0.2), value: showContent)
+
+            Spacer()
+        }
+        .onAppear { scheduleAutoPlay() }
+    }
+
+    // MARK: Header (swaps copy on lock)
+    @ViewBuilder private var header: some View {
+        VStack(spacing: 6) {
+            SectionLabel(text: "How Home works", color: Color.luxuryMuted)
+
+            if locked {
+                HStack(spacing: 6) {
+                    Text("You're")
+                        .font(Font.header(26, weight: .regular))
+                        .foregroundColor(Color.luxuryCream)
+                    Text("locked in")
+                        .font(Font.bodySerif(40, weight: .bold))
+                        .italic()
+                        .foregroundColor(Color.luxuryGold)
+                        .goldShimmer()
+                }
+                Text("Reserve · route · text · calendar")
+                    .font(Font.bodySans(12, weight: .medium))
+                    .foregroundColor(Color.luxuryGold.opacity(0.85))
+                    .transition(.opacity)
+            } else {
+                HStack(spacing: 6) {
+                    Text("Open the app.")
+                        .font(Font.header(24, weight: .regular))
+                        .foregroundColor(Color.luxuryCream)
+                    Text("Tonight's ready")
+                        .font(Font.bodySerif(36, weight: .bold))
+                        .italic()
+                        .foregroundColor(Color.luxuryGold)
+                }
+                Text("Tap Lock it in — reserve, route & share unlock after.")
+                    .font(Font.bodySans(12, weight: .regular))
+                    .foregroundColor(Color.luxuryMuted)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 28)
+                    .transition(.opacity)
+            }
+        }
+    }
+
+    // MARK: Lock-in CTA (gold → green)
+    @ViewBuilder private var lockButton: some View {
+        let button = Button {
+            userInteracted = true
+            if locked {
+                withAnimation(.easeInOut(duration: 0.3)) { locked = false }
+            } else {
+                lockIn()
+            }
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: locked ? "checkmark.circle.fill" : "sparkles")
+                    .font(.system(size: 13, weight: .semibold))
+                Text(locked ? "Locked in" : "Lock it in")
+                    .font(Font.inter(14, weight: .semibold))
+            }
+            .foregroundColor(locked ? .white : Color.luxuryMaroon)
+            .frame(maxWidth: .infinity)
+            .frame(height: 44)
+            .background(
+                Group {
+                    if locked {
+                        LinearGradient(
+                            colors: [Color(hex: "3d8a5a"), Color(hex: "2d6a44")],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    } else {
+                        LinearGradient.goldShimmer
+                    }
+                }
+            )
+            .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+
+        if locked {
+            button
+        } else {
+            button.pulseGlow(cornerRadius: 22)
+        }
+    }
+
+    // MARK: Action chips (staggered pop)
+    private var actionChips: some View {
+        VStack(spacing: 8) {
+            HStack(spacing: 8) {
+                chip(index: 0)
+                chip(index: 1)
+            }
+            HStack(spacing: 8) {
+                chip(index: 2)
+                chip(index: 3)
+            }
+        }
+    }
+
+    private func chip(index: Int) -> some View {
+        let item = actions[index]
+        return HStack(spacing: 5) {
+            Text(item.emoji)
+                .font(.system(size: 12))
+            Text(item.label)
+                .font(Font.bodySans(11, weight: .medium))
+        }
+        .foregroundColor(Color.luxuryGold)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 7)
+        .background(Color.luxuryGold.opacity(0.1))
+        .clipShape(Capsule())
+        .overlay(Capsule().stroke(Color.luxuryGold.opacity(0.28), lineWidth: 1))
+        .scaleEffect(locked ? 1 : 0.4)
+        .opacity(locked ? 1 : 0)
+        .animation(
+            reduceMotion
+                ? nil
+                : .spring(response: 0.42, dampingFraction: 0.6).delay(locked ? Double(index) * 0.12 + 0.05 : 0),
+            value: locked
+        )
+    }
+
+    // MARK: Interaction
+    private func lockIn() {
+        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.35)) {
+            locked = true
+        }
+    }
+
+    /// Auto-play the lock-in once shortly after the slide appears, unless the user already tapped.
+    /// With Reduce Motion on, jump straight to the locked payoff with no animation.
+    private func scheduleAutoPlay() {
+        guard !locked, !userInteracted else { return }
+        if reduceMotion {
+            locked = true
+            return
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.7) {
+            if !userInteracted && !locked {
+                lockIn()
+            }
+        }
+    }
+}
+
+// MARK: - Slide 5: Plus on every date (the three extras)
+struct LuxurySlideExtras: View {
+    let showContent: Bool
+
+    private struct Extra: Identifiable {
+        let id = UUID()
+        let emoji: String
+        let title: String
+        let blurb: String
+        let location: String
+    }
+
+    private let extras: [Extra] = [
+        Extra(emoji: "✨", title: "Convo starters", blurb: "Swipe questions matched to your relationship", location: "Convo tab"),
+        Extra(emoji: "💌", title: "Love notes", blurb: "AI-drafted sweet notes you send before the date", location: "On your itinerary"),
+        Extra(emoji: "🎁", title: "Gift finder", blurb: "Gift ideas from their profile & budget", location: "Add from any stop")
+    ]
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // Header
+            VStack(spacing: 6) {
+                SectionLabel(text: "Plus on every date", color: Color.luxuryMuted)
+
+                HStack(spacing: 6) {
+                    Text("Three extras on")
+                        .font(Font.header(24, weight: .regular))
+                        .foregroundColor(Color.luxuryCream)
+                    Text("every plan")
+                        .font(Font.bodySerif(38, weight: .bold))
+                        .italic()
+                        .foregroundColor(Color.luxuryGold)
+                        .goldShimmer()
+                }
+
+                Text("Not separate apps — talk, text & gifts are part of the date Genie builds.")
+                    .font(Font.bodySans(13, weight: .regular))
+                    .foregroundColor(Color.luxuryCreamMuted)
+                    .multilineTextAlignment(.center)
+                    .lineSpacing(3)
+                    .padding(.horizontal, 28)
+                    .padding(.top, 2)
+            }
+            .padding(.top, 12)
+            .opacity(showContent ? 1 : 0)
+            .animation(.easeOut(duration: 0.4), value: showContent)
+
+            // Included card
+            VStack(spacing: 0) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("What's included")
+                            .font(Font.header(16, weight: .bold))
+                            .foregroundColor(Color.luxuryCream)
+                        Text("3 extras · built into every date plan")
+                            .font(Font.bodySans(12, weight: .regular))
+                            .foregroundColor(Color.luxuryMuted)
+                    }
+                    Spacer()
+                    Image(systemName: "sparkles")
+                        .foregroundStyle(LinearGradient.goldShimmer)
+                }
+                .padding(18)
+                .background(Color.luxuryMaroonLight.opacity(0.8))
+
+                VStack(spacing: 14) {
+                    ForEach(Array(extras.enumerated()), id: \.element.id) { index, extra in
+                        HStack(alignment: .top, spacing: 12) {
+                            ZStack {
+                                Circle()
+                                    .fill(Color.luxuryGold.opacity(0.14))
+                                    .frame(width: 40, height: 40)
+                                Text(extra.emoji)
+                                    .font(.system(size: 18))
+                            }
+                            .iconWiggle()
+
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(extra.title)
+                                    .font(Font.header(15, weight: .bold))
+                                    .foregroundColor(Color.luxuryCream)
+                                Text(extra.blurb)
+                                    .font(Font.bodySans(12.5, weight: .regular))
+                                    .foregroundColor(Color.luxuryCreamMuted)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                Text(extra.location)
+                                    .font(Font.bodySans(11, weight: .medium))
+                                    .foregroundColor(Color.luxuryGold)
+                            }
+                            Spacer(minLength: 0)
+                        }
+                        .opacity(showContent ? 1 : 0)
+                        .offset(x: showContent ? 0 : -20)
+                        .animation(.easeOut(duration: 0.4).delay(Double(index) * 0.12 + 0.3), value: showContent)
+                    }
+                }
+                .padding(18)
+            }
+            .luxuryCard()
+            .cardShine(delay: 1.2)
+            .padding(.horizontal, 24)
+            .padding(.top, 18)
+            .opacity(showContent ? 1 : 0)
+            .offset(y: showContent ? 0 : 30)
+            .animation(.easeOut(duration: 0.5).delay(0.2), value: showContent)
+
+            Text("Premium · unlimited plans & all extras")
+                .font(Font.bodySans(12, weight: .medium))
+                .foregroundColor(Color.luxuryMuted)
+                .padding(.top, 14)
+                .opacity(showContent ? 1 : 0)
+                .animation(.easeOut(duration: 0.4).delay(0.7), value: showContent)
+
+            Spacer()
+        }
+    }
+}
+
+// MARK: - Slide 6: Get Started
 struct LuxurySlideGetStarted: View {
     let showContent: Bool
     @State private var benefitChecks = [false, false, false]
@@ -663,6 +1056,7 @@ struct LuxurySlideGetStarted: View {
                         image
                             .resizable()
                             .aspectRatio(contentMode: .fill)
+                            .kenBurns(maxScale: 1.07, duration: 12)
                     case .empty, .failure:
                         Rectangle()
                             .fill(Color.luxuryMaroonLight)
@@ -698,7 +1092,7 @@ struct LuxurySlideGetStarted: View {
                     }
                     
                     Text("Magical")
-                        .font(Font.tangerine(32, weight: .bold))
+                        .font(Font.bodySerif(32, weight: .bold))
                         .italic()
                         .foregroundColor(Color.luxuryGold)
                     Text("evenings")
@@ -720,23 +1114,16 @@ struct LuxurySlideGetStarted: View {
                         .font(Font.header(26, weight: .regular))
                         .foregroundColor(Color.luxuryCream)
                     Text("better dates?")
-                        .font(Font.tangerine(42, weight: .bold))
+                        .font(Font.bodySerif(42, weight: .bold))
                         .italic()
                         .foregroundColor(Color.luxuryGold)
+                        .goldShimmer()
                 }
                 
-                HStack(spacing: 4) {
-                    Text("Answer a few questions. Get")
-                        .font(Font.bodySans(15, weight: .regular))
-                        .foregroundColor(Color.luxuryCreamMuted)
-                    Text("magic")
-                        .font(Font.tangerine(28, weight: .bold))
-                        .italic()
-                        .foregroundColor(Color.luxuryGold)
-                    Text("in seconds.")
-                        .font(Font.bodySans(15, weight: .regular))
-                        .foregroundColor(Color.luxuryCreamMuted)
-                }
+                Text("Quick Genie Profile — then your first plan waits on Home.")
+                    .font(Font.bodySans(15, weight: .regular))
+                    .foregroundColor(Color.luxuryCreamMuted)
+                    .padding(.horizontal, 28)
             }
             .multilineTextAlignment(.center)
             .padding(.top, 24)
@@ -745,9 +1132,9 @@ struct LuxurySlideGetStarted: View {
             
             // Benefits
             VStack(spacing: 14) {
-                OnboardingBenefitRow(text: "Takes less than 2 minutes", isChecked: benefitChecks[0])
-                OnboardingBenefitRow(text: "Tailored to your vibe & budget", isChecked: benefitChecks[1])
-                OnboardingBenefitRow(text: "Real venues, verified details", isChecked: benefitChecks[2])
+                OnboardingBenefitRow(text: "Free plan included — no card to start", isChecked: benefitChecks[0])
+                OnboardingBenefitRow(text: "Real venues, verified · tailored to you two", isChecked: benefitChecks[1])
+                OnboardingBenefitRow(text: "About 2 minutes · skip anything you want", isChecked: benefitChecks[2])
             }
             .padding(.horizontal, 40)
             .padding(.top, 24)
@@ -862,6 +1249,187 @@ struct OnboardingBenefitRow: View {
             Spacer()
         }
         .animation(.spring(response: 0.3), value: isChecked)
+    }
+}
+
+// MARK: - Ambient animation modifiers (ported from YDG_interactive_prototype.html)
+//
+// These mirror the looping CSS micro-animations in the web prototype:
+//   • kenBurns      → obKenBurns (slow hero zoom)
+//   • goldShimmer   → tutGoldShimmer (light sweep across gold text)
+//   • cardShine     → tutCardShine / obCardShine (diagonal sheen over cards)
+//   • iconWiggle    → tutIconWiggle (periodic emoji wiggle)
+//   • pulseGlow     → tutLockPulse (expanding ring on the primary CTA)
+//   • hintPulse     → tutHintPulse (breathing opacity on the swipe hint)
+// Every loop honors Reduce Motion (the prototype's @media prefers-reduced-motion).
+
+/// Slow, continuous zoom on hero imagery. Apply to the resizable image *before* `.frame().clipped()`
+/// so the zoom is clipped to the frame.
+private struct KenBurnsModifier: ViewModifier {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var zoomed = false
+    var maxScale: CGFloat = 1.06
+    var duration: Double = 9
+
+    func body(content: Content) -> some View {
+        content
+            .scaleEffect(reduceMotion ? 1.0 : (zoomed ? maxScale : 1.0))
+            .onAppear {
+                guard !reduceMotion else { return }
+                withAnimation(.easeInOut(duration: duration).repeatForever(autoreverses: true)) {
+                    zoomed = true
+                }
+            }
+    }
+}
+
+/// Bright light sweep that travels left→right across the masked content (use on gold headline text).
+private struct GoldShimmerModifier: ViewModifier {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var phase: CGFloat = -1
+    var duration: Double = 2.6
+
+    func body(content: Content) -> some View {
+        content
+            .overlay {
+                if !reduceMotion {
+                    GeometryReader { geo in
+                        let w = geo.size.width
+                        LinearGradient(
+                            colors: [.clear, Color.white.opacity(0.9), .clear],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                        .frame(width: w * 0.55)
+                        .offset(x: phase * (w + w * 0.55))
+                        .blendMode(.screen)
+                    }
+                    .mask { content }
+                    .allowsHitTesting(false)
+                }
+            }
+            .onAppear {
+                guard !reduceMotion else { return }
+                phase = -1
+                withAnimation(.linear(duration: duration).repeatForever(autoreverses: false)) {
+                    phase = 1
+                }
+            }
+    }
+}
+
+/// Diagonal gold sheen that sweeps across a card. Clips to the card's corner radius (20).
+private struct CardShineModifier: ViewModifier {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var move = false
+    var delay: Double = 0.9
+    var cornerRadius: CGFloat = 20
+
+    func body(content: Content) -> some View {
+        content
+            .overlay {
+                if !reduceMotion {
+                    GeometryReader { geo in
+                        let w = geo.size.width
+                        LinearGradient(
+                            colors: [.clear, Color.luxuryGold.opacity(0.16), .clear],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                        .frame(width: w * 0.35)
+                        .rotationEffect(.degrees(20))
+                        .offset(x: move ? w * 1.2 : -w * 1.2)
+                    }
+                    .allowsHitTesting(false)
+                }
+            }
+            .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
+            .onAppear {
+                guard !reduceMotion else { return }
+                withAnimation(.easeInOut(duration: 3.8).repeatForever(autoreverses: false).delay(delay)) {
+                    move = true
+                }
+            }
+    }
+}
+
+/// Periodic playful wiggle for emoji icons — long calm hold, then a quick two-beat wiggle.
+private struct IconWiggleModifier: ViewModifier {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func body(content: Content) -> some View {
+        if reduceMotion {
+            content
+        } else {
+            content.phaseAnimator([0, 1, 2, 3]) { view, phase in
+                view
+                    .rotationEffect(.degrees(phase == 1 ? -8 : (phase == 2 ? 6 : 0)))
+                    .scaleEffect(phase == 1 ? 1.12 : (phase == 2 ? 1.06 : 1.0))
+            } animation: { phase in
+                phase == 0 ? .easeInOut(duration: 2.6) : .easeInOut(duration: 0.16)
+            }
+        }
+    }
+}
+
+/// Expanding, fading ring behind the primary CTA to draw the eye (matches tutLockPulse).
+private struct PulseGlowModifier: ViewModifier {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var pulse = false
+    var cornerRadius: CGFloat = 14
+
+    func body(content: Content) -> some View {
+        content
+            .background(
+                RoundedRectangle(cornerRadius: cornerRadius)
+                    .stroke(Color.luxuryGold.opacity(pulse ? 0 : 0.55), lineWidth: 3)
+                    .scaleEffect(pulse ? 1.08 : 1.0)
+                    .opacity(reduceMotion ? 0 : 1)
+            )
+            .onAppear {
+                guard !reduceMotion else { return }
+                withAnimation(.easeOut(duration: 2.2).repeatForever(autoreverses: false)) {
+                    pulse = true
+                }
+            }
+    }
+}
+
+/// Gentle breathing opacity for the swipe hint (matches tutHintPulse).
+private struct HintPulseModifier: ViewModifier {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var dim = false
+
+    func body(content: Content) -> some View {
+        content
+            .opacity(reduceMotion ? 1 : (dim ? 0.55 : 1))
+            .onAppear {
+                guard !reduceMotion else { return }
+                withAnimation(.easeInOut(duration: 2).repeatForever(autoreverses: true)) {
+                    dim = true
+                }
+            }
+    }
+}
+
+extension View {
+    func kenBurns(maxScale: CGFloat = 1.06, duration: Double = 9) -> some View {
+        modifier(KenBurnsModifier(maxScale: maxScale, duration: duration))
+    }
+    func goldShimmer(duration: Double = 2.6) -> some View {
+        modifier(GoldShimmerModifier(duration: duration))
+    }
+    func cardShine(delay: Double = 0.9, cornerRadius: CGFloat = 20) -> some View {
+        modifier(CardShineModifier(delay: delay, cornerRadius: cornerRadius))
+    }
+    func iconWiggle() -> some View {
+        modifier(IconWiggleModifier())
+    }
+    func pulseGlow(cornerRadius: CGFloat = 14) -> some View {
+        modifier(PulseGlowModifier(cornerRadius: cornerRadius))
+    }
+    func hintPulse() -> some View {
+        modifier(HintPulseModifier())
     }
 }
 

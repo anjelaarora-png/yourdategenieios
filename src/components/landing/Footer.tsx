@@ -52,6 +52,9 @@ const Footer = () => {
               <Link to="/signup" className="text-primary hover:text-primary/80 transition-colors font-medium">
                 Sign Up Free
               </Link>
+              <Link to="/for-business" className="hover:text-foreground transition-colors">
+                For Business
+              </Link>
               <Link to="/privacy" className="hover:text-foreground transition-colors">
                 Privacy Policy
               </Link>

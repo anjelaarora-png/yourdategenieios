@@ -1,24 +1,31 @@
 import SwiftUI
 
-// MARK: - Luxurious Dark Theme Colors
-// A magical, romantic color palette inspired by candlelit evenings and fine wine
+// MARK: - Charcoal Maroon Theme (dark-first; maroon = accent only)
+// Screen backgrounds use charcoal. Maroon appears on hero borders, active tabs, partner strip.
 
 extension Color {
-    // Primary Colors
-    static let luxuryMaroon = Color(hex: "4A0E0E")           // Deep burgundy background
-    static let luxuryMaroonLight = Color(hex: "6B1A1A")      // Lighter maroon for cards
-    static let luxuryMaroonMedium = Color(hex: "5A1212")     // Medium maroon for surfaces
-    
-    // Accent Colors
-    static let luxuryGold = Color(hex: "C7A677")             // Primary gold
-    static let luxuryGoldLight = Color(hex: "D4B896")        // Light gold for highlights
-    static let luxuryGoldDark = Color(hex: "A68B5B")         // Dark gold for depth
-    static let tangerine = Color(hex: "E07C24")              // Warm tangerine for loading/headers
-    
-    // Text Colors
-    static let luxuryCream = Color(hex: "FFF8F0")            // Primary text on dark
-    static let luxuryCreamMuted = Color(hex: "E8DDD0")       // Secondary text
-    static let luxuryMuted = Color(hex: "B8A090")            // Muted/tertiary text
+    // Semantic tokens — Charcoal Maroon redesign
+    static let backgroundPrimary = Color(hex: "1A1A1A")
+    static let surfaceElevated = Color(hex: "242424")
+    static let creamCard = Color(hex: "F5F0E8")
+    static let accentGold = Color(hex: "C9A84C")
+    static let accentMaroon = Color(hex: "4A0E0E")
+    static let textPrimary = Color(hex: "FAFAF8")
+    static let textOnCard = Color(hex: "1A1A1A")
+    static let textMutedOnCard = Color(hex: "888888")
+    static let maroonBorderTint = Color(hex: "4A0E0E").opacity(0.15)
+
+    // Legacy aliases (mapped to Charcoal Maroon tokens)
+    static let luxuryMaroon = accentMaroon
+    static let luxuryMaroonLight = surfaceElevated
+    static let luxuryMaroonMedium = Color(hex: "2E2E2E")
+    static let luxuryGold = accentGold
+    static let luxuryGoldLight = Color(hex: "D4B896")
+    static let luxuryGoldDark = Color(hex: "A68B5B")
+    static let tangerine = Color(hex: "E07C24")
+    static let luxuryCream = textPrimary
+    static let luxuryCreamMuted = Color(hex: "FAFAF8").opacity(0.65)
+    static let luxuryMuted = Color(hex: "888888")
     
     // Functional Colors
     static let luxurySuccess = Color(hex: "7CB87C")          // Muted green
@@ -31,10 +38,10 @@ extension Color {
     static let polaroidCaption = Color(hex: "2C2C2C")        // Dark charcoal for caption text
     static let polaroidShadow = Color(hex: "1A0808")         // Deep shadow for polaroid
     
-    // Legacy aliases for backward compatibility
-    static let brandPrimary = luxuryMaroon
-    static let brandGold = luxuryGold
-    static let brandCream = luxuryCream
+    // Brand aliases
+    static let brandPrimary = accentMaroon
+    static let brandGold = accentGold
+    static let brandCream = textPrimary
     static let brandMuted = luxuryMuted
 }
 
@@ -86,9 +93,9 @@ extension LinearGradient {
         endPoint: .bottom
     )
     
-    // Maroon depth gradient
+    // Surface depth gradient (charcoal surfaces)
     static let maroonDepth = LinearGradient(
-        gradient: Gradient(colors: [Color.luxuryMaroonLight, Color.luxuryMaroon]),
+        gradient: Gradient(colors: [Color.surfaceElevated, Color.backgroundPrimary]),
         startPoint: .top,
         endPoint: .bottom
     )
@@ -96,8 +103,8 @@ extension LinearGradient {
     // Card background gradient
     static let cardGradient = LinearGradient(
         gradient: Gradient(colors: [
-            Color.luxuryMaroonLight.opacity(0.8),
-            Color.luxuryMaroonMedium.opacity(0.6)
+            Color.surfaceElevated.opacity(0.95),
+            Color.luxuryMaroonMedium.opacity(0.85)
         ]),
         startPoint: .topLeading,
         endPoint: .bottomTrailing
@@ -165,8 +172,8 @@ struct LuxuryOutlineButtonStyle: ButtonStyle {
 /// Solid gold button with dark or light label (e.g. onboarding: white text)
 struct LuxuryGoldButtonStyle: ButtonStyle {
     var isSmall: Bool = false
-    /// Use .luxuryCream or .white for onboarding to match reference; default dark maroon elsewhere.
-    var labelColor: Color = Color.luxuryMaroon
+    /// Use .textPrimary or .white for onboarding; default charcoal on gold CTA.
+    var labelColor: Color = Color.backgroundPrimary
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
@@ -307,7 +314,8 @@ extension View {
 /// Brand Font Families:
 /// - Header: Times New Roman / Serif - For main headings and titles
 /// - Subheader: Times New Roman - For subheadings and card titles (same as header)
-/// - Special: Tangerine - For magical/special accent words
+/// - Display: Georgia serif (`displaySerif`) — functional screen headers
+/// - Legacy: Tangerine — marketing-only; prefer `displaySerif` on in-app screens
 /// - Body: Inter (sans-serif) - For all body text app-wide. Same font as questionnaire "What time works best?" buttons.
 
 extension Font {
@@ -346,8 +354,15 @@ extension Font {
         .custom("TimesNewRomanPS-ItalicMT", size: size)
     }
     
-    // MARK: - Tangerine Font (Special/Magical Text)
-    /// Tangerine handwritten font for magical/romantic words
+    // MARK: - Display Serif (functional headers)
+    /// Georgia serif for display titles on charcoal screens (replaces Tangerine in-app).
+    static func displaySerif(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
+        bodySerif(size, weight: weight)
+    }
+    
+    // MARK: - Tangerine Font (marketing-only legacy)
+    /// Tangerine handwritten font — avoid on functional screens; use `displaySerif` instead.
+    @available(*, deprecated, message: "Use Font.displaySerif for in-app headers")
     static func tangerine(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
         let fontName: String
         if weight == .bold {
@@ -358,9 +373,9 @@ extension Font {
         return Font.custom(fontName, size: size)
     }
     
-    /// Special accent font - alias for tangerine
+    /// Special accent font — now maps to display serif (was Tangerine).
     static func special(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
-        return Font.tangerine(size, weight: weight)
+        displaySerif(size, weight: weight)
     }
     
     // MARK: - Body Font (Serif - Georgia)
@@ -461,14 +476,14 @@ extension Font {
         .bodySans(11, weight: .regular)
     }
     
-    /// Special magical text - Tangerine 28pt
+    /// Display serif accent — Georgia (was Tangerine magical 28pt)
     static func magical(_ size: CGFloat = 28) -> Font {
-        .special(size, weight: .regular)
+        .displaySerif(size, weight: .regular)
     }
     
-    /// Special magical text bold - Tangerine Bold 32pt
+    /// Display serif accent bold — Georgia (was Tangerine Bold 32pt)
     static func magicalBold(_ size: CGFloat = 32) -> Font {
-        .special(size, weight: .bold)
+        .displaySerif(size, weight: .bold)
     }
     
     // Legacy support
@@ -483,17 +498,15 @@ extension Font {
 
 // MARK: - Special Text Views for Mixed Typography
 
-/// A view that renders text in the special Tangerine font
+/// Accent display text in Georgia serif (legacy name kept for call sites).
 struct MagicalText: View {
     let text: String
     var size: CGFloat = 28
     var color: Color = .luxuryGold
-    var italic: Bool = true
     
     var body: some View {
         Text(text)
-            .font(Font.tangerine(size, weight: .bold))
-            .italic(italic)
+            .font(Font.displaySerif(size, weight: .bold))
             .foregroundColor(color)
     }
 }
@@ -517,8 +530,7 @@ struct MagicalInlineText: View {
             }
             
             Text(magical)
-                .font(Font.tangerine(magicalSize, weight: .bold))
-                .italic()
+                .font(Font.displaySerif(magicalSize, weight: .bold))
                 .foregroundColor(magicalColor)
             
             if !suffix.isEmpty {
@@ -530,7 +542,7 @@ struct MagicalInlineText: View {
     }
 }
 
-/// Header with magical word - "Get Early Access - Join The Waitlist!" style
+/// Header with serif accent word — "Get Early Access - Join The Waitlist!" style
 struct HeaderWithMagical: View {
     let headerText: String
     let magicalText: String
@@ -554,14 +566,13 @@ struct HeaderWithMagical: View {
             }
             
             Text(magicalText)
-                .font(Font.tangerine(magicalSize, weight: .bold))
-                .italic()
+                .font(Font.displaySerif(magicalSize, weight: .bold))
                 .foregroundColor(magicalColor)
         }
     }
 }
 
-/// Multi-line header with mixed fonts - like "Designed to make Romance feel Natural, not Complicated"
+/// Multi-line header with mixed fonts — serif accent segments use Georgia
 struct MixedStyleHeader: View {
     let segments: [TextSegment]
     var alignment: HorizontalAlignment = .center
@@ -594,8 +605,7 @@ struct MixedStyleHeader: View {
                 ForEach(Array(lineSegments.enumerated()), id: \.offset) { _, segment in
                     if segment.isMagical {
                         Text(segment.text)
-                            .font(Font.tangerine(36, weight: .bold))
-                            .italic()
+                            .font(Font.displaySerif(36, weight: .bold))
                             .foregroundColor(.luxuryGold)
                     } else {
                         Text(segment.text)

@@ -146,29 +146,37 @@ class NavigationCoordinator: ObservableObject {
     
     enum Tab: String, CaseIterable {
         case home = "Home"
-        case loveNote = "Love Notes"
-        case gifts = "Gifts"
-        case memories = "Memories"
-        case profile = "Profile"
-        
+        case dates = "Dates"
+        case convo = "Convo"
+        case you = "You"
+
         /// Short label for tab bar so text doesn’t overflow on small screens.
         var tabBarTitle: String {
             switch self {
             case .home: return "Home"
-            case .loveNote: return "Love Notes"
-            case .gifts: return "Gifts"
-            case .memories: return "Memories"
-            case .profile: return "Profile"
+            case .dates: return "Dates"
+            case .convo: return "Convo"
+            case .you: return "You"
             }
         }
-        
+
+        /// Outline glyph for the unselected state.
         var icon: String {
             switch self {
+            case .home: return "house"
+            case .dates: return "heart"
+            case .convo: return "bubble.left.and.bubble.right"
+            case .you: return "person"
+            }
+        }
+
+        /// Filled glyph for the selected state.
+        var selectedIcon: String {
+            switch self {
             case .home: return "house.fill"
-            case .loveNote: return "heart.text.square.fill"
-            case .gifts: return "gift.fill"
-            case .memories: return "photo.stack.fill"
-            case .profile: return "person.fill"
+            case .dates: return "heart.fill"
+            case .convo: return "bubble.left.and.bubble.right.fill"
+            case .you: return "person.fill"
             }
         }
     }
@@ -177,6 +185,7 @@ class NavigationCoordinator: ObservableObject {
         case questionnaire
         case datePlanResult
         case datePlanOptions
+        case gifts
         case giftFinder(datePlan: DatePlan?, dateLocation: String?)
         case playlist(planTitle: String, planId: UUID? = nil)
         case reservation(venueName: String, venueType: String, address: String?, phone: String?, bookingUrl: String?, websiteUrl: String?, openingHours: [String]?)
@@ -201,6 +210,7 @@ class NavigationCoordinator: ObservableObject {
             case .questionnaire: return "questionnaire"
             case .datePlanResult: return "datePlanResult"
             case .datePlanOptions: return "datePlanOptions"
+            case .gifts: return "gifts"
             case .giftFinder: return "giftFinder"
             case .playlist(_, _): return "playlist"
             case .reservation(_, _, _, _, _, _, _): return "reservation"
@@ -1354,7 +1364,7 @@ struct RootNavigationView: View {
 
     var body: some View {
         ZStack {
-            Color.luxuryMaroon
+            Color.backgroundPrimary
                 .ignoresSafeArea()
 
             if showSplash {

@@ -5,6 +5,7 @@ struct LuxuryProfileTabView: View {
     @EnvironmentObject var coordinator: NavigationCoordinator
     @EnvironmentObject private var access: AccessManager
     @ObservedObject private var profileManager = UserProfileManager.shared
+    @ObservedObject private var partnerManager = PartnerSessionManager.shared
     @StateObject private var notificationManager = NotificationManager.shared
     @EnvironmentObject private var memoryManager: MemoryManager
     @State private var showSignOutAlert = false
@@ -22,7 +23,7 @@ struct LuxuryProfileTabView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color.luxuryMaroon
+                Color.backgroundPrimary
                     .ignoresSafeArea()
                 
                 ScrollView(.vertical, showsIndicators: false) {
@@ -30,52 +31,42 @@ struct LuxuryProfileTabView: View {
                         VStack(spacing: 16) {
                             ZStack {
                                 Circle()
-                                    .fill(LinearGradient.goldShimmer.opacity(0.2))
-                                    .frame(width: 90, height: 90)
+                                    .fill(Color.surfaceElevated)
+                                    .frame(width: 72, height: 72)
+                                    .overlay(
+                                        Circle()
+                                            .stroke(Color.accentGold, lineWidth: 2)
+                                    )
                                 
                                 Text(userInitials)
-                                    .font(Font.header(32, weight: .bold))
-                                    .foregroundColor(Color.luxuryGold)
+                                    .font(Font.bodySerif(28, weight: .regular))
+                                    .foregroundColor(Color.accentGold)
                             }
                             
                             VStack(spacing: 4) {
                                 Text(userProfile?.displayName ?? "Date Enthusiast")
-                                    .font(Font.tangerine(40, weight: .bold))
-                                    .italic()
-                                    .foregroundColor(Color.luxuryGold)
+                                    .font(Font.bodySerif(20, weight: .regular))
+                                    .foregroundColor(Color.textPrimary)
                                 
                                 if let email = userProfile?.email, !email.isEmpty {
-                                    Text(email)
-                                        .font(Font.bodySans(13, weight: .regular))
-                                        .foregroundColor(Color.luxuryMuted)
-                                }
-                                
-                                if let memberSince = userProfile?.memberSince, !memberSince.isEmpty {
-                                    Text("Member since \(memberSince)")
+                                    Text(memberLine(email: email))
                                         .font(Font.bodySans(12, weight: .regular))
-                                        .foregroundColor(Color.luxuryMuted.opacity(0.7))
+                                        .foregroundColor(Color.luxuryMuted)
                                 }
                             }
                         }
                         .padding(.top, 16)
-                        
-                        HStack(spacing: 0) {
-                            LuxuryStatItem(value: "\(coordinator.savedPlans.count)", label: "Saved")
-                            
-                            Rectangle()
-                                .fill(Color.luxuryGold.opacity(0.3))
-                                .frame(width: 1, height: 40)
-                            
-                            LuxuryStatItem(value: "\(coordinator.pastPlans.count)", label: "Completed")
-                            
-                            Rectangle()
-                                .fill(Color.luxuryGold.opacity(0.3))
-                                .frame(width: 1, height: 40)
-                            
-                            LuxuryStatItem(value: "\(memoryManager.totalMemoriesCount)", label: "Memories")
+
+                        if let partnerName = linkedPartnerName {
+                            partnerStrip(name: partnerName)
+                                .padding(.horizontal, 20)
                         }
-                        .padding(.vertical, 16)
-                        .luxuryCard()
+                        
+                        HStack(spacing: 10) {
+                            ProfileStatBox(value: "\(coordinator.savedPlans.count)", label: "Saved")
+                            ProfileStatBox(value: "\(coordinator.pastPlans.count)", label: "Completed")
+                            ProfileStatBox(value: "\(memoryManager.totalMemoriesCount)", label: "Memories")
+                        }
                         .padding(.horizontal, 20)
                         
                         if let prefs = userProfile?.preferences {
@@ -85,31 +76,47 @@ struct LuxuryProfileTabView: View {
                                 .padding(.horizontal, 20)
                         }
                         
-                        VStack(spacing: 2) {
+                        VStack(spacing: 0) {
                             LuxuryProfileMenuItem(icon: "bookmark.fill", title: "Saved Plans", isLocked: !access.canAccess(.datePlan)) {
                                 access.require(.datePlan) {
                                     coordinator.activeSheet = .savedPlansList
                                 }
                             }
+                            Divider().background(Color.white.opacity(0.06))
                             LuxuryProfileMenuItem(icon: "clock.fill", title: "Date History", isLocked: !access.canAccess(.datePlan)) {
                                 access.require(.datePlan) {
                                     coordinator.activeSheet = .pastMagic
                                 }
                             }
+                            Divider().background(Color.white.opacity(0.06))
+                            LuxuryProfileMenuItem(icon: "gift.fill", title: "Gifts", isLocked: !access.canAccess(.gifting)) {
+                                access.require(.gifting) {
+                                    coordinator.activeSheet = .gifts
+                                }
+                            }
+                            Divider().background(Color.white.opacity(0.06))
                             LuxuryProfileMenuItem(icon: "heart.fill", title: "Preferences") {
                                 coordinator.startEditPreferencesOnly()
                             }
+                            Divider().background(Color.white.opacity(0.06))
                             LuxuryProfileMenuItem(icon: "bell.fill", title: "Notifications") {
                                 notificationManager.showNotificationsSheet = true
                             }
+                            Divider().background(Color.white.opacity(0.06))
                             LuxuryProfileMenuItem(icon: "gearshape.fill", title: "Settings") {
                                 coordinator.activeSheet = .settings
                             }
+                            Divider().background(Color.white.opacity(0.06))
                             LuxuryProfileMenuItem(icon: "questionmark.circle.fill", title: "Help & Support") {
                                 showHelpSupport = true
                             }
                         }
-                        .luxuryCard(hasBorder: false)
+                        .background(Color.surfaceElevated)
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 14)
+                                .stroke(Color.accentGold.opacity(0.15), lineWidth: 1)
+                        )
                         .padding(.horizontal, 20)
                         
                         // Restore Purchases
@@ -132,14 +139,14 @@ struct LuxuryProfileTabView: View {
                                 Text("Restore Purchases")
                             }
                             .font(Font.bodySans(14, weight: .medium))
-                            .foregroundColor(Color.luxuryGold)
+                            .foregroundColor(Color.accentGold)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 14)
-                            .background(Color.luxuryMaroonLight)
-                            .cornerRadius(12)
+                            .background(Color.clear)
+                            .cornerRadius(10)
                             .overlay(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .stroke(Color.luxuryGold.opacity(0.3), lineWidth: 1)
+                                RoundedRectangle(cornerRadius: 10)
+                                    .stroke(Color.white.opacity(0.12), lineWidth: 1)
                             )
                         }
                         .padding(.horizontal, 20)
@@ -151,19 +158,19 @@ struct LuxuryProfileTabView: View {
                             HStack(spacing: 10) {
                                 Image(systemName: "arrow.left.square.fill")
                                     .font(.system(size: 20))
-                                    .foregroundColor(Color.luxuryError)
+                                    .foregroundColor(Color.luxuryError.opacity(0.85))
                                     .frame(width: 24, height: 24)
 
                                 Text("Sign Out")
                             }
                             .font(Font.bodySans(14, weight: .medium))
-                            .foregroundColor(Color.luxuryError)
+                            .foregroundColor(Color.luxuryError.opacity(0.85))
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 14)
-                            .background(Color.luxuryMaroonLight)
-                            .cornerRadius(12)
+                            .background(Color.clear)
+                            .cornerRadius(10)
                             .overlay(
-                                RoundedRectangle(cornerRadius: 12)
+                                RoundedRectangle(cornerRadius: 10)
                                     .stroke(Color.luxuryError.opacity(0.3), lineWidth: 1)
                             )
                         }
@@ -193,9 +200,9 @@ struct LuxuryProfileTabView: View {
                 }
                 .scrollBounceBehavior(.basedOnSize)
             }
-            .navigationTitle("Profile")
+            .navigationTitle("You")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(Color.luxuryMaroon, for: .navigationBar)
+            .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .sheet(isPresented: $notificationManager.showNotificationsSheet) {
                 NotificationsSheetView(notificationManager: notificationManager)
@@ -246,6 +253,58 @@ struct LuxuryProfileTabView: View {
         let last = profile.lastName.prefix(1).uppercased()
         return first.isEmpty ? "DG" : "\(first)\(last)"
     }
+
+    private var linkedPartnerName: String? {
+        guard partnerManager.partnerState != .none else { return nil }
+        let inviteName = partnerManager.inviteInfo?.partnerName
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if !inviteName.isEmpty { return inviteName }
+        let inviter = partnerManager.inviterName?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return inviter.isEmpty ? nil : inviter
+    }
+
+    private func memberLine(email: String) -> String {
+        if let memberSince = userProfile?.memberSince, !memberSince.isEmpty {
+            return "\(email) · member since \(memberSince)"
+        }
+        return email
+    }
+
+    private func partnerStrip(name: String) -> some View {
+        Button {
+            coordinator.showPartnerPlanning()
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "person.2.fill")
+                    .font(.system(size: 13, weight: .semibold))
+                Text("Planning with \(name)")
+                    .font(Font.bodySans(11, weight: .semibold))
+                    .tracking(0.4)
+                    .textCase(.uppercase)
+                Spacer(minLength: 8)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 11, weight: .semibold))
+                    .opacity(0.6)
+            }
+            .foregroundColor(Color.textPrimary)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(Color.surfaceElevated)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .overlay(alignment: .leading) {
+                RoundedRectangle(cornerRadius: 1.5)
+                    .fill(Color.accentMaroon)
+                    .frame(width: 3)
+                    .padding(.vertical, 4)
+            }
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(Color.accentMaroon.opacity(0.45), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+    }
 }
 
 // MARK: - Preferences Summary Card
@@ -261,9 +320,8 @@ struct PreferencesSummaryCard: View {
                         .font(Font.header(16, weight: .regular))
                         .foregroundColor(Color.luxuryCream)
                     Text("Preferences")
-                        .font(Font.tangerine(26, weight: .bold))
-                        .italic()
-                        .foregroundColor(Color.luxuryGold)
+                        .font(Font.bodySerif(20, weight: .regular))
+                        .foregroundColor(Color.accentGold)
                 }
                 
                 Spacer()
@@ -355,7 +413,12 @@ struct PreferencesSummaryCard: View {
             }
         }
         .padding(18)
-        .luxuryCard()
+        .background(Color.surfaceElevated)
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(Color.accentGold.opacity(0.2), lineWidth: 1)
+        )
     }
 }
 
@@ -445,11 +508,39 @@ struct PreferenceChip: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
-        .background(Color.luxuryMaroonLight)
+        .background(Color.backgroundPrimary.opacity(0.5))
         .cornerRadius(20)
         .overlay(
             RoundedRectangle(cornerRadius: 20)
-                .stroke(Color.luxuryGold.opacity(0.35), lineWidth: 1)
+                .stroke(Color.accentGold.opacity(0.25), lineWidth: 1)
+        )
+    }
+}
+
+// MARK: - Profile stat box (cream card)
+struct ProfileStatBox: View {
+    let value: String
+    let label: String
+
+    var body: some View {
+        VStack(spacing: 4) {
+            Text(value)
+                .font(Font.bodySerif(24, weight: .regular))
+                .foregroundColor(Color.accentGold)
+            Text(label.lowercased())
+                .font(Font.bodySans(10, weight: .regular))
+                .foregroundColor(Color.textMutedOnCard)
+                .lineLimit(2)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 14)
+        .padding(.horizontal, 8)
+        .background(Color.creamCard)
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(Color.accentGold.opacity(0.2), lineWidth: 1)
         )
     }
 }
@@ -513,19 +604,13 @@ struct LuxuryProfileMenuItem: View {
         } label: {
             HStack(spacing: 16) {
                 Image(systemName: icon)
-                    .font(.system(size: 18))
-                    .foregroundColor(Color.luxuryGold)
-                    .frame(width: 32, height: 32)
-                    .background(Color.luxuryGold.opacity(0.12))
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(Color.luxuryGold.opacity(0.3), lineWidth: 1)
-                    )
+                    .font(.system(size: 16))
+                    .foregroundColor(Color.accentGold)
+                    .frame(width: 24, alignment: .center)
                 
                 Text(title)
-                    .font(Font.bodySans(16, weight: .regular))
-                    .foregroundColor(Color.luxuryCream)
+                    .font(Font.bodySans(14, weight: .regular))
+                    .foregroundColor(Color.textPrimary)
                 
                 Spacer()
 
@@ -539,8 +624,8 @@ struct LuxuryProfileMenuItem: View {
                     .font(.system(size: 14))
                     .foregroundColor(Color.luxuryMuted)
             }
-            .padding(.horizontal, 18)
-            .padding(.vertical, 16)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
             .opacity(isLocked ? 0.5 : 1)
         }
     }

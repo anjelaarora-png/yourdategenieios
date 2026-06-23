@@ -32,7 +32,7 @@ struct PaywallView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color.luxuryMaroon
+                Color.backgroundPrimary
                     .ignoresSafeArea()
 
                 ScrollView(showsIndicators: false) {
@@ -49,7 +49,7 @@ struct PaywallView: View {
                 }
             }
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(Color.luxuryMaroon, for: .navigationBar)
+            .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar {
@@ -69,29 +69,24 @@ struct PaywallView: View {
 
     private var headerSection: some View {
         VStack(spacing: 10) {
-            Image(systemName: "sparkles")
-                .font(.system(size: 44))
-                .foregroundStyle(LinearGradient.goldShimmer)
-                .padding(.top, 8)
-
             Text("Your Date Genie")
-                .font(Font.tangerine(32, weight: .bold))
-                .italic()
-                .foregroundColor(Color.luxuryGold)
+                .font(Font.bodySerif(28, weight: .regular))
+                .foregroundColor(Color.accentGold)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: .infinity)
 
-            Text("Plan perfect dates — automatically")
+            Text("Wake up to a finished date plan — not a blank page")
                 .font(Font.bodySans(17, weight: .medium))
-                .foregroundColor(Color.luxuryCream)
+                .foregroundColor(Color.textPrimary)
                 .multilineTextAlignment(.center)
 
             Text("7-day free trial · Cancel anytime")
                 .font(Font.bodySans(13, weight: .regular))
-                .foregroundColor(Color.luxuryGold.opacity(0.9))
+                .foregroundColor(Color.accentGold.opacity(0.9))
                 .multilineTextAlignment(.center)
                 .padding(.top, 2)
         }
+        .padding(.top, 8)
     }
 
     // MARK: - Plan toggle
@@ -215,15 +210,15 @@ struct PaywallView: View {
 
     private var benefitsSection: some View {
         VStack(alignment: .leading, spacing: 14) {
-            benefitRow("Plan the perfect date in 60 seconds",
-                       detail: "AI-powered, fully personalised to you")
+            benefitRow("Approve a complete itinerary in one tap",
+                       detail: "Stops, timing, and backup options — ready to go")
             benefitRow("Unlimited date plans",
-                       detail: "Generate as many as you want, any time")
+                       detail: "Generate as many finished plans as you need")
             benefitRow("Plan together with your partner",
-                       detail: "Invite, rank options and reveal your match")
-            benefitRow("Love Notes, Gift Finder & Memories",
-                       detail: "Every romantic detail, beautifully organised")
-            benefitRow("Smart playlists & conversation starters", detail: nil)
+                       detail: "Invite, rank options, and lock in your match")
+            benefitRow("Note drafts, Gift Finder & Memories",
+                       detail: "Every romantic detail, organized for you")
+            benefitRow("Conversation cues & smart playlists", detail: nil)
             benefitRow("Route maps & calendar integration", detail: nil)
         }
         .frame(maxWidth: .infinity, alignment: .leading)

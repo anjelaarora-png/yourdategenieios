@@ -29,7 +29,7 @@ struct PlaybookView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color.luxuryMaroon
+                Color.backgroundPrimary
                     .ignoresSafeArea()
 
                 if selectedCategory == nil {
@@ -39,7 +39,7 @@ struct PlaybookView: View {
                 }
             }
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(Color.luxuryMaroon, for: .navigationBar)
+            .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar {
@@ -86,8 +86,7 @@ struct PlaybookView: View {
                         .font(Font.header(26, weight: .regular))
                         .foregroundColor(Color.luxuryCream)
                     Text("you")
-                        .font(Font.tangerine(38, weight: .bold))
-                        .italic()
+                        .font(Font.displaySerif(38, weight: .bold))
                         .foregroundColor(Color.luxuryGold)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)

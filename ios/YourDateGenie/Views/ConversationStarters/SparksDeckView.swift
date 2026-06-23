@@ -50,7 +50,7 @@ struct SparksDeckView: View {
 
     var body: some View {
         ZStack {
-            Color.luxuryMaroon
+            Color.backgroundPrimary
                 .ignoresSafeArea()
 
             VStack(spacing: 0) {
@@ -99,9 +99,8 @@ struct SparksDeckView: View {
     private var headerSection: some View {
         VStack(spacing: 4) {
             Text("Your Sparks")
-                .font(Font.tangerine(48, weight: .bold))
-                .italic()
-                .foregroundColor(Color.luxuryGold)
+                .font(Font.bodySerif(32, weight: .regular))
+                .foregroundColor(Color.accentGold)
                 .frame(maxWidth: .infinity)
             Text("\(relationshipLabel) · \(vibeLabel)")
                 .font(Font.bodySans(16, weight: .semibold))
@@ -161,13 +160,12 @@ struct SparksDeckView: View {
     // MARK: - End of deck overlay (Regenerate vs Back)
     private var endOfDeckOverlay: some View {
         VStack(spacing: 0) {
-            Color.luxuryMaroon.opacity(0.85)
+            Color.backgroundPrimary.opacity(0.85)
                 .ignoresSafeArea()
             VStack(spacing: 24) {
                 Text("You've seen all your sparks")
-                    .font(Font.tangerine(38, weight: .bold))
-                    .italic()
-                    .foregroundColor(Color.luxuryGold)
+                    .font(Font.bodySerif(26, weight: .regular))
+                    .foregroundColor(Color.accentGold)
                     .multilineTextAlignment(.center)
                 Text("Get a fresh set or head back.")
                     .font(Font.bodySans(16, weight: .regular))

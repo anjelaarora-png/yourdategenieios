@@ -492,6 +492,7 @@ IMPORTANT: This is a SOLO DATE for ONE PERSON. All activities should be enjoyabl
 4. Each option should have 3-4 stops with ${isSoloDate ? "self-care tips" : "romantic tips"} and travel logistics.
 5. Use ONLY real, well-known venues that actually exist in ${data.city} or within the travel radius.
 6. Be specific with venue names - use actual restaurant names, park names, etc.
+6b. NEVER suggest warehouses, storage units, industrial sites, offices, or non-hospitality businesses. Every stop must be a real date-worthy venue (restaurant, bar, cafe, park, museum, gallery, theater, boutique, etc.).
 7. Double-check that every venue's address is in ${data.city} or within ${travelRadius} of it.
 9. PLAN TITLES — CRITICAL RULES (READ CAREFULLY):
    ❌ FORBIDDEN: Lazy, generic titles — NO "Mediterranean Evening", "Italian Night", "Japanese Dinner", "French Bistro Night", "Brunch Date", or any title that is just "[Cuisine] + [generic time/word]".
@@ -499,16 +500,17 @@ IMPORTANT: This is a SOLO DATE for ONE PERSON. All activities should be enjoyabl
    ❌ FORBIDDEN: Do not use generic phrases like "Evening Out", "Date Night", "Night Out", "Romantic Evening", "Dinner Date".
    ❌ FORBIDDEN: All 3 plan titles must be completely different in structure and theme — no two can share the same formula or feel similar.
    
-   ✅ REQUIRED: Each title must capture the MOOD, ATMOSPHERE, or EMOTIONAL EXPERIENCE of that specific plan — what it FEELS like.
-   ✅ REQUIRED: Titles must feel magical, cinematic, and personal. Imagine a movie title or a song title for the night.
-   ✅ REQUIRED: 2–6 words, punchy, wrap-friendly, fits on a card.
-   ✅ ALLOWED: Cuisine/cultural words CAN appear if used creatively and poetically — e.g. "Mediterranean Moonlight", "A Taste of Midnight", "Spice, Stars & You", "Saffron & Slow Jazz" are great. The word must add atmosphere, not just label the food.
-   
+   ✅ REQUIRED: Each title must be creative AND tell the user what they're walking into — combine mood with 1–2 itinerary anchors (e.g. "Gallery Hop & Candlelit Pasta", "Rooftop Jazz, Then Gelato").
+   ✅ REQUIRED: Titles must feel magical but honest — the user should know the experience type before they open the plan.
+   ✅ REQUIRED: 3–7 words, punchy, wrap-friendly, fits on a card.
+   ✅ REQUIRED: Put a short itinerary hint in the tagline when helpful (e.g. "Wine bar → trattoria → skyline views").
+   ✅ ALLOWED: Cuisine/cultural words when paired with a specific experience anchor — e.g. "Velvet Pasta & City Lights", "Saffron Jazz & Late Dessert".
+
    GREAT TITLE FORMULAS TO USE (pick different formulas for each plan):
-   - Sensory + Place: "Velvet & City Lights", "Salt Air & Starlight", "Neon Glow & Slow Wine"
-   - Poetic Moment: "The Night We Stayed", "Where the Music Finds You", "Golden Hour, Last Dance"
-   - Emotion + Element: "Champagne & Butterflies", "Barefoot & Breathless", "Stolen Kisses, Open Sky"
-   - Mystery/Wonder: "The Midnight Detour", "Something Borrowed, Somewhere New", "Follow the Lanterns"
+   - Anchor + Mood: "Gallery Hop & Candlelit Pasta", "Rooftop Jazz, Then Gelato", "Park Stroll → Wine Bar Secrets"
+   - Route-style: "The Gallery-to-Rooftop Route", "From Market Browsing to Midnight Bites"
+   - Sensory + Stop type: "Velvet Pasta & City Lights", "Salt Air, Sushi & Starlight"
+   - Poetic but specific: "Follow the Lanterns to Late Dessert", "Champagne, Pasta & Skyline Views"
    - Playful/Bold: "Plot Twist Romance", "One Wild Beautiful Night", "Break All the Rules"
    - Atmosphere-first: "Candlelight & Conspiracy", "Fog, Jazz & You", "Rooftop Confessions"
    - Creative cuisine use: "Mediterranean Moonlight", "Saffron & Slow Jazz", "Spice, Stars & You"

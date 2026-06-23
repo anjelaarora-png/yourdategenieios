@@ -140,8 +140,7 @@ struct Step1LocationView: View {
                     // Part of day + time — one seamless selection
                     VStack(alignment: .leading, spacing: 14) {
                         Text("What time works best?")
-                            .font(Font.tangerine(22, weight: .bold))
-                            .italic()
+                            .font(Font.displaySerif(22, weight: .bold))
                             .foregroundColor(Color.luxuryGold)
                         
                         // Period cards (Morning / Afternoon / Evening / Late Night)
@@ -373,5 +372,5 @@ final class CurrentLocationHelper: NSObject, ObservableObject, CLLocationManager
 
 #Preview {
     Step1LocationView(data: .constant(QuestionnaireData()), isPreferencesOnly: false)
-        .background(Color.luxuryMaroon)
+        .background(Color.backgroundPrimary)
 }

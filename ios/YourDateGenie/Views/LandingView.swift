@@ -7,12 +7,7 @@ struct LandingView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                // Deep maroon background
-                Color.luxuryMaroon
-                    .ignoresSafeArea()
-                
-                // Subtle vignette overlay
-                RadialGradient.maroonVignette
+                Color.backgroundPrimary
                     .ignoresSafeArea()
                 
                 ScrollView(showsIndicators: false) {
@@ -91,7 +86,7 @@ struct LandingView: View {
                         .font(Font.header(20, weight: .regular))
                         .foregroundColor(Color.luxuryCream.opacity(0.9))
                     Text("planned")
-                        .font(Font.tangerine(32, weight: .bold))
+                        .font(Font.bodySerif(32, weight: .bold))
                         .italic()
                         .foregroundColor(Color.luxuryGold)
                     Text("for you.")
@@ -133,7 +128,7 @@ struct LandingView: View {
                         .font(Font.header(26, weight: .regular))
                         .foregroundColor(Color.luxuryCream)
                     Text("Us")
-                        .font(Font.tangerine(40, weight: .bold))
+                        .font(Font.bodySerif(40, weight: .bold))
                         .italic()
                         .foregroundColor(Color.luxuryGold)
                 }
@@ -179,7 +174,7 @@ struct LandingView: View {
                         .font(Font.bodySans(15, weight: .regular))
                         .foregroundColor(Color.luxuryCreamMuted)
                     Text("Genie")
-                        .font(Font.tangerine(32, weight: .bold))
+                        .font(Font.bodySerif(32, weight: .bold))
                         .italic()
                         .foregroundColor(Color.luxuryGold)
                     Text("steps in.")
@@ -207,7 +202,7 @@ struct LandingView: View {
                     .font(Font.header(26, weight: .regular))
                     .foregroundColor(Color.luxuryCream)
                 Text("Works")
-                    .font(Font.tangerine(40, weight: .bold))
+                    .font(Font.bodySerif(40, weight: .bold))
                     .italic()
                     .foregroundColor(Color.luxuryGold)
             }
@@ -245,7 +240,7 @@ struct LandingView: View {
         VStack(spacing: 36) {
             HStack(spacing: 6) {
                 Text("Everything")
-                    .font(Font.tangerine(40, weight: .bold))
+                    .font(Font.bodySerif(40, weight: .bold))
                     .italic()
                     .foregroundColor(Color.luxuryGold)
                 Text("You Need")
@@ -277,7 +272,7 @@ struct LandingView: View {
                     .font(Font.header(26, weight: .regular))
                     .foregroundColor(Color.luxuryCream)
                 Text("Better Dates?")
-                    .font(Font.tangerine(40, weight: .bold))
+                    .font(Font.bodySerif(40, weight: .bold))
                     .italic()
                     .foregroundColor(Color.luxuryGold)
             }

@@ -22,7 +22,7 @@ struct DatePickerSheet: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color.luxuryMaroon.ignoresSafeArea()
+                Color.backgroundPrimary.ignoresSafeArea()
                 ScrollView {
                     VStack(spacing: 28) {
                         headerView
@@ -32,7 +32,7 @@ struct DatePickerSheet: View {
                 }
             }
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(Color.luxuryMaroon, for: .navigationBar)
+            .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
@@ -51,7 +51,7 @@ struct DatePickerSheet: View {
     private var headerView: some View {
         VStack(spacing: 6) {
             Text("When's your date?")
-                .font(Font.tangerine(32, weight: .bold))
+                .font(Font.bodySerif(32, weight: .bold))
                 .italic()
                 .foregroundColor(Color.luxuryGold)
             Text("Pick the day you'll go on \"\(planTitle)\"")

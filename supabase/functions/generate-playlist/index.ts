@@ -476,7 +476,7 @@ interface LastFmTracksResponse {
 function getArtistName(t: LastFmTrack): string {
   const a = t?.artist;
   if (!a) return "";
-  const name = (a as { "#text"?: string }).["#text"] ?? (a as { name?: string }).name;
+  const name = (a as { "#text"?: string })["#text"] ?? (a as { name?: string }).name;
   return typeof name === "string" ? name.trim() : "";
 }
 

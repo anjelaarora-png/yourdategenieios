@@ -37,7 +37,7 @@ struct MemoryGalleryView: View {
                     }
                 }
             }
-            .toolbarBackground(Color.luxuryMaroon, for: .navigationBar)
+            .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .sheet(isPresented: $showAddMemory) {
                 AddMemorySheet()
@@ -56,7 +56,7 @@ struct MemoryGalleryView: View {
     // MARK: - Luxury Background
     private var luxuryBackground: some View {
         ZStack {
-            Color.luxuryMaroon
+            Color.backgroundPrimary
                 .ignoresSafeArea()
             
             FloatingSparklesView()
@@ -116,9 +116,8 @@ struct MemoryGalleryView: View {
                         .font(Font.header(24, weight: .regular))
                         .foregroundColor(Color.luxuryCream)
                     Text("love story")
-                        .font(Font.tangerine(36, weight: .bold))
-                        .italic()
-                        .foregroundColor(Color.luxuryGold)
+                        .font(Font.bodySerif(26, weight: .regular))
+                        .foregroundColor(Color.accentGold)
                     Text("begins here")
                         .font(Font.header(24, weight: .regular))
                         .foregroundColor(Color.luxuryCream)
@@ -172,9 +171,8 @@ struct MemoryGalleryView: View {
                     .font(Font.header(30, weight: .regular))
                     .foregroundColor(Color.luxuryCream)
                 Text("Memories")
-                    .font(Font.tangerine(48, weight: .bold))
-                    .italic()
-                    .foregroundColor(Color.luxuryGold)
+                    .font(Font.bodySerif(32, weight: .regular))
+                    .foregroundColor(Color.accentGold)
             }
             
             Text("Every date, beautifully remembered")
@@ -329,7 +327,7 @@ struct PolaroidTimelineItem: View {
     private var captionArea: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(memory.caption ?? memory.title)
-                .font(Font.tangerine(22, weight: .bold))
+                .font(Font.bodySerif(16, weight: .regular))
                 .foregroundColor(Color.polaroidCaption)
                 .lineLimit(2)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -417,7 +415,7 @@ struct AddMemorySheet: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color.luxuryMaroon
+                Color.backgroundPrimary
                     .ignoresSafeArea()
                 
                 ScrollView(showsIndicators: false) {
@@ -446,7 +444,7 @@ struct AddMemorySheet: View {
                     .foregroundColor(Color.luxuryGold)
                 }
             }
-            .toolbarBackground(Color.luxuryMaroon, for: .navigationBar)
+            .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .onChange(of: selectedItem) { _, newValue in
                 Task {
@@ -682,7 +680,7 @@ struct MemoryDetailView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color.luxuryMaroon
+                Color.backgroundPrimary
                     .ignoresSafeArea()
                 
                 ScrollView(showsIndicators: false) {
@@ -707,7 +705,7 @@ struct MemoryDetailView: View {
                     .foregroundColor(Color.luxuryGold)
                 }
             }
-            .toolbarBackground(Color.luxuryMaroon, for: .navigationBar)
+            .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .alert("Delete Memory?", isPresented: $showDeleteConfirmation) {
                 Button("Cancel", role: .cancel) { }
@@ -736,7 +734,7 @@ struct MemoryDetailView: View {
             
             VStack(alignment: .leading, spacing: 8) {
                 Text(memory.caption ?? memory.title)
-                    .font(Font.tangerine(32, weight: .bold))
+                    .font(Font.bodySerif(22, weight: .regular))
                     .foregroundColor(Color.polaroidCaption)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }

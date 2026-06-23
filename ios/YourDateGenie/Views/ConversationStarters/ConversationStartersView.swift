@@ -32,7 +32,7 @@ struct ConversationStartersView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color.luxuryMaroon
+                Color.backgroundPrimary
                     .ignoresSafeArea()
 
                 if let session = showingSessionDetail {
@@ -63,9 +63,8 @@ struct ConversationStartersView: View {
                                 .font(Font.header(22, weight: .regular))
                                 .foregroundColor(Color.luxuryCream)
                             Text("you")
-                                .font(Font.tangerine(34, weight: .bold))
-                                .italic()
-                                .foregroundColor(Color.luxuryGold)
+                                .font(Font.bodySerif(24, weight: .regular))
+                                .foregroundColor(Color.accentGold)
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.horizontal, 20)
@@ -93,7 +92,7 @@ struct ConversationStartersView: View {
             }
             .navigationTitle("Dating Tips")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(Color.luxuryMaroon, for: .navigationBar)
+            .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar {
@@ -145,9 +144,8 @@ struct ConversationStartersView: View {
                         .font(Font.header(26, weight: .regular))
                         .foregroundColor(Color.luxuryCream)
                     Text("you")
-                        .font(Font.tangerine(42, weight: .bold))
-                        .italic()
-                        .foregroundColor(Color.luxuryGold)
+                        .font(Font.bodySerif(28, weight: .regular))
+                        .foregroundColor(Color.accentGold)
                 }
                 .padding(.horizontal, 4)
 
@@ -200,9 +198,8 @@ struct ConversationStartersView: View {
                 .buttonStyle(ScaleButtonStyle())
 
                 Text("Your favorites")
-                    .font(Font.tangerine(26, weight: .bold))
-                    .italic()
-                    .foregroundColor(Color.luxuryGold)
+                    .font(Font.bodySerif(20, weight: .regular))
+                    .foregroundColor(Color.accentGold)
                     .padding(.top, 8)
 
                 if storage.savedStarters.isEmpty {
@@ -222,9 +219,8 @@ struct ConversationStartersView: View {
                 }
 
                 Text("Past sessions")
-                    .font(Font.tangerine(26, weight: .bold))
-                    .italic()
-                    .foregroundColor(Color.luxuryGold)
+                    .font(Font.bodySerif(20, weight: .regular))
+                    .foregroundColor(Color.accentGold)
                     .padding(.top, 16)
 
                 if sessionStorage.sessions.isEmpty {
@@ -496,7 +492,7 @@ struct ConversationStartersView: View {
         }
         .padding(.vertical, 16)
         .background(
-            Color.luxuryMaroon
+            Color.backgroundPrimary
                 .shadow(color: Color.black.opacity(0.3), radius: 10, y: -5)
         )
     }

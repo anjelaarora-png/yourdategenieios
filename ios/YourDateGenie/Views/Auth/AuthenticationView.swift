@@ -9,7 +9,11 @@ struct AuthenticationView: View {
     @StateObject private var profileManager = UserProfileManager.shared
     @StateObject private var socialAuth = SocialAuthService.shared
     @FocusState private var focusedField: AuthInputField?
+    @State private var accountMode: AccountMode = .individual
+    @State private var showBusinessPortal = false
     @State private var showResetPasswordSheet = false
+
+    enum AccountMode { case individual, business }
     @State private var resendCooldownRemaining = 0
     @State private var resendFeedbackMessage: String?
     @State private var showResendSuccess = false
@@ -27,7 +31,7 @@ struct AuthenticationView: View {
 
     var body: some View {
         ZStack {
-            Color.luxuryMaroon
+            Color.backgroundPrimary
                 .ignoresSafeArea()
             
             RadialGradient.goldGlow
@@ -42,37 +46,45 @@ struct AuthenticationView: View {
                         VStack(spacing: 0) {
                             authHeader
 
-                            authModeToggle
-                                .padding(.top, 24)
+                            accountModeToggle
+                                .padding(.top, 20)
 
-                            if viewModel.isSignUp {
-                                signUpForm
+                            if accountMode == .business {
+                                businessPanel
+                                    .padding(.top, 24)
                             } else {
-                                signInForm
-                            }
+                                authModeToggle
+                                    .padding(.top, 24)
 
-                            authButton
-                                .padding(.top, 24)
+                                if viewModel.isSignUp {
+                                    signUpForm
+                                } else {
+                                    signInForm
+                                }
 
-                            if !viewModel.isSignUp {
-                                forgotPasswordButton
-                                    .padding(.top, 12)
-                            }
+                                authButton
+                                    .padding(.top, 24)
 
-                            socialDivider
-                                .padding(.top, 28)
+                                if !viewModel.isSignUp {
+                                    forgotPasswordButton
+                                        .padding(.top, 12)
+                                }
 
-                            socialAuthButtons
-                                .padding(.top, 16)
-
-                            if viewModel.isSignUp {
-                                signUpBenefits
-                                    .padding(.top, 32)
-                            }
-
-                            if allowSkipToExplore {
-                                exploreWithoutAccountButton
+                                socialDivider
                                     .padding(.top, 28)
+
+                                socialAuthButtons
+                                    .padding(.top, 16)
+
+                                if viewModel.isSignUp {
+                                    signUpBenefits
+                                        .padding(.top, 32)
+                                }
+
+                                if allowSkipToExplore {
+                                    exploreWithoutAccountButton
+                                        .padding(.top, 28)
+                                }
                             }
 
                             Spacer(minLength: 100)
@@ -89,6 +101,12 @@ struct AuthenticationView: View {
                         showResetPasswordSheet = false
                     },
                     onDismiss: { showResetPasswordSheet = false }
+                )
+            }
+            .fullScreenCover(isPresented: $showBusinessPortal) {
+                BusinessPortalView(
+                    defaultEmail: viewModel.email,
+                    onClose: { showBusinessPortal = false }
                 )
             }
             
@@ -334,8 +352,7 @@ struct AuthenticationView: View {
                 .padding(.bottom, 28)
 
             Text("Check your email")
-                .font(Font.tangerine(30, weight: .bold))
-                .italic()
+                .font(Font.bodySerif(30, weight: .regular))
                 .foregroundColor(Color.luxuryGold)
                 .multilineTextAlignment(.center)
 
@@ -438,17 +455,84 @@ struct AuthenticationView: View {
                 .shadow(color: Color.luxuryGold.opacity(0.3), radius: 20)
             
             Text(viewModel.isSignUp ? "Create Your Account" : "Welcome Back")
-                .font(Font.tangerine(36, weight: .bold))
-                .italic()
-                .foregroundColor(Color.luxuryGold)
+                .font(Font.bodySerif(28, weight: .regular))
+                .foregroundColor(Color.accentGold)
             
-            Text(viewModel.isSignUp ? "Start planning unforgettable dates" : "Sign in to continue your journey")
+            Text(viewModel.isSignUp ? "Plans ready when you are — no spreadsheets required." : "Pick up where you left off.")
                 .font(Font.bodySans(15, weight: .regular))
                 .foregroundColor(Color.luxuryCreamMuted)
         }
         .padding(.top, 60)
     }
     
+    private var accountModeToggle: some View {
+        HStack(spacing: 0) {
+            ForEach([AccountMode.individual, AccountMode.business], id: \.self) { mode in
+                let isOn = accountMode == mode
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) { accountMode = mode }
+                } label: {
+                    Text(mode == .individual ? "Individual" : "Business")
+                        .font(Font.bodySans(15, weight: isOn ? .semibold : .regular))
+                        .foregroundColor(isOn ? Color.luxuryMaroon : Color.luxuryMuted)
+                        .frame(maxWidth: .infinity)
+                        .frame(minHeight: 44)
+                        .background(isOn ? AnyShapeStyle(LinearGradient.goldShimmer) : AnyShapeStyle(Color.clear))
+                }
+                .accessibilityAddTraits(isOn ? .isSelected : [])
+            }
+        }
+        .background(Color.luxuryMaroonLight)
+        .cornerRadius(12)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.luxuryGold.opacity(0.3), lineWidth: 1)
+        )
+    }
+
+    private var businessPanel: some View {
+        VStack(spacing: 18) {
+            VStack(spacing: 10) {
+                ZStack {
+                    Circle()
+                        .fill(Color.luxuryGold.opacity(0.12))
+                        .frame(width: 64, height: 64)
+                    Image(systemName: "storefront.fill")
+                        .font(.system(size: 28))
+                        .foregroundColor(Color.luxuryGold)
+                }
+                Text("Own a date spot?")
+                    .font(Font.bodySerif(28, weight: .regular))
+                    .foregroundColor(Color.accentGold)
+                Text("Advertise to couples planning date nights in your area. Every category welcome — restaurants, bars, experiences, retail, events & more.")
+                    .font(Font.bodySans(15, weight: .regular))
+                    .foregroundColor(Color.luxuryCreamMuted)
+                    .multilineTextAlignment(.center)
+                    .lineSpacing(3)
+            }
+
+            VStack(alignment: .leading, spacing: 12) {
+                AuthBenefitRow(text: "Featured inside AI date itineraries")
+                AuthBenefitRow(text: "Reach couples mid-plan, not mid-scroll")
+                AuthBenefitRow(text: "Launch partner placement rates")
+            }
+            .padding(.vertical, 4)
+
+            Button {
+                showBusinessPortal = true
+            } label: {
+                HStack(spacing: 10) {
+                    Text("Continue to partner portal")
+                        .font(Font.bodySans(16, weight: .semibold))
+                    Image(systemName: "arrow.right")
+                        .font(.system(size: 14, weight: .semibold))
+                }
+                .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(LuxuryGoldButtonStyle())
+        }
+    }
+
     private var authModeToggle: some View {
         HStack(spacing: 0) {
             Button {
@@ -885,7 +969,7 @@ private struct ResetPasswordSheet: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color.luxuryMaroon
+                Color.backgroundPrimary
                     .ignoresSafeArea()
                 
                 VStack(spacing: 24) {

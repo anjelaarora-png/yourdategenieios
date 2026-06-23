@@ -1,62 +1,180 @@
-# API Keys Setup
+# API keys & third-party integrations
 
-Your Date Genie uses the **same Google API key** for address autocomplete, place details, and geocoding. You only need **one** key from Google Cloud, but you must add it in the right place(s) depending on which part of the app you’re running.
+Single reference for **where each integration is configured** and **what breaks if it’s missing**.
 
-## 1. Get a Google API key
+| Integration | API key needed? | Where to configure | Used for |
+|-------------|-----------------|-------------------|----------|
+| **OpenAI** | Yes | Supabase secret `OPENAI_API_KEY` | Date plans, gifts, love-note rewrite |
+| **Google Places** | Yes | iOS `Secrets.xcconfig` + Supabase secret + web `.env` | Autocomplete, geocoding, server venue verification |
+| **Last.fm** | Yes | Supabase secret `LASTFM_API_KEY` | Playlist generation only |
+| **OpenTable / Resy** | No | N/A (URLs + deep links) | Reservation links on stops; detected in AI output + `places.ts` |
+| **Sign in with Apple** | No (Apple Developer + Supabase Auth) | Xcode entitlements + Supabase Apple provider | Login |
+| **Google login** | No (Supabase Auth OAuth) | Supabase Google provider + redirect URL | Login |
 
-1. Go to [Google Cloud Console](https://console.cloud.google.com/).
-2. Create or select a project.
-3. Enable these APIs:
-   - **Places API** (for autocomplete + place details)
-   - **Geocoding API** (for address → coordinates)
-4. Go to **APIs & Services → Credentials**, create an **API key**, and (optionally) restrict it by API.
+---
+
+## 1. OpenAI (server-side only)
+
+**Never** put `OPENAI_API_KEY` in the iOS app, web bundle, or git.
+
+| Edge function | Feature |
+|---------------|---------|
+| `generate-date-plan` | AI date itineraries |
+| `generate-more-gifts` | Gift Finder suggestions |
+| `rewrite-love-note` | Love Notes “make it poetic” |
+
+```bash
+supabase secrets set OPENAI_API_KEY=sk-... --project-ref jhpwacmsocjmzhimtbxj
+supabase functions deploy generate-date-plan generate-more-gifts rewrite-love-note
+```
+
+iOS calls these via `SupabaseService` → `functions/v1/...` with the user’s JWT.
 
 ---
 
-## 2. Where to add the key
+## 2. Google Places & Geocoding
 
-### iOS app
+One Google Cloud API key can serve all three surfaces. Enable **Places API** and **Geocoding API**.
 
-Put the key in **`ios/Secrets.xcconfig`** (not committed to git):
+### iOS app (client)
 
-1. Copy `ios/Secrets.xcconfig.example` to `ios/Secrets.xcconfig`.
-2. Set `GOOGLE_PLACES_API_KEY = YOUR_KEY` in `Secrets.xcconfig`.
-3. Build and run in Xcode; the app reads the key via Info.plist.
+- File: `ios/Secrets.xcconfig` (copy from `Secrets.xcconfig.example`)
+- Variable: `GOOGLE_PLACES_API_KEY`
+- Read at runtime: `Config.swift` → `GooglePlacesService` (autocomplete, place details, route geocoding)
 
-If you don’t have `Secrets.xcconfig`, create it next to `Secrets.xcconfig.example` with the same variable names and your real values.
+### Supabase (server)
 
----
+- Secret: `GOOGLE_PLACES_API_KEY`
+- Used in `generate-date-plan` → `places.ts` (`validateAllStops`, `geocodeAddress`)
+- Without it: plans still generate, but stops are **unverified** (no Places cross-check)
+
+```bash
+supabase secrets set GOOGLE_PLACES_API_KEY=... --project-ref jhpwacmsocjmzhimtbxj
+```
 
 ### Web app (Vite)
 
-Put the key in a **`.env`** file at the **project root** (same folder as `package.json`):
-
-```bash
-VITE_GOOGLE_MAPS_API_KEY=your_google_api_key_here
-```
-
-Restart the dev server after changing `.env`. This is used for the web address autocomplete and map.
+- Root `.env`: `VITE_GOOGLE_MAPS_API_KEY=...`
+- Used in `src/components/ui/PlacesAutocompleteInput.tsx`
 
 ---
 
-### Supabase Edge Functions (date plan generation)
+## 3. Last.fm (playlists only)
 
-If you use the **Supabase** `generate-date-plan` function (venue verification / geocoding on the server), set the key as a **Supabase secret**:
+| Edge function | iOS entry point |
+|---------------|-----------------|
+| `generate-playlist` | `PlaylistWidgetView`, `SavedPlaylistsView` → `SupabaseService.generatePlaylist` |
 
 ```bash
-supabase secrets set GOOGLE_PLACES_API_KEY=your_google_api_key_here
+supabase secrets set LASTFM_API_KEY=... --project-ref jhpwacmsocjmzhimtbxj
+supabase functions deploy generate-playlist
 ```
 
-Deploy or run your functions after setting secrets.
+Get a key: [last.fm/api/account/create](https://www.last.fm/api/account/create)
+
+If missing, the app shows: *“Add LASTFM_API_KEY in Supabase → Edge Functions → Secrets.”*
+
+See also: `docs/PLAYLIST_DEPLOY_STEPS.md`
 
 ---
 
-## Summary
+## 4. OpenTable & Resy (no API keys)
 
-| Where you're running | Where to add the key |
-|----------------------|----------------------|
-| **iOS app** | `ios/Secrets.xcconfig` → `GOOGLE_PLACES_API_KEY` |
-| **Web app** | Root `.env` → `VITE_GOOGLE_MAPS_API_KEY` |
-| **Supabase** `generate-date-plan` | `supabase secrets set GOOGLE_PLACES_API_KEY=...` |
+There is **no** OpenTable or Resy developer API in this stack.
 
-Use the **same** Google API key in all three if you want address and map features to work in every part of the app.
+How reservations work:
+
+1. **AI** (`generate-date-plan/prompt.ts`) may include `bookingUrl` on restaurant stops.
+2. **Server** (`places.ts`) detects `opentable.com` / `resy.com` on venue websites → sets `reservationPlatforms`.
+3. **iOS** (`ReservationWidgetView.swift`, `OpenTableReservationSafari`) opens booking URLs with platform-aware labels and iOS referrer params.
+
+Nothing to add to `Secrets.xcconfig` or Supabase secrets for OpenTable/Resy.
+
+---
+
+## 5. Sign in with Apple
+
+### iOS (code — already wired)
+
+- `SocialAuthService` → `SupabaseService.signInWithApple`
+- `AuthenticationView` — native `SignInWithAppleButton`
+- Entitlement: `ios/YourDateGenie/YourDateGenie.entitlements` → `com.apple.developer.applesignin`
+
+### Apple Developer (manual)
+
+1. App ID → Sign in with Apple enabled
+2. Services ID + key (.p8) if using web redirect (optional for native-only)
+
+### Supabase Dashboard (manual)
+
+**Authentication → Providers → Apple** — enable and paste Team ID, Key ID, private key, Services ID.
+
+---
+
+## 6. Google login
+
+Uses **Supabase Auth PKCE OAuth** (no Google SDK in the app).
+
+### iOS (code — already wired)
+
+- `SocialAuthService.signInWithGoogle()` → `SupabaseService.signInWithGoogle()`
+- Redirect: `yourdategenie://auth-callback` (see `Info.plist` URL scheme + `AppDelegate`)
+
+### Supabase Dashboard (manual)
+
+1. **Authentication → Providers → Google** — enable, paste OAuth client ID/secret from Google Cloud Console
+2. **Authentication → URL configuration → Redirect URLs** — add:
+   - `yourdategenie://auth-callback`
+   - Your Supabase project callback URL (`https://<project>.supabase.co/auth/v1/callback`)
+
+### Google Cloud Console
+
+OAuth 2.0 client for **Web application** (Supabase callback) — not the Places API key.
+
+---
+
+## 7. Other Supabase secrets
+
+See `supabase/secrets.example` for the full list (Resend, Twilio, Apple bundle ID for StoreKit, etc.).
+
+---
+
+## Quick verification
+
+### iOS (`Config.validateConfiguration()`)
+
+On launch, missing keys log as:
+
+- `SUPABASE_URL` / `SUPABASE_ANON_KEY` — `ios/Secrets.xcconfig`
+- `GOOGLE_PLACES_API_KEY` — same file
+
+### Supabase
+
+Dashboard → Edge Functions → Logs:
+
+- `OPENAI_API_KEY is not configured` → set OpenAI secret
+- `LASTFM_API_KEY not configured` → set Last.fm secret
+- `[Validation] Cannot verify venues - missing API key` → set `GOOGLE_PLACES_API_KEY`
+
+### Deploy checklist
+
+```bash
+supabase functions deploy generate-date-plan generate-more-gifts rewrite-love-note generate-playlist \
+  validate-receipt delete-account submit-report send-welcome-email send-date-plan-email \
+  notify-new-signup import-eventbrite-event send-date-plan-sms
+
+# Apple webhook only — no JWT at gateway:
+supabase functions deploy apple-notifications-v2 --no-verify-jwt
+```
+
+---
+
+## Summary table
+
+| Where you're running | File / location |
+|----------------------|-----------------|
+| **iOS** | `ios/Secrets.xcconfig` → `SUPABASE_*`, `GOOGLE_PLACES_API_KEY` |
+| **Web** | Root `.env` → `VITE_*`, `VITE_GOOGLE_MAPS_API_KEY` |
+| **Supabase Edge Functions** | Dashboard secrets or `supabase secrets set` — see `supabase/secrets.example` |
+| **Apple / Google login** | Supabase Auth providers + Apple Developer portal (no app secrets) |
+| **OpenTable / Resy** | No keys — booking URLs only |

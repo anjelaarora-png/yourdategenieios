@@ -208,7 +208,7 @@ struct NotificationsSheetView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color.luxuryMaroon
+                Color.backgroundPrimary
                     .ignoresSafeArea()
                 
                 if notificationManager.notifications.isEmpty {
@@ -226,7 +226,7 @@ struct NotificationsSheetView: View {
                                 .font(Font.bodySans(14, weight: .regular))
                                 .foregroundColor(Color.luxuryMuted)
                             Text("magical!")
-                                .font(Font.tangerine(26, weight: .bold))
+                                .font(Font.displaySerif(20, weight: .bold))
                                 .italic()
                                 .foregroundColor(Color.luxuryGold)
                         }
@@ -273,7 +273,7 @@ struct NotificationsSheetView: View {
                     }
                 }
             }
-            .toolbarBackground(Color.luxuryMaroon, for: .navigationBar)
+            .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
         }
     }

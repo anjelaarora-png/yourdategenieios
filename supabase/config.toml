@@ -1,11 +1,9 @@
 project_id = "jhpwacmsocjmzhimtbxj"
 
-# generate-date-plan is called by the web/Lovable frontend (not the iOS app) so it remains
-# with verify_jwt = false to avoid breaking the web flow. All other functions require a
-# valid Supabase JWT (either anon or authenticated) before the function body executes.
+# generate-date-plan requires a signed-in user JWT (iOS app). Anon-only calls are rejected in-function.
 
 [functions.generate-date-plan]
-verify_jwt = false
+verify_jwt = true
 
 [functions.generate-more-gifts]
 verify_jwt = true
@@ -27,3 +25,19 @@ verify_jwt = true
 
 [functions.delete-account]
 verify_jwt = true
+
+[functions.rewrite-love-note]
+verify_jwt = true
+
+[functions.validate-receipt]
+verify_jwt = true
+
+[functions.submit-report]
+verify_jwt = true
+
+[functions.send-date-plan-sms]
+verify_jwt = true
+
+# Apple sends its own JWS — deploy with: supabase functions deploy apple-notifications-v2 --no-verify-jwt
+[functions.apple-notifications-v2]
+verify_jwt = false
