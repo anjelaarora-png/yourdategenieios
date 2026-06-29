@@ -141,7 +141,7 @@ struct PartnerJoinView: View {
                     .cornerRadius(12)
                     .overlay(
                         RoundedRectangle(cornerRadius: 12)
-                            .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                            .stroke(Color.luxeSurfaceBorder, lineWidth: 1)
                     )
             }
 

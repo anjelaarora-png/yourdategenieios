@@ -15,7 +15,7 @@ struct DatesTabView: View {
 
     var body: some View {
         ZStack {
-            Color.backgroundPrimary
+            CharcoalMaroonBackground()
                 .ignoresSafeArea()
 
             VStack(spacing: 0) {
@@ -116,8 +116,8 @@ struct DatesTabView: View {
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 4)
-                .padding(.bottom, 24)
             }
+            .mainTabBarScrollInset()
         }
     }
 
@@ -156,7 +156,7 @@ struct DatesTabView: View {
             Button {
                 coordinator.startDatePlanning()
             } label: {
-                Text("Plan a date")
+                Text("Plan My Next Date")
                     .font(Font.bodySans(15, weight: .semibold))
                     .foregroundColor(Color.luxuryMaroon)
                     .padding(.horizontal, 28)

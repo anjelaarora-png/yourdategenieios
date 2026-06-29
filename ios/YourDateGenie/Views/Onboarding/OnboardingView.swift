@@ -12,7 +12,7 @@ struct MobileOnboardingView: View {
     var body: some View {
         ZStack {
             // Luxurious background
-            Color.backgroundPrimary
+            Color.clear
                 .ignoresSafeArea()
             
             // Subtle gold vignette
@@ -136,7 +136,7 @@ struct MobileOnboardingView: View {
                             coordinator.completeOnboarding()
                         } label: {
                             Text("Skip intro")
-                                .font(Font.bodySans(15, weight: .semibold))
+                                .font(Font.bodySans(14, weight: .semibold))
                                 .foregroundColor(Color.luxuryGold)
                                 .frame(maxWidth: .infinity)
                                 .frame(minHeight: 44)
@@ -231,35 +231,22 @@ struct LuxurySlideWelcome: View {
                 .scaleEffect(showContent ? 1 : 0.5)
                 .animation(.spring(response: 0.6).delay(0.2), value: showContent)
                 
-                // Title
-                VStack(spacing: 8) {
-                    HStack(spacing: 6) {
-                        Text("Date nights,")
-                            .font(Font.header(32, weight: .regular))
-                            .foregroundColor(Color.luxuryCream)
-                    }
-                    
-                    HStack(spacing: 6) {
-                        Text("planned")
-                            .font(Font.bodySerif(48, weight: .bold))
-                            .italic()
-                            .foregroundStyle(LinearGradient.goldShimmer)
-                            .goldShimmer()
-                        Text("for you.")
-                            .font(Font.header(32, weight: .regular))
-                            .foregroundColor(Color.luxuryCream)
-                    }
-                }
+                OnboardingSectionHeader(
+                    label: "Your evening",
+                    subtitle: "Personalized from your preferences"
+                )
                 .opacity(showContent ? 1 : 0)
-                .offset(y: showContent ? 0 : 20)
-                .animation(.easeOut(duration: 0.5).delay(0.4), value: showContent)
-                
-                // Description
-                Text("Tell us what you love once. We build a complete evening — venues, timing, route & every detail handled.")
-                    .font(Font.bodySans(15, weight: .regular))
-                    .foregroundColor(Color.luxuryCreamMuted)
-                    .multilineTextAlignment(.center)
-                    .lineSpacing(5)
+                .animation(.easeOut(duration: 0.5).delay(0.35), value: showContent)
+
+                OnboardingSlideTitle(lead: "Date nights, ", accent: "planned for you.")
+                    .padding(.horizontal, 20)
+                    .opacity(showContent ? 1 : 0)
+                    .offset(y: showContent ? 0 : 12)
+                    .animation(.easeOut(duration: 0.5).delay(0.4), value: showContent)
+
+                OnboardingBodyText(
+                    text: "Tell us what you love once. We build a complete evening — venues, timing, route & every detail handled."
+                )
                     .padding(.horizontal, 20)
                     .opacity(showContent ? 1 : 0)
                     .animation(.easeOut(duration: 0.5).delay(0.5), value: showContent)
@@ -294,19 +281,10 @@ struct LuxurySlideChaos: View {
     var body: some View {
         VStack(spacing: 0) {
             // Header
-            VStack(spacing: 6) {
-                SectionLabel(text: "Sound familiar?", color: Color.luxuryMuted)
-                
-                HStack(spacing: 6) {
-                    Text("Friday night.")
-                        .font(Font.header(26, weight: .regular))
-                        .foregroundColor(Color.luxuryCream)
-                    Text("No plan.")
-                        .font(Font.bodySerif(40, weight: .bold))
-                        .italic()
-                        .foregroundColor(Color.luxuryGold)
-                        .goldShimmer()
-                }
+            VStack(spacing: 8) {
+                OnboardingSectionHeader(label: "Sound familiar?")
+                OnboardingSlideTitle(lead: "Friday night. ", accent: "No plan.")
+                    .padding(.horizontal, 24)
             }
             .padding(.top, 12)
             .opacity(showContent ? 1 : 0)
@@ -357,7 +335,7 @@ struct LuxurySlideChaos: View {
                                         
                                         VStack(alignment: .leading, spacing: 3) {
                                             RoundedRectangle(cornerRadius: 2)
-                                                .fill(Color.white.opacity(0.6))
+                                                .fill(Color.creamParchmentLight.opacity(0.55))
                                                 .frame(width: CGFloat.random(in: 60...100), height: 10)
                                             RoundedRectangle(cornerRadius: 2)
                                                 .fill(Color.gray.opacity(0.4))
@@ -367,7 +345,7 @@ struct LuxurySlideChaos: View {
                                     }
                                     .padding(.horizontal, 10)
                                     .padding(.vertical, 8)
-                                    .background(Color.white.opacity(0.1))
+                                    .background(Color.luxeSurfaceTintStrong)
                                     .cornerRadius(8)
                                     .opacity(showContent ? 1 : 0)
                                     .offset(x: showContent ? 0 : -50)
@@ -434,21 +412,10 @@ struct LuxurySlideChaos: View {
             
             // Pain point text
             VStack(spacing: 6) {
-                Text("Too many apps. Too many reviews.")
-                    .font(Font.bodySans(15, weight: .regular))
-                    .foregroundColor(Color.luxuryCreamMuted)
-                
-                HStack(spacing: 4) {
-                    Text("After work,")
-                        .font(Font.bodySans(15, weight: .regular))
-                        .foregroundColor(Color.luxuryCreamMuted)
-                    Text("who has time?")
-                        .font(Font.bodySerif(28, weight: .bold))
-                        .italic()
-                        .foregroundColor(Color.luxuryGold)
-                }
+                OnboardingBodyText(text: "Too many apps. Too many reviews.")
+                OnboardingAccentBody(lead: "After work, ", accent: "who has time?")
             }
-            .multilineTextAlignment(.center)
+            .padding(.horizontal, 24)
             .opacity(showContent ? 1 : 0)
             .animation(.easeOut(duration: 0.4).delay(1.0), value: showContent)
             
@@ -465,24 +432,13 @@ struct LuxurySlideItinerary: View {
     var body: some View {
         VStack(spacing: 0) {
             // Header
-            VStack(spacing: 6) {
-                SectionLabel(text: "Your night, planned", color: Color.luxuryMuted)
-                
-                HStack(spacing: 6) {
-                    Text("Ready on")
-                        .font(Font.header(26, weight: .regular))
-                        .foregroundColor(Color.luxuryCream)
-                    Text("Home")
-                        .font(Font.bodySerif(40, weight: .bold))
-                        .italic()
-                        .foregroundColor(Color.luxuryGold)
-                        .goldShimmer()
-                }
-
-                Text("Real venues · verified · timing & route included")
-                    .font(Font.bodySans(12, weight: .regular))
-                    .foregroundColor(Color.luxuryMuted)
-                    .multilineTextAlignment(.center)
+            VStack(spacing: 8) {
+                OnboardingSectionHeader(
+                    label: "Your night, planned",
+                    subtitle: "Real venues · verified · timing & route included"
+                )
+                OnboardingSlideTitle(lead: "Ready on ", accent: "Home")
+                    .padding(.horizontal, 24)
             }
             .padding(.top, 12)
             .opacity(showContent ? 1 : 0)
@@ -495,11 +451,10 @@ struct LuxurySlideItinerary: View {
                     VStack(alignment: .leading, spacing: 4) {
                         HStack(spacing: 4) {
                             Text("Romantic")
-                                .font(Font.bodySerif(28, weight: .bold))
-                                .italic()
+                                .font(Font.bodySerif(17, weight: .regular))
                                 .foregroundColor(Color.luxuryGold)
                             Text("Italian Night")
-                                .font(Font.header(18, weight: .regular))
+                                .font(Font.bodySans(14, weight: .semibold))
                                 .foregroundColor(Color.luxuryGold)
                         }
                         
@@ -625,12 +580,11 @@ struct OnboardingItineraryStop: View {
                     .foregroundColor(Color.luxuryGold)
                 
                 Text(name)
-                    .font(Font.header(15, weight: .bold))
+                    .font(Font.bodySans(14, weight: .semibold))
                     .foregroundColor(Color.luxuryCream)
                 
                 Text(tip)
-                    .font(Font.bodySerif(20, weight: .bold))
-                    .italic()
+                    .font(Font.bodySans(12, weight: .regular))
                     .foregroundColor(Color.luxuryMuted)
             }
             .opacity(isActive ? 1 : 0.5)
@@ -730,7 +684,7 @@ struct LuxurySlideHomeFlow: View {
                             .font(Font.bodySans(11, weight: .medium))
                             .foregroundColor(Color.luxuryMuted)
                         Text("Pasta · gallery · gelato")
-                            .font(Font.header(16, weight: .bold))
+                            .font(Font.bodySans(14, weight: .semibold))
                             .foregroundColor(Color.luxuryCream)
                         Text("romantic · ~$90 · 7–11 PM")
                             .font(Font.bodySans(11, weight: .regular))
@@ -772,38 +726,22 @@ struct LuxurySlideHomeFlow: View {
 
     // MARK: Header (swaps copy on lock)
     @ViewBuilder private var header: some View {
-        VStack(spacing: 6) {
-            SectionLabel(text: "How Home works", color: Color.luxuryMuted)
+        VStack(spacing: 8) {
+            OnboardingSectionHeader(label: "How Home works")
 
             if locked {
-                HStack(spacing: 6) {
-                    Text("You're")
-                        .font(Font.header(26, weight: .regular))
-                        .foregroundColor(Color.luxuryCream)
-                    Text("locked in")
-                        .font(Font.bodySerif(40, weight: .bold))
-                        .italic()
-                        .foregroundColor(Color.luxuryGold)
-                        .goldShimmer()
-                }
+                OnboardingSlideTitle(lead: "You're ", accent: "locked in")
+                    .padding(.horizontal, 24)
+                    .transition(.opacity)
                 Text("Reserve · route · text · calendar")
-                    .font(Font.bodySans(12, weight: .medium))
+                    .font(Font.bodySans(13, weight: .regular))
                     .foregroundColor(Color.luxuryGold.opacity(0.85))
                     .transition(.opacity)
             } else {
-                HStack(spacing: 6) {
-                    Text("Open the app.")
-                        .font(Font.header(24, weight: .regular))
-                        .foregroundColor(Color.luxuryCream)
-                    Text("Tonight's ready")
-                        .font(Font.bodySerif(36, weight: .bold))
-                        .italic()
-                        .foregroundColor(Color.luxuryGold)
-                }
-                Text("Tap Lock it in — reserve, route & share unlock after.")
-                    .font(Font.bodySans(12, weight: .regular))
-                    .foregroundColor(Color.luxuryMuted)
-                    .multilineTextAlignment(.center)
+                OnboardingSlideTitle(lead: "Open the app. ", accent: "Tonight's ready")
+                    .padding(.horizontal, 24)
+                    .transition(.opacity)
+                OnboardingBodyText(text: "Tap Lock it in — reserve, route & share unlock after.")
                     .padding(.horizontal, 28)
                     .transition(.opacity)
             }
@@ -927,35 +865,25 @@ struct LuxurySlideExtras: View {
     }
 
     private let extras: [Extra] = [
-        Extra(emoji: "✨", title: "Convo starters", blurb: "Swipe questions matched to your relationship", location: "Convo tab"),
-        Extra(emoji: "💌", title: "Love notes", blurb: "AI-drafted sweet notes you send before the date", location: "On your itinerary"),
-        Extra(emoji: "🎁", title: "Gift finder", blurb: "Gift ideas from their profile & budget", location: "Add from any stop")
+        Extra(emoji: "✨", title: "Conversation Starters", blurb: "Swipe questions matched to your relationship", location: "Convo tab"),
+        Extra(emoji: "💌", title: "Love Notes", blurb: "AI-drafted sweet notes you send before the date", location: "On your itinerary"),
+        Extra(emoji: "🎁", title: "Gift Finder", blurb: "Gift ideas from their profile & budget", location: "Add from any stop")
     ]
 
     var body: some View {
         VStack(spacing: 0) {
             // Header
-            VStack(spacing: 6) {
-                SectionLabel(text: "Plus on every date", color: Color.luxuryMuted)
-
-                HStack(spacing: 6) {
-                    Text("Three extras on")
-                        .font(Font.header(24, weight: .regular))
-                        .foregroundColor(Color.luxuryCream)
-                    Text("every plan")
-                        .font(Font.bodySerif(38, weight: .bold))
-                        .italic()
-                        .foregroundColor(Color.luxuryGold)
-                        .goldShimmer()
-                }
-
-                Text("Not separate apps — talk, text & gifts are part of the date Genie builds.")
-                    .font(Font.bodySans(13, weight: .regular))
-                    .foregroundColor(Color.luxuryCreamMuted)
-                    .multilineTextAlignment(.center)
-                    .lineSpacing(3)
+            VStack(spacing: 8) {
+                OnboardingSectionHeader(
+                    label: "Plus on every date",
+                    subtitle: "Built into every Date Genie plan"
+                )
+                OnboardingSlideTitle(lead: "Three extras on ", accent: "every plan")
+                    .padding(.horizontal, 24)
+                OnboardingBodyText(
+                    text: "Not separate apps — talk, text & gifts are part of every plan."
+                )
                     .padding(.horizontal, 28)
-                    .padding(.top, 2)
             }
             .padding(.top, 12)
             .opacity(showContent ? 1 : 0)
@@ -966,7 +894,7 @@ struct LuxurySlideExtras: View {
                 HStack {
                     VStack(alignment: .leading, spacing: 3) {
                         Text("What's included")
-                            .font(Font.header(16, weight: .bold))
+                            .font(Font.bodySans(14, weight: .semibold))
                             .foregroundColor(Color.luxuryCream)
                         Text("3 extras · built into every date plan")
                             .font(Font.bodySans(12, weight: .regular))
@@ -993,10 +921,10 @@ struct LuxurySlideExtras: View {
 
                             VStack(alignment: .leading, spacing: 3) {
                                 Text(extra.title)
-                                    .font(Font.header(15, weight: .bold))
+                                    .font(Font.bodySans(14, weight: .semibold))
                                     .foregroundColor(Color.luxuryCream)
                                 Text(extra.blurb)
-                                    .font(Font.bodySans(12.5, weight: .regular))
+                                    .font(Font.bodySans(13, weight: .regular))
                                     .foregroundColor(Color.luxuryCreamMuted)
                                     .fixedSize(horizontal: false, vertical: true)
                                 Text(extra.location)
@@ -1091,13 +1019,9 @@ struct LuxurySlideGetStarted: View {
                             .animation(.spring(response: 0.3).delay(Double(index) * 0.1 + 0.4), value: showContent)
                     }
                     
-                    Text("Magical")
-                        .font(Font.bodySerif(32, weight: .bold))
-                        .italic()
+                    Text("Magical evenings")
+                        .font(Font.bodySerif(17, weight: .regular))
                         .foregroundColor(Color.luxuryGold)
-                    Text("evenings")
-                        .font(Font.header(14, weight: .regular))
-                        .foregroundColor(Color.luxuryCream)
                 }
                 .padding(16)
             }
@@ -1109,23 +1033,15 @@ struct LuxurySlideGetStarted: View {
             
             // Title
             VStack(spacing: 8) {
-                HStack(spacing: 6) {
-                    Text("Ready for")
-                        .font(Font.header(26, weight: .regular))
-                        .foregroundColor(Color.luxuryCream)
-                    Text("better dates?")
-                        .font(Font.bodySerif(42, weight: .bold))
-                        .italic()
-                        .foregroundColor(Color.luxuryGold)
-                        .goldShimmer()
-                }
-                
-                Text("Quick Genie Profile — then your first plan waits on Home.")
-                    .font(Font.bodySans(15, weight: .regular))
-                    .foregroundColor(Color.luxuryCreamMuted)
+                OnboardingSectionHeader(
+                    label: "Almost there",
+                    subtitle: "Quick Genie Profile next"
+                )
+                OnboardingSlideTitle(lead: "Ready for ", accent: "better dates?")
+                    .padding(.horizontal, 24)
+                OnboardingBodyText(text: "Then your first plan waits on Home.")
                     .padding(.horizontal, 28)
             }
-            .multilineTextAlignment(.center)
             .padding(.top, 24)
             .opacity(showContent ? 1 : 0)
             .animation(.easeOut(duration: 0.4).delay(0.2), value: showContent)
@@ -1243,12 +1159,82 @@ struct OnboardingBenefitRow: View {
             }
             
             Text(text)
-                .font(Font.bodySans(15, weight: .regular))
+                .font(Font.bodySans(13, weight: .regular))
                 .foregroundColor(isChecked ? Color.luxuryCream : Color.luxuryMuted)
             
             Spacer()
         }
         .animation(.spring(response: 0.3), value: isChecked)
+    }
+}
+
+// MARK: - Onboarding typography (Option D section labels + Option B slide titles)
+
+/// Home-style gold uppercase section label with optional muted subtitle.
+struct OnboardingSectionHeader: View {
+    let label: String
+    var subtitle: String? = nil
+
+    var body: some View {
+        VStack(spacing: 2) {
+            Text(label.uppercased())
+                .font(Font.bodySans(13, weight: .semibold))
+                .tracking(1.2)
+                .foregroundColor(Color.luxuryGold)
+            if let subtitle, !subtitle.isEmpty {
+                Text(subtitle)
+                    .font(Font.bodySans(11, weight: .regular))
+                    .foregroundColor(Color.luxuryCreamMuted.opacity(0.75))
+                    .multilineTextAlignment(.center)
+            }
+        }
+    }
+}
+
+/// Georgia 22 title with an inline gold accent — matches home greeting & plan sheet.
+struct OnboardingSlideTitle: View {
+    var lead: String = ""
+    var accent: String = ""
+    var trail: String = ""
+
+    var body: some View {
+        Group {
+            if accent.isEmpty {
+                Text(lead + trail)
+            } else {
+                Text(lead) + Text(accent).foregroundColor(Color.luxuryGold) + Text(trail)
+            }
+        }
+        .font(Font.bodySerif(22, weight: .regular))
+        .foregroundColor(Color.luxuryCream)
+        .multilineTextAlignment(.center)
+        .lineSpacing(4)
+    }
+}
+
+/// Standard onboarding body copy — Sans 13, muted cream.
+struct OnboardingBodyText: View {
+    let text: String
+
+    var body: some View {
+        Text(text)
+            .font(Font.bodySans(13, weight: .regular))
+            .foregroundColor(Color.luxuryCreamMuted)
+            .multilineTextAlignment(.center)
+            .lineSpacing(4)
+    }
+}
+
+/// Body line with a gold accent phrase inline.
+struct OnboardingAccentBody: View {
+    let lead: String
+    let accent: String
+
+    var body: some View {
+        (Text(lead).foregroundColor(Color.luxuryCreamMuted) +
+         Text(accent).foregroundColor(Color.luxuryGold))
+            .font(Font.bodySans(13, weight: .regular))
+            .multilineTextAlignment(.center)
     }
 }
 
@@ -1296,7 +1282,7 @@ private struct GoldShimmerModifier: ViewModifier {
                     GeometryReader { geo in
                         let w = geo.size.width
                         LinearGradient(
-                            colors: [.clear, Color.white.opacity(0.9), .clear],
+                            colors: [.clear, Color.creamParchmentLight.opacity(0.85), .clear],
                             startPoint: .leading,
                             endPoint: .trailing
                         )

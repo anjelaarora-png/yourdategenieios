@@ -21,13 +21,13 @@ struct LuxuryQuickTile: View {
                         .foregroundColor(color)
                 }
                 Text(title)
-                    .font(Font.bodySans(12, weight: .medium))
+                    .font(Font.bodySans(11, weight: .medium))
                     .foregroundColor(Color.luxuryCream)
                     .lineLimit(2)
                     .multilineTextAlignment(.center)
                     .truncationMode(.tail)
                     .minimumScaleFactor(0.85)
-                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(minHeight: 28)
             }
             .frame(maxWidth: .infinity)
             .opacity(isLocked ? 0.5 : 1)
@@ -165,9 +165,9 @@ struct LoveLetterItineraryBackground<Content: View>: View {
                     .fill(
                         LinearGradient(
                             colors: [
-                                Color(hex: "FDF8F0"),
-                                Color(hex: "F5EDE0"),
-                                Color(hex: "F0E6D8")
+                                Color.creamParchmentLight,
+                                Color.creamParchmentMid,
+                                Color.creamParchmentDeep
                             ],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing

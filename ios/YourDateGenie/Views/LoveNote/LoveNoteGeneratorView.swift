@@ -54,9 +54,11 @@ struct LoveNoteGeneratorView: View {
                     }
                     .padding(.horizontal, 20)
                     .padding(.top, 16)
-                    .padding(.bottom, 120)
                 }
+                .mainTabBarScrollInset()
             }
+            .navigationTitle("Love Notes")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -80,12 +82,12 @@ struct LoveNoteGeneratorView: View {
             .onChange(of: signOffName) { _, _ in scheduleDraftSave() }
             .onChange(of: poeticText) { _, _ in scheduleDraftSave() }
             .onChange(of: selectedRewriteStyle) { _, _ in scheduleDraftSave() }
-            .alert("Saved!", isPresented: $showSaveSuccess) {
+            .alert("Love Note Saved!", isPresented: $showSaveSuccess) {
                 Button("OK") { showSaveSuccess = false }
             } message: {
                 Text(saveSuccessMessage)
             }
-            .alert("Couldn't Save", isPresented: $showSaveError) {
+            .alert("Couldn't Save Love Note", isPresented: $showSaveError) {
                 Button("OK") { showSaveError = false }
             } message: {
                 Text(saveErrorMessage)
@@ -106,14 +108,18 @@ struct LoveNoteGeneratorView: View {
                     Image(systemName: "heart.text.square.fill")
                         .font(.system(size: 12))
                         .foregroundColor(Color.luxuryGold.opacity(0.9))
-                    Text(draftSavedAt != nil ? "Draft saved" : "Draft")
+                    Text(draftSavedAt != nil ? "Love Note draft saved" : "Love Note draft")
                         .font(Font.bodySans(13, weight: .medium))
                         .foregroundColor(Color.luxuryCreamMuted)
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
-                .background(Color.luxuryMaroonLight.opacity(0.6))
+                .background(Color.luxeSurfaceTintStrong)
                 .cornerRadius(10)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(Color.luxeSurfaceBorder, lineWidth: 1)
+                )
             }
         }
     }
@@ -192,12 +198,17 @@ struct LoveNoteGeneratorView: View {
 
     private var headerSection: some View {
         VStack(spacing: 10) {
-            Text("Draft a note")
-                .font(Font.bodySerif(28, weight: .regular))
-                .foregroundColor(Color.accentGold)
-                .multilineTextAlignment(.center)
+            HStack(spacing: 8) {
+                Image(systemName: "heart.text.square.fill")
+                    .font(.system(size: 22))
+                    .foregroundStyle(LinearGradient.goldShimmer)
+                Text("Write a Love Note")
+                    .font(Font.bodySerif(28, weight: .regular))
+                    .foregroundColor(Color.accentGold)
+            }
+            .multilineTextAlignment(.center)
 
-            Text("Write your feelings, pick a style to rewrite, then save as a note to send.")
+            Text("Pour your heart out, rewrite with AI, then save or send your Love Note.")
                 .font(Font.bodySans(15, weight: .regular))
                 .foregroundColor(Color.luxuryCreamMuted)
                 .multilineTextAlignment(.center)
@@ -259,23 +270,18 @@ struct LoveNoteGeneratorView: View {
                 if noteText.isEmpty {
                     Text(prompts[selectedPromptIndex].placeholder)
                         .font(Font.bodySans(16, weight: .regular))
-                        .foregroundColor(Color.luxuryCreamMuted)
+                        .foregroundColor(Color.textMutedOnCard)
                         .padding(.horizontal, 16)
                         .padding(.vertical, 14)
                 }
                 TextEditor(text: $noteText)
                     .font(Font.bodySans(16, weight: .regular))
-                    .foregroundColor(Color.luxuryCream)
+                    .foregroundColor(Color.textOnCard)
                     .scrollContentBackground(.hidden)
                     .padding(12)
                     .frame(minHeight: 140)
             }
-            .background(Color.luxuryMaroonLight.opacity(0.8))
-            .cornerRadius(16)
-            .overlay(
-                RoundedRectangle(cornerRadius: 16)
-                    .stroke(Color.luxuryGold.opacity(0.4), lineWidth: 1)
-            )
+            .creamParchmentMaroonAccent(cornerRadius: 16)
         }
     }
 
@@ -293,14 +299,9 @@ struct LoveNoteGeneratorView: View {
             }
             TextField("Your name", text: $signOffName)
                 .font(Font.bodySans(16, weight: .regular))
-                .foregroundColor(Color.luxuryCream)
+                .foregroundColor(Color.textOnCard)
                 .padding(14)
-                .background(Color.luxuryMaroonLight.opacity(0.8))
-                .cornerRadius(12)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color.luxuryGold.opacity(0.3), lineWidth: 1)
-                )
+                .creamParchmentMaroonAccent(cornerRadius: 12)
                 .autocapitalization(.words)
         }
     }
@@ -411,7 +412,7 @@ struct LoveNoteGeneratorView: View {
     private var previewSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 6) {
-                Text("Love letter")
+                Text("Love Note")
                     .font(Font.bodySerif(28, weight: .bold))
                     .italic()
                     .foregroundColor(Color.luxuryGold)
@@ -460,7 +461,7 @@ struct LoveNoteGeneratorView: View {
                     HStack(spacing: 10) {
                         Image(systemName: "heart.text.square.fill")
                             .font(.system(size: 18))
-                        Text("Save love note")
+                        Text("Save Love Note")
                             .font(Font.bodySans(15, weight: .semibold))
                         Spacer()
                     }
@@ -525,7 +526,7 @@ struct LoveNoteGeneratorView: View {
         let signOff = signOffName.trimmingCharacters(in: .whitespaces).isEmpty ? nil : signOffName.trimmingCharacters(in: .whitespaces)
         storage.add(message: displayMessage, signOffName: signOff)
         storage.clearDraft()
-        saveSuccessMessage = "Saved to your love notes."
+        saveSuccessMessage = "Saved to your Love Notes."
         showSaveSuccess = true
     }
 
@@ -554,7 +555,7 @@ struct LoveNoteGeneratorView: View {
                     if success {
                         storage.add(message: displayMessage, signOffName: signOff)
                         storage.clearDraft()
-                        saveSuccessMessage = "Your love note was saved to your photos. Share it with someone special!"
+                        saveSuccessMessage = "Your Love Note was saved to Photos. Share it with someone special!"
                         showSaveSuccess = true
                     } else {
                         saveErrorMessage = error?.localizedDescription ?? "Could not save to photos."
@@ -573,7 +574,7 @@ struct LoveNoteGeneratorView: View {
             return
         }
         storage.add(message: displayMessage, signOffName: signOff)
-        let shareText = "A love note for you 💕"
+        let shareText = "A Love Note for you 💕"
         let activityController = UIActivityViewController(activityItems: [image, shareText], applicationActivities: nil)
         guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
               let window = windowScene.windows.first(where: { $0.isKeyWindow }) ?? windowScene.windows.first,
@@ -644,23 +645,7 @@ struct SavedLoveNoteCard: View {
             }
             .frame(width: 160, height: 100)
             .padding(14)
-            .background(
-                RoundedRectangle(cornerRadius: 14)
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                Color(hex: "FDF8F0"),
-                                Color(hex: "F5EDE0")
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 14)
-                    .stroke(Color.luxuryGold.opacity(0.4), lineWidth: 1)
-            )
+            .creamParchmentMaroonAccent(cornerRadius: 14)
         }
         .buttonStyle(.plain)
     }
@@ -715,7 +700,7 @@ struct SavedLoveNoteDetailSheet: View {
                             } label: {
                                 HStack(spacing: 8) {
                                     Image(systemName: "trash")
-                                    Text("Remove from saved")
+                                    Text("Remove from Love Notes")
                                         .lineLimit(2)
                                         .multilineTextAlignment(.center)
                                 }
@@ -728,7 +713,7 @@ struct SavedLoveNoteDetailSheet: View {
                     .padding(.bottom, 40)
                 }
             }
-            .navigationTitle("Saved love note")
+            .navigationTitle("Saved Love Note")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
             .toolbar {
@@ -739,12 +724,12 @@ struct SavedLoveNoteDetailSheet: View {
                     .foregroundColor(Color.luxuryGold)
                 }
             }
-            .alert("Saved!", isPresented: $showSaveSuccess) {
+            .alert("Love Note Saved!", isPresented: $showSaveSuccess) {
                 Button("OK") { showSaveSuccess = false }
             } message: {
-                Text("Saved to your photos.")
+                Text("Saved to your Photos.")
             }
-            .alert("Couldn't save", isPresented: $showSaveError) {
+            .alert("Couldn't Save Love Note", isPresented: $showSaveError) {
                 Button("OK") { showSaveError = false }
             } message: {
                 Text(saveErrorMessage)
@@ -801,26 +786,15 @@ struct LoveLetterCardView: View {
 
     var body: some View {
         ZStack {
-            // Paper / parchment style background
             RoundedRectangle(cornerRadius: 20)
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            Color(hex: "FDF8F0"),
-                            Color(hex: "F5EDE0"),
-                            Color(hex: "F0E6D8")
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
+                .fill(LinearGradient.creamParchment)
                 .overlay(
                     RoundedRectangle(cornerRadius: 20)
                         .stroke(
                             LinearGradient(
                                 colors: [
                                     Color.luxuryGold.opacity(0.6),
-                                    Color.luxuryGold.opacity(0.2)
+                                    Color.accentMaroon.opacity(0.35)
                                 ],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
@@ -828,21 +802,23 @@ struct LoveLetterCardView: View {
                             lineWidth: 2
                         )
                 )
-                .shadow(color: Color.black.opacity(0.15), radius: 20, y: 8)
+                .shadow(color: Color.accentMaroon.opacity(0.12), radius: 20, y: 8)
 
             VStack(alignment: .leading, spacing: 20) {
-                // Decorative header
                 HStack {
-                    Image(systemName: "heart.fill")
-                        .font(.system(size: 22))
-                        .foregroundStyle(LinearGradient(
-                            colors: [Color.luxuryGold, Color.luxuryGoldDark],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ))
+                    HStack(spacing: 6) {
+                        Image(systemName: "heart.text.square.fill")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(Color.accentMaroon)
+                        Text("Love Note")
+                            .font(Font.bodySans(11, weight: .bold))
+                            .tracking(1.2)
+                            .foregroundColor(Color.accentMaroon.opacity(0.85))
+                            .textCase(.uppercase)
+                    }
                     Spacer()
                     Text(signOffLine)
-                        .font(Font.bodySerif(28, weight: .bold))
+                        .font(Font.bodySerif(20, weight: .bold))
                         .italic()
                         .foregroundColor(Color.luxuryMaroon.opacity(0.9))
                 }
@@ -854,7 +830,7 @@ struct LoveLetterCardView: View {
 
                 Text(message)
                     .font(Font.bodySans(16, weight: .regular))
-                    .foregroundColor(placeholder ? Color.gray.opacity(0.6) : Color(hex: "3D2C2C"))
+                    .foregroundColor(placeholder ? Color.textMutedOnCard : Color(hex: "3D2C2C"))
                     .lineSpacing(8)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                     .fixedSize(horizontal: false, vertical: true)
@@ -865,6 +841,7 @@ struct LoveLetterCardView: View {
         }
         .frame(maxWidth: .infinity)
         .aspectRatio(340/440, contentMode: .fit)
+        .maroonLeadingAccent(width: 3)
     }
 }
 

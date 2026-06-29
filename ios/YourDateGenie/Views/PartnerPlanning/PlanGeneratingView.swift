@@ -135,7 +135,7 @@ struct PlanGeneratingView: View {
         .cornerRadius(20)
         .overlay(
             RoundedRectangle(cornerRadius: 20)
-                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                .stroke(Color.luxeSurfaceBorder, lineWidth: 1)
         )
     }
 

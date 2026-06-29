@@ -109,9 +109,9 @@ struct PartnerRankingView: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 7)
-        .background(Color.white.opacity(0.05))
+        .background(Color.luxeSurfaceTint)
         .cornerRadius(20)
-        .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.white.opacity(0.1), lineWidth: 1))
+        .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.luxeSurfaceTintStrong, lineWidth: 1))
     }
 
     private var rankingInstructions: some View {

@@ -8,7 +8,7 @@ struct GiftsTabView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color.backgroundPrimary
+                CharcoalMaroonBackground()
                     .ignoresSafeArea()
                 
                 ScrollView(.vertical, showsIndicators: false) {

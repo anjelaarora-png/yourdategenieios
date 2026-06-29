@@ -8,16 +8,20 @@ struct LuxuryMainAppView: View {
     @StateObject private var network = NetworkMonitor.shared
     @State private var undoDeletedPlan: DatePlan?
     @State private var undoTimer: Timer?
+    @AppStorage("hasSeenHomeTutorial") private var hasSeenHomeTutorial = false
+    @State private var showHomeTutorial = false
+    @State private var tutorialStep = 0
+    @State private var tutorialAnchors: [HomeTutorialAnchor: CGRect] = [:]
     
     var body: some View {
         ZStack(alignment: .bottom) {
-            Color.backgroundPrimary
+            CharcoalMaroonBackground()
                 .ignoresSafeArea()
 
             Group {
                 switch coordinator.currentTab {
                 case .home:
-                    LuxuryHomeTabView()
+                    LuxuryHomeTabView(tutorialStep: $tutorialStep, isTutorialActive: showHomeTutorial)
                 case .dates:
                     DatesTabView()
                 case .convo:
@@ -27,15 +31,17 @@ struct LuxuryMainAppView: View {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+            bottomChrome
+                .zIndex(50)
         }
         .tint(Color.luxuryGold)
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            LuxuryTabBar(selectedTab: $coordinator.currentTab) {
-                coordinator.startDatePlanning()
-            }
-        }
         .sheet(item: $coordinator.activeSheet) { sheet in
             sheetContent(for: sheet)
+        }
+        .sheet(isPresented: $coordinator.showPlanStartChooser) {
+            PlanDateStartSheet()
+                .environmentObject(coordinator)
         }
         .sheet(isPresented: $coordinator.showMemoryGallery) {
             MemoryGalleryView(showCloseButton: true)
@@ -78,19 +84,60 @@ struct LuxuryMainAppView: View {
                     .animation(.easeInOut(duration: 0.35), value: network.isConnected)
             }
         }
-        // Undo snackbar at the bottom
-        .safeAreaInset(edge: .bottom, spacing: 0) {
+        .coordinateSpace(name: "homeTutorialSpace")
+        .onPreferenceChange(HomeTutorialAnchorPreferenceKey.self) { tutorialAnchors = $0 }
+        .onAppear {
+            guard !hasSeenHomeTutorial else { return }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.85) {
+                beginHomeTutorial()
+            }
+        }
+        .onChange(of: coordinator.homeTutorialReplayToken) { _, _ in
+            beginHomeTutorial()
+        }
+        .onChange(of: showHomeTutorial) { _, isShowing in
+            if !isShowing {
+                hasSeenHomeTutorial = true
+            }
+        }
+        .overlay {
+            if showHomeTutorial {
+                HomeTutorialOverlayView(
+                    isPresented: $showHomeTutorial,
+                    step: $tutorialStep,
+                    anchors: tutorialAnchors
+                )
+                .zIndex(300)
+            }
+        }
+    }
+
+    private var bottomChrome: some View {
+        VStack(spacing: 8) {
             if let plan = undoDeletedPlan {
                 UndoSnackbarView(message: "Plan deleted") {
-                    // Undo: restore the plan
                     coordinator.savedPlans.insert(plan, at: 0)
                     undoDeletedPlan = nil
                     undoTimer?.invalidate()
                 } onDismiss: {
                     undoDeletedPlan = nil
                 }
+                .padding(.horizontal, 16)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
                 .animation(.spring(response: 0.4), value: undoDeletedPlan != nil)
             }
+
+            LuxuryTabBar(selectedTab: $coordinator.currentTab) {
+                coordinator.startDatePlanning()
+            }
+        }
+    }
+
+    private func beginHomeTutorial() {
+        coordinator.currentTab = .home
+        tutorialStep = 0
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+            showHomeTutorial = true
         }
     }
 
@@ -146,7 +193,7 @@ struct LuxuryMainAppView: View {
                     } else {
                         LockedPremiumTabPlaceholder(
                             feature: .gifting,
-                            title: "Gifts",
+                            title: "Gift Finder",
                             subtitle: "Discover thoughtful gift ideas tailored to your dates."
                         )
                     }

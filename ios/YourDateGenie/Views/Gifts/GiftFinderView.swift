@@ -66,10 +66,8 @@ struct GiftFinderView: View {
         if let firstStop = datePlan?.stops.first, let address = firstStop.address {
             return address
         }
-        let fromProfile = UserProfileManager.shared.currentUser?.preferences.defaultStartingPoint.trimmingCharacters(in: .whitespacesAndNewlines)
-        if let loc = fromProfile, !loc.isEmpty { return loc }
-        let fromUserLocation = UserProfileManager.shared.currentUser?.location.trimmingCharacters(in: .whitespacesAndNewlines)
-        if let loc = fromUserLocation, !loc.isEmpty { return loc }
+        let fromProfile = UserProfileManager.resolvedLocationForDiscovery()
+        if !fromProfile.isEmpty { return fromProfile }
         return ""
     }
 

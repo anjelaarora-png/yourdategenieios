@@ -183,7 +183,7 @@ struct LockedInView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.surfaceElevated)
         .cornerRadius(14)
-        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.06), lineWidth: 1))
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.luxeSurfaceBorder, lineWidth: 1))
     }
 
     // MARK: - Drafted note
@@ -194,7 +194,7 @@ struct LockedInView: View {
                 Image(systemName: "envelope.fill")
                     .font(.system(size: 13))
                     .foregroundColor(Color.accentMaroon)
-                Text("A note, ready to send")
+                Text("Your Love Note, ready to send")
                     .font(Font.bodySans(11, weight: .bold))
                     .tracking(1.5)
                     .foregroundColor(Color.textPrimary.opacity(0.6))
@@ -203,13 +203,11 @@ struct LockedInView: View {
 
             Text(noteText)
                 .font(Font.bodySerif(15, weight: .regular))
-                .foregroundColor(Color.textPrimary.opacity(0.9))
+                .foregroundColor(Color.textOnCard)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(16)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.surfaceElevated)
-                .cornerRadius(14)
-                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.06), lineWidth: 1))
+                .creamParchmentMaroonAccent(cornerRadius: 14)
         }
     }
 
@@ -223,7 +221,7 @@ struct LockedInView: View {
                 HStack(spacing: 8) {
                     Image(systemName: didCopyNote ? "checkmark" : "doc.on.doc.fill")
                         .font(.system(size: 16))
-                    Text(didCopyNote ? "Copied — paste it to \(partnerDisplayName)" : "Copy note for \(partnerDisplayName)")
+                    Text(didCopyNote ? "Copied — paste your Love Note to \(partnerDisplayName)" : "Copy Love Note for \(partnerDisplayName)")
                         .font(Font.bodySans(16, weight: .semibold))
                 }
                 .foregroundColor(Color.backgroundPrimary)

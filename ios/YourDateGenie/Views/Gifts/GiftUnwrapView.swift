@@ -42,7 +42,7 @@ struct GiftUnwrapView: View {
                     RoundedRectangle(cornerRadius: 8)
                         .fill(
                             LinearGradient(
-                                colors: [Color.white.opacity(0.2), Color.clear],
+                                colors: [Color.creamParchmentLight.opacity(0.25), Color.clear],
                                 startPoint: .topLeading,
                                 endPoint: .center
                             )
@@ -78,7 +78,7 @@ struct GiftUnwrapView: View {
                     RoundedRectangle(cornerRadius: 8)
                         .fill(
                             LinearGradient(
-                                colors: [Color.white.opacity(0.25), Color.clear],
+                                colors: [Color.creamParchmentLight.opacity(0.3), Color.clear],
                                 startPoint: .top,
                                 endPoint: .center
                             )
@@ -107,7 +107,7 @@ struct GiftUnwrapView: View {
                     .frame(width: 22, height: 22)
                     .shadow(color: Color.black.opacity(0.2), radius: 2, x: 0, y: 1)
                 Circle()
-                    .fill(Color.white.opacity(0.3))
+                    .fill(Color.creamParchmentLight.opacity(0.35))
                     .frame(width: 8, height: 8)
                     .offset(x: -3, y: -3)
             }

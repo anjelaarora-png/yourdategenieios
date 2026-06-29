@@ -285,7 +285,7 @@ private struct IntricateBowView: View {
                     .frame(width: 20, height: 20)
                     .overlay(Circle().stroke(Color.luxuryGold.opacity(0.8), lineWidth: 1))
                 Circle()
-                    .fill(Color.white.opacity(0.5))
+                    .fill(Color.creamParchmentLight.opacity(0.5))
                     .frame(width: 6, height: 6)
                     .offset(x: -2, y: -2)
             }

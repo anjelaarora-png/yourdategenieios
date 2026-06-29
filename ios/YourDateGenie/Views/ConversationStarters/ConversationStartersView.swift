@@ -48,9 +48,10 @@ struct ConversationStartersView: View {
                         },
                         onRegenerate: { regenerateSparks() }
                     )
+                    .id(session.id)
                 } else if showingGeneratorFlow {
                     VStack(spacing: 0) {
-                        Text("DATING TIPS")
+                        Text("CONVERSATION STARTERS")
                             .font(Font.bodySans(12, weight: .semibold))
                             .tracking(2)
                             .foregroundColor(Color.luxuryGold)
@@ -59,7 +60,7 @@ struct ConversationStartersView: View {
                             .padding(.top, 6)
                             .padding(.bottom, 2)
                         HStack(alignment: .firstTextBaseline, spacing: 4) {
-                            Text("Find the tip made for ")
+                            Text("Find the spark made for ")
                                 .font(Font.displaySerif(22, weight: .regular))
                                 .foregroundColor(Color.luxuryCream)
                             Text("you")
@@ -69,7 +70,7 @@ struct ConversationStartersView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.horizontal, 20)
                         .padding(.bottom, 2)
-                        Text("2 taps. Personalised instantly.")
+                        Text("2 taps. Personalized instantly.")
                             .font(Font.bodySans(14, weight: .regular))
                             .foregroundColor(Color.luxuryCreamMuted)
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -90,7 +91,7 @@ struct ConversationStartersView: View {
                     hubContent
                 }
             }
-            .navigationTitle("Dating Tips")
+            .navigationTitle("Conversation Starters")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
@@ -129,18 +130,18 @@ struct ConversationStartersView: View {
         }
     }
 
-    // MARK: - Hub (Dating Tips – Find the tip made for you)
+    // MARK: - Hub (Conversation Starters)
     private var hubContent: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 24) {
-                Text("DATING TIPS")
+                Text("CONVERSATION STARTERS")
                     .font(Font.bodySans(12, weight: .semibold))
                     .tracking(2)
                     .foregroundColor(Color.luxuryGold)
                     .padding(.horizontal, 4)
 
                 HStack(alignment: .firstTextBaseline, spacing: 4) {
-                    Text("Find the tip made for ")
+                    Text("Find the spark made for ")
                         .font(Font.displaySerif(26, weight: .regular))
                         .foregroundColor(Color.luxuryCream)
                     Text("you")
@@ -149,7 +150,7 @@ struct ConversationStartersView: View {
                 }
                 .padding(.horizontal, 4)
 
-                Text("2 taps. Personalised instantly.")
+                Text("2 taps. Personalized instantly.")
                     .font(Font.bodySans(15, weight: .regular))
                     .foregroundColor(Color.luxuryCreamMuted)
                     .padding(.horizontal, 4)
@@ -240,8 +241,8 @@ struct ConversationStartersView: View {
                 }
             }
             .padding(20)
-            .padding(.bottom, 40)
         }
+        .mainTabBarScrollInset()
     }
 
     private func savedCount(for session: SparkSession) -> Int {
@@ -309,8 +310,8 @@ struct ConversationStartersView: View {
 
             }
             .padding(20)
-            .padding(.bottom, 100)
         }
+        .mainTabBarScrollInset()
     }
 
     // MARK: - Step 2: Vibe (4 options, list layout)
@@ -341,8 +342,8 @@ struct ConversationStartersView: View {
                 }
             }
             .padding(20)
-            .padding(.bottom, 100)
         }
+        .mainTabBarScrollInset()
     }
 
     private func vibeIcon(_ value: String) -> String {
@@ -406,8 +407,8 @@ struct ConversationStartersView: View {
                 }
             }
             .padding(20)
-            .padding(.bottom, 120)
         }
+        .mainTabBarScrollInset()
     }
 
     private func revealSparks() {
@@ -429,11 +430,22 @@ struct ConversationStartersView: View {
     /// Generate a new set of sparks with the same vibe/stage/topic and stay in the deck.
     private func regenerateSparks() {
         guard let session = currentSession else { return }
+        let currentBatch = Set(session.sparks.map(\.openingQuestion))
+        var alsoAvoid: Set<String> = []
+        for past in sessionStorage.sessions.prefix(8) {
+            guard past.id != session.id,
+                  past.relationshipStage == session.relationshipStage,
+                  past.mood == session.mood,
+                  past.topic == session.topic else { continue }
+            alsoAvoid.formUnion(past.sparks.map(\.openingQuestion))
+        }
         let sparks = ConversationOpenerContent.pickMultipleOpeners(
             relationshipStage: session.relationshipStage,
             mood: session.mood,
             topic: session.topic,
-            count: 10
+            count: 10,
+            excludingQuestions: currentBatch,
+            alsoAvoidQuestions: alsoAvoid
         )
         guard !sparks.isEmpty else { return }
         let newSession = SparkSession(

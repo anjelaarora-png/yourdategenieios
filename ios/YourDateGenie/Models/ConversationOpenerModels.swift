@@ -215,24 +215,65 @@ enum ConversationOpenerContent {
         return matching.randomElement()
     }
 
-    /// Pick multiple openers for a session. Prefers topic-matched; fills to requested count with stage+mood matches. Shuffled so each generation is different.
-    static func pickMultipleOpeners(relationshipStage: String, mood: String, topic: String?, count: Int = 10) -> [SparkItem] {
-        let topicMatching = openers.filter { set in
-            guard set.relationshipStages.contains(relationshipStage), set.moods.contains(mood) else { return false }
-            if topic == nil { return true }
-            return set.topics == nil || set.topics?.isEmpty == true || set.topics?.contains(topic!) == true
+    /// Pick multiple openers for a session. Prefers topic-matched; fills with stage+mood matches.
+    /// `excludingQuestions` are never repeated (current deck). `alsoAvoidQuestions` are skipped when enough remain.
+    static func pickMultipleOpeners(
+        relationshipStage: String,
+        mood: String,
+        topic: String?,
+        count: Int = 10,
+        excludingQuestions: Set<String> = [],
+        alsoAvoidQuestions: Set<String> = []
+    ) -> [SparkItem] {
+        func matchesStageAndMood(_ set: ConversationOpenerSet) -> Bool {
+            set.relationshipStages.contains(relationshipStage) && set.moods.contains(mood)
         }
-        let stageMoodMatching = openers.filter {
-            $0.relationshipStages.contains(relationshipStage) && $0.moods.contains(mood)
+
+        func matchesTopic(_ set: ConversationOpenerSet) -> Bool {
+            guard let topic else { return true }
+            return set.topics == nil || set.topics?.isEmpty == true || set.topics?.contains(topic) == true
         }
-        var pool = topicMatching.isEmpty ? stageMoodMatching : topicMatching
-        if pool.count < count {
-            let seen = Set(pool.map { $0.openingQuestion })
-            let extra = stageMoodMatching.filter { !seen.contains($0.openingQuestion) }
-            pool.append(contentsOf: extra)
+
+        func filteredPool(from source: [ConversationOpenerSet], requireTopic: Bool, exclude: Set<String>) -> [ConversationOpenerSet] {
+            source.filter { set in
+                matchesStageAndMood(set)
+                    && (!requireTopic || matchesTopic(set))
+                    && !exclude.contains(set.openingQuestion)
+            }
         }
-        return pool.shuffled().prefix(count).map { o in
-            SparkItem(openingQuestion: o.openingQuestion, followUp: o.followUp, tagsLabel: o.tagsLabel)
+
+        func buildPool(exclude: Set<String>, requireTopic: Bool) -> [ConversationOpenerSet] {
+            var pool: [ConversationOpenerSet] = []
+            if requireTopic, topic != nil {
+                pool = filteredPool(from: openers, requireTopic: true, exclude: exclude)
+            }
+            if pool.count < count {
+                let seen = Set(pool.map(\.openingQuestion))
+                let extra = filteredPool(from: openers, requireTopic: false, exclude: exclude)
+                    .filter { !seen.contains($0.openingQuestion) }
+                pool.append(contentsOf: extra)
+            }
+            return pool
+        }
+
+        let hardExclude = excludingQuestions
+        let softExclude = hardExclude.union(alsoAvoidQuestions)
+
+        var pool = buildPool(exclude: softExclude, requireTopic: topic != nil)
+
+        if pool.count < count, !alsoAvoidQuestions.isEmpty {
+            pool = buildPool(exclude: hardExclude, requireTopic: topic != nil)
+        }
+
+        if pool.isEmpty {
+            pool = openers.filter { matchesStageAndMood($0) && !hardExclude.contains($0.openingQuestion) }
+        }
+
+        let capped = min(count, pool.count)
+        guard capped > 0 else { return [] }
+
+        return pool.shuffled().prefix(capped).map { opener in
+            SparkItem(openingQuestion: opener.openingQuestion, followUp: opener.followUp, tagsLabel: opener.tagsLabel)
         }
     }
 }

@@ -65,6 +65,11 @@ struct Config {
         !googleIOSClientID.isEmpty && googleIOSClientID.hasSuffix(".apps.googleusercontent.com")
     }
 
+    #if DEBUG
+    /// When true: all premium gates open and the app skips login to land on Home (simulator demos only).
+    static let previewUnlockAllFeatures = true
+    #endif
+
     // MARK: - Google Calendar feature flag
     // When true: users can opt into Google Calendar (incremental OAuth scopes) alongside
     // Apple Calendar (EventKit default). Requires Google Calendar API enabled in Cloud

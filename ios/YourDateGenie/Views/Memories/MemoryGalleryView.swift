@@ -289,7 +289,7 @@ struct PolaroidTimelineItem: View {
             captionArea
         }
         .frame(width: 200)
-        .background(Color.polaroidWhite)
+        .background(Color.creamCard)
         .cornerRadius(4)
         .shadow(color: Color.polaroidShadow.opacity(0.25), radius: 8, x: 2, y: 4)
         .shadow(color: Color.black.opacity(0.12), radius: 20, x: 4, y: 8)
@@ -742,7 +742,7 @@ struct MemoryDetailView: View {
             .padding(.top, 12)
             .padding(.bottom, 24)
         }
-        .background(Color.polaroidWhite)
+        .background(Color.creamCard)
         .cornerRadius(6)
         .shadow(color: Color.polaroidShadow.opacity(0.3), radius: 12, x: 3, y: 6)
         .shadow(color: Color.black.opacity(0.15), radius: 24, x: 6, y: 12)

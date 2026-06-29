@@ -1,5 +1,25 @@
 import SwiftUI
 
+/// Layout constants for the pinned bottom tab bar (shared with scroll insets).
+enum LuxuryTabBarMetrics {
+    /// Icon + label row height.
+    static let barRowHeight: CGFloat = 56
+    /// Center + button rises above the bar row.
+    static let planButtonProtrusion: CGFloat = 22
+    /// Total chrome height above the home-indicator safe area.
+    static var barShellHeight: CGFloat { barRowHeight + planButtonProtrusion }
+    /// Padding so the last scroll item clears the bar when scrolled to the end.
+    static let scrollBreathingRoom: CGFloat = 12
+    static var scrollBottomInset: CGFloat { barShellHeight + scrollBreathingRoom }
+}
+
+extension View {
+    /// Keeps scroll content from sitting under the pinned tab bar; content scrolls behind the opaque bar.
+    func mainTabBarScrollInset() -> some View {
+        contentMargins(.bottom, LuxuryTabBarMetrics.scrollBottomInset, for: .scrollContent)
+    }
+}
+
 /// Custom bottom navigation: Home · Dates · [ + Plan ] · Convo · You.
 /// The center action is elevated because planning a date is the app's single primary job.
 struct LuxuryTabBar: View {
@@ -10,7 +30,11 @@ struct LuxuryTabBar: View {
     private let rightTabs: [NavigationCoordinator.Tab] = [.convo, .you]
 
     var body: some View {
-        ZStack(alignment: .top) {
+        ZStack(alignment: .bottom) {
+            tabBarBackground
+                .frame(height: LuxuryTabBarMetrics.barRowHeight)
+                .frame(maxWidth: .infinity, alignment: .bottom)
+
             HStack(spacing: 0) {
                 ForEach(leftTabs, id: \.self) { tab in
                     tabButton(tab)
@@ -23,12 +47,18 @@ struct LuxuryTabBar: View {
                     tabButton(tab)
                 }
             }
-            .frame(height: 56)
-            .background(tabBarBackground)
+            .frame(height: LuxuryTabBarMetrics.barRowHeight)
 
             planButton
-                .offset(y: -22)
+                .offset(y: -LuxuryTabBarMetrics.planButtonProtrusion)
         }
+        .frame(height: LuxuryTabBarMetrics.barShellHeight, alignment: .bottom)
+        .frame(maxWidth: .infinity)
+        .background(
+            tabBarBackground
+                .ignoresSafeArea(edges: .bottom)
+        )
+        .homeTutorialAnchor(.tabBar)
     }
 
     private func tabButton(_ tab: NavigationCoordinator.Tab) -> some View {
@@ -85,13 +115,15 @@ struct LuxuryTabBar: View {
     }
 
     private var tabBarBackground: some View {
-        Color.backgroundPrimary
-            .overlay(
-                Rectangle()
-                    .fill(Color.white.opacity(0.08))
-                    .frame(height: 1),
-                alignment: .top
-            )
-            .ignoresSafeArea(edges: .bottom)
+        ZStack {
+            CharcoalMaroonBackground()
+            Color.black.opacity(0.15)
+        }
+        .overlay(
+            Rectangle()
+                .fill(Color.luxeSurfaceBorder)
+                .frame(height: 1),
+            alignment: .top
+        )
     }
 }

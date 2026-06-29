@@ -146,57 +146,46 @@ class NotificationManager: ObservableObject {
 // MARK: - Notification Bell Button
 struct NotificationBellButton: View {
     @ObservedObject var notificationManager: NotificationManager
-    @State private var bellAnimation = false
-    
+
+    private var badgeLabel: String {
+        let count = notificationManager.unreadCount
+        if count > 9 { return "9+" }
+        return "\(count)"
+    }
+
     var body: some View {
         Button {
             notificationManager.showNotificationsSheet = true
         } label: {
             ZStack(alignment: .topTrailing) {
-                ZStack {
-                    if notificationManager.unreadCount > 0 {
-                        Circle()
-                            .fill(Color.luxuryGold.opacity(0.3))
-                            .frame(width: 40, height: 40)
-                            .blur(radius: 8)
-                    }
-                    
-                    Image(systemName: notificationManager.unreadCount > 0 ? "bell.badge.fill" : "bell.fill")
-                        .font(.system(size: 20))
-                        .foregroundColor(Color.luxuryGold)
-                        .rotationEffect(.degrees(bellAnimation && notificationManager.unreadCount > 0 ? 15 : 0))
-                        .animation(
-                            notificationManager.unreadCount > 0 ?
-                            .easeInOut(duration: 0.15).repeatCount(6, autoreverses: true) : .default,
-                            value: bellAnimation
-                        )
-                }
-                
+                Image(systemName: "bell")
+                    .font(.system(size: 17, weight: .medium))
+                    .foregroundColor(Color.luxuryGold)
+                    .frame(width: 36, height: 36)
+                    .background(Color.luxeSurfaceTint)
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .stroke(Color.luxeSurfaceTintStrong, lineWidth: 1)
+                    )
+
                 if notificationManager.unreadCount > 0 {
-                    Text("\(notificationManager.unreadCount)")
-                        .font(Font.bodySans(10, weight: .bold))
+                    Text(badgeLabel)
+                        .font(Font.bodySans(9, weight: .bold))
                         .foregroundColor(Color.luxuryMaroon)
-                        .frame(width: 16, height: 16)
+                        .frame(minWidth: 16, minHeight: 16)
+                        .padding(.horizontal, 2)
                         .background(Circle().fill(LinearGradient.goldShimmer))
-                        .offset(x: 4, y: 2)
+                        .overlay(Circle().stroke(Color.backgroundPrimary, lineWidth: 1.5))
+                        .offset(x: 6, y: -4)
                 }
             }
-            .frame(width: 48, height: 44)
-            .frame(minWidth: 80, minHeight: 44, alignment: .trailing)
-            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityLabel(notificationManager.unreadCount > 0
             ? "Notifications, \(notificationManager.unreadCount) unread"
             : "Notifications")
         .accessibilityHint("Opens notifications panel")
-        .onAppear {
-            if notificationManager.unreadCount > 0 {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-                    bellAnimation = true
-                }
-            }
-        }
     }
 }
 

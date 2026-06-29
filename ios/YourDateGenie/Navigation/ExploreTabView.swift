@@ -42,20 +42,16 @@ struct LuxuryExploreTabView: View {
 
     private var exploreRadiusMeters: Int { exploreRadiusMiles * 1609 }
 
-    /// Same as Home: starting point address first, then city (from Google Places / Maps).
+    /// Same as Home: starting point address first, then city (from profile or last questionnaire).
     private var preferredCity: String {
-        guard let user = UserProfileManager.shared.currentUser else { return "your area" }
-        let start = user.preferences.defaultStartingPoint.trimmingCharacters(in: .whitespaces)
-        let city = user.preferences.defaultCity.trimmingCharacters(in: .whitespaces)
-        if !start.isEmpty { return start }
-        if !city.isEmpty { return city }
-        return "your area"
+        let resolved = UserProfileManager.resolvedLocationForDiscovery()
+        return resolved.isEmpty ? "your area" : resolved
     }
     
     var body: some View {
         GeometryReader { geo in
             ZStack {
-                Color.backgroundPrimary
+                CharcoalMaroonBackground()
                     .ignoresSafeArea()
                 
                 ScrollView(.vertical, showsIndicators: false) {
@@ -475,9 +471,26 @@ struct LuxuryExploreTabView: View {
     
     /// Opens the business profile in Google Maps or Apple Maps (reviews, hours, photos).
     private func openPlaceInPreferredMaps(place: GooglePlacesService.PlaceSearchResult) {
+        ExplorePlaceOpener.open(place)
+    }
+}
+
+// MARK: - Chip button style — ensures chip taps are consumed and don’t pass through to cards below
+private struct ChipButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .contentShape(Rectangle())
+            .opacity(configuration.isPressed ? 0.9 : 1)
+            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
+    }
+}
+
+// MARK: - Maps opener (shared by Home preview + full Explore)
+
+enum ExplorePlaceOpener {
+    static func open(_ place: GooglePlacesService.PlaceSearchResult) {
         let app = UserDefaults.standard.string(forKey: "dateGenie_preferredMapsApp") ?? "apple"
         if app == "google" {
-            // Google Maps: api=1 + query (lat,lon) + query_place_id opens the business profile in the app
             let query = "\(place.latitude),\(place.longitude)".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
             let placeIdEncoded = place.placeId.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? place.placeId
             if let url = URL(string: "https://www.google.com/maps/search/?api=1&query=\(query)&query_place_id=\(placeIdEncoded)") {
@@ -485,7 +498,6 @@ struct LuxuryExploreTabView: View {
                 return
             }
         }
-        // Apple Maps: place URL shows business-style card with name, address, coordinate
         var comp = URLComponents(string: "https://maps.apple.com/place")!
         comp.queryItems = [
             URLQueryItem(name: "address", value: place.address),
@@ -505,18 +517,8 @@ struct LuxuryExploreTabView: View {
     }
 }
 
-// MARK: - Chip button style — ensures chip taps are consumed and don’t pass through to cards below
-private struct ChipButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .contentShape(Rectangle())
-            .opacity(configuration.isPressed ? 0.9 : 1)
-            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
-    }
-}
-
 // MARK: - Explore Place Card (Google Places result, View in Maps)
-private struct ExplorePlaceCard: View {
+struct ExplorePlaceCard: View {
     let place: GooglePlacesService.PlaceSearchResult
     let preferredCity: String
     let onOpenInMaps: () -> Void
@@ -602,6 +604,37 @@ private struct ExplorePlaceCard: View {
             .shadow(color: Color.luxuryGold.opacity(0.15), radius: 12, y: 4)
         }
         .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Continue exploring (Home carousel tail → full Explore)
+struct ExploreContinueCircleButton: View {
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            ZStack {
+                Circle()
+                    .fill(Color.luxuryMaroonLight.opacity(0.8))
+                    .overlay(Circle().stroke(LinearGradient.goldShimmer, lineWidth: 2))
+                    .shadow(color: Color.luxuryGold.opacity(0.3), radius: 16, y: 4)
+                    .frame(width: 160, height: 160)
+                VStack(spacing: 8) {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 44, weight: .medium))
+                        .foregroundStyle(LinearGradient.goldShimmer)
+                    Text("Continue exploring")
+                        .font(Font.bodySans(14, weight: .semibold))
+                        .foregroundStyle(LinearGradient.goldShimmer)
+                        .multilineTextAlignment(.center)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .frame(width: 160, height: 160)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Continue exploring — open full Explore")
     }
 }
 

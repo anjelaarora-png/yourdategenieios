@@ -40,16 +40,21 @@ private struct AladdinLampShape: Shape {
 
 struct MagicalLoadingView: View {
     @ObservedObject var generator: DatePlanGeneratorService
+    var onCancel: (() -> Void)? = nil
+
+    private static let sparkleCount = 6
     
     @State private var confettiPieces: [LoadingConfettiPiece] = []
     @State private var petalPositions: [CGPoint] = []
-    @State private var sparkleOpacity: [Double] = Array(repeating: 0.3, count: 6)
+    @State private var sparkleOpacity: [Double] = Array(repeating: 0.3, count: sparkleCount)
     @State private var sparklePositions: [CGPoint] = []
     @State private var glowOpacity: Double = 0
     @State private var glowScale: CGFloat = 0.4
     @State private var titleOpacity: Double = 0
     @State private var titleScale: CGFloat = 0.92
     @State private var tipOfTheDay: String = "Pick a place you've been to or have vetted—don't experiment on a first date."
+    
+    @State private var petalAnimationDurations: [Double] = Array(repeating: 5.0, count: 3)
     
     /// Route progress for trim animation (0...1).
     private var routeProgress: CGFloat {
@@ -112,7 +117,7 @@ struct MagicalLoadingView: View {
                         .rotationEffect(.degrees(Double(index * 45)))
                         .position(petalPosition(for: index, in: geo.size))
                         .animation(
-                            .easeInOut(duration: Double.random(in: 4...7))
+                            .easeInOut(duration: petalAnimationDurations[index])
                             .repeatForever(autoreverses: true)
                             .delay(Double(index) * 0.3),
                             value: petalPositions
@@ -120,7 +125,7 @@ struct MagicalLoadingView: View {
                 }
                 
                 // 3. Golden sparkles (minimal)
-                ForEach(0..<6, id: \.self) { index in
+                ForEach(0..<Self.sparkleCount, id: \.self) { index in
                     if index < sparklePositions.count {
                         Image(systemName: "sparkle")
                             .font(.system(size: [10, 12, 14, 16][index % 4]))
@@ -195,6 +200,14 @@ struct MagicalLoadingView: View {
                                 .font(Font.inter(11, weight: .regular))
                                 .foregroundColor(Color.luxuryMuted)
                                 .opacity(titleOpacity)
+
+                            if let onCancel {
+                                Button("Cancel", action: onCancel)
+                                    .font(Font.inter(14, weight: .medium))
+                                    .foregroundColor(Color.luxuryCreamMuted)
+                                    .padding(.top, 8)
+                                    .opacity(titleOpacity)
+                            }
                         }
                         .padding(.horizontal, 24)
                         .padding(.bottom, 40)
@@ -205,6 +218,7 @@ struct MagicalLoadingView: View {
         }
         .onAppear {
             tipOfTheDay = Self.tipsOfTheDay.randomElement() ?? Self.tipsOfTheDay[0]
+            petalAnimationDurations = (0..<3).map { _ in Double.random(in: 4...7) }
             let size = UIScreen.main.bounds.size
             spawnConfetti(in: size)
             animateConfetti(delay: 0.3)
@@ -216,7 +230,7 @@ struct MagicalLoadingView: View {
             }
             // Keep sparkles in upper area so they don't cover the text block
             let sparkleMaxY = size.height * 0.38
-            sparklePositions = (0..<6).map { _ in
+            sparklePositions = (0..<Self.sparkleCount).map { _ in
                 CGPoint(
                     x: CGFloat.random(in: 20...(size.width - 20)),
                     y: CGFloat.random(in: 60...(sparkleMaxY))
@@ -286,7 +300,7 @@ struct MagicalLoadingView: View {
     }
     
     private func startSparkleAnimations() {
-        for i in 0..<20 {
+        for i in sparkleOpacity.indices {
             withAnimation(
                 .easeInOut(duration: Double.random(in: 1.5...3))
                 .repeatForever(autoreverses: true)

@@ -12,6 +12,11 @@ struct PlaylistWidgetView: View {
     @State private var selectedMood: MoodOption = .none
     @State private var isGenerating = false
     @State private var playlist: DatePlaylist?
+    /// Vibe used for the current `playlist` (may differ from `selectedVibe` after "Change Vibe" without regen).
+    @State private var generatedVibe: VibeOption?
+    @State private var generatedEnergy: EnergyLevel?
+    @State private var generatedEra: EraOption?
+    @State private var generatedMood: MoodOption?
     @State private var currentlyPlaying: String?
     @State private var copiedToClipboard = false
     @State private var showAddSong = false
@@ -212,7 +217,7 @@ struct PlaylistWidgetView: View {
                     .padding(.horizontal, 0)
                 }
             }
-            .navigationTitle("Date Playlist")
+            .navigationTitle("Smart Playlists")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
@@ -272,18 +277,30 @@ struct PlaylistWidgetView: View {
         playlist = DatePlaylist(name: current.name, mood: current.mood, totalDuration: current.totalDuration, songs: songs)
     }
     
+    private var displayedVibe: VibeOption {
+        generatedVibe ?? selectedVibe
+    }
+
+    private var selectionSubtitle: String {
+        var parts: [String] = [displayedVibe.label]
+        if let e = generatedEnergy { parts.append(e.label) }
+        if let era = generatedEra, era != .any { parts.append(era.label) }
+        if let mood = generatedMood, mood != .none { parts.append(mood.label) }
+        return parts.joined(separator: " · ")
+    }
+
     private func savePlaylistToStorage() {
         guard let current = playlist else { return }
         let songTuples = current.songs.map { (title: $0.title, artist: $0.artist, duration: $0.duration) }
         _ = storage.savePlaylist(
-            name: "\(selectedVibe.label) Playlist",
+            name: "\(displayedVibe.label) Playlist",
             datePlanTitle: planTitle,
-            vibe: selectedVibe.rawValue,
+            vibe: displayedVibe.rawValue,
             songs: songTuples,
             stops: stops,
-            energy: selectedEnergy?.rawValue,
-            era: selectedEra == .any ? nil : selectedEra.rawValue,
-            mood: selectedMood == .none ? nil : selectedMood.rawValue
+            energy: generatedEnergy?.rawValue ?? selectedEnergy?.rawValue,
+            era: (generatedEra ?? selectedEra) == .any ? nil : (generatedEra ?? selectedEra).rawValue,
+            mood: (generatedMood ?? selectedMood) == .none ? nil : (generatedMood ?? selectedMood).rawValue
         )
         savedMessage = true
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) { savedMessage = false }
@@ -471,11 +488,15 @@ struct PlaylistWidgetView: View {
                             .foregroundColor(Color.luxuryGold)
                         
                         HStack(spacing: 8) {
-                            Text(selectedVibe.emoji)
+                            Text(displayedVibe.emoji)
                             Text(currentPlaylist.mood)
                                 .font(Font.playfair(15, weight: .regular))
                                 .foregroundColor(Color.luxuryCreamMuted)
                         }
+
+                        Text(selectionSubtitle)
+                            .font(Font.inter(11, weight: .medium))
+                            .foregroundColor(Color.luxuryMuted)
                         
                         Text("\(currentPlaylist.songs.count) songs · \(currentPlaylist.totalDuration)")
                             .font(Font.inter(12, weight: .medium))
@@ -588,6 +609,10 @@ struct PlaylistWidgetView: View {
                     
                     Button {
                         playlist = nil
+                        generatedVibe = nil
+                        generatedEnergy = nil
+                        generatedEra = nil
+                        generatedMood = nil
                         playlistGenerationError = nil
                     } label: {
                         HStack(spacing: 8) {
@@ -644,6 +669,10 @@ struct PlaylistWidgetView: View {
                 )
                 await MainActor.run {
                     self.playlist = datePlaylist
+                    self.generatedVibe = vibe
+                    self.generatedEnergy = energy
+                    self.generatedEra = era
+                    self.generatedMood = mood
                     self.isGenerating = false
                     self.playlistGenerationError = nil
                     persistPlaylistToSupabaseIfNeeded(datePlaylist)
@@ -660,6 +689,10 @@ struct PlaylistWidgetView: View {
                         mood: mood,
                         excludingSongKeys: currentKeys.isEmpty ? nil : currentKeys
                     )
+                    self.generatedVibe = vibe
+                    self.generatedEnergy = energy
+                    self.generatedEra = era
+                    self.generatedMood = mood
                     self.isGenerating = false
                 }
             }
@@ -1014,6 +1047,11 @@ struct PlaylistWidgetView: View {
                 PlaylistSong(title: "Tujh Mein Rab Dikhta Hai", artist: "Roop Kumar Rathod", duration: "4:41", energy: .chill, era: .twentyTensNow),
                 PlaylistSong(title: "Phir Le Aaya Dil", artist: "Arijit Singh", duration: "5:59", energy: .chill, era: .twentyTensNow),
                 PlaylistSong(title: "Kal Ho Naa Ho", artist: "Sonu Nigam", duration: "5:21", energy: .balanced, era: .twoThousands),
+                PlaylistSong(title: "Chaiyya Chaiyya", artist: "Sukhwinder Singh", duration: "6:20", energy: .energetic, era: .nineties),
+                PlaylistSong(title: "Jai Ho", artist: "A.R. Rahman", duration: "5:09", energy: .energetic, era: .twoThousands),
+                PlaylistSong(title: "Senorita", artist: "Farhan Akhtar & Hrithik Roshan", duration: "3:52", energy: .energetic, era: .twentyTensNow),
+                PlaylistSong(title: "Tum Se Hi", artist: "Mohit Chauhan", duration: "5:21", energy: .chill, era: .twoThousands),
+                PlaylistSong(title: "Shayad", artist: "Arijit Singh", duration: "4:07", energy: .chill, era: .twentyTensNow),
             ]
         case .arabic:
             moodLabel = "Arabic & Middle Eastern"

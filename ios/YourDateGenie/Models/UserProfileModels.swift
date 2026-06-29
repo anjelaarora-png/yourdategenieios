@@ -606,10 +606,17 @@ class UserProfileManager: ObservableObject {
         if var profile = currentUser {
             profile.preferences = preferences
             currentUser = profile
+        } else {
+            var profile = UserProfile()
+            profile.preferences = preferences
+            currentUser = profile
         }
-        hasCompletedPreferences = true
-        UserDefaults.standard.set(true, forKey: preferencesCompleteKey)
-        
+        hasCompletedPreferences = Self.preferencesIncludeLocation(preferences)
+        UserDefaults.standard.set(hasCompletedPreferences, forKey: preferencesCompleteKey)
+        saveProfileLocally()
+
+        guard isLoggedIn else { return }
+
         Task {
             print("[updatePreferences] called")
             do {
@@ -729,6 +736,8 @@ class UserProfileManager: ObservableObject {
     
     /// Save preferences from questionnaire data only (no date plan). Used when user edits preferences from Profile.
     func savePreferencesFromQuestionnaire(_ data: QuestionnaireData) {
+        var normalized = data
+        normalized.syncCityFromStartingAddress()
         // Use existing preferences as the base so fields not covered by the questionnaire
         // (e.g. gift preferences set elsewhere) are preserved. If currentUser hasn't loaded
         // yet (can happen on first save right after sign-up), start from defaults — all
@@ -736,35 +745,35 @@ class UserProfileManager: ObservableObject {
         // fire the DB write regardless of currentUser state.
         var prefs = currentUser?.preferences ?? DatePreferences()
         // Identity
-        prefs.gender = Gender(rawValue: data.userGender) ?? .preferNotToSay
-        prefs.partnerGender = Gender(rawValue: data.partnerGender) ?? .preferNotToSay
-        let langs = (data.loveLanguageRaws ?? []).compactMap { LoveLanguage(rawValue: $0) }
+        prefs.gender = Gender(rawValue: normalized.userGender) ?? .preferNotToSay
+        prefs.partnerGender = Gender(rawValue: normalized.partnerGender) ?? .preferNotToSay
+        let langs = (normalized.loveLanguageRaws ?? []).compactMap { LoveLanguage(rawValue: $0) }
         prefs.loveLanguages = langs.isEmpty ? [.qualityTime] : langs
         // Location
-        prefs.defaultCity = data.city
-        prefs.defaultNeighborhood = data.neighborhood
-        prefs.defaultStartingPoint = data.startingAddress
-        prefs.energyLevel = data.energyLevel
-        prefs.transportationMode = data.transportationMode
-        prefs.travelRadius = data.travelRadius
+        prefs.defaultCity = normalized.city
+        prefs.defaultNeighborhood = normalized.neighborhood
+        prefs.defaultStartingPoint = normalized.startingAddress
+        prefs.energyLevel = normalized.energyLevel
+        prefs.transportationMode = normalized.transportationMode
+        prefs.travelRadius = normalized.travelRadius
         // Activity / food
-        prefs.favoriteActivities = data.activityPreferences
-        prefs.favoriteCuisines = data.cuisinePreferences
-        prefs.beveragePreferences = data.drinkPreferences
-        prefs.defaultBudget = data.budgetRange
-        prefs.dietaryRestrictions = data.dietaryRestrictions
-        prefs.allergies = data.allergies
-        prefs.hardNos = data.hardNos
-        prefs.accessibilityNeeds = data.accessibilityNeeds
-        prefs.smokingPreference = data.smokingPreference
-        prefs.additionalNotes = data.additionalNotes
+        prefs.favoriteActivities = normalized.activityPreferences
+        prefs.favoriteCuisines = normalized.cuisinePreferences
+        prefs.beveragePreferences = normalized.drinkPreferences
+        prefs.defaultBudget = normalized.budgetRange
+        prefs.dietaryRestrictions = normalized.dietaryRestrictions
+        prefs.allergies = normalized.allergies
+        prefs.hardNos = normalized.hardNos
+        prefs.accessibilityNeeds = normalized.accessibilityNeeds
+        prefs.smokingPreference = normalized.smokingPreference
+        prefs.additionalNotes = normalized.additionalNotes
         // Relationship context
-        prefs.relationshipStage = data.relationshipStage
-        prefs.conversationTopics = data.conversationTopics
+        prefs.relationshipStage = normalized.relationshipStage
+        prefs.conversationTopics = normalized.conversationTopics
         // Gift preferences
-        prefs.giftRecipient = data.giftRecipient
-        prefs.giftInterests = data.partnerInterests
-        prefs.giftBudget = data.giftBudget
+        prefs.giftRecipient = normalized.giftRecipient
+        prefs.giftInterests = normalized.partnerInterests
+        prefs.giftBudget = normalized.giftBudget
         updatePreferences(prefs)
     }
     
@@ -889,6 +898,23 @@ class UserProfileManager: ObservableObject {
            let profile = try? JSONDecoder().decode(UserProfile.self, from: data) {
             currentUser = profile
             isProfileComplete = isBasicInfoComplete(profile)
+            if Self.preferencesIncludeLocation(profile.preferences) {
+                hasCompletedPreferences = true
+            }
+            return
+        }
+
+        // Hydrate location from the last questionnaire session (guest / pre-login onboarding).
+        if let last = LastQuestionnaireStore.load() {
+            var profile = UserProfile()
+            profile.preferences.defaultCity = last.city
+            profile.preferences.defaultNeighborhood = last.neighborhood
+            profile.preferences.defaultStartingPoint = last.startingAddress
+            currentUser = profile
+            if Self.preferencesIncludeLocation(profile.preferences) {
+                hasCompletedPreferences = true
+                UserDefaults.standard.set(true, forKey: preferencesCompleteKey)
+            }
         }
     }
     
@@ -1037,6 +1063,28 @@ class UserProfileManager: ObservableObject {
     /// Applies saved profile preferences into questionnaire data (alias intent: single entry point for planning pre-fill).
     func applySavedPreferences(to data: inout QuestionnaireData) {
         prePopulateQuestionnaireData(&data)
+    }
+
+    /// True when starting address is set (city is derived from it when possible).
+    static func preferencesIncludeLocation(_ prefs: DatePreferences) -> Bool {
+        !prefs.defaultStartingPoint.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    /// Starting address preferred, then city — falls back to last questionnaire session.
+    static func resolvedLocationForDiscovery(from profile: UserProfileManager = .shared) -> String {
+        if let prefs = profile.currentUser?.preferences {
+            let start = prefs.defaultStartingPoint.trimmingCharacters(in: .whitespacesAndNewlines)
+            let city = prefs.defaultCity.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !start.isEmpty { return start }
+            if !city.isEmpty { return city }
+        }
+        if let last = LastQuestionnaireStore.load() {
+            let start = last.startingAddress.trimmingCharacters(in: .whitespacesAndNewlines)
+            let city = last.city.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !start.isEmpty { return start }
+            if !city.isEmpty { return city }
+        }
+        return ""
     }
 }
 

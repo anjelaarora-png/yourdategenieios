@@ -72,12 +72,12 @@ private struct PremiumIncludesView: View {
     }
 
     private let features: [PremiumFeature] = [
-        PremiumFeature(icon: "sparkles",         title: "Unlimited date plans",         detail: "AI-powered, personalised to you"),
+        PremiumFeature(icon: "sparkles",         title: "Unlimited date plans",         detail: "AI-powered, personalized to you"),
         PremiumFeature(icon: "heart.text.square", title: "Love Notes",                 detail: "Write beautiful messages for your partner"),
-        PremiumFeature(icon: "gift",              title: "Gift Finder",                 detail: "Personalised gift ideas for any occasion"),
+        PremiumFeature(icon: "gift",              title: "Gift Finder",                 detail: "Personalized gift ideas for any occasion"),
         PremiumFeature(icon: "photo.on.rectangle.angled", title: "Memories",           detail: "Photo timeline of all your special dates"),
-        PremiumFeature(icon: "music.note.list",   title: "Smart playlists",            detail: "The perfect soundtrack for every date"),
-        PremiumFeature(icon: "bubble.left.and.bubble.right", title: "Conversation starters", detail: "Never run out of things to say"),
+        PremiumFeature(icon: "music.note.list",   title: "Smart Playlists",            detail: "The perfect soundtrack for every date"),
+        PremiumFeature(icon: "bubble.left.and.bubble.right", title: "Conversation Starters", detail: "Never run out of things to say"),
         PremiumFeature(icon: "map",               title: "Route maps & calendar",      detail: "Full journey planned end to end"),
     ]
 

@@ -14,7 +14,9 @@ struct InitialPreferencesGateView: View {
                 .environmentObject(coordinator)
                 .environmentObject(AccessManager.shared)
             } else {
-                QuestionnaireView(onComplete: { _ in })
+                QuestionnaireView { data in
+                    coordinator.completeQuestionnaire(with: data)
+                }
                     .environmentObject(coordinator)
                     .environmentObject(AccessManager.shared)
                     .onAppear {

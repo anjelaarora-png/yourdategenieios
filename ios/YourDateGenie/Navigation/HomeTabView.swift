@@ -12,9 +12,9 @@ struct LuxuryHomeTabView: View {
     @EnvironmentObject var coordinator: NavigationCoordinator
     @EnvironmentObject var userProfileManager: UserProfileManager
     @EnvironmentObject private var access: AccessManager
-    @Environment(\.scenePhase) private var scenePhase
     @StateObject private var notificationManager = NotificationManager.shared
     @EnvironmentObject private var memoryManager: MemoryManager
+    @Environment(\.scenePhase) private var scenePhase
     @State private var planForCalendar: DatePlan?
     @State private var calendarDate = Date()
     @State private var calendarMessage: String?
@@ -23,18 +23,17 @@ struct LuxuryHomeTabView: View {
     @State private var trendingPlacesLoading = false
     @State private var trendingFetchFailed = false
     @State private var lastLoadedLocationKey: String = ""
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @AppStorage("hasSeenHomeTutorial") private var hasSeenHomeTutorial = false
-    @State private var showHomeTutorial = false
     @AppStorage("hasChosenMapsApp") private var hasChosenMapsApp = false
     @State private var showMapsAppPicker = false
     @State private var pendingPlaceForMaps: GooglePlacesService.PlaceSearchResult?
-
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Binding var tutorialStep: Int
+    var isTutorialActive: Bool
     // Section collapse states — Shortcuts expanded by default; others collapsed
     @AppStorage("home_shortcuts_expanded") private var shortcutsExpanded = true
     @AppStorage("home_upcoming_expanded") private var upcomingExpanded = false
     @AppStorage("home_experiences_expanded") private var dateExperiencesExpanded = false
-    @AppStorage("home_trending_expanded") private var trendingExpanded = false
+    @AppStorage("home_explore_expanded") private var exploreExpanded = true
     @AppStorage("home_story_expanded") private var storyExpanded = false
     // Upcoming Dates: show first 3, tap to expand
     // Sheet for reviewing > 3 unsaved plans
@@ -80,40 +79,52 @@ struct LuxuryHomeTabView: View {
         return waiting.isEmpty ? coordinator.generatedPlans : waiting
     }
 
+    init(tutorialStep: Binding<Int> = .constant(0), isTutorialActive: Bool = false) {
+        _tutorialStep = tutorialStep
+        self.isTutorialActive = isTutorialActive
+    }
+
     var body: some View {
         NavigationStack(path: $coordinator.navigationPath) {
             ZStack {
-                Color.backgroundPrimary
+                CharcoalMaroonBackground()
                     .ignoresSafeArea()
                 
-                ScrollView(.vertical, showsIndicators: false) {
-                    VStack(spacing: 28) {
-                        headerSection
-                        proactiveNudgeSection
-                        heroSection
-                        lowKeyLink
-                        shortcutsCollapsibleSection
-                        yourUpcomingDatesSection
-                        dateExperiencesCollapsibleSection
-                        trendingInYourAreaSection
-                        relationshipStorySection
+                ScrollViewReader { scrollProxy in
+                    ScrollView(.vertical, showsIndicators: false) {
+                        VStack(spacing: 28) {
+                            HomeAppHeaderBar(notificationManager: notificationManager)
+                            headerSection
+                            proactiveNudgeSection
+                            heroSection
+                                .id(HomeTutorialAnchor.heroPlan.rawValue)
+                            lowKeyLink
+                            shortcutsCollapsibleSection
+                            yourUpcomingDatesSection
+                            dateExperiencesCollapsibleSection
+                            exploreCollapsibleSection
+                            relationshipStorySection
+                        }
                     }
-                    .padding(.bottom, 120)
+                    .mainTabBarScrollInset()
+                    .scrollBounceBehavior(.basedOnSize)
+                    .scrollContentBackground(.hidden)
+                    .onChange(of: tutorialStep) { _, step in
+                        guard isTutorialActive else { return }
+                        scrollTutorial(to: step, proxy: scrollProxy)
+                    }
+                    .onChange(of: isTutorialActive) { _, active in
+                        if active {
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                                scrollTutorial(to: tutorialStep, proxy: scrollProxy)
+                            }
+                        }
+                    }
                 }
-                .scrollBounceBehavior(.basedOnSize)
             }
             .onAppear {
                 coordinator.refreshPreferencesState()
                 Task { await loadTrendingPlaces() }
-                if !hasSeenHomeTutorial {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-                        showHomeTutorial = true
-                        hasSeenHomeTutorial = true
-                    }
-                }
-            }
-            .fullScreenCover(isPresented: $showHomeTutorial) {
-                HomeTutorialOverlayView(isPresented: $showHomeTutorial)
             }
             .confirmationDialog("Open route in which app?", isPresented: $showMapsAppPicker, titleVisibility: .visible) {
                 Button("Apple Maps") {
@@ -136,6 +147,7 @@ struct LuxuryHomeTabView: View {
                 Task { await loadTrendingPlaces(force: true) }
             }
             .refreshable {
+                coordinator.refreshPreferencesState()
                 await loadTrendingPlaces(force: true)
             }
             .onChange(of: scenePhase) { _, newPhase in
@@ -165,24 +177,7 @@ struct LuxuryHomeTabView: View {
             } message: {
                 if let msg = calendarMessage { Text(msg) }
             }
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    // Match UIBarButtonItem host width (~80pt) to avoid Auto Layout conflict with SwiftUI’s width <= ~68.
-                    Image("Logo")
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 36, height: 36)
-                        .frame(minWidth: 80, minHeight: 44, alignment: .leading)
-                        .accessibilityLabel("Your Date Genie")
-                }
-                
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    NotificationBellButton(notificationManager: notificationManager)
-                }
-            }
-            .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
-            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbar(.hidden, for: .navigationBar)
             .sheet(isPresented: $notificationManager.showNotificationsSheet) {
                 NotificationsSheetView(notificationManager: notificationManager)
             }
@@ -205,7 +200,7 @@ struct LuxuryHomeTabView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.horizontal, 20)
-        .padding(.top, 20)
+        .padding(.top, 4)
     }
     
     private var greetingLine1: String {
@@ -238,8 +233,24 @@ struct LuxuryHomeTabView: View {
                     onSwap: { presentSwapSheet(for: plan) },
                     onView: { openHeroPlan(plan) }
                 )
+                .homeTutorialAnchor(.planButton)
+                .id(HomeTutorialAnchor.planButton.rawValue)
             } else {
                 emptyHeroPlanCTA
+            }
+        }
+        .homeTutorialAnchor(.heroPlan)
+    }
+
+    private func scrollTutorial(to step: Int, proxy: ScrollViewProxy) {
+        withAnimation(.easeInOut(duration: 0.45)) {
+            switch step {
+            case 0:
+                proxy.scrollTo(HomeTutorialAnchor.planButton.rawValue, anchor: .center)
+            case 1:
+                proxy.scrollTo(HomeTutorialAnchor.heroPlan.rawValue, anchor: .center)
+            default:
+                break
             }
         }
     }
@@ -294,14 +305,7 @@ struct LuxuryHomeTabView: View {
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 14)
-                .background(
-                    RoundedRectangle(cornerRadius: 16)
-                        .fill(Color.luxuryMaroon)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 16)
-                                .stroke(Color.luxuryGold.opacity(0.25), lineWidth: 1)
-                        )
-                )
+                .goldHighlightMaroonAccent(cornerRadius: 16)
             }
             .buttonStyle(.plain)
             .padding(.horizontal, 20)
@@ -368,8 +372,15 @@ struct LuxuryHomeTabView: View {
                     .cornerRadius(16)
             }
             .buttonStyle(.plain)
+            .homeTutorialAnchor(.planButton)
+            .id(HomeTutorialAnchor.planButton.rawValue)
 
-            if !access.isSubscribed && access.freePlansRemaining > 0 {
+            if !coordinator.isLoggedIn {
+                Text("Sign in to generate your date plan")
+                    .font(Font.bodySans(12, weight: .regular))
+                    .foregroundColor(Color.textPrimary.opacity(0.55))
+                    .multilineTextAlignment(.center)
+            } else if !access.isSubscribed && access.freePlansRemaining > 0 {
                 Text(access.freePlansRemaining == AccessManager.freePlanLimit
                      ? "\(access.freePlansRemaining) free date plans included — no card needed"
                      : "\(access.freePlansRemaining) free plan remaining · subscribe for unlimited")
@@ -416,15 +427,9 @@ struct LuxuryHomeTabView: View {
     
     /// Key used to refetch trending when location (starting point or city) becomes available or changes.
     private var trendingLocationKey: String {
-        guard let prefs = userProfileManager.currentUser?.preferences else { return "" }
-        let start = prefs.defaultStartingPoint.trimmingCharacters(in: .whitespacesAndNewlines)
-        let city = prefs.defaultCity.trimmingCharacters(in: .whitespacesAndNewlines)
-        return start.isEmpty ? city : start
+        UserProfileManager.resolvedLocationForDiscovery(from: userProfileManager)
     }
-    
-    // MARK: - Recommended in your area (Google Places; refetches when location loads, on pull-to-refresh, and when app becomes active)
 
-    /// Fetch only when not already loading for this location key. Used by onAppear and scene-active.
     private func loadTrendingPlacesIfNeeded() async {
         let key = trendingLocationKey
         guard !key.isEmpty else { return }
@@ -437,7 +442,6 @@ struct LuxuryHomeTabView: View {
         await performTrendingFetch(location: key)
     }
 
-    /// Force a fresh fetch regardless of loading state. Used by pull-to-refresh and location changes.
     private func loadTrendingPlaces(force: Bool = false) async {
         let key = trendingLocationKey
         guard !key.isEmpty else { return }
@@ -455,7 +459,7 @@ struct LuxuryHomeTabView: View {
 
     private func performTrendingFetch(location: String) async {
         do {
-            let places = try await GooglePlacesService.shared.fetchRecommendedInCity(city: location, limit: 6)
+            let places = try await GooglePlacesService.shared.fetchRecommendedInCity(city: location, limit: 6, radiusMeters: 16_090)
             await MainActor.run {
                 trendingPlaces = places
                 trendingPlacesLoading = false
@@ -470,214 +474,190 @@ struct LuxuryHomeTabView: View {
             }
         }
     }
-    
-    /// Opens the business profile in Google Maps or Apple Maps (reviews, hours, photos).
-    /// On first use, prompts the user to choose their preferred app.
+
     private func openPlaceInPreferredMaps(place: GooglePlacesService.PlaceSearchResult) {
         guard hasChosenMapsApp else {
             pendingPlaceForMaps = place
             showMapsAppPicker = true
             return
         }
-        let app = UserDefaults.standard.string(forKey: "dateGenie_preferredMapsApp") ?? "apple"
-        if app == "google" {
-            // Google Maps: api=1 + query (lat,lon) + query_place_id opens the business profile in the app
-            let query = "\(place.latitude),\(place.longitude)".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
-            let placeIdEncoded = place.placeId.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? place.placeId
-            if let url = URL(string: "https://www.google.com/maps/search/?api=1&query=\(query)&query_place_id=\(placeIdEncoded)") {
-                UIApplication.shared.open(url)
-                return
+        ExplorePlaceOpener.open(place)
+    }
+
+    // MARK: - Explore (Google Places carousel → full Explore sheet)
+
+    private var exploreCollapsibleSection: some View {
+        CollapsibleHomeSection(
+            title: "Explore",
+            subtitle: exploreSectionSubtitle,
+            isExpanded: $exploreExpanded,
+            headerTrailing: {
+                Button { coordinator.showExplore() } label: {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 16))
+                        .foregroundColor(Color.accentGold)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Open full Explore list")
             }
-        }
-        // Apple Maps: place URL shows business-style card with name, address, coordinate
-        var comp = URLComponents(string: "https://maps.apple.com/place")!
-        comp.queryItems = [
-            URLQueryItem(name: "address", value: place.address),
-            URLQueryItem(name: "coordinate", value: "\(place.latitude),\(place.longitude)"),
-            URLQueryItem(name: "name", value: place.name),
-            URLQueryItem(name: "q", value: place.name),
-            URLQueryItem(name: "map", value: "explore"),
-        ]
-        if let url = comp.url {
-            UIApplication.shared.open(url)
-        } else {
-            let coord = CLLocationCoordinate2D(latitude: place.latitude, longitude: place.longitude)
-            let placemark = MKPlacemark(coordinate: coord)
-            let mapItem = MKMapItem(placemark: placemark)
-            mapItem.name = place.name
-            mapItem.openInMaps(launchOptions: nil)
+        ) {
+            exploreCarouselContent
+                .padding(.top, 14)
         }
     }
-    
-    private var trendingInYourAreaSection: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // Gold section divider
-            Rectangle()
-                .fill(Color.luxuryGold.opacity(0.12))
-                .frame(height: 1)
-                .padding(.horizontal, 20)
-                .padding(.bottom, 18)
 
-            // Collapsible header
-            Button {
-                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                    trendingExpanded.toggle()
-                }
-            } label: {
-                HStack(spacing: 8) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("NEAR YOU")
-                            .font(Font.bodySans(13, weight: .semibold))
-                            .tracking(1.2)
-                            .foregroundColor(Color.accentGold)
-                        Text("Top-rated spots handpicked for your next date")
-                            .font(Font.bodySans(11, weight: .regular))
-                            .foregroundColor(Color.textPrimary.opacity(0.5))
+    private var exploreSectionSubtitle: String {
+        let city = trendingLocationKey
+        if city.isEmpty {
+            return "Top-rated spots · tap a card or sparkles for the full list"
+        }
+        return "Near \(city) · tap for restaurants, bars & date-night spots"
+    }
+
+    @ViewBuilder
+    private var exploreCarouselContent: some View {
+        if trendingPlacesLoading {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 14) {
+                    ForEach(0..<3, id: \.self) { _ in
+                        RoundedRectangle(cornerRadius: 20)
+                            .fill(Color.luxuryMaroonLight.opacity(0.5))
+                            .frame(width: 200, height: 200)
+                            .overlay(ProgressView().tint(Color.luxuryGold))
                     }
-                    Spacer(minLength: 8)
-                    Button { coordinator.showExplore() } label: {
-                        Image(systemName: "map")
-                            .font(.system(size: 16))
-                            .foregroundColor(Color.accentGold)
-                    }
-                    .buttonStyle(.plain)
-                    Image(systemName: trendingExpanded ? "chevron.up" : "chevron.down")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(Color.accentGold.opacity(0.7))
+                    ExploreContinueCircleButton(action: { coordinator.showExplore() })
                 }
+                .padding(.horizontal, 20)
+            }
+        } else if !trendingPlaces.isEmpty {
+            let preferredCity = trendingLocationKey
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 14) {
+                    ForEach(trendingPlaces.prefix(6), id: \.placeId) { place in
+                        let price = CurrencyHelper.formattedPriceLevel(place.priceLevel)
+                        let cityState = MapURLHelper.cityStateOrRegionFromAddress(place.address)
+                        let location = cityState.isEmpty ? preferredCity : cityState
+                        let tagline: String = {
+                            if let r = place.rating {
+                                let stars = "★ \(String(format: "%.1f", r))"
+                                if let n = place.userRatingsTotal, n > 0 { return "\(stars) · \(n) reviews" }
+                                return stars
+                            }
+                            return "On Google Maps"
+                        }()
+                        LuxuryUnifiedDateCard(
+                            imageUrl: place.photoUrl ?? "https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=400&h=300&fit=crop",
+                            title: place.name,
+                            tagline: tagline,
+                            location: location,
+                            time: place.openNow == true ? "Open now" : "",
+                            price: price,
+                            actionTitle: "View in Maps",
+                            action: { openPlaceInPreferredMaps(place: place) }
+                        )
+                    }
+                    ExploreContinueCircleButton(action: { coordinator.showExplore() })
+                }
+                .padding(.horizontal, 20)
+            }
+
+            Button { coordinator.showExplore() } label: {
+                HStack(spacing: 6) {
+                    Text("See all spots in Explore")
+                        .font(Font.bodySans(13, weight: .semibold))
+                        .foregroundColor(Color.luxuryGold)
+                    Image(systemName: "arrow.right")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(Color.luxuryGold)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 11)
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.luxuryGold.opacity(0.3), lineWidth: 1))
             }
             .buttonStyle(.plain)
             .padding(.horizontal, 20)
-
-            // Keep views in the hierarchy when collapsed so AsyncImage requests are never cancelled.
-            VStack(alignment: .leading, spacing: 12) {
-                // Only show actual places from Google — no vague or fake cards
-                if trendingPlacesLoading {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 14) {
-                            ForEach(0..<3, id: \.self) { _ in
-                                RoundedRectangle(cornerRadius: 20)
-                                    .fill(Color.luxuryMaroonLight.opacity(0.5))
-                                    .frame(width: 200, height: 200)
-                                    .overlay(ProgressView().tint(Color.luxuryGold))
-                            }
-                        }
-                        .padding(.horizontal, 20)
-                    }
-                } else if !trendingPlaces.isEmpty {
-                    let preferredCity = userProfileManager.currentUser?.preferences.defaultCity.trimmingCharacters(in: .whitespaces) ?? userProfileManager.currentUser?.preferences.defaultStartingPoint.trimmingCharacters(in: .whitespaces) ?? ""
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 14) {
-                            ForEach(trendingPlaces.prefix(6), id: \.placeId) { place in
-                                let price = CurrencyHelper.formattedPriceLevel(place.priceLevel)
-                                let cityState = MapURLHelper.cityStateOrRegionFromAddress(place.address)
-                                let location = cityState.isEmpty ? preferredCity : cityState
-                                let tagline: String = {
-                                    if let r = place.rating {
-                                        let stars = "★ \(String(format: "%.1f", r))"
-                                        if let n = place.userRatingsTotal, n > 0 { return "\(stars) · \(n) reviews" }
-                                        return stars
-                                    }
-                                    return "On Google Maps"
-                                }()
-                                LuxuryUnifiedDateCard(
-                                    imageUrl: place.photoUrl ?? "https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=400&h=300&fit=crop",
-                                    title: place.name,
-                                    tagline: tagline,
-                                    location: location,
-                                    time: place.openNow == true ? "Open now" : "",
-                                    price: price,
-                                    actionTitle: "View in Maps",
-                                    action: { openPlaceInPreferredMaps(place: place) }
-                                )
-                            }
-                            TrendingExploreCircleButton(action: { coordinator.showExplore() })
-                        }
-                        .padding(.horizontal, 20)
-                    }
-                } else {
-                    trendingEmptyState
-                }
-            }
-            .opacity(trendingExpanded ? 1 : 0)
-            .frame(height: trendingExpanded ? nil : 0)
-            .clipped()
+            .padding(.top, 4)
+        } else {
+            exploreEmptyState
         }
     }
-    
-    /// Shown when we have no actual places (no location set or fetch failed). No vague placeholder cards.
-    private var trendingEmptyState: some View {
-        VStack(spacing: 14) {
+
+    private var exploreEmptyState: some View {
+        VStack(spacing: 12) {
             if trendingLocationKey.isEmpty {
-                Text("Set your starting address (or city) in Settings to see recommended spots near you.")
-                    .font(Font.bodySans(14, weight: .medium))
+                Text("Set your starting address or city in Settings to see recommended spots.")
+                    .font(Font.bodySans(13, weight: .regular))
                     .foregroundColor(Color.luxuryCreamMuted)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 24)
-                Button {
-                    coordinator.activeSheet = .settings
-                } label: {
+                    .multilineTextAlignment(.leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Button { coordinator.activeSheet = .settings } label: {
                     HStack(spacing: 6) {
-                        Image(systemName: "gearshape.fill")
-                            .font(.system(size: 13))
                         Text("Open Settings")
                             .font(Font.bodySans(13, weight: .semibold))
+                        Image(systemName: "arrow.right")
+                            .font(.system(size: 11, weight: .semibold))
                     }
-                    .foregroundColor(Color.accentGold)
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 10)
-                    .background(Color.accentMaroon)
-                    .cornerRadius(12)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(Color.accentGold.opacity(0.3), lineWidth: 1)
-                    )
+                    .foregroundColor(Color.luxuryGold)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 11)
+                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.luxuryGold.opacity(0.3), lineWidth: 1))
                 }
                 .buttonStyle(.plain)
             } else if trendingFetchFailed {
-                VStack(spacing: 10) {
-                    Image(systemName: "wifi.exclamationmark")
-                        .font(.system(size: 22))
-                        .foregroundColor(Color.luxuryGold.opacity(0.7))
-                    Text("Couldn't load nearby spots. Check your connection and pull down to refresh.")
-                        .font(Font.bodySans(13, weight: .medium))
-                        .foregroundColor(Color.luxuryCreamMuted)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 24)
-                    Button {
-                        Task { await loadTrendingPlaces(force: true) }
-                    } label: {
-                        HStack(spacing: 6) {
-                            Image(systemName: "arrow.clockwise")
-                                .font(.system(size: 13, weight: .semibold))
-                            Text("Try Again")
-                                .font(Font.bodySans(13, weight: .semibold))
-                        }
-                        .foregroundColor(Color.accentGold)
-                        .padding(.horizontal, 20)
-                        .padding(.vertical, 10)
-                        .background(Color.accentMaroon)
-                        .cornerRadius(12)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(Color.accentGold.opacity(0.3), lineWidth: 1)
-                        )
-                    }
-                    .buttonStyle(.plain)
-                }
-            } else {
-                Text("Highly rated restaurants and things to do will appear here. Pull down to refresh or tap below for more.")
-                    .font(Font.bodySans(14, weight: .medium))
+                Text("Couldn't load nearby spots. Pull down to refresh.")
+                    .font(Font.bodySans(13, weight: .regular))
                     .foregroundColor(Color.luxuryCreamMuted)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 24)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Button { Task { await loadTrendingPlaces(force: true) } } label: {
+                    HStack(spacing: 6) {
+                        Text("Try again")
+                            .font(Font.bodySans(13, weight: .semibold))
+                        Image(systemName: "arrow.clockwise")
+                            .font(.system(size: 11, weight: .semibold))
+                    }
+                    .foregroundColor(Color.luxuryGold)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 11)
+                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.luxuryGold.opacity(0.3), lineWidth: 1))
+                }
+                .buttonStyle(.plain)
+            } else {
+                Text("Browse categories and hot spots in your area.")
+                    .font(Font.bodySans(13, weight: .regular))
+                    .foregroundColor(Color.luxuryCreamMuted)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
-            TrendingExploreCircleButton(action: { coordinator.showExplore() })
+
+            Button { coordinator.showExplore() } label: {
+                HStack(spacing: 6) {
+                    Text("Open Explore")
+                        .font(Font.bodySans(13, weight: .semibold))
+                        .foregroundColor(Color.luxuryGold)
+                    Image(systemName: "arrow.right")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(Color.luxuryGold)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 11)
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.luxuryGold.opacity(0.3), lineWidth: 1))
+            }
+            .buttonStyle(.plain)
         }
-        .padding(.vertical, 16)
         .padding(.horizontal, 20)
     }
-    
+
+    // MARK: - Date Experiences collapsible wrapper (events only)
+    private var dateExperiencesCollapsibleSection: some View {
+        CollapsibleHomeSection(
+            title: "Happening Near You",
+            subtitle: "Live events within 60 miles",
+            isExpanded: $dateExperiencesExpanded
+        ) {
+            DateExperiencesSection(showHeader: false, compactEmptyState: true)
+                .padding(.top, 4)
+        }
+    }
+
     // MARK: - Upcoming Date Row
     /// Elegant list row: gold left-accent bar, capsule chips for meta, clean gold action icon.
     /// `isUnsaved`: dashed border + "UNSAVED" chip + bookmark icon.
@@ -1146,48 +1126,6 @@ struct LuxuryHomeTabView: View {
         }
     }
 
-    // MARK: - Date Experiences collapsible wrapper
-    private var dateExperiencesCollapsibleSection: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // Gold section divider
-            Rectangle()
-                .fill(Color.luxuryGold.opacity(0.12))
-                .frame(height: 1)
-                .padding(.horizontal, 20)
-                .padding(.bottom, 18)
-
-            // Collapsible header
-            Button {
-                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                    dateExperiencesExpanded.toggle()
-                }
-            } label: {
-                HStack(spacing: 8) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("HAPPENING NEAR YOU")
-                            .font(Font.bodySans(13, weight: .semibold))
-                            .tracking(1.2)
-                            .foregroundColor(Color.accentGold)
-                        Text("Live events & experiences within 60 miles")
-                            .font(Font.bodySans(11, weight: .regular))
-                            .foregroundColor(Color.textPrimary.opacity(0.5))
-                    }
-                    Spacer()
-                    Image(systemName: dateExperiencesExpanded ? "chevron.up" : "chevron.down")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(Color.accentGold.opacity(0.7))
-                }
-            }
-            .buttonStyle(.plain)
-            .padding(.horizontal, 20)
-
-            DateExperiencesSection(showHeader: false)
-                .opacity(dateExperiencesExpanded ? 1 : 0)
-                .frame(height: dateExperiencesExpanded ? nil : 0)
-                .clipped()
-        }
-    }
-    
     private var shortcutsCollapsibleSection: some View {
         CollapsibleHomeSection(
             title: "Shortcuts",
@@ -1200,9 +1138,11 @@ struct LuxuryHomeTabView: View {
     }
 
     private var shortcutsGridContent: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 12) {
-                LuxuryQuickTile(icon: "gift", title: "Gift Finder", color: Color.accentGold, isLocked: !access.canAccess(.gifting)) {
+        LazyVGrid(
+            columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 4),
+            spacing: 16
+        ) {
+            LuxuryQuickTile(icon: "gift", title: "Gift Finder", color: Color.accentGold, isLocked: !access.canAccess(.gifting)) {
                     access.require(.gifting) {
                         coordinator.showGiftFinder(
                             datePlan: coordinator.currentDatePlan,
@@ -1210,12 +1150,12 @@ struct LuxuryHomeTabView: View {
                         )
                     }
                 }
-                LuxuryQuickTile(icon: "music.note.list", title: "Date Playlist", color: Color.luxuryGoldLight, isLocked: !access.canAccess(.playlist)) {
+                LuxuryQuickTile(icon: "music.note.list", title: "Smart Playlists", color: Color.luxuryGoldLight, isLocked: !access.canAccess(.playlist)) {
                     access.require(.playlist) {
                         coordinator.showPlaylist(for: coordinator.currentDatePlan?.title ?? "Date Night", planId: coordinator.currentDatePlan?.id)
                     }
                 }
-                LuxuryQuickTile(icon: "bubble.left.and.bubble.right", title: "Convo Cues", color: Color.accentGold, isLocked: !access.canAccess(.conversation)) {
+                LuxuryQuickTile(icon: "bubble.left.and.bubble.right", title: "Conversation Starters", color: Color.accentGold, isLocked: !access.canAccess(.conversation)) {
                     access.require(.conversation) {
                         coordinator.showConversationStarters()
                     }
@@ -1252,9 +1192,8 @@ struct LuxuryHomeTabView: View {
                         coordinator.showPlaybook()
                     }
                 }
-            }
-            .padding(.horizontal, 20)
         }
+        .padding(.horizontal, 20)
     }
 
     // MARK: - Your Relationship Story
@@ -1360,40 +1299,7 @@ struct LuxuryHomeTabView: View {
     }
 }
 
-// MARK: - Trending Explore Circle (large circle with golden sparkles + "Continue exploring" at end of trending scroll)
-private struct TrendingExploreCircleButton: View {
-    let action: () -> Void
-    
-    var body: some View {
-        Button(action: action) {
-            ZStack {
-                Circle()
-                    .fill(Color.luxuryMaroonLight.opacity(0.8))
-                    .overlay(
-                        Circle()
-                            .stroke(LinearGradient.goldShimmer, lineWidth: 2)
-                    )
-                    .shadow(color: Color.luxuryGold.opacity(0.3), radius: 16, y: 4)
-                    .frame(width: 160, height: 160)
-                VStack(spacing: 8) {
-                    Image(systemName: "sparkles")
-                        .font(.system(size: 44, weight: .medium))
-                        .foregroundStyle(LinearGradient.goldShimmer)
-                    Text("Continue exploring")
-                        .font(Font.bodySans(14, weight: .semibold))
-                        .foregroundStyle(LinearGradient.goldShimmer)
-                        .multilineTextAlignment(.center)
-                        .lineLimit(2)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-            .frame(width: 160, height: 160)
-        }
-        .buttonStyle(.plain)
-    }
-}
-
-// MARK: - Luxury Unified Date Card (IMAGE / TITLE / TAG LINE / DETAILS / ACTION, 24pt radius, glass-style, gold shadow)
+// MARK: - Luxury Unified Date Card (Explore carousel on Home)
 private struct LuxuryUnifiedDateCard: View {
     let imageUrl: String
     let title: String
@@ -1405,16 +1311,14 @@ private struct LuxuryUnifiedDateCard: View {
     var isPremiumLocked: Bool = false
     let action: () -> Void
     var onAddToCalendar: (() -> Void)? = nil
-    
+
     var body: some View {
         Button(action: action) {
             VStack(alignment: .leading, spacing: 0) {
                 AsyncImage(url: URL(string: imageUrl)) { phase in
                     switch phase {
                     case .success(let image):
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
+                        image.resizable().aspectRatio(contentMode: .fill)
                     case .empty, .failure:
                         Color.luxuryMaroonLight
                     @unknown default:
@@ -1437,66 +1341,46 @@ private struct LuxuryUnifiedDateCard: View {
                             .font(.system(size: 12, weight: .semibold))
                             .foregroundColor(Color.luxuryGold)
                             .padding(8)
-                            .shadow(color: .black.opacity(0.4), radius: 2, y: 1)
                     }
                 }
-                
+
                 VStack(alignment: .leading, spacing: 8) {
                     Text(title)
                         .font(Font.bodySans(15, weight: .semibold))
                         .foregroundColor(Color.luxuryCream)
                         .lineLimit(2)
-                    
                     Text(tagline)
                         .font(Font.bodySans(12, weight: .regular))
                         .foregroundColor(Color.luxuryMuted)
                         .lineLimit(1)
-                    
                     HStack(spacing: 10) {
                         if !location.isEmpty {
                             Label(location, systemImage: "location")
                                 .font(Font.bodySans(11, weight: .medium))
                                 .foregroundColor(Color.luxuryCreamMuted)
                         }
-                        Label(time, systemImage: "clock")
-                            .font(Font.bodySans(11, weight: .medium))
-                            .foregroundColor(Color.luxuryCreamMuted)
+                        if !time.isEmpty {
+                            Label(time, systemImage: "clock")
+                                .font(Font.bodySans(11, weight: .medium))
+                                .foregroundColor(Color.luxuryCreamMuted)
+                        }
                         if !price.isEmpty {
                             Text(price)
                                 .font(Font.bodySans(11, weight: .medium))
                                 .foregroundColor(Color.luxuryCreamMuted)
                         }
                     }
-                    
-                    HStack(spacing: 8) {
-                        Text(actionTitle)
-                            .font(Font.bodySans(12, weight: .semibold))
-                            .foregroundColor(Color.luxuryMaroon)
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 8)
-                            .background(LinearGradient.goldShimmer)
-                            .cornerRadius(12)
-                        
-                        if let onAddToCalendar = onAddToCalendar {
-                            Button {
-                                onAddToCalendar()
-                            } label: {
-                                HStack(spacing: 4) {
-                                    Image(systemName: "calendar.badge.plus")
-                                        .font(.system(size: 10))
-                                    Text("Calendar")
-                                        .font(Font.bodySans(10, weight: .semibold))
-                                }
-                                .foregroundColor(Color.luxuryGold)
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
+                    Text(actionTitle)
+                        .font(Font.bodySans(12, weight: .semibold))
+                        .foregroundColor(Color.luxuryMaroon)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .background(LinearGradient.goldShimmer)
+                        .cornerRadius(12)
                 }
                 .padding(14)
             }
             .frame(width: 200)
-            .opacity(isPremiumLocked ? 0.5 : 1)
             .background(
                 RoundedRectangle(cornerRadius: 20)
                     .fill(Color.luxuryMaroonLight.opacity(0.7))

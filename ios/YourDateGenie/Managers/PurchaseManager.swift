@@ -19,7 +19,8 @@ enum PurchaseManagerError: LocalizedError {
 }
 
 /// StoreKit 2 purchase coordinator: loads the premium monthly product, purchases, verifies JWS-backed transactions,
-/// keeps `isSubscribed` in sync with **verified** `Transaction.currentEntitlements`, and mirrors state to `UserDefaults` for fast cold start (always refreshed from the App Store).
+/// keeps `isSubscribed` in sync with **verified** `Transaction.currentEntitlements` (includes active **7-day free trial**),
+/// and mirrors state to `UserDefaults` for fast cold start (always refreshed from the App Store).
 @MainActor
 final class PurchaseManager: ObservableObject {
     static let shared = PurchaseManager()
@@ -196,8 +197,10 @@ final class PurchaseManager: ObservableObject {
         for await result in Transaction.currentEntitlements {
             guard case .verified(let transaction) = result else { continue }
             guard transaction.revocationDate == nil else { continue }
+            if let expiration = transaction.expirationDate, expiration <= Date() { continue }
             let validIDs: Set<String> = [Self.premiumMonthlyProductID, Self.premiumAnnualProductID]
             guard validIDs.contains(transaction.productID) else { continue }
+            // Active entitlement — includes introductory free-trial period (StoreKit 2).
             return true
         }
         return false
@@ -265,16 +268,20 @@ final class PurchaseManager: ObservableObject {
 
     /// Queries the server-side `subscriptions` table for the authoritative premium state.
     /// Called on cold start after AppStore.sync so the UI reflects real server state.
+    /// Never revokes a local StoreKit entitlement when the server row is missing or stale —
+    /// trial users must keep premium access even before validate-receipt finishes.
     func refreshEntitlementsFromServer() async {
         do {
             guard let userId = await SupabaseService.shared.currentUser?.id else { return }
+            let storePremium = await computeIsSubscribedFromStore()
             let serverIsPremium = try await SupabaseService.shared.fetchServerSubscriptionStatus(userId: userId)
+            let effectivePremium = storePremium || serverIsPremium
             let wasSubscribed = isSubscribed
-            if isSubscribed != serverIsPremium {
-                isSubscribed = serverIsPremium
-                persistSubscribed(serverIsPremium)
+            if isSubscribed != effectivePremium {
+                isSubscribed = effectivePremium
+                persistSubscribed(effectivePremium)
             }
-            if serverIsPremium && !wasSubscribed {
+            if effectivePremium && !wasSubscribed {
                 NotificationManager.shared.addNotification(AppNotification(
                     type: .subscriptionActivated,
                     title: "Welcome to Premium! 👑",

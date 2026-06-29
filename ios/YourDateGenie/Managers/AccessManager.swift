@@ -16,7 +16,10 @@ enum AppFeature {
 /// Central subscription gate. Mirrors `PurchaseManager.shared.isSubscribed` and coordinates a
 /// single app-wide paywall + deferred navigation.
 ///
-/// Free tier: users may generate up to `freePlanLimit` date plans before subscribing.
+/// **Premium access** (unlocks all features): paid subscription, **7-day free trial**, or grace period.
+/// StoreKit entitlements are authoritative locally; server `trialing` rows also count.
+///
+/// **Free tier** (no trial): users may generate up to `freePlanLimit` date plans; premium shortcuts stay locked.
 /// Viewing previously generated plans is always allowed so users are never locked out of content
 /// they already created.
 @MainActor
@@ -41,22 +44,27 @@ final class AccessManager: ObservableObject {
         UserDefaults.standard.integer(forKey: Self.freePlansUsedKey)
     }
 
-    /// Remaining free generations before the paywall. Always 0 when subscribed.
+    /// Paid subscription, free trial, or grace period — same signal as `PurchaseManager.isSubscribed`.
+    var hasPremiumAccess: Bool { isSubscribed }
+
+    /// Remaining free generations before the paywall. Always 0 when on trial or subscribed.
     var freePlansRemaining: Int {
-        guard !isSubscribed else { return 0 }
+        guard !hasPremiumAccess else { return 0 }
         return max(0, Self.freePlanLimit - freePlansUsed)
     }
 
-    /// `true` when the user can start a new date-plan generation (either subscribed or still
-    /// within the free tier allowance).
+    /// `true` when the user can start a new date-plan generation (premium/trial unlimited, or free tier credits).
     func canGenerateDatePlan() -> Bool {
-        return isSubscribed || freePlansUsed < Self.freePlanLimit
+        #if DEBUG
+        if Config.previewUnlockAllFeatures { return true }
+        #endif
+        return hasPremiumAccess || freePlansUsed < Self.freePlanLimit
     }
 
     /// Call this once after each successful date-plan generation to consume one free credit.
-    /// No-ops when already subscribed — subscribers have unlimited generations.
+    /// No-ops when on trial or subscribed — unlimited generations.
     func recordDatePlanGenerated() {
-        guard !isSubscribed else { return }
+        guard !hasPremiumAccess else { return }
         UserDefaults.standard.set(freePlansUsed + 1, forKey: Self.freePlansUsedKey)
     }
 
@@ -78,11 +86,14 @@ final class AccessManager: ObservableObject {
     // MARK: - Feature access
 
     func canAccess(_ feature: AppFeature) -> Bool {
+        #if DEBUG
+        if Config.previewUnlockAllFeatures { return true }
+        #endif
         switch feature {
         case .nearby:
             return true
         default:
-            return isSubscribed
+            return hasPremiumAccess
         }
     }
 
@@ -108,7 +119,7 @@ final class AccessManager: ObservableObject {
 
     /// When the paywall sheet closes without subscribing (e.g. "Not now", swipe), drop any deferred navigation.
     func paywallSheetDismissed() {
-        if !isSubscribed {
+        if !hasPremiumAccess {
             pendingUnlock = nil
         }
     }

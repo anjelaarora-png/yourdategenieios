@@ -223,7 +223,7 @@ struct PartnerReceivesPlanView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.surfaceElevated)
         .cornerRadius(14)
-        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.06), lineWidth: 1))
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.luxeSurfaceTint, lineWidth: 1))
     }
 
     // MARK: - Actions (single gold highlight)

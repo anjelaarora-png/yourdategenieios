@@ -9,6 +9,22 @@ final class DateExperienceViewModel: ObservableObject {
     @Published private(set) var isLoading = false
     @Published private(set) var fetchError: String? = nil
 
+    /// Events whose location matches the user's saved city / starting point.
+    var filteredExperiences: [DateExperience] {
+        let query = UserProfileManager.resolvedLocationForDiscovery().lowercased()
+        guard !query.isEmpty else { return experiences }
+        let tokens = query
+            .split(separator: ",")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
+            .filter { !$0.isEmpty }
+        let cityHint = tokens.count >= 2 ? tokens[tokens.count - 2] : tokens.last ?? query
+        let matched = experiences.filter { event in
+            let loc = event.location.lowercased()
+            return loc.contains(cityHint) || tokens.contains(where: { loc.contains($0) })
+        }
+        return matched.isEmpty ? experiences : matched
+    }
+
     func fetchExperiences() async {
         guard !isLoading else { return }
         isLoading = true
@@ -68,7 +84,7 @@ private struct ShimmerModifier: ViewModifier {
                     LinearGradient(
                         gradient: Gradient(stops: [
                             .init(color: .clear, location: max(0, phase - 0.3)),
-                            .init(color: Color.white.opacity(0.18), location: phase),
+                            .init(color: Color.creamParchmentLight.opacity(0.2), location: phase),
                             .init(color: .clear, location: min(1, phase + 0.3))
                         ]),
                         startPoint: .leading,
@@ -249,6 +265,8 @@ struct EventCardView: View {
 struct DateExperiencesSection: View {
     /// Pass `false` when embedding inside a collapsible wrapper that already shows the header.
     var showHeader: Bool = true
+    /// Home embed: match Upcoming empty copy styling (single muted line).
+    var compactEmptyState: Bool = false
 
     @StateObject private var viewModel = DateExperienceViewModel()
     @State private var selectedExperience: DateExperience? = nil
@@ -285,9 +303,17 @@ struct DateExperiencesSection: View {
                     .foregroundColor(Color.luxuryCream)
             }
 
-            Text("Live events & experiences within 60 miles")
-                .font(Font.bodySans(13, weight: .regular))
-                .foregroundColor(Color.luxuryCreamMuted)
+            let locationLabel = UserProfileManager.resolvedLocationForDiscovery()
+            if locationLabel.isEmpty {
+                Text("Live events & experiences within 60 miles")
+                    .font(Font.bodySans(13, weight: .regular))
+                    .foregroundColor(Color.luxuryCreamMuted)
+            } else {
+                Text("Near \(locationLabel) · within 60 miles")
+                    .font(Font.bodySans(13, weight: .regular))
+                    .foregroundColor(Color.luxuryCreamMuted)
+                    .lineLimit(2)
+            }
         }
         .padding(.horizontal, 20)
     }
@@ -300,7 +326,7 @@ struct DateExperiencesSection: View {
             loadingCards
         } else if let errorMessage = viewModel.fetchError {
             errorState(message: errorMessage)
-        } else if viewModel.experiences.isEmpty {
+        } else if viewModel.filteredExperiences.isEmpty {
             emptyState
         } else {
             liveCards
@@ -321,7 +347,7 @@ struct DateExperiencesSection: View {
     private var liveCards: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 14) {
-                ForEach(viewModel.experiences) { experience in
+                ForEach(viewModel.filteredExperiences) { experience in
                     EventCardView(experience: experience) {
                         selectedExperience = experience
                     }
@@ -333,36 +359,84 @@ struct DateExperiencesSection: View {
     }
 
     private var emptyState: some View {
-        VStack(spacing: 10) {
-            Text("No date experiences yet ✨")
-                .font(Font.header(17, weight: .semibold))
-                .foregroundColor(Color.accentGold)
-                .multilineTextAlignment(.center)
+        Group {
+            if compactEmptyState {
+                Text(
+                    UserProfileManager.resolvedLocationForDiscovery().isEmpty
+                        ? "Set your location in Settings to see events nearby."
+                        : "No events nearby yet — check back soon."
+                )
+                .font(Font.bodySans(13, weight: .regular))
+                .foregroundColor(Color.luxuryCreamMuted)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 20)
+            } else {
+                VStack(spacing: 10) {
+                    Text("No events nearby yet")
+                        .font(Font.bodySans(15, weight: .semibold))
+                        .foregroundColor(Color.luxuryCream)
+                        .multilineTextAlignment(.center)
 
-            Text("Check back soon for something special.")
-                .font(Font.bodySans(14, weight: .regular))
-                .foregroundColor(Color.luxuryCream)
-                .multilineTextAlignment(.center)
+                    Text(
+                        UserProfileManager.resolvedLocationForDiscovery().isEmpty
+                            ? "Set your location in Settings to see events nearby."
+                            : "Check back soon — we're adding more events in your area."
+                    )
+                    .font(Font.bodySans(13, weight: .regular))
+                    .foregroundColor(Color.luxuryCreamMuted)
+                    .multilineTextAlignment(.center)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 28)
+                .padding(.horizontal, 24)
+            }
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 28)
-        .padding(.horizontal, 24)
     }
 
     private func errorState(message: String) -> some View {
+        Group {
+            if compactEmptyState {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Couldn't load events. Pull down to refresh.")
+                        .font(Font.bodySans(13, weight: .regular))
+                        .foregroundColor(Color.luxuryCreamMuted)
+                    Button {
+                        Task { await viewModel.fetchExperiences() }
+                    } label: {
+                        HStack(spacing: 6) {
+                            Text("Try again")
+                                .font(Font.bodySans(13, weight: .semibold))
+                            Image(systemName: "arrow.clockwise")
+                                .font(.system(size: 11, weight: .semibold))
+                        }
+                        .foregroundColor(Color.luxuryGold)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 11)
+                        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.luxuryGold.opacity(0.3), lineWidth: 1))
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.horizontal, 20)
+            } else {
+                errorStateFull(message: message)
+            }
+        }
+    }
+
+    private func errorStateFull(message: String) -> some View {
         VStack(spacing: 12) {
             Image(systemName: "wifi.exclamationmark")
                 .font(.system(size: 28))
                 .foregroundColor(Color.accentGold.opacity(0.7))
 
-            Text("Couldn't load experiences")
-                .font(Font.header(15, weight: .semibold))
-                .foregroundColor(Color.accentGold)
+            Text("Couldn't load events")
+                .font(Font.bodySans(15, weight: .semibold))
+                .foregroundColor(Color.luxuryCream)
                 .multilineTextAlignment(.center)
 
             Text("Check your connection and try again.")
                 .font(Font.bodySans(13, weight: .regular))
-                .foregroundColor(Color.luxuryCream.opacity(0.8))
+                .foregroundColor(Color.luxuryCreamMuted)
                 .multilineTextAlignment(.center)
 
             Button {

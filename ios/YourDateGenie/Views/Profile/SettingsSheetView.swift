@@ -13,7 +13,6 @@ struct SettingsSheetView: View {
     @State private var isConnectingGoogleCalendar = false
     @State private var showEditAccount = false
     @State private var showSubscriptionOffer = false
-    @AppStorage("hasSeenHomeTutorial") private var hasSeenHomeTutorial = false
 
     @State private var remotePreferences: DBPreferences?
     @State private var isLoadingRemotePreferences = false
@@ -150,7 +149,7 @@ struct SettingsSheetView: View {
                             }
                         }
                         .padding(18)
-                        .luxuryCard()
+                        .goldHighlightMaroonAccent(cornerRadius: 14)
 
                         // MARK: - Date preferences (saved from onboarding / profile)
                         if let prefs = userProfile?.preferences {
@@ -294,7 +293,7 @@ struct SettingsSheetView: View {
 
                             #if DEBUG
                             Button {
-                                coordinator.resetOnboarding()
+                                coordinator.replayIntroOnboarding()
                                 dismiss()
                             } label: {
                                 HStack(spacing: 14) {
@@ -303,10 +302,10 @@ struct SettingsSheetView: View {
                                         .foregroundColor(Color.luxuryGold)
                                         .frame(width: 28)
                                     VStack(alignment: .leading, spacing: 2) {
-                                        Text("Show onboarding again")
+                                        Text("Reset onboarding flags")
                                             .font(Font.bodySans(15, weight: .medium))
                                             .foregroundColor(Color.luxuryCream)
-                                        Text("For testing")
+                                        Text("Debug only")
                                             .font(Font.bodySans(12, weight: .regular))
                                             .foregroundColor(Color.luxuryMuted)
                                     }
@@ -435,32 +434,66 @@ struct SettingsSheetView: View {
                         }
                         .padding(18)
                         .luxuryCard()
+
+                        // MARK: - App tour & intro
+                        VStack(spacing: 12) {
+                            Button {
+                                coordinator.replayHomeTutorial()
+                                dismiss()
+                            } label: {
+                                HStack(spacing: 14) {
+                                    Image(systemName: "questionmark.circle.fill")
+                                        .font(.system(size: 18))
+                                        .foregroundColor(Color.luxuryGold)
+                                        .frame(width: 28)
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text("Show home tutorial again")
+                                            .font(Font.bodySans(15, weight: .medium))
+                                            .foregroundColor(Color.luxuryCream)
+                                        Text("Quick walkthrough of the home screen")
+                                            .font(Font.bodySans(12, weight: .regular))
+                                            .foregroundColor(Color.luxuryMuted)
+                                    }
+                                    Spacer()
+                                    Image(systemName: "chevron.right")
+                                        .font(.system(size: 12))
+                                        .foregroundColor(Color.luxuryMuted)
+                                }
+                                .padding(.vertical, 4)
+                            }
+                            .buttonStyle(.plain)
+
+                            Button {
+                                coordinator.replayIntroOnboarding()
+                                dismiss()
+                            } label: {
+                                HStack(spacing: 14) {
+                                    Image(systemName: "sparkles")
+                                        .font(.system(size: 18))
+                                        .foregroundColor(Color.luxuryGold)
+                                        .frame(width: 28)
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text("Replay intro slides")
+                                            .font(Font.bodySans(15, weight: .medium))
+                                            .foregroundColor(Color.luxuryCream)
+                                        Text("Watch the welcome tour again")
+                                            .font(Font.bodySans(12, weight: .regular))
+                                            .foregroundColor(Color.luxuryMuted)
+                                    }
+                                    Spacer()
+                                    Image(systemName: "chevron.right")
+                                        .font(.system(size: 12))
+                                        .foregroundColor(Color.luxuryMuted)
+                                }
+                                .padding(.vertical, 4)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        .padding(18)
+                        .luxuryCard()
                     }
                     .padding(20)
                 }
-
-                // App tour
-                Button {
-                    hasSeenHomeTutorial = false
-                } label: {
-                    HStack(spacing: 12) {
-                        Image(systemName: "questionmark.circle.fill")
-                            .foregroundColor(Color.luxuryGold)
-                            .frame(width: 24)
-                        Text("Show home tutorial again")
-                            .font(Font.bodySans(15, weight: .regular))
-                            .foregroundColor(Color.luxuryCream)
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 12))
-                            .foregroundColor(Color.luxuryMuted)
-                    }
-                    .padding(.horizontal, 18)
-                    .padding(.vertical, 14)
-                    .frame(minHeight: 44)
-                }
-                .buttonStyle(.plain)
-                .padding(.horizontal, 20)
             }
             .sheet(isPresented: $showEditAccount) {
                 EditAccountSheetView()

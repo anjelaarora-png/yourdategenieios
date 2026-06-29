@@ -1,12 +1,57 @@
 import SwiftUI
 
+// MARK: - Home app header (logo + notifications — inline, not system toolbar)
+
+struct HomeAppHeaderBar: View {
+    @ObservedObject var notificationManager: NotificationManager
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 12) {
+            Image("Logo")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 24, height: 24)
+                .padding(4)
+                .background(Color.surfaceElevated)
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .stroke(Color.accentMaroon.opacity(0.35), lineWidth: 1)
+                )
+                .accessibilityLabel("Your Date Genie")
+
+            Spacer(minLength: 0)
+
+            NotificationBellButton(notificationManager: notificationManager)
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 8)
+        .padding(.bottom, 4)
+    }
+}
+
 // MARK: - Collapsible home section (Charcoal Maroon IA)
 
-struct CollapsibleHomeSection<Content: View>: View {
+struct CollapsibleHomeSection<Content: View, Trailing: View>: View {
     let title: String
     var subtitle: String? = nil
     @Binding var isExpanded: Bool
+    @ViewBuilder var headerTrailing: () -> Trailing
     @ViewBuilder var content: () -> Content
+
+    init(
+        title: String,
+        subtitle: String? = nil,
+        isExpanded: Binding<Bool>,
+        @ViewBuilder headerTrailing: @escaping () -> Trailing = { EmptyView() },
+        @ViewBuilder content: @escaping () -> Content
+    ) {
+        self.title = title
+        self.subtitle = subtitle
+        self._isExpanded = isExpanded
+        self.headerTrailing = headerTrailing
+        self.content = content
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -34,6 +79,7 @@ struct CollapsibleHomeSection<Content: View>: View {
                         }
                     }
                     Spacer(minLength: 8)
+                    headerTrailing()
                     Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundColor(Color.accentGold.opacity(0.7))
@@ -87,7 +133,7 @@ struct ItineraryHeroCard: View {
                     .font(Font.bodySans(10, weight: .semibold))
                     .tracking(0.6)
                     .textCase(.uppercase)
-                    .foregroundColor(Color.white.opacity(0.85))
+                    .foregroundColor(Color.creamParchmentLight.opacity(0.85))
                     .padding(.horizontal, 12)
                     .padding(.bottom, 8)
             }
@@ -391,11 +437,11 @@ struct SwapStopSheet: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(14)
-                    .background(Color.white.opacity(0.03))
+                    .background(Color.luxeSurfaceTint)
                     .cornerRadius(12)
                     .overlay(
                         RoundedRectangle(cornerRadius: 12)
-                            .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                            .stroke(Color.luxeSurfaceTintStrong, lineWidth: 1)
                     )
                 }
                 .buttonStyle(.plain)

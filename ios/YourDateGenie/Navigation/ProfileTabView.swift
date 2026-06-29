@@ -23,7 +23,7 @@ struct LuxuryProfileTabView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color.backgroundPrimary
+                CharcoalMaroonBackground()
                     .ignoresSafeArea()
                 
                 ScrollView(.vertical, showsIndicators: false) {
@@ -82,45 +82,40 @@ struct LuxuryProfileTabView: View {
                                     coordinator.activeSheet = .savedPlansList
                                 }
                             }
-                            Divider().background(Color.white.opacity(0.06))
+                            Divider().background(Color.luxeSurfaceTint)
                             LuxuryProfileMenuItem(icon: "clock.fill", title: "Date History", isLocked: !access.canAccess(.datePlan)) {
                                 access.require(.datePlan) {
                                     coordinator.activeSheet = .pastMagic
                                 }
                             }
-                            Divider().background(Color.white.opacity(0.06))
-                            LuxuryProfileMenuItem(icon: "gift.fill", title: "Gifts", isLocked: !access.canAccess(.gifting)) {
+                            Divider().background(Color.luxeSurfaceTint)
+                            LuxuryProfileMenuItem(icon: "gift.fill", title: "Gift Finder", isLocked: !access.canAccess(.gifting)) {
                                 access.require(.gifting) {
                                     coordinator.activeSheet = .gifts
                                 }
                             }
-                            Divider().background(Color.white.opacity(0.06))
+                            Divider().background(Color.luxeSurfaceTint)
                             LuxuryProfileMenuItem(icon: "leaf.fill", title: "Your Journey") {
                                 coordinator.activeSheet = .roseRewards
                             }
-                            Divider().background(Color.white.opacity(0.06))
+                            Divider().background(Color.luxeSurfaceTint)
                             LuxuryProfileMenuItem(icon: "heart.fill", title: "Preferences") {
                                 coordinator.startEditPreferencesOnly()
                             }
-                            Divider().background(Color.white.opacity(0.06))
+                            Divider().background(Color.luxeSurfaceTint)
                             LuxuryProfileMenuItem(icon: "bell.fill", title: "Notifications") {
                                 notificationManager.showNotificationsSheet = true
                             }
-                            Divider().background(Color.white.opacity(0.06))
+                            Divider().background(Color.luxeSurfaceTint)
                             LuxuryProfileMenuItem(icon: "gearshape.fill", title: "Settings") {
                                 coordinator.activeSheet = .settings
                             }
-                            Divider().background(Color.white.opacity(0.06))
+                            Divider().background(Color.luxeSurfaceTint)
                             LuxuryProfileMenuItem(icon: "questionmark.circle.fill", title: "Help & Support") {
                                 showHelpSupport = true
                             }
                         }
-                        .background(Color.surfaceElevated)
-                        .clipShape(RoundedRectangle(cornerRadius: 14))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 14)
-                                .stroke(Color.accentGold.opacity(0.15), lineWidth: 1)
-                        )
+                        .goldHighlightMaroonAccent(cornerRadius: 14)
                         .padding(.horizontal, 20)
                         
                         // Restore Purchases
@@ -150,7 +145,7 @@ struct LuxuryProfileTabView: View {
                             .cornerRadius(10)
                             .overlay(
                                 RoundedRectangle(cornerRadius: 10)
-                                    .stroke(Color.white.opacity(0.12), lineWidth: 1)
+                                    .stroke(Color.luxeSurfaceBorder, lineWidth: 1)
                             )
                         }
                         .padding(.horizontal, 20)
@@ -200,8 +195,8 @@ struct LuxuryProfileTabView: View {
                         .disabled(isDeletingAccount)
                         .padding(.horizontal, 20)
                     }
-                    .padding(.bottom, 120)
                 }
+                .mainTabBarScrollInset()
                 .scrollBounceBehavior(.basedOnSize)
             }
             .navigationTitle("You")
@@ -294,18 +289,7 @@ struct LuxuryProfileTabView: View {
             .foregroundColor(Color.textPrimary)
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
-            .background(Color.surfaceElevated)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-            .overlay(alignment: .leading) {
-                RoundedRectangle(cornerRadius: 1.5)
-                    .fill(Color.accentMaroon)
-                    .frame(width: 3)
-                    .padding(.vertical, 4)
-            }
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(Color.accentMaroon.opacity(0.45), lineWidth: 1)
-            )
+            .goldHighlightMaroonAccent(cornerRadius: 12)
         }
         .buttonStyle(.plain)
     }
@@ -417,12 +401,7 @@ struct PreferencesSummaryCard: View {
             }
         }
         .padding(18)
-        .background(Color.surfaceElevated)
-        .clipShape(RoundedRectangle(cornerRadius: 14))
-        .overlay(
-            RoundedRectangle(cornerRadius: 14)
-                .stroke(Color.accentGold.opacity(0.2), lineWidth: 1)
-        )
+        .goldHighlightMaroonAccent(cornerRadius: 14)
     }
 }
 
@@ -540,12 +519,7 @@ struct ProfileStatBox: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, 14)
         .padding(.horizontal, 8)
-        .background(Color.creamCard)
-        .clipShape(RoundedRectangle(cornerRadius: 14))
-        .overlay(
-            RoundedRectangle(cornerRadius: 14)
-                .stroke(Color.accentGold.opacity(0.2), lineWidth: 1)
-        )
+        .creamCardMaroonAccent(cornerRadius: 14)
     }
 }
 

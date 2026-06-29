@@ -8,6 +8,13 @@ extension Color {
     static let backgroundPrimary = Color(hex: "1A1A1A")
     static let surfaceElevated = Color(hex: "242424")
     static let creamCard = Color(hex: "F5F0E8")
+    static let creamParchmentLight = Color(hex: "FDF8F0")
+    static let creamParchmentMid = Color(hex: "F5EDE0")
+    static let creamParchmentDeep = Color(hex: "F0E6D8")
+    /// Warm cream tint on charcoal surfaces — never stark white overlays.
+    static let luxeSurfaceTint = Color(hex: "F5F0E8").opacity(0.08)
+    static let luxeSurfaceTintStrong = Color(hex: "F5F0E8").opacity(0.12)
+    static let luxeSurfaceBorder = Color(hex: "F5F0E8").opacity(0.16)
     static let accentGold = Color(hex: "C9A84C")
     static let accentMaroon = Color(hex: "4A0E0E")
     static let textPrimary = Color(hex: "FAFAF8")
@@ -108,6 +115,28 @@ extension LinearGradient {
         startPoint: .topLeading,
         endPoint: .bottomTrailing
     )
+
+    /// Warm parchment gradient for Love Notes, polaroids, and luxe cream cards.
+    static let creamParchment = LinearGradient(
+        gradient: Gradient(colors: [
+            Color.creamParchmentLight,
+            Color.creamParchmentMid,
+            Color.creamParchmentDeep
+        ]),
+        startPoint: .topLeading,
+        endPoint: .bottomTrailing
+    )
+
+    /// Charcoal-to-maroon depth for inset panels on dark screens.
+    static let charcoalMaroonInset = LinearGradient(
+        gradient: Gradient(colors: [
+            Color.surfaceElevated,
+            Color.backgroundPrimary,
+            Color.accentMaroon.opacity(0.18)
+        ]),
+        startPoint: .topLeading,
+        endPoint: .bottomTrailing
+    )
     
     // Magical sparkle overlay
     static let magicalOverlay = LinearGradient(
@@ -143,6 +172,50 @@ extension RadialGradient {
         startRadius: 100,
         endRadius: 400
     )
+}
+
+// MARK: - Charcoal Maroon screen backdrop (subtle maroon glow at edges — accent only)
+
+struct CharcoalMaroonBackground: View {
+    var body: some View {
+        ZStack {
+            Color.backgroundPrimary
+
+            LinearGradient(
+                colors: [
+                    Color.accentMaroon.opacity(0.24),
+                    Color.backgroundPrimary,
+                    Color(hex: "141010"),
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+
+            RadialGradient(
+                colors: [Color.accentMaroon.opacity(0.16), Color.clear],
+                center: UnitPoint(x: 0.88, y: 0.06),
+                startRadius: 0,
+                endRadius: 300
+            )
+
+            RadialGradient(
+                colors: [Color.accentMaroon.opacity(0.12), Color.clear],
+                center: UnitPoint(x: 0.1, y: 0.94),
+                startRadius: 0,
+                endRadius: 280
+            )
+        }
+    }
+}
+
+extension View {
+    /// Full-screen charcoal base with subtle maroon edge glow (Charcoal Maroon design system).
+    func charcoalMaroonScreenBackground() -> some View {
+        background {
+            CharcoalMaroonBackground()
+                .ignoresSafeArea()
+        }
+    }
 }
 
 // MARK: - Luxurious Button Styles
@@ -305,6 +378,105 @@ extension View {
     
     func cardStyle() -> some View {
         luxuryCard()
+    }
+}
+
+// MARK: - Charcoal Maroon highlight boxes (website parity: gold boxes + maroon pops)
+
+/// Subtle gold fill + gold border — use on charcoal for callouts, nudges, and grouped content.
+struct GoldHighlightBoxModifier: ViewModifier {
+    var cornerRadius: CGFloat = 14
+
+    func body(content: Content) -> some View {
+        content
+            .background(Color.accentGold.opacity(0.1))
+            .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerRadius)
+                    .stroke(Color.accentGold.opacity(0.35), lineWidth: 1)
+            )
+    }
+}
+
+/// 3pt maroon rail on the leading edge — accent pop only, never a full maroon fill.
+struct MaroonLeadingAccentModifier: ViewModifier {
+    var width: CGFloat = 3
+
+    func body(content: Content) -> some View {
+        content
+            .overlay(alignment: .leading) {
+                RoundedRectangle(cornerRadius: 1.5)
+                    .fill(Color.accentMaroon)
+                    .frame(width: width)
+                    .padding(.vertical, 6)
+            }
+    }
+}
+
+extension View {
+    func goldHighlightBox(cornerRadius: CGFloat = 14) -> some View {
+        modifier(GoldHighlightBoxModifier(cornerRadius: cornerRadius))
+    }
+
+    func maroonLeadingAccent(width: CGFloat = 3) -> some View {
+        modifier(MaroonLeadingAccentModifier(width: width))
+    }
+
+    /// Cream card + maroon border tint + leading maroon rail (itinerary rows, stats).
+    func creamCardMaroonAccent(cornerRadius: CGFloat = 14) -> some View {
+        background(Color.creamCard)
+            .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerRadius)
+                    .stroke(Color.maroonBorderTint, lineWidth: 1)
+            )
+            .maroonLeadingAccent()
+    }
+
+    /// Gold highlight box on charcoal + maroon leading rail (nudges, partner strip, paywall blocks).
+    func goldHighlightMaroonAccent(cornerRadius: CGFloat = 14) -> some View {
+        modifier(GoldHighlightBoxModifier(cornerRadius: cornerRadius))
+            .maroonLeadingAccent()
+    }
+
+    /// Cream card with gold highlight border + maroon rail (success states on plan cards).
+    func creamGoldHighlightMaroonAccent(cornerRadius: CGFloat = 14) -> some View {
+        background(Color.creamCard)
+            .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerRadius)
+                    .stroke(Color.accentGold.opacity(0.45), lineWidth: 1)
+            )
+            .maroonLeadingAccent()
+    }
+
+    /// Parchment-style cream surface with gold + maroon accents (Love Notes, letter cards).
+    func creamParchmentMaroonAccent(cornerRadius: CGFloat = 16) -> some View {
+        background(LinearGradient.creamParchment)
+            .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerRadius)
+                    .stroke(
+                        LinearGradient(
+                            colors: [Color.accentGold.opacity(0.55), Color.accentMaroon.opacity(0.25)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 1
+                    )
+            )
+            .maroonLeadingAccent()
+    }
+
+    /// Charcoal inset with cream border tint — form fields on dark screens.
+    func luxeInsetSurface(cornerRadius: CGFloat = 14) -> some View {
+        background(LinearGradient.charcoalMaroonInset)
+            .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerRadius)
+                    .stroke(Color.luxeSurfaceBorder, lineWidth: 1)
+            )
+            .maroonLeadingAccent(width: 2)
     }
 }
 
@@ -715,7 +887,7 @@ struct PolaroidModifier: ViewModifier {
     
     func body(content: Content) -> some View {
         content
-            .background(Color.polaroidWhite)
+            .background(LinearGradient.creamParchment)
             .cornerRadius(4)
             .shadow(color: Color.polaroidShadow.opacity(0.3), radius: 8, x: 2, y: 4)
             .shadow(color: Color.black.opacity(0.15), radius: 20, x: 5, y: 10)

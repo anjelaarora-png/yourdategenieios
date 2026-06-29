@@ -203,7 +203,7 @@ struct PaywallView: View {
         }
         .padding(20)
         .frame(maxWidth: .infinity)
-        .luxuryCard()
+        .goldHighlightMaroonAccent(cornerRadius: 16)
     }
 
     // MARK: - Benefits
@@ -216,13 +216,14 @@ struct PaywallView: View {
                        detail: "Generate as many finished plans as you need")
             benefitRow("Plan together with your partner",
                        detail: "Invite, rank options, and lock in your match")
-            benefitRow("Note drafts, Gift Finder & Memories",
+            benefitRow("Love Notes, Gift Finder & Memories",
                        detail: "Every romantic detail, organized for you")
-            benefitRow("Conversation cues & smart playlists", detail: nil)
+            benefitRow("Conversation Starters & smart playlists", detail: nil)
             benefitRow("Route maps & calendar integration", detail: nil)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 8)
+        .padding(16)
+        .goldHighlightMaroonAccent(cornerRadius: 14)
     }
 
     private func benefitRow(_ text: String, detail: String? = nil) -> some View {

@@ -263,7 +263,7 @@ struct PartnerPlanningSheetView: View {
                 HStack(spacing: 8) {
                     Image(systemName: "heart.circle.fill")
                         .font(Font.bodySans(18, weight: .semibold))
-                    Text("Plan a date together")
+                    Text("Start Plan Together")
                         .font(Font.bodySans(16, weight: .semibold))
                     Spacer()
                     Image(systemName: "arrow.right")
@@ -402,7 +402,7 @@ struct PartnerPlanningSheetView: View {
                                 .foregroundColor(Color.textPrimary.opacity(0.7))
                                 .padding(.horizontal, 10)
                                 .padding(.vertical, 6)
-                                .background(Color.white.opacity(0.06))
+                                .background(Color.luxeSurfaceTint)
                                 .cornerRadius(8)
                         }
                         .buttonStyle(.plain)
@@ -412,7 +412,7 @@ struct PartnerPlanningSheetView: View {
                     .cornerRadius(12)
                     .overlay(
                         RoundedRectangle(cornerRadius: 12)
-                            .stroke(Color.white.opacity(0.06), lineWidth: 1)
+                            .stroke(Color.luxeSurfaceTint, lineWidth: 1)
                     )
                     .overlay(alignment: .leading) {
                         RoundedRectangle(cornerRadius: 1.5)
@@ -474,7 +474,7 @@ struct PartnerPlanningSheetView: View {
                         .cornerRadius(12)
                         .overlay(
                             RoundedRectangle(cornerRadius: 12)
-                                .stroke(Color.white.opacity(0.06), lineWidth: 1)
+                                .stroke(Color.luxeSurfaceTint, lineWidth: 1)
                         )
                         .overlay(alignment: .leading) {
                             RoundedRectangle(cornerRadius: 1.5)
@@ -539,7 +539,7 @@ struct PartnerPlanningSheetView: View {
         .padding(14)
         .background(Color.surfaceElevated)
         .cornerRadius(14)
-        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.06), lineWidth: 1))
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.luxeSurfaceTint, lineWidth: 1))
     }
 
     private func phaseBannerIcon(_ phase: PlanPhase) -> String {
@@ -846,7 +846,7 @@ struct PartnerPlanningSheetView: View {
                     .cornerRadius(12)
                     .overlay(
                         RoundedRectangle(cornerRadius: 12)
-                            .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                            .stroke(Color.luxeSurfaceBorder, lineWidth: 1)
                     )
             }
         }
@@ -912,7 +912,7 @@ struct PartnerPlanningSheetView: View {
         .cornerRadius(16)
         .overlay(
             RoundedRectangle(cornerRadius: 16)
-                .stroke(Color.white.opacity(0.06), lineWidth: 1)
+                .stroke(Color.luxeSurfaceTint, lineWidth: 1)
         )
     }
 
@@ -965,7 +965,7 @@ struct PartnerPlanningSheetView: View {
                         .font(Font.bodySans(12, weight: .semibold))
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 8)
-                        .background(calendarSync.provider == provider ? Color.accentMaroon : Color.white.opacity(0.05))
+                        .background(calendarSync.provider == provider ? Color.accentMaroon : Color.luxeSurfaceTint)
                         .foregroundColor(calendarSync.provider == provider ? Color.textPrimary : Color.textPrimary.opacity(0.55))
                         .cornerRadius(9)
                 }
@@ -1034,10 +1034,14 @@ struct PartnerPlanningSheetView: View {
             if isSynced {
                 Text("✓ synced")
                     .font(Font.bodySans(11, weight: .semibold))
-                    .foregroundColor(Color.luxurySuccess)
+                    .foregroundColor(Color.accentGold)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 5)
-                    .background(Color.luxurySuccess.opacity(0.12))
+                    .background(Color.accentMaroon.opacity(0.35))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 20)
+                            .stroke(Color.accentGold.opacity(0.35), lineWidth: 1)
+                    )
                     .cornerRadius(20)
             } else {
                 Text("pending")
@@ -1045,14 +1049,14 @@ struct PartnerPlanningSheetView: View {
                     .foregroundColor(Color.textPrimary.opacity(0.45))
                     .padding(.horizontal, 10)
                     .padding(.vertical, 5)
-                    .background(Color.white.opacity(0.05))
+                    .background(Color.luxeSurfaceTint)
                     .cornerRadius(20)
             }
         }
         .padding(12)
         .background(Color.surfaceElevated)
         .cornerRadius(14)
-        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.06), lineWidth: 1))
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.luxeSurfaceTint, lineWidth: 1))
     }
 
     private var calendarScanningCard: some View {
@@ -1080,9 +1084,7 @@ struct PartnerPlanningSheetView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(14)
-        .background(Color.creamCard)
-        .cornerRadius(14)
-        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.accentGold, lineWidth: 1))
+        .creamGoldHighlightMaroonAccent(cornerRadius: 14)
     }
 
     private var noFreeEveningsCard: some View {
@@ -1098,7 +1100,7 @@ struct PartnerPlanningSheetView: View {
         .padding(14)
         .background(Color.surfaceElevated)
         .cornerRadius(14)
-        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.06), lineWidth: 1))
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.luxeSurfaceTint, lineWidth: 1))
     }
 
     private var calendarDeniedCard: some View {
@@ -1149,7 +1151,7 @@ struct PartnerPlanningSheetView: View {
         .padding(14)
         .background(Color.surfaceElevated)
         .cornerRadius(14)
-        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.06), lineWidth: 1))
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.luxeSurfaceTint, lineWidth: 1))
     }
 
     private var manualTimesSection: some View {
@@ -1270,7 +1272,7 @@ struct PartnerPlanningSheetView: View {
                 .cornerRadius(12)
                 .overlay(
                     RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                        .stroke(Color.luxeSurfaceBorder, lineWidth: 1)
                 )
             }
 
@@ -1550,7 +1552,7 @@ struct PartnerPlanningSheetView: View {
 
             // MARK: Safety (Apple §1.2)
             Divider()
-                .background(Color.white.opacity(0.1))
+                .background(Color.luxeSurfaceTintStrong)
                 .padding(.horizontal, 40)
                 .padding(.top, 8)
 
@@ -1579,7 +1581,7 @@ struct PartnerPlanningSheetView: View {
                 .fill(Color.surfaceElevated)
                 .overlay(
                     RoundedRectangle(cornerRadius: 20)
-                        .stroke(Color.white.opacity(0.06), lineWidth: 1)
+                        .stroke(Color.luxeSurfaceTint, lineWidth: 1)
                 )
         )
         .alert("Block & Unlink Partner?", isPresented: $showingUnlinkConfirmation) {
@@ -1771,7 +1773,7 @@ private struct PartnerInviteTextField: View {
             .cornerRadius(12)
             .overlay(
                 RoundedRectangle(cornerRadius: 12)
-                    .stroke(Color.white.opacity(text.isEmpty ? 0.08 : 0.16), lineWidth: 1)
+                    .stroke(text.isEmpty ? Color.luxeSurfaceBorder : Color.luxeSurfaceTintStrong, lineWidth: 1)
             )
         }
     }
@@ -1824,7 +1826,7 @@ private struct PartnerTutorialBannerView: View {
             HStack {
                 Image(systemName: "person.2.fill")
                     .foregroundColor(Color.accentMaroon)
-                Text("How Partner Planning works")
+                Text("How Plan Together works")
                     .font(Font.bodySans(15, weight: .semibold))
                     .foregroundColor(Color.textPrimary)
                 Spacer()
@@ -1833,7 +1835,7 @@ private struct PartnerTutorialBannerView: View {
                         .font(.system(size: 12, weight: .medium))
                         .foregroundColor(Color.textPrimary.opacity(0.5))
                         .frame(width: 28, height: 28)
-                        .background(Color.white.opacity(0.06))
+                        .background(Color.luxeSurfaceTint)
                         .clipShape(Circle())
                 }
                 .buttonStyle(.plain)
@@ -1849,7 +1851,7 @@ private struct PartnerTutorialBannerView: View {
         .padding(16)
         .background(Color.surfaceElevated)
         .cornerRadius(14)
-        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.08), lineWidth: 1))
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.luxeSurfaceBorder, lineWidth: 1))
         .transition(.opacity.combined(with: .move(edge: .top)))
     }
 }

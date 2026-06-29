@@ -1161,18 +1161,16 @@ final class SupabaseService: ObservableObject {
     /// Calls the generate-date-plan edge function with the full QuestionnaireData and returns
     /// the raw response Data containing `{ "datePlans": [...] }`.
     func generateDatePlanEdge(preferences: QuestionnaireData) async throws -> Data {
-        try? await refreshRestAuthFromSDK()
+        try await ensureSessionForEdgeFunction()
         let urlString = baseURL.hasSuffix("/")
             ? "\(baseURL)functions/v1/generate-date-plan"
             : "\(baseURL)/functions/v1/generate-date-plan"
         guard let url = URL(string: urlString) else { throw SupabaseError.invalidResponse }
+        guard let token = accessToken, !token.isEmpty else { throw SupabaseError.unauthorized }
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("Bearer \(anonKey)", forHTTPHeaderField: "Authorization")
-        if let token = accessToken {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        }
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.timeoutInterval = 120
 
         // Encode QuestionnaireData → wrap in { "preferences": {...} }
@@ -1196,6 +1194,11 @@ final class SupabaseService: ObservableObject {
         if http.statusCode != 200 {
             if http.statusCode == 401 { throw SupabaseError.unauthorized }
             if http.statusCode == 429 { throw SupabaseError.authFailed("Rate limited. Try again in a moment.") }
+            if http.statusCode == 422 {
+                let msg = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["error"] as? String
+                    ?? "We couldn't verify venues for your area. Try again or adjust your starting address."
+                throw SupabaseError.authFailed(msg)
+            }
             if http.statusCode == 502 || http.statusCode == 503 {
                 throw SupabaseError.authFailed("AI service temporarily unavailable. Please try again.")
             }
@@ -1649,15 +1652,25 @@ final class SupabaseService: ObservableObject {
     
     // MARK: - Generic Database Operations
 
+    /// Refreshes the Supabase session and fails if there is no user JWT for Edge Functions.
+    func ensureSessionForEdgeFunction() async throws {
+        invalidateAuthRefreshCache()
+        let session = try await supabaseClient.auth.session
+        guard !session.isExpired else {
+            throw SupabaseError.unauthorized
+        }
+        await syncSessionFromSDK(session)
+        guard let token = accessToken, !token.isEmpty else {
+            throw SupabaseError.unauthorized
+        }
+    }
+
     /// PostgREST RLS uses `auth.uid()` from the JWT. Manual `URLRequest` must use the same access token as `supabaseClient.auth` (it can be nil/stale right after launch or in background `Task`s).
     /// Skips the SDK round-trip if we refreshed within the last 30 seconds — avoids N serial auth hops when a screen fires multiple DB calls in a burst.
     private func refreshRestAuthFromSDK() async throws {
         guard Date().timeIntervalSince(lastAuthRefreshDate) > authRefreshCooldownSeconds else { return }
         let s = try await supabaseClient.auth.session
-        await MainActor.run {
-            syncSessionFromSDK(s)
-            lastAuthRefreshDate = Date()
-        }
+        await syncSessionFromSDK(s)
     }
 
     /// Call after any auth state change (sign-in, sign-out, token rotation) to force the next

@@ -231,7 +231,9 @@ struct Step6ExtrasView: View {
                 )
             }
             .padding(20)
+            .padding(.bottom, 24)
         }
+        .scrollBounceBehavior(.basedOnSize)
     }
     
     private func toggleSelection(_ value: String, in array: inout [String]) {

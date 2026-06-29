@@ -11,14 +11,12 @@ struct Step1LocationView: View {
             VStack(alignment: .leading, spacing: 24) {
                 // Location Input
                 VStack(alignment: .leading, spacing: 12) {
-                    SectionHeader(emoji: "📍", title: isPreferencesOnly ? "Your location" : "Where are you planning?")
-                    
-                    PlacesAutocompleteField(
-                        placeholder: "City or neighborhood",
-                        text: $data.city,
-                        mode: .city
+                    SectionHeader(
+                        emoji: "📍",
+                        title: isPreferencesOnly ? "Your location" : "Where are you planning?",
+                        subtitle: "We use your starting address for routes, maps, and nearby spots"
                     )
-                    
+
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Where are you leaving from?")
                             .font(Font.bodySans(13, weight: .medium))
@@ -32,12 +30,17 @@ struct Step1LocationView: View {
                             Text("Required for your route and map")
                                 .font(Font.inter(11, weight: .regular))
                                 .foregroundColor(Color.luxuryGold.opacity(0.9))
+                        } else if !data.city.isEmpty {
+                            Text("Planning near \(data.city)")
+                                .font(Font.inter(11, weight: .regular))
+                                .foregroundColor(Color.luxuryMuted)
                         }
 
                         Button {
                             locationHelper.requestCurrentLocation { address, city in
                                 if let address = address {
                                     data.startingAddress = address
+                                    data.syncCityFromStartingAddress()
                                 }
                                 if let city = city, data.city.isEmpty {
                                     data.city = city
@@ -187,6 +190,9 @@ struct Step1LocationView: View {
             .padding(20)
         }
         .scrollDismissesKeyboard(.interactively)
+        .onChange(of: data.startingAddress) { _, _ in
+            data.syncCityFromStartingAddress()
+        }
         .onAppear {
             if !isPreferencesOnly && data.timeOfDay.isEmpty {
                 data.timeOfDay = "evening"

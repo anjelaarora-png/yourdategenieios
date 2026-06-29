@@ -51,7 +51,7 @@ function toLastFmTag(value: string): string {
     romantic_dinner: "love",
     road_trip: "road trip",
     chill: "chill",
-    balanced: "chill",
+    // balanced: omit — adding "chill" as a modifier tag dilutes genre-specific results
     energetic: "dance",
     // Mood: map to tags that match intent and have good coverage
     party: "dance",
@@ -146,12 +146,27 @@ function hasEraInMatchedTags(s: TaggedSong, eraTagSet: Set<string>): boolean {
   return s.matchedTags.some((t) => eraTagSet.has(t));
 }
 
+function matchesPrimaryGenre(s: TaggedSong, primarySet: Set<string>): boolean {
+  return s.matchedTags.some((t) => primarySet.has(t));
+}
+
+function filterPrimaryOnly(songs: TaggedSong[], primarySet: Set<string>): TaggedSong[] {
+  return songs.filter((s) => matchesPrimaryGenre(s, primarySet));
+}
+
 /** Several Last.fm tags per app vibe — tracks matching more of them rank higher (reduces one noisy tag). */
 function primaryTagsForVibe(vibe: string): string[] {
   const v = vibe.toLowerCase().trim();
   const main = (toLastFmTag(vibe) || "").trim();
   const bundles: Record<string, string[]> = {
-    bollywood: ["hindi film music", "bollywood soundtracks", "hindi soundtrack"],
+    bollywood: [
+      "hindi film music",
+      "bollywood soundtracks",
+      "hindi soundtrack",
+      "bollywood",
+      "indian",
+      "filmi",
+    ],
     kpop: ["k-pop", "korean pop"],
     jpop: ["j-pop", "japanese pop"],
     rnb: ["r-n-b", "neo soul", "soul"],
@@ -204,7 +219,10 @@ function buildModifierTags(req: PlaylistRequest, primaryTags: string[]): string[
   }
   if (req.energy) {
     const t = toLastFmTag(req.energy);
-    if (t && !primarySet.has(t) && !tags.includes(t)) tags.push(t);
+    // Skip balanced — no extra Last.fm tag (avoids pulling chill/dance into every genre)
+    if (t && req.energy.toLowerCase() !== "balanced" && !primarySet.has(t) && !tags.includes(t)) {
+      tags.push(t);
+    }
   }
   return tags.filter(Boolean);
 }
@@ -247,6 +265,7 @@ function scoreTaggedSong(
   }
   if (hitPrimary && hitEra) score += 22;
   else if (hitPrimary && hitOtherMod) score += 10;
+  if (!hitPrimary) score -= 35;
   return score + (s.scoreAdjust ?? 0);
 }
 
@@ -314,11 +333,12 @@ function sortByScoreWithTieShuffle(
 function selectTaggedPlaylist(
   ordered: TaggedSong[],
   eraTagSet: Set<string>,
+  primarySet: Set<string>,
   targetCount: number,
   eraRequested: boolean,
 ): TaggedSong[] {
   if (!eraRequested || eraTagSet.size === 0) {
-    return ordered.slice(0, targetCount);
+    return filterPrimaryOnly(ordered, primarySet).slice(0, targetCount);
   }
   const minEraSlots = Math.min(10, targetCount);
   const n = Math.min(targetCount, ordered.length);
@@ -327,7 +347,12 @@ function selectTaggedPlaylist(
   if (eraCount >= minEraSlots) return sel;
 
   const selKeys = new Set(sel.map((s) => trackKey(s.title, s.artist)));
-  const extras = ordered.filter((s) => !selKeys.has(trackKey(s.title, s.artist)) && hasEraInMatchedTags(s, eraTagSet));
+  const extras = ordered.filter(
+    (s) =>
+      !selKeys.has(trackKey(s.title, s.artist)) &&
+      hasEraInMatchedTags(s, eraTagSet) &&
+      s.matchedTags.some((t) => primarySet.has(t)),
+  );
 
   let xi = 0;
   for (let i = sel.length - 1; i >= 0 && eraCount < minEraSlots && xi < extras.length; i--) {
@@ -341,7 +366,7 @@ function selectTaggedPlaylist(
       eraCount++;
     }
   }
-  return sel;
+  return filterPrimaryOnly(sel, primarySet);
 }
 
 function normalizeLastFmTagArray(tagField: unknown): string[] {
@@ -551,7 +576,6 @@ async function fetchTopTracksForTag(
 
 async function generateWithLastFm(apiKey: string, request: PlaylistRequest): Promise<SongSuggestion[]> {
   const targetCount = 15;
-  const eraPoolMin = 4;
   const timeSeed = Math.floor(Date.now() / 1000);
   const pageForTag = (tag: string, i: number) =>
     ((timeSeed + i * 17 + Math.floor(Math.random() * 100)) % 20) + 1;
@@ -598,19 +622,18 @@ async function generateWithLastFm(apiKey: string, request: PlaylistRequest): Pro
   const eraTagsList = eraToTags(request.era ?? undefined);
   const eraTagSet = new Set(eraTagsList);
 
-  if (merged.length < targetCount) {
-    if (eraTagsList.length > 0) {
-      let bump = 0;
-      for (const eraTag of eraTagsList) {
-        if (merged.length >= targetCount) break;
-        const ep = ((timeSeed + 200 + bump) % 18) + 1;
-        bump += 3;
-        const extra = await fetchTopTracksForTag(apiKey, eraTag, limitModifier, ep);
-        flatTagged.push(...tagToTagged(eraTag, extra));
-      }
+  // Top up from primary genre tags only — never era/modifier tags (those pollute niche genres like bollywood).
+  if (filterPrimaryOnly(merged, primarySet).length < targetCount) {
+    let bump = 0;
+    for (const tag of primaryTags) {
+      if (filterPrimaryOnly(merged, primarySet).length >= targetCount) break;
+      const ep = ((timeSeed + 100 + bump) % 18) + 1;
+      bump += 3;
+      const extra = await fetchTopTracksForTag(apiKey, tag, limitPerPrimary, ep);
+      flatTagged.push(...tagToTagged(tag, extra));
       merged = mergeTaggedByTrack(flatTagged);
     }
-    if (merged.length < targetCount) {
+    if (filterPrimaryOnly(merged, primarySet).length < targetCount) {
       const fallbackPage = ((timeSeed + 99) % 15) + 1;
       const extra = await fetchTopTracksForTag(apiKey, primaryTags[0], limitPerPrimary, fallbackPage);
       flatTagged.push(...tagToTagged(primaryTags[0], extra));
@@ -618,15 +641,10 @@ async function generateWithLastFm(apiKey: string, request: PlaylistRequest): Pro
     }
   }
 
-  const withPrimary = merged.filter((s) => s.matchedTags.some((t) => primarySet.has(t)));
-  let pool = withPrimary.length > 0 ? withPrimary : merged;
+  const pool = filterPrimaryOnly(merged, primarySet);
 
-  if (eraTagSet.size > 0) {
-    const withEra = pool.filter((s) => s.matchedTags.some((t) => eraTagSet.has(t)));
-    if (withEra.length >= targetCount || withEra.length >= eraPoolMin) {
-      pool = withEra;
-    }
-  }
+  // Era is enforced via scoring + selectTaggedPlaylist — do not replace pool with era-only
+  // tracks (that dropped jazz/rock/etc. in favor of generic decade charts).
 
   let ordered = sortByScoreWithTieShuffle(pool, primarySet, modifierSet, eraTagSet);
 
@@ -648,49 +666,51 @@ async function generateWithLastFm(apiKey: string, request: PlaylistRequest): Pro
   });
 
   const eraRequested = eraTagSet.size > 0;
-  const pickedTagged = selectTaggedPlaylist(ordered, eraTagSet, targetCount, eraRequested);
+  const pickedTagged = selectTaggedPlaylist(ordered, eraTagSet, primarySet, targetCount, eraRequested);
   let out: SongSuggestion[] = pickedTagged.map(toSuggestion);
 
-  if (out.length === 0 && merged.length === 0) {
+  if (out.length === 0 && pool.length === 0) {
     const rescueTag = fallbackTagForVibe(request.vibe);
-    const lastResort = await fetchTopTracksForTag(apiKey, rescueTag, limitPerPrimary, 1);
-    out = tagToTagged(rescueTag, lastResort).slice(0, targetCount).map(toSuggestion);
-  }
-
-  if (out.length < targetCount && eraTagsList.length > 0) {
-    const haveEraFill = new Set(out.map((x) => trackKey(x.title, x.artist)));
-    let eraPageBump = 0;
-    for (let round = 0; round < 3 && out.length < targetCount; round++) {
-      for (const eraTag of eraTagsList) {
-        if (out.length >= targetCount) break;
-        const ep = ((timeSeed + 61 + eraPageBump + round * 7) % 12) + 1;
-        eraPageBump += 4;
-        const eraFill = await fetchTopTracksForTag(apiKey, eraTag, limitModifier, ep);
-        for (const t of eraFill) {
-          if (out.length >= targetCount) break;
-          const k = trackKey(t.title, t.artist);
-          if (haveEraFill.has(k)) continue;
-          haveEraFill.add(k);
-          out.push({ title: t.title, artist: t.artist, genre: request.vibe });
-        }
-      }
-    }
+    const lastResort = tagToTagged(
+      rescueTag,
+      await fetchTopTracksForTag(apiKey, rescueTag, limitPerPrimary, 1),
+    );
+    out = filterPrimaryOnly(lastResort, primarySet).slice(0, targetCount).map(toSuggestion);
   }
 
   if (out.length < targetCount) {
-    const fillTag = fallbackTagForVibe(request.vibe);
+    const haveFill = new Set(out.map((x) => trackKey(x.title, x.artist)));
+    for (const s of ordered) {
+      if (out.length >= targetCount) break;
+      if (!matchesPrimaryGenre(s, primarySet)) continue;
+      const k = trackKey(s.title, s.artist);
+      if (haveFill.has(k)) continue;
+      haveFill.add(k);
+      out.push(toSuggestion(s));
+    }
+  }
+
+  // Extra pages from primary tags only — each candidate carries a primary matchedTag.
+  if (out.length < targetCount) {
     const have = new Set(out.map((x) => trackKey(x.title, x.artist)));
     let fillPageBump = 0;
-    for (let round = 0; round < (eraTagSet.size > 0 ? 2 : 1) && out.length < targetCount; round++) {
-      const fillPage = ((timeSeed + 50 + fillPageBump) % 10) + 1;
-      fillPageBump += 5;
-      const fillExtra = await fetchTopTracksForTag(apiKey, fillTag, limitModifier, fillPage);
-      for (const t of fillExtra) {
-        if (out.length >= targetCount) break;
-        const k = trackKey(t.title, t.artist);
-        if (have.has(k)) continue;
-        have.add(k);
-        out.push({ title: t.title, artist: t.artist, genre: request.vibe });
+    for (const tag of primaryTags) {
+      if (out.length >= targetCount) break;
+      for (let round = 0; round < 2 && out.length < targetCount; round++) {
+        const fillPage = ((timeSeed + 50 + fillPageBump) % 10) + 1;
+        fillPageBump += 5;
+        const fillTagged = tagToTagged(
+          tag,
+          await fetchTopTracksForTag(apiKey, tag, limitModifier, fillPage),
+        );
+        for (const t of fillTagged) {
+          if (out.length >= targetCount) break;
+          if (!matchesPrimaryGenre(t, primarySet)) continue;
+          const k = trackKey(t.title, t.artist);
+          if (have.has(k)) continue;
+          have.add(k);
+          out.push(toSuggestion(t));
+        }
       }
     }
   }
@@ -707,7 +727,8 @@ async function generateWithLastFm(apiKey: string, request: PlaylistRequest): Pro
       "Last.fm returned no tracks. In Supabase: set LASTFM_API_KEY in Project Settings → Edge Functions → Secrets (get a key at last.fm/api/account/create). Then check the function logs for this invocation to see why each tag returned 0 tracks.",
     );
   }
-  return out.slice(0, targetCount);
+  // Return fewer tracks rather than polluting with era-only or modifier-only rows.
+  return out.slice(0, Math.min(targetCount, out.length));
 }
 
 // Fallback config for playlist name and description when Last.fm is used

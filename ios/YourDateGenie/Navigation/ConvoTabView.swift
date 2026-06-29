@@ -1,20 +1,20 @@
 import SwiftUI
 
-/// "Convo" tab — nurture connection between dates: Note drafts · Conversation cues.
+/// "Convo" tab — nurture connection between dates: Love Notes · Conversation Starters.
 struct ConvoTabView: View {
     @EnvironmentObject var coordinator: NavigationCoordinator
     @EnvironmentObject private var access: AccessManager
     @State private var segment: Segment = .notes
 
     enum Segment: String, CaseIterable, Identifiable {
-        case notes = "Note drafts"
-        case sparks = "Conversation cues"
+        case notes = "Love Notes"
+        case sparks = "Conversation Starters"
         var id: String { rawValue }
     }
 
     var body: some View {
         ZStack {
-            Color.backgroundPrimary
+            CharcoalMaroonBackground()
                 .ignoresSafeArea()
 
             VStack(spacing: 0) {
@@ -31,8 +31,8 @@ struct ConvoTabView: View {
                         } else {
                             LockedPremiumTabPlaceholder(
                                 feature: .loveNotes,
-                                title: "Note drafts",
-                                subtitle: "Write heartfelt notes and AI-enhanced messages for your partner."
+                                title: "Love Notes",
+                                subtitle: "Write heartfelt Love Notes and AI-enhanced messages for your partner."
                             )
                         }
                     case .sparks:

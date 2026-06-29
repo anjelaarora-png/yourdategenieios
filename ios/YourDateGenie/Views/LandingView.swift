@@ -164,7 +164,7 @@ struct LandingView: View {
             
             // Description
             VStack(spacing: 16) {
-                Text("Your Date Genie was created for people who love with intention but juggle full-demanding lives.")
+                Text("Your Date Genie was created for people who love with intention but juggle full, demanding lives.")
                     .font(Font.bodySans(15, weight: .regular))
                     .foregroundColor(Color.luxuryCreamMuted)
                     .lineSpacing(6)
@@ -252,7 +252,7 @@ struct LandingView: View {
                 LuxuryFeatureCard(icon: "map.fill", title: "Verified Venues")
                 LuxuryFeatureCard(icon: "gift.fill", title: "Gift Ideas")
                 LuxuryFeatureCard(icon: "bubble.left.and.bubble.right.fill", title: "Conversation Starters")
-                LuxuryFeatureCard(icon: "music.note", title: "Date Playlists")
+                LuxuryFeatureCard(icon: "music.note", title: "Smart Playlists")
             }
         }
         .padding(.horizontal, 24)

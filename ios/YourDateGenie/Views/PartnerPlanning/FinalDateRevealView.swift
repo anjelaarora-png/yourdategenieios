@@ -160,7 +160,7 @@ struct FinalDateRevealView: View {
         )
         .overlay(
             RoundedRectangle(cornerRadius: 20)
-                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                .stroke(Color.luxeSurfaceBorder, lineWidth: 1)
         )
         .overlay(alignment: .leading) {
             RoundedRectangle(cornerRadius: 2)
@@ -245,9 +245,9 @@ struct FinalDateRevealView: View {
                             .foregroundColor(Color.textPrimary.opacity(0.8))
                             .padding(.horizontal, 10)
                             .padding(.vertical, 4)
-                            .background(Color.white.opacity(0.06))
+                            .background(Color.luxeSurfaceTint)
                             .cornerRadius(10)
-                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.12), lineWidth: 1))
+                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.luxeSurfaceBorder, lineWidth: 1))
                     }
                 }
             }
@@ -279,7 +279,7 @@ struct FinalDateRevealView: View {
                 .padding(16)
                 .background(Color.surfaceElevated)
                 .cornerRadius(14)
-                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.06), lineWidth: 1))
+                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.luxeSurfaceTint, lineWidth: 1))
             }
         }
     }
@@ -367,7 +367,7 @@ struct FinalDateRevealView: View {
                 .padding(14)
                 .background(Color.surfaceElevated)
                 .cornerRadius(12)
-                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.06), lineWidth: 1))
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.luxeSurfaceTint, lineWidth: 1))
             }
             .buttonStyle(.plain)
 
@@ -386,7 +386,7 @@ struct FinalDateRevealView: View {
                 .padding(14)
                 .background(Color.surfaceElevated.opacity(0.6))
                 .cornerRadius(12)
-                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.06), lineWidth: 1))
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.luxeSurfaceTint, lineWidth: 1))
                 .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }

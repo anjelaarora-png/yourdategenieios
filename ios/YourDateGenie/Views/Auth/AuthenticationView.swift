@@ -31,7 +31,7 @@ struct AuthenticationView: View {
 
     var body: some View {
         ZStack {
-            Color.backgroundPrimary
+            Color.clear
                 .ignoresSafeArea()
             
             RadialGradient.goldGlow
@@ -270,10 +270,14 @@ struct AuthenticationView: View {
                     Text("Continue with Google")
                         .font(Font.bodySans(15, weight: .medium))
                 }
-                .foregroundColor(.black)
+                .foregroundColor(Color.textOnCard)
                 .frame(maxWidth: .infinity)
                 .frame(height: 50)
-                .background(Color.white)
+                .background(LinearGradient.creamParchment)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(Color.luxeSurfaceBorder, lineWidth: 1)
+                )
                 .cornerRadius(12)
             }
             .disabled(socialAuth.isLoading)
@@ -454,15 +458,33 @@ struct AuthenticationView: View {
                 .frame(width: 120, height: 120)
                 .shadow(color: Color.luxuryGold.opacity(0.3), radius: 20)
             
-            Text(viewModel.isSignUp ? "Create Your Account" : "Welcome Back")
+            Text(authHeaderTitle)
                 .font(Font.bodySerif(28, weight: .regular))
                 .foregroundColor(Color.accentGold)
             
-            Text(viewModel.isSignUp ? "Plans ready when you are — no spreadsheets required." : "Pick up where you left off.")
+            Text(authHeaderSubtitle)
                 .font(Font.bodySans(15, weight: .regular))
                 .foregroundColor(Color.luxuryCreamMuted)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 24)
         }
         .padding(.top, 60)
+    }
+
+    private var authHeaderTitle: String {
+        if coordinator.authRequiredForIntent != nil {
+            return "Sign in to plan a date"
+        }
+        return viewModel.isSignUp ? "Create Your Account" : "Welcome Back"
+    }
+
+    private var authHeaderSubtitle: String {
+        if coordinator.authRequiredForIntent != nil {
+            return "A free account is required to generate your personalized date plan."
+        }
+        return viewModel.isSignUp
+            ? "Plans ready when you are — no spreadsheets required."
+            : "Pick up where you left off."
     }
     
     private var accountModeToggle: some View {
@@ -969,7 +991,7 @@ private struct ResetPasswordSheet: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color.backgroundPrimary
+                Color.clear
                     .ignoresSafeArea()
                 
                 VStack(spacing: 24) {

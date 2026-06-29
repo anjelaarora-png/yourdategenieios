@@ -6,7 +6,7 @@ struct QuestionnaireView: View {
     @EnvironmentObject var coordinator: NavigationCoordinator
     @EnvironmentObject private var access: AccessManager
     @StateObject private var viewModel = QuestionnaireViewModel()
-    @StateObject private var generator = DatePlanGeneratorService.shared
+    @ObservedObject private var generator = DatePlanGeneratorService.shared
     @State private var isGenerating = false
     @State private var showError = false
     @State private var errorTitle = "Generation Error"
@@ -16,50 +16,53 @@ struct QuestionnaireView: View {
     /// True while editing preferences from Profile — avoids stale `LastQuestionnaireStore` and resume-store noise.
     @State private var sessionIsPreferencesOnlyEdit = false
     @State private var showSavedIndicator = false
+    @State private var generationTask: Task<Void, Never>?
     
     var onComplete: ((QuestionnaireData) -> Void)?
     
     var body: some View {
         NavigationStack {
             ZStack {
-                // Luxurious background
                 Color.backgroundPrimary
                     .ignoresSafeArea()
-                
-                if isGenerating {
-                    MagicalLoadingView(generator: generator)
-                } else {
-                    VStack(spacing: 0) {
-                        // Progress indicator
-                        StepProgressView(currentStep: viewModel.currentStep, totalSteps: 6)
-                            .padding(.horizontal)
-                            .padding(.top, 8)
-                        
-                        // Step content (custom switcher — not paging TabView — so Places autocomplete lists are not clipped)
-                        Group {
-                            switch viewModel.currentStep {
-                            case 1:
-                                Step1LocationView(data: $viewModel.data, isPreferencesOnly: coordinator.questionnairePreferencesOnly)
-                            case 2:
-                                Step2TransportationView(data: $viewModel.data)
-                            case 3:
-                                Step3VibeView(data: $viewModel.data, isPreferencesOnly: coordinator.questionnairePreferencesOnly)
-                            case 4:
-                                Step4FoodView(data: $viewModel.data)
-                            case 5:
-                                Step5DealBreakersView(data: $viewModel.data, isPreferencesOnly: coordinator.questionnairePreferencesOnly)
-                            case 6:
-                                Step6ExtrasView(data: $viewModel.data, isPreferencesOnly: coordinator.questionnairePreferencesOnly)
-                            default:
-                                Step1LocationView(data: $viewModel.data, isPreferencesOnly: coordinator.questionnairePreferencesOnly)
-                            }
+
+                // Keep questionnaire mounted — swapping the whole tree on tap crashes SwiftUI on device.
+                VStack(spacing: 0) {
+                    StepProgressView(currentStep: viewModel.currentStep, totalSteps: 6)
+                        .padding(.horizontal)
+                        .padding(.top, 8)
+
+                    Group {
+                        switch viewModel.currentStep {
+                        case 1:
+                            Step1LocationView(data: $viewModel.data, isPreferencesOnly: coordinator.questionnairePreferencesOnly)
+                        case 2:
+                            Step2TransportationView(data: $viewModel.data)
+                        case 3:
+                            Step3VibeView(data: $viewModel.data, isPreferencesOnly: coordinator.questionnairePreferencesOnly)
+                        case 4:
+                            Step4FoodView(data: $viewModel.data)
+                        case 5:
+                            Step5DealBreakersView(data: $viewModel.data, isPreferencesOnly: coordinator.questionnairePreferencesOnly)
+                        case 6:
+                            Step6ExtrasView(data: $viewModel.data, isPreferencesOnly: coordinator.questionnairePreferencesOnly)
+                        default:
+                            Step1LocationView(data: $viewModel.data, isPreferencesOnly: coordinator.questionnairePreferencesOnly)
                         }
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .animation(.easeInOut(duration: 0.3), value: viewModel.currentStep)
-                        
-                        // Navigation buttons
-                        navigationButtons
                     }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .animation(.easeInOut(duration: 0.3), value: viewModel.currentStep)
+
+                    navigationButtons
+                }
+                .opacity(isGenerating ? 0 : 1)
+                .allowsHitTesting(!isGenerating)
+
+                if isGenerating {
+                    MagicalLoadingView(generator: generator) {
+                        cancelGeneration()
+                    }
+                    .transition(.opacity)
                 }
             }
             .navigationBarTitleDisplayMode(.inline)
@@ -118,29 +121,17 @@ struct QuestionnaireView: View {
             } message: {
                 Text(errorMessage)
             }
-            .onChange(of: generator.generatedPlans) { _, plans in
-                if !plans.isEmpty && isGenerating {
-                    LastQuestionnaireStore.save(viewModel.data)
-                    if UserProfileManager.shared.currentUser != nil {
-                        UserProfileManager.shared.savePreferencesFromQuestionnaire(viewModel.data)
-                    }
-                    access.recordDatePlanGenerated()
-                    onComplete?(viewModel.data)
-                    dismiss()
-                }
-            }
-            .onChange(of: generator.error) { _, error in
-                if let error = error {
-                    handleGenerationError(error)
-                }
-            }
             .onAppear {
                 viewModel.isPreferencesOnly = coordinator.questionnairePreferencesOnly
                 switch coordinator.planIntent {
-                case .fresh:
+                case .fresh, .prefilled:
                     QuestionnaireProgressStore.clear()
                     viewModel.data = QuestionnaireData()
                     UserProfileManager.shared.applySavedPreferences(to: &viewModel.data)
+                    viewModel.currentStep = 1
+                case .startFresh:
+                    QuestionnaireProgressStore.clear()
+                    viewModel.data = QuestionnaireData()
                     viewModel.currentStep = 1
                 case .useLast:
                     if coordinator.questionnairePreferencesOnly {
@@ -157,6 +148,17 @@ struct QuestionnaireView: View {
                             viewModel.currentStep = 1
                         }
                     }
+                case .repeatLast:
+                    sessionIsPreferencesOnlyEdit = false
+                    if let last = LastQuestionnaireStore.load() {
+                        viewModel.data = last
+                        viewModel.currentStep = 1
+                    } else {
+                        QuestionnaireProgressStore.clear()
+                        viewModel.data = QuestionnaireData()
+                        UserProfileManager.shared.applySavedPreferences(to: &viewModel.data)
+                        viewModel.currentStep = 1
+                    }
                 case .resume:
                     if let loaded = QuestionnaireProgressStore.load() {
                         viewModel.data = loaded.data
@@ -165,17 +167,22 @@ struct QuestionnaireView: View {
                 }
             }
             .onChange(of: viewModel.currentStep) { _, _ in
-                if coordinator.planIntent != .fresh && !sessionIsPreferencesOnlyEdit {
+                if !coordinator.planIntent.skipsProgressAutoSave && !sessionIsPreferencesOnlyEdit {
                     QuestionnaireProgressStore.save(data: viewModel.data, step: viewModel.currentStep)
                 }
                 flashSavedIndicator()
             }
             .onDisappear {
+                if isGenerating {
+                    generationTask?.cancel()
+                    generationTask = nil
+                    generator.cancelGeneration()
+                }
                 let prefsOnly = sessionIsPreferencesOnlyEdit
                 if prefsOnly {
                     sessionIsPreferencesOnlyEdit = false
                 }
-                if coordinator.planIntent != .fresh && !isGenerating && !prefsOnly {
+                if !coordinator.planIntent.skipsProgressAutoSave && !isGenerating && !prefsOnly {
                     QuestionnaireProgressStore.save(data: viewModel.data, step: viewModel.currentStep)
                 }
                 if !coordinator.isPresentingInitialPreferencesFlow {
@@ -203,7 +210,6 @@ struct QuestionnaireView: View {
     
     private var navigationButtons: some View {
         VStack(spacing: 0) {
-            // Auto-save indicator
             HStack(spacing: 6) {
                 Image(systemName: "checkmark.circle.fill")
                     .font(.system(size: 12))
@@ -216,82 +222,94 @@ struct QuestionnaireView: View {
             .animation(.easeInOut(duration: 0.3), value: showSavedIndicator)
             .padding(.top, 6)
 
-        HStack(spacing: 16) {
-            if viewModel.currentStep > 1 {
-                Button {
-                    withAnimation {
-                        viewModel.previousStep()
-                    }
-                } label: {
-                    HStack(spacing: 8) {
-                        Image(systemName: "chevron.left")
-                        Text("Back")
-                    }
-                }
-                .buttonStyle(LuxuryOutlineButtonStyle(isSmall: true))
-            } else {
-                Spacer()
-            }
-
-            if viewModel.currentStep == 6,
-               coordinator.partnerJoinSessionId == nil,
-               !coordinator.questionnairePreferencesOnly {
-                Button {
-                    goToHomeFromQuestionnaire()
-                } label: {
-                    Text("Go to Home")
-                }
-                .buttonStyle(LuxuryOutlineButtonStyle(isSmall: true))
-
-                Button {
-                    requestGenerateDatePlan()
-                } label: {
-                    HStack(spacing: 8) {
-                        Image(systemName: "sparkles")
-                        Text("Generate Date Plan")
-                    }
-                }
-                .buttonStyle(LuxuryGoldButtonStyle(isSmall: true))
-                .disabled(!viewModel.isCurrentStepValid)
-                .opacity(viewModel.isCurrentStepValid ? 1 : 0.5)
-            } else {
-                Button {
-                    if viewModel.currentStep == 6 {
-                        if let sessionId = coordinator.partnerJoinSessionId {
-                            submitPartnerJoinAndDismiss(sessionId: sessionId)
-                        } else if coordinator.questionnairePreferencesOnly {
-                            savePreferencesOnly()
-                        } else {
-                            requestGenerateDatePlan()
+            if showsFullWidthGenerateFooter {
+                VStack(spacing: 10) {
+                    Button {
+                        requestGenerateDatePlan()
+                    } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: "sparkles")
+                            Text("Generate Date Plan")
                         }
+                        .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(LuxuryGoldButtonStyle(isSmall: true))
+
+                    HStack(spacing: 12) {
+                        Button {
+                            withAnimation { viewModel.previousStep() }
+                        } label: {
+                            HStack(spacing: 8) {
+                                Image(systemName: "chevron.left")
+                                Text("Back")
+                            }
+                            .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(LuxuryOutlineButtonStyle(isSmall: true))
+
+                        Button {
+                            goToHomeFromQuestionnaire()
+                        } label: {
+                            Text("Go to Home")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(LuxuryOutlineButtonStyle(isSmall: true))
+                    }
+                }
+            } else {
+                HStack(spacing: 16) {
+                    if viewModel.currentStep > 1 {
+                        Button {
+                            withAnimation { viewModel.previousStep() }
+                        } label: {
+                            HStack(spacing: 8) {
+                                Image(systemName: "chevron.left")
+                                Text("Back")
+                            }
+                        }
+                        .buttonStyle(LuxuryOutlineButtonStyle(isSmall: true))
                     } else {
-                        withAnimation {
-                            viewModel.nextStep()
-                        }
+                        Spacer()
                     }
-                } label: {
-                    HStack(spacing: 8) {
+
+                    Button {
                         if viewModel.currentStep == 6 {
-                            if coordinator.partnerJoinSessionId != nil {
-                                Image(systemName: "checkmark.circle.fill")
-                                Text("I'm in")
+                            if let sessionId = coordinator.partnerJoinSessionId {
+                                submitPartnerJoinAndDismiss(sessionId: sessionId)
                             } else if coordinator.questionnairePreferencesOnly {
-                                Image(systemName: "checkmark.circle.fill")
-                                Text("Save preferences")
+                                savePreferencesOnly()
+                            } else if !UserProfileManager.shared.isLoggedIn {
+                                coordinator.requireAuthForPlanGeneration(intent: coordinator.planIntent)
                             } else {
-                                Image(systemName: "sparkles")
-                                Text("Generate Date Plan")
+                                requestGenerateDatePlan()
                             }
                         } else {
-                            Text("Next")
-                            Image(systemName: "chevron.right")
+                            withAnimation { viewModel.nextStep() }
                         }
+                    } label: {
+                        HStack(spacing: 8) {
+                            if viewModel.currentStep == 6 {
+                                if coordinator.partnerJoinSessionId != nil {
+                                    Image(systemName: "checkmark.circle.fill")
+                                    Text("I'm in")
+                                } else if coordinator.questionnairePreferencesOnly {
+                                    Image(systemName: "checkmark.circle.fill")
+                                    Text("Save preferences")
+                                } else {
+                                    Image(systemName: "sparkles")
+                                    Text("Generate Date Plan")
+                                }
+                            } else {
+                                Text("Next")
+                                Image(systemName: "chevron.right")
+                            }
+                        }
+                        .frame(maxWidth: viewModel.currentStep == 1 ? .infinity : nil)
                     }
-                    .frame(maxWidth: viewModel.currentStep == 1 ? .infinity : nil)
+                    .buttonStyle(LuxuryGoldButtonStyle(isSmall: true))
+                    .disabled(!viewModel.isCurrentStepValid)
+                    .opacity(viewModel.isCurrentStepValid ? 1 : 0.5)
                 }
-                .buttonStyle(LuxuryGoldButtonStyle(isSmall: true))
-                .disabled(!viewModel.isCurrentStepValid)
-                .opacity(viewModel.isCurrentStepValid ? 1 : 0.5)
             }
         }
         .padding(.horizontal, 20)
@@ -300,7 +318,14 @@ struct QuestionnaireView: View {
             Color.backgroundPrimary
                 .shadow(color: Color.black.opacity(0.3), radius: 10, y: -5)
         )
-        } // end outer VStack
+    }
+
+    /// Extras step in plan mode: full-width Generate (logged-in users only).
+    private var showsFullWidthGenerateFooter: Bool {
+        viewModel.currentStep == 6
+            && coordinator.partnerJoinSessionId == nil
+            && !coordinator.questionnairePreferencesOnly
+            && UserProfileManager.shared.isLoggedIn
     }
 
     private func flashSavedIndicator() {
@@ -311,28 +336,40 @@ struct QuestionnaireView: View {
     }
 
     private func goToHomeFromQuestionnaire() {
-        LastQuestionnaireStore.save(viewModel.data)
+        var data = viewModel.data
+        data.syncCityFromStartingAddress()
+        viewModel.data = data
+        LastQuestionnaireStore.save(data)
         QuestionnaireProgressStore.clear()
-        if UserProfileManager.shared.currentUser != nil {
-            UserProfileManager.shared.savePreferencesFromQuestionnaire(viewModel.data)
-        }
-        if coordinator.isPresentingInitialPreferencesFlow {
+        UserProfileManager.shared.savePreferencesFromQuestionnaire(data)
+        let finishingInitialPrefs = coordinator.isPresentingInitialPreferencesFlow
+        if finishingInitialPrefs {
             coordinator.isPresentingInitialPreferencesFlow = false
             coordinator.completePreferences()
         }
         coordinator.currentTab = .home
         coordinator.questionnairePreferencesOnly = false
+        if finishingInitialPrefs {
+            // Root view replaces InitialPreferencesGateView — do not dismiss (crashes).
+            return
+        }
         coordinator.dismissSheet()
         dismiss()
     }
     
     private func savePreferencesOnly() {
-        LastQuestionnaireStore.save(viewModel.data)
+        var data = viewModel.data
+        data.syncCityFromStartingAddress()
+        viewModel.data = data
+        LastQuestionnaireStore.save(data)
         QuestionnaireProgressStore.clear()
-        UserProfileManager.shared.savePreferencesFromQuestionnaire(viewModel.data)
-        if coordinator.isPresentingInitialPreferencesFlow {
+        UserProfileManager.shared.savePreferencesFromQuestionnaire(data)
+        let finishingInitialPrefs = coordinator.isPresentingInitialPreferencesFlow
+        if finishingInitialPrefs {
             coordinator.isPresentingInitialPreferencesFlow = false
             coordinator.completePreferences()
+            // Root view transition handles teardown — dismiss() here crashes.
+            return
         }
         coordinator.questionnairePreferencesOnly = false
         coordinator.activeSheet = nil
@@ -349,13 +386,57 @@ struct QuestionnaireView: View {
         coordinator.activeSheet = .planGenerating(sessionId: sessionId, role: .partner)
     }
     
-    /// Presents the premium paywall when needed, then runs generation.
+    /// Presents the premium paywall when needed, then runs generation (signed-in users only).
     private func requestGenerateDatePlan() {
+        guard UserProfileManager.shared.isLoggedIn else {
+            coordinator.requireAuthForPlanGeneration(intent: coordinator.planIntent)
+            return
+        }
         guard access.canGenerateDatePlan() else {
             showPremiumPaywall = true
             return
         }
         generateDatePlan()
+    }
+
+    /// Plans arrived — hand off to coordinator. Never call `dismiss()` here; sheet transitions
+    /// are owned by `completeQuestionnaire` (same crash class as save-preferences on root gate).
+    private func handleGenerationSuccess(plans: [DatePlan]) {
+        guard isGenerating else { return }
+        guard !plans.isEmpty else { return }
+
+        generationTask = nil
+        isGenerating = false
+
+        let questionnaireData = viewModel.data
+        let finishingInitialPrefs = coordinator.isPresentingInitialPreferencesFlow
+
+        // Defer ObservableObject publishes — mutating @Published during the button-tap /
+        // view-update cycle crashes on main thread ("Publishing changes from within view updates").
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 100_000_000)
+            generator.generatedPlans = plans
+            coordinator.generatedPlans = plans
+            coordinator.generatedPlansSelectedIndex = 0
+            coordinator.currentDatePlan = plans.first
+            LastQuestionnaireStore.save(questionnaireData)
+            UserProfileManager.shared.savePreferencesFromQuestionnaire(questionnaireData)
+            access.recordDatePlanGenerated()
+            QuestionnaireProgressStore.clear()
+            if finishingInitialPrefs {
+                coordinator.isPresentingInitialPreferencesFlow = false
+                coordinator.completePreferences()
+            }
+            try? await Task.sleep(nanoseconds: 200_000_000)
+            onComplete?(questionnaireData)
+        }
+    }
+
+    private func cancelGeneration() {
+        generationTask?.cancel()
+        generationTask = nil
+        generator.cancelGeneration()
+        isGenerating = false
     }
 
     private func generateDatePlan() {
@@ -366,31 +447,66 @@ struct QuestionnaireView: View {
             showError = true
             return
         }
-        LastQuestionnaireStore.save(viewModel.data)
-        QuestionnaireProgressStore.clear()
-        withAnimation {
-            isGenerating = true
+        let address = viewModel.data.startingAddress.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !address.isEmpty else {
+            errorTitle = "Starting address required"
+            errorMessage = "Go back to Step 1 and enter where you're leaving from so we can build your route."
+            showRetryOption = false
+            showError = true
+            return
         }
-        
-        Task {
+
+        generationTask?.cancel()
+        // Only flip local UI state synchronously — mutating ObservableObjects here crashes on main thread.
+        isGenerating = true
+
+        var questionnaireData = viewModel.data
+        questionnaireData.syncCityFromStartingAddress()
+
+        generationTask = Task { @MainActor in
+            await Task.yield()
+            try? await Task.sleep(nanoseconds: 80_000_000)
+            viewModel.data = questionnaireData
+            generator.error = nil
+            generator.generatedPlans = []
+            LastQuestionnaireStore.save(questionnaireData)
+            QuestionnaireProgressStore.clear()
             do {
-                let _ = try await generator.generateDatePlan(from: viewModel.data)
+                let plans = try await generator.generateDatePlan(from: questionnaireData)
+                guard !Task.isCancelled else { return }
+                guard !plans.isEmpty else {
+                    isGenerating = false
+                    errorTitle = "Invalid Response"
+                    errorMessage = "The server returned no date plans. Please try again."
+                    showRetryOption = true
+                    showError = true
+                    return
+                }
+                handleGenerationSuccess(plans: plans)
+            } catch is CancellationError {
+                generator.cancelGeneration()
+                isGenerating = false
             } catch {
-                await MainActor.run {
-                    if let genError = error as? DatePlanGeneratorService.GenerationError {
-                        handleGenerationError(genError)
-                    } else {
-                        errorTitle = "Error"
-                        errorMessage = error.localizedDescription
-                        showRetryOption = true
-                        showError = true
-                    }
+                isGenerating = false
+                if let genError = error as? DatePlanGeneratorService.GenerationError {
+                    handleGenerationError(genError)
+                } else if let supabaseError = error as? SupabaseError, case .unauthorized = supabaseError {
+                    errorTitle = "Authentication Error"
+                    errorMessage = "Your session expired. Please sign in again and try generating."
+                    showRetryOption = false
+                    showError = true
+                } else {
+                    errorTitle = "Error"
+                    errorMessage = error.localizedDescription
+                    showRetryOption = true
+                    showError = true
                 }
             }
         }
     }
     
     private func handleGenerationError(_ error: DatePlanGeneratorService.GenerationError) {
+        isGenerating = false
         switch error {
         case .missingAPIKey:
             errorTitle = "Configuration Error"
@@ -535,8 +651,8 @@ class QuestionnaireViewModel: ObservableObject {
     var isCurrentStepValid: Bool {
         switch currentStep {
         case 1:
-            let locationOk = !data.city.isEmpty && !data.startingAddress.isEmpty
-            return isPreferencesOnly ? locationOk : (locationOk && !data.dateType.isEmpty)
+            let addressOk = !data.startingAddress.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            return isPreferencesOnly ? addressOk : (addressOk && !data.dateType.isEmpty)
         case 2: return !data.transportationMode.isEmpty && !data.travelRadius.isEmpty
         case 3: return !data.energyLevel.isEmpty
         case 4: return !data.budgetRange.isEmpty

@@ -192,7 +192,7 @@ private struct CelebrationBowView: View {
                     .fill(RadialGradient(colors: [Color.luxuryCream, Color.luxuryGoldLight, Color.luxuryGold], center: .center, startRadius: 0, endRadius: 7))
                     .frame(width: 14, height: 14)
                     .overlay(Circle().stroke(Color.luxuryGold.opacity(0.8), lineWidth: 1))
-                Circle().fill(Color.white.opacity(0.5)).frame(width: 4, height: 4).offset(x: -1, y: -1)
+                Circle().fill(Color.creamParchmentLight.opacity(0.55)).frame(width: 4, height: 4).offset(x: -1, y: -1)
             }
             .offset(y: 2)
         }

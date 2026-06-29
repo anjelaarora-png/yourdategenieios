@@ -118,6 +118,16 @@ struct QuestionnaireData: Codable {
         self.relationshipStage = relationshipStage
         self.conversationTopics = conversationTopics
     }
+
+    /// Fills `city` from `startingAddress` when the address is set (used for discovery + AI prompts).
+    mutating func syncCityFromStartingAddress() {
+        let address = startingAddress.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !address.isEmpty else { return }
+        let derived = MapURLHelper.cityStateOrRegionFromAddress(address)
+        if !derived.isEmpty {
+            city = derived
+        }
+    }
 }
 
 // MARK: - Stored Questionnaire Progress (for "Pick up where you left off")

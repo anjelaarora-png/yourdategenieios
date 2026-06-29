@@ -71,6 +71,28 @@ enum AppDestination: Hashable {
     }
 }
 
+// MARK: - Plan Intent
+/// How the questionnaire should be prefilled when the user starts (or resumes) date planning.
+enum PlanIntent: Hashable {
+    /// Legacy default — clear form, apply saved account preferences.
+    case fresh
+    /// PlanDateStartSheet "Use saved preferences" and auth default.
+    case prefilled
+    /// Edit preferences, regenerate fallback, HomeTabView resume path.
+    case useLast
+    /// PlanDateStartSheet "Repeat my last date setup".
+    case repeatLast
+    /// PlanDateStartSheet "Continue where I left off".
+    case resume
+    /// PlanDateStartSheet blank form — no saved prefs applied.
+    case startFresh
+
+    /// Blank or legacy-fresh starts should not write QuestionnaireProgressStore.
+    var skipsProgressAutoSave: Bool {
+        self == .fresh || self == .startFresh
+    }
+}
+
 // MARK: - Navigation Coordinator
 @MainActor
 class NavigationCoordinator: ObservableObject {
@@ -90,10 +112,19 @@ class NavigationCoordinator: ObservableObject {
     @Published var hasCompletedPreferences = false
     @Published var showMemoryGallery = false
     @Published var isShowingMemoryCapture = false
-    /// When true, user skipped login and can browse the app; creating a date plan will prompt for auth.
+    /// When true, user skipped login and can browse the app with local prefs + free-tier plan credits.
     @Published var hasSkippedLogin = false
     /// When auth was required to create a date plan, holds the intent so we open questionnaire after login.
     @Published var authRequiredForIntent: PlanIntent?
+
+    /// How to prefill the next questionnaire session.
+    @Published var planIntent: PlanIntent = .prefilled
+    /// When true, questionnaire saves preferences only (no plan generation).
+    @Published var questionnairePreferencesOnly = false
+    /// True while regenerating plans from the options sheet (shows loading overlay).
+    @Published var isRegeneratingFromOptions = false
+    /// Presents PlanDateStartSheet when user taps + Plan.
+    @Published var showPlanStartChooser = false
 
     @Published var activeSheet: ActiveSheet?
 
@@ -133,6 +164,9 @@ class NavigationCoordinator: ObservableObject {
 
     /// After email-confirm deep link with session, show hero once before initial preferences questionnaire.
     @Published var presentHeroBeforeInitialPreferences: Bool = false
+
+    /// Increment to replay the home-screen coach-mark tutorial from Settings.
+    @Published var homeTutorialReplayToken: UInt = 0
 
     /// True while root shows full-screen questionnaire for first-time preferences (replaces PreferencesSetupView).
     @Published var isPresentingInitialPreferencesFlow: Bool = false
@@ -277,10 +311,25 @@ class NavigationCoordinator: ObservableObject {
 
     private init() {
         loadSavedState()
+        #if DEBUG
+        if Config.previewUnlockAllFeatures {
+            applyPreviewSessionState()
+        }
+        #endif
         setupGeneratorSubscription()
         setupAuthStateSubscription()
         setupPartnerPhaseObservation()
     }
+
+    #if DEBUG
+    /// Lands on the main tab shell without auth for local simulator previews.
+    private func applyPreviewSessionState() {
+        hasCompletedOnboarding = true
+        hasSkippedLogin = true
+        hasCompletedPreferences = true
+        hasDeferredInitialPreferences = true
+    }
+    #endif
     
     // MARK: - Partner Phase Observation
 
@@ -534,40 +583,41 @@ class NavigationCoordinator: ObservableObject {
     }
     
     // MARK: - Navigation Actions
-    
+
+    /// Date-plan generation and the plan questionnaire require a Supabase session.
+    func requireAuthForPlanGeneration(intent: PlanIntent? = nil) {
+        let mode = intent ?? planIntent
+        authRequiredForIntent = mode
+        planIntent = mode
+        questionnairePreferencesOnly = false
+        activeSheet = .authRequired(mode)
+    }
+
     func startDatePlanning() {
-        startDatePlanning(mode: .fresh)
+        presentPlanStartChooser()
     }
-    
-    /// Intent for questionnaire: fresh (new), useLast (prefill from saved preferences), or resume (restore from stored progress).
-    enum PlanIntent {
-        case fresh
-        case useLast
-        case resume
+
+    /// Presents how to fill the questionnaire (+ Plan). Default choice is saved preferences.
+    func presentPlanStartChooser() {
+        guard UserProfileManager.shared.isLoggedIn else {
+            requireAuthForPlanGeneration(intent: .prefilled)
+            return
+        }
+        showPlanStartChooser = true
     }
-    
-    @Published var planIntent: PlanIntent = .fresh
-    
-    /// When true, questionnaire shows "Save preferences" and only saves; no date plan generation.
-    @Published var questionnairePreferencesOnly = false
-    
-    /// True when user tapped Regenerate from options sheet; we generate from last questionnaire without showing the form.
-    @Published var isRegeneratingFromOptions = false
     
     func startDatePlanning(mode: PlanIntent) {
+        showPlanStartChooser = false
         guard UserProfileManager.shared.isLoggedIn else {
-            authRequiredForIntent = mode
-            planIntent = mode
-            questionnairePreferencesOnly = false
-            if mode == .fresh {
+            if mode == .startFresh {
                 lastQuestionnaireScheduledDate = nil
             }
-            activeSheet = .authRequired(mode)
+            requireAuthForPlanGeneration(intent: mode)
             return
         }
         planIntent = mode
         questionnairePreferencesOnly = false
-        if mode == .fresh {
+        if mode == .startFresh {
             lastQuestionnaireScheduledDate = nil
         }
         activeSheet = .questionnaire
@@ -581,31 +631,49 @@ class NavigationCoordinator: ObservableObject {
     }
     
     func completeQuestionnaire(with data: QuestionnaireData) {
+        guard UserProfileManager.shared.isLoggedIn else {
+            requireAuthForPlanGeneration(intent: planIntent)
+            return
+        }
         if isPartnerPlanningInviter {
             PartnerSessionManager.shared.setInviterFilled(data)
             isPartnerPlanningInviter = false
         }
         currentPlanPartnerNames = nil
         lastQuestionnaireScheduledDate = Self.scheduledDate(from: data)
-        activeSheet = nil
-        
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-            let generator = DatePlanGeneratorService.shared
-            if !generator.generatedPlans.isEmpty {
-                self.currentDatePlan = generator.generatedPlans.first
-                self.generatedPlans = generator.generatedPlans
-                self.generatedPlansSelectedIndex = 0
-            } else {
-                self.currentDatePlan = DatePlan.sample
-                self.generatedPlans = [DatePlan.sample, DatePlan.sampleOptionB, DatePlan.sampleOptionC]
+
+        let resolvedPlans: [DatePlan] = {
+            if !generatedPlans.isEmpty { return generatedPlans }
+            let fromGenerator = DatePlanGeneratorService.shared.generatedPlans
+            if !fromGenerator.isEmpty { return fromGenerator }
+            return []
+        }()
+        guard !resolvedPlans.isEmpty else {
+            AppLogger.error("completeQuestionnaire: no generated plans to present")
+            return
+        }
+
+        currentDatePlan = resolvedPlans.first
+        generatedPlans = resolvedPlans
+        generatedPlansSelectedIndex = 0
+
+        let nextSheet: ActiveSheet = resolvedPlans.count >= 3 ? .datePlanOptions : .datePlanResult
+        let replacingQuestionnaireSheet: Bool = {
+            if case .questionnaire? = activeSheet { return true }
+            return false
+        }()
+
+        if replacingQuestionnaireSheet {
+            // Dismiss questionnaire first — swapping sheet identity in one frame crashes SwiftUI.
+            activeSheet = nil
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { [weak self] in
+                guard let self else { return }
+                self.activeSheet = nextSheet
+                self.scheduleSyncAllUnsavedExperiencesToCloud()
             }
-            
-            if self.generatedPlans.count >= 3 {
-                self.activeSheet = .datePlanOptions
-            } else {
-                self.activeSheet = .datePlanResult
-            }
-            self.scheduleSyncAllUnsavedExperiencesToCloud()
+        } else {
+            activeSheet = nextSheet
+            scheduleSyncAllUnsavedExperiencesToCloud()
         }
     }
     
@@ -795,6 +863,10 @@ class NavigationCoordinator: ObservableObject {
     
     /// Called from Date Plan Options sheet when user taps Regenerate: generate three new plans using the last submitted questionnaire data (no questionnaire UI).
     func requestRegenerateFromOptions() {
+        guard UserProfileManager.shared.isLoggedIn else {
+            requireAuthForPlanGeneration(intent: .useLast)
+            return
+        }
         guard let data = LastQuestionnaireStore.load() else {
             // No saved questionnaire; fall back to opening questionnaire prefilled from profile so they can submit again.
             planIntent = .useLast
@@ -847,12 +919,24 @@ class NavigationCoordinator: ObservableObject {
         hasCompletedOnboarding = UserDefaults.standard.bool(forKey: "hasCompletedOnboarding")
     }
 
+    /// Reset intro slides so they play again on next launch.
+    func replayIntroOnboarding() {
+        hasCompletedOnboarding = false
+        hasDeferredInitialPreferences = false
+        UserDefaults.standard.set(false, forKey: "hasCompletedOnboarding")
+        UserDefaults.standard.set(false, forKey: Self.deferredInitialPreferencesKey)
+        saveState()
+    }
+
+    /// Replay the home tab coach-mark walkthrough (Plan CTA, hero, tab bar).
+    func replayHomeTutorial() {
+        homeTutorialReplayToken &+= 1
+    }
+
     #if DEBUG
     /// Reset onboarding so it shows again (for testing after reinstall or to replay the flow).
     func resetOnboarding() {
-        hasCompletedOnboarding = false
-        UserDefaults.standard.removeObject(forKey: "hasCompletedOnboarding")
-        saveState()
+        replayIntroOnboarding()
     }
     #endif
     
@@ -871,7 +955,7 @@ class NavigationCoordinator: ObservableObject {
                 guard let self = self else { return }
                 self.planIntent = intent
                 self.questionnairePreferencesOnly = false
-                if intent == .fresh {
+                if intent == .startFresh || intent == .fresh {
                     self.lastQuestionnaireScheduledDate = nil
                 }
                 self.activeSheet = .questionnaire
@@ -914,7 +998,7 @@ class NavigationCoordinator: ObservableObject {
                 guard let self = self else { return }
                 self.planIntent = intent
                 self.questionnairePreferencesOnly = false
-                if intent == .fresh {
+                if intent == .startFresh || intent == .fresh {
                     self.lastQuestionnaireScheduledDate = nil
                 }
                 self.activeSheet = .questionnaire
@@ -1454,7 +1538,7 @@ struct RootNavigationView: View {
 
     var body: some View {
         ZStack {
-            Color.backgroundPrimary
+            CharcoalMaroonBackground()
                 .ignoresSafeArea()
 
             if showSplash {
@@ -1464,14 +1548,18 @@ struct RootNavigationView: View {
                 MobileOnboardingView()
                     .environmentObject(coordinator)
             } else if !coordinator.isLoggedIn && !coordinator.hasSkippedLogin {
-                AuthenticationView(isReinstallFlow: false, onDismiss: nil, allowSkipToExplore: false)
+                AuthenticationView(
+                    isReinstallFlow: false,
+                    onDismiss: { coordinator.skipLogin() },
+                    allowSkipToExplore: true
+                )
                     .environmentObject(coordinator)
-            } else if !coordinator.isLoggedIn && coordinator.hasSkippedLogin {
-                LuxuryMainAppView()
-                    .environmentObject(coordinator)
-                    .environmentObject(userProfileManager)
             } else if !coordinator.hasCompletedPreferences && !coordinator.hasDeferredInitialPreferences {
                 InitialPreferencesGateView()
+                    .environmentObject(coordinator)
+                    .environmentObject(userProfileManager)
+            } else if !coordinator.isLoggedIn && coordinator.hasSkippedLogin {
+                LuxuryMainAppView()
                     .environmentObject(coordinator)
                     .environmentObject(userProfileManager)
             } else {

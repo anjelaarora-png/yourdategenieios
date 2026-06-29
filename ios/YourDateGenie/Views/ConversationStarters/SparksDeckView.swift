@@ -93,15 +93,41 @@ struct SparksDeckView: View {
         .onChange(of: currentIndex) { _, _ in
             clampIndex()
         }
+        .onChange(of: session.id) { _, _ in
+            dragOffset = 0
+            showEndOfDeck = false
+            showWelcomePrompt = false
+        }
     }
 
     // MARK: - Header
     private var headerSection: some View {
         VStack(spacing: 4) {
-            Text("Your Sparks")
-                .font(Font.bodySerif(32, weight: .regular))
-                .foregroundColor(Color.accentGold)
-                .frame(maxWidth: .infinity)
+            HStack(alignment: .center) {
+                Spacer(minLength: 0)
+                Text("Your Sparks")
+                    .font(Font.bodySerif(32, weight: .regular))
+                    .foregroundColor(Color.accentGold)
+                Spacer(minLength: 0)
+                Button {
+                    showEndOfDeck = false
+                    dragOffset = 0
+                    onRegenerate()
+                    let generator = UIImpactFeedbackGenerator(style: .medium)
+                    generator.impactOccurred()
+                } label: {
+                    Image(systemName: "arrow.clockwise")
+                        .font(Font.bodySans(16, weight: .semibold))
+                        .symbolRenderingMode(.monochrome)
+                        .foregroundColor(Color.luxuryGold)
+                        .frame(width: 36, height: 36)
+                        .background(Color.luxuryMaroonLight.opacity(0.9))
+                        .clipShape(Circle())
+                        .overlay(Circle().stroke(Color.luxuryGold.opacity(0.35), lineWidth: 1))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Refresh sparks")
+            }
             Text("\(relationshipLabel) · \(vibeLabel)")
                 .font(Font.bodySans(16, weight: .semibold))
                 .foregroundColor(Color.luxuryCream)

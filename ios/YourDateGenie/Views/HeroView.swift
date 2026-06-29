@@ -59,29 +59,17 @@ struct HeroView: View {
                         .frame(width: 160, height: 160)
                 }
                 
-                // Tagline
-                VStack(spacing: 4) {
-                    Text("Date nights,")
-                        .font(Font.header(36, weight: .regular))
-                        .foregroundColor(Color.luxuryCream)
-                    
-                    HStack(spacing: 6) {
-                        Text("planned")
-                            .font(Font.displaySerif(52, weight: .bold))
-                            .foregroundStyle(LinearGradient.goldShimmer)
-                        Text("for you.")
-                            .font(Font.header(36, weight: .regular))
-                            .foregroundColor(Color.luxuryCream)
-                    }
-                }
-                .multilineTextAlignment(.center)
-                
-                // Description
-                Text("Tell us what you love. We'll create a complete evening — venues, timing, and all the details.")
-                    .font(Font.bodySans(15, weight: .regular))
-                    .foregroundColor(Color.luxuryCreamMuted)
-                    .multilineTextAlignment(.center)
-                    .lineSpacing(5)
+                OnboardingSectionHeader(
+                    label: "Your evening",
+                    subtitle: "Personalized from your preferences"
+                )
+
+                OnboardingSlideTitle(lead: "Date nights, ", accent: "planned for you.")
+                    .padding(.horizontal, 24)
+
+                OnboardingBodyText(
+                    text: "Tell us what you love. We'll create a complete evening — venues, timing, and all the details."
+                )
                     .padding(.horizontal, 24)
                 
                 // CTA Button
@@ -109,12 +97,9 @@ struct HeroView: View {
                     Text("Join 500+ couples planning")
                         .font(Font.bodySans(12, weight: .regular))
                         .foregroundColor(Color.luxuryMuted)
-                    Text("memorable")
-                        .font(Font.displaySerif(24, weight: .bold))
-                        .foregroundColor(Color.luxuryGold)
-                    Text("dates")
+                    Text("memorable dates")
                         .font(Font.bodySans(12, weight: .regular))
-                        .foregroundColor(Color.luxuryMuted)
+                        .foregroundColor(Color.luxuryGold)
                 }
             }
             .padding(.bottom, 60)

@@ -75,7 +75,7 @@ struct PlaybookView: View {
     private var categoryGrid: some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: 16) {
-                Text("DATING TIPS")
+                Text("DATE TIPS")
                     .font(Font.bodySans(12, weight: .semibold))
                     .tracking(2)
                     .foregroundColor(Color.luxuryGold)
@@ -91,7 +91,7 @@ struct PlaybookView: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 4)
-                Text("Pick a category. Personalised to your situation.")
+                Text("Pick a category. Personalized to your situation.")
                     .font(Font.bodySans(14, weight: .regular))
                     .foregroundColor(Color.luxuryCreamMuted)
                     .frame(maxWidth: .infinity, alignment: .leading)

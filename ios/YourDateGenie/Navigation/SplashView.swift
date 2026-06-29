@@ -8,7 +8,7 @@ struct LuxurySplashView: View {
     
     var body: some View {
         ZStack {
-            Color.backgroundPrimary
+            CharcoalMaroonBackground()
                 .ignoresSafeArea()
             
             RadialGradient.goldGlow

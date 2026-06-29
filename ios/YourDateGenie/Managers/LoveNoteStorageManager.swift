@@ -92,7 +92,7 @@ final class LoveNoteStorageManager: ObservableObject {
         save()
         NotificationManager.shared.addNotification(AppNotification(
             type: .loveNoteSaved,
-            title: "Love note saved!",
+            title: "Love Note saved!",
             message: "\"\(String(message.prefix(60)).trimmingCharacters(in: .whitespaces))\(message.count > 60 ? "…" : "")\"",
             timestamp: Date()
         ))

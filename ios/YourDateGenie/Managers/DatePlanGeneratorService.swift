@@ -4,6 +4,7 @@ import Combine
 // MARK: - Date Plan Generator Service
 
 /// Service responsible for generating date plans using OpenAI GPT
+@MainActor
 class DatePlanGeneratorService: ObservableObject {
     static let shared = DatePlanGeneratorService()
     
@@ -75,46 +76,37 @@ class DatePlanGeneratorService: ObservableObject {
     
     /// Generate a personalized date plan using OpenAI GPT. Starting point (user-provided address) is required.
     func generateDatePlan(from questionnaire: QuestionnaireData) async throws -> [DatePlan] {
+        guard UserProfileManager.shared.isLoggedIn else {
+            throw GenerationError.unauthorized
+        }
         let startingAddress = questionnaire.startingAddress.trimmingCharacters(in: .whitespaces)
         guard !startingAddress.isEmpty else {
             throw GenerationError.apiError("Starting address is required for your route and map. Please enter where you're leaving from.")
         }
-        
-        await MainActor.run {
-            isGenerating = true
-            generationProgress = 0
-            currentStatusMessage = "Crafting your perfect evening..."
-            error = nil
-            loadingPlanIndices = []
-            stopProgressSimulation()
-        }
+
+        await Task.yield()
+
+        // Use @MainActor helpers — not `MainActor.run` — so callers on the main actor
+        // (e.g. QuestionnaireView's generation Task) don't deadlock before the loading UI renders.
+        await resetForGeneration()
         
         do {
             await updateProgress(0.1, message: "Consulting the stars...")
             await updateProgress(0.2, message: "Finding hidden gems...")
 
-            await MainActor.run { startProgressSimulation() }
+            await startProgressSimulation()
 
             // All generation, venue verification, and directions enrichment happen server-side.
             let plans = try await callEdgeFunction(preferences: questionnaire)
 
-            await MainActor.run { stopProgressSimulation() }
+            await stopProgressSimulation()
             await updateProgress(1.0, message: "Your magical evening awaits!")
 
-            await MainActor.run {
-                self.generatedPlans = plans
-                self.isGenerating = false
-                self.loadingPlanIndices = []
-            }
+            await finishGeneration(plans: plans)
             return plans
             
         } catch {
-            await MainActor.run {
-                stopProgressSimulation()
-                self.generationProgress = 0
-                self.error = error as? GenerationError ?? .networkError(error.localizedDescription)
-                self.isGenerating = false
-            }
+            await failGeneration(error)
             throw error
         }
     }
@@ -488,12 +480,12 @@ class DatePlanGeneratorService: ObservableObject {
               let tagline = json["tagline"] as? String,
               let totalDuration = json["totalDuration"] as? String,
               let estimatedCost = json["estimatedCost"] as? String,
-              let stopsArray = json["stops"] as? [[String: Any]],
-              let secretTouchJson = json["genieSecretTouch"] as? [String: Any],
-              let packingList = json["packingList"] as? [String],
-              let weatherNote = json["weatherNote"] as? String else {
+              let stopsArray = json["stops"] as? [[String: Any]] else {
             throw GenerationError.parsingError("Missing required fields in plan")
         }
+        let secretTouchJson = json["genieSecretTouch"] as? [String: Any] ?? [:]
+        let packingList = json["packingList"] as? [String] ?? []
+        let weatherNote = json["weatherNote"] as? String ?? ""
         
         // Parse stops
         var stops: [DatePlanStop] = []
@@ -590,6 +582,31 @@ class DatePlanGeneratorService: ObservableObject {
     }
     
     // MARK: - Progress Updates
+
+    @MainActor
+    private func resetForGeneration() {
+        isGenerating = true
+        generationProgress = 0
+        currentStatusMessage = "Crafting your perfect evening..."
+        error = nil
+        loadingPlanIndices = []
+        stopProgressSimulation()
+    }
+
+    @MainActor
+    private func finishGeneration(plans: [DatePlan]) {
+        generatedPlans = plans
+        isGenerating = false
+        loadingPlanIndices = []
+    }
+
+    @MainActor
+    private func failGeneration(_ error: Error) {
+        stopProgressSimulation()
+        generationProgress = 0
+        self.error = error as? GenerationError ?? .networkError(error.localizedDescription)
+        isGenerating = false
+    }
     
     @MainActor
     private func updateProgress(_ progress: Double, message: String) {
@@ -598,14 +615,18 @@ class DatePlanGeneratorService: ObservableObject {
     }
     
     /// Advances generationProgress from current value toward 0.85 over ~55 seconds so the loading UI never appears stuck during long API calls.
+    @MainActor
     private func startProgressSimulation() {
         stopProgressSimulation()
         let targetCap: Double = 0.85
         let steps = 110
         let increment = (targetCap - 0.2) / Double(steps)
         progressSimulationTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] timer in
-            guard let self = self else { timer.invalidate(); return }
-            DispatchQueue.main.async {
+            Task { @MainActor [weak self] in
+                guard let self else {
+                    timer.invalidate()
+                    return
+                }
                 if self.generationProgress < targetCap {
                     self.generationProgress = min(targetCap, self.generationProgress + increment)
                 } else {
@@ -613,12 +634,24 @@ class DatePlanGeneratorService: ObservableObject {
                 }
             }
         }
-        progressSimulationTimer?.tolerance = 0.1
-        RunLoop.main.add(progressSimulationTimer!, forMode: .common)
+        guard let progressSimulationTimer else { return }
+        progressSimulationTimer.tolerance = 0.1
+        RunLoop.main.add(progressSimulationTimer, forMode: .common)
     }
     
+    @MainActor
     private func stopProgressSimulation() {
         progressSimulationTimer?.invalidate()
         progressSimulationTimer = nil
+    }
+
+    /// Reset loading UI when the user cancels generation from the questionnaire.
+    @MainActor
+    func cancelGeneration() {
+        stopProgressSimulation()
+        generationProgress = 0
+        currentStatusMessage = "Starting..."
+        isGenerating = false
+        error = nil
     }
 }
