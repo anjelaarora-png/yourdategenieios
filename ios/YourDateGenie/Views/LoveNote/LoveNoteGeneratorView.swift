@@ -266,22 +266,23 @@ struct LoveNoteGeneratorView: View {
                     .italic()
                     .foregroundColor(Color.luxuryGold)
             }
-            ZStack(alignment: .topLeading) {
-                if noteText.isEmpty {
-                    Text(prompts[selectedPromptIndex].placeholder)
+            LoveNoteCreamCard(bannerSubtitle: "Your words") {
+                ZStack(alignment: .topLeading) {
+                    if noteText.isEmpty {
+                        Text(prompts[selectedPromptIndex].placeholder)
+                            .font(Font.bodySans(16, weight: .regular))
+                            .foregroundColor(Color.textMutedOnCard)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 14)
+                    }
+                    TextEditor(text: $noteText)
                         .font(Font.bodySans(16, weight: .regular))
-                        .foregroundColor(Color.textMutedOnCard)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 14)
+                        .foregroundColor(Color.textOnCard)
+                        .scrollContentBackground(.hidden)
+                        .padding(12)
+                        .frame(minHeight: 140)
                 }
-                TextEditor(text: $noteText)
-                    .font(Font.bodySans(16, weight: .regular))
-                    .foregroundColor(Color.textOnCard)
-                    .scrollContentBackground(.hidden)
-                    .padding(12)
-                    .frame(minHeight: 140)
             }
-            .creamParchmentMaroonAccent(cornerRadius: 16)
         }
     }
 
@@ -297,12 +298,13 @@ struct LoveNoteGeneratorView: View {
                     .italic()
                     .foregroundColor(Color.luxuryGold)
             }
-            TextField("Your name", text: $signOffName)
-                .font(Font.bodySans(16, weight: .regular))
-                .foregroundColor(Color.textOnCard)
-                .padding(14)
-                .creamParchmentMaroonAccent(cornerRadius: 12)
-                .autocapitalization(.words)
+            LoveNoteCreamCard(bannerSubtitle: "Sign as") {
+                TextField("Your name", text: $signOffName)
+                    .font(Font.bodySans(16, weight: .regular))
+                    .foregroundColor(Color.textOnCard)
+                    .padding(14)
+                    .autocapitalization(.words)
+            }
         }
     }
 
@@ -632,20 +634,21 @@ struct SavedLoveNoteCard: View {
 
     var body: some View {
         Button(action: onTap) {
-            VStack(alignment: .leading, spacing: 8) {
-                Text(preview)
-                    .font(Font.bodySerif(14, weight: .regular))
-                    .foregroundColor(Color(hex: "3D2C2C"))
-                    .lineLimit(3)
-                    .multilineTextAlignment(.leading)
-                Spacer(minLength: 0)
-                Text(dateText)
-                    .font(Font.bodySans(11, weight: .medium))
-                    .foregroundColor(Color.luxuryGold)
+            LoveNoteCreamCard(bannerSubtitle: "Saved") {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(preview)
+                        .font(Font.bodySerif(14, weight: .regular))
+                        .foregroundColor(Color.textOnCard)
+                        .lineLimit(3)
+                        .multilineTextAlignment(.leading)
+                    Spacer(minLength: 0)
+                    Text(dateText)
+                        .font(Font.bodySans(11, weight: .medium))
+                        .foregroundColor(Color.textMutedOnCard)
+                }
+                .frame(width: 160, height: 88)
+                .padding(12)
             }
-            .frame(width: 160, height: 100)
-            .padding(14)
-            .creamParchmentMaroonAccent(cornerRadius: 14)
         }
         .buttonStyle(.plain)
     }
@@ -785,63 +788,43 @@ struct LoveLetterCardView: View {
     }
 
     var body: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 20)
-                .fill(LinearGradient.creamParchment)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 20)
-                        .stroke(
-                            LinearGradient(
-                                colors: [
-                                    Color.luxuryGold.opacity(0.6),
-                                    Color.accentMaroon.opacity(0.35)
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            ),
-                            lineWidth: 2
-                        )
-                )
-                .shadow(color: Color.accentMaroon.opacity(0.12), radius: 20, y: 8)
+        VStack(alignment: .leading, spacing: 0) {
+            LoveNoteGradientBanner(subtitle: signOffLine)
 
-            VStack(alignment: .leading, spacing: 20) {
-                HStack {
-                    HStack(spacing: 6) {
-                        Image(systemName: "heart.text.square.fill")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundColor(Color.accentMaroon)
-                        Text("Love Note")
-                            .font(Font.bodySans(11, weight: .bold))
-                            .tracking(1.2)
-                            .foregroundColor(Color.accentMaroon.opacity(0.85))
-                            .textCase(.uppercase)
-                    }
-                    Spacer()
-                    Text(signOffLine)
-                        .font(Font.bodySerif(20, weight: .bold))
-                        .italic()
-                        .foregroundColor(Color.luxuryMaroon.opacity(0.9))
-                }
-                .padding(.horizontal, 4)
-
-                Divider()
-                    .background(Color.luxuryGold.opacity(0.4))
-                    .padding(.vertical, 4)
-
+            VStack(alignment: .leading, spacing: 16) {
                 Text(message)
                     .font(Font.bodySans(16, weight: .regular))
-                    .foregroundColor(placeholder ? Color.textMutedOnCard : Color(hex: "3D2C2C"))
+                    .foregroundColor(placeholder ? Color.textMutedOnCard : Color.textOnCard)
                     .lineSpacing(8)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                     .fixedSize(horizontal: false, vertical: true)
 
+                if !placeholder {
+                    Text(signOffLine)
+                        .font(Font.bodySerif(16, weight: .bold))
+                        .italic()
+                        .foregroundColor(Color.textMutedOnCard)
+                        .frame(maxWidth: .infinity, alignment: .trailing)
+                }
+
                 Spacer(minLength: 0)
             }
-            .padding(28)
+            .padding(20)
+        }
+        .background(Color.creamCard)
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(Color.maroonBorderTint, lineWidth: 1)
+        )
+        .overlay(alignment: .leading) {
+            RoundedRectangle(cornerRadius: 1.5)
+                .fill(Color.accentMaroon)
+                .frame(width: 3)
+                .padding(.vertical, 1)
         }
         .frame(maxWidth: .infinity)
         .aspectRatio(340/440, contentMode: .fit)
-        .maroonLeadingAccent(width: 3)
     }
 }
 

@@ -120,63 +120,7 @@ struct PartnerReceivesPlanView: View {
     // MARK: - Plan card (cream itinerary card, maroon left border)
 
     private var planCard: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            VStack(alignment: .leading, spacing: 4) {
-                if let scheduledLabel = scheduledLabel {
-                    Text(scheduledLabel.uppercased())
-                        .font(Font.bodySans(11, weight: .bold))
-                        .tracking(1.5)
-                        .foregroundColor(Color.textMutedOnCard)
-                }
-                Text(plan.title)
-                    .font(Font.displaySerif(26, weight: .bold))
-                    .foregroundColor(Color.textOnCard)
-                    .fixedSize(horizontal: false, vertical: true)
-                if !plan.tagline.isEmpty {
-                    Text(plan.tagline)
-                        .font(Font.bodySans(13, weight: .regular))
-                        .foregroundColor(Color.textMutedOnCard)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-
-            if !plan.stops.isEmpty {
-                Divider().background(Color.textOnCard.opacity(0.12))
-                VStack(alignment: .leading, spacing: 10) {
-                    ForEach(plan.stops.prefix(4), id: \.name) { stop in
-                        HStack(alignment: .top, spacing: 10) {
-                            Text(stop.timeSlot)
-                                .font(Font.bodySans(11, weight: .semibold))
-                                .foregroundColor(Color.accentMaroon)
-                                .frame(width: 56, alignment: .leading)
-                            Text(stop.name)
-                                .font(Font.bodySans(13, weight: .medium))
-                                .foregroundColor(Color.textOnCard)
-                                .fixedSize(horizontal: false, vertical: true)
-                            Spacer(minLength: 0)
-                        }
-                    }
-                }
-            }
-        }
-        .padding(18)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.creamCard)
-        .cornerRadius(18)
-        .overlay(alignment: .leading) {
-            RoundedRectangle(cornerRadius: 2)
-                .fill(Color.accentMaroon)
-                .frame(width: 4)
-                .padding(.vertical, 6)
-        }
-        .shadow(color: Color.black.opacity(0.25), radius: 14, y: 6)
-    }
-
-    private var scheduledLabel: String? {
-        guard let date = plan.scheduledDate else { return nil }
-        let formatter = DateFormatter()
-        formatter.dateFormat = "EEEE, MMM d · h:mm a"
-        return formatter.string(from: date)
+        ItineraryCreamPlanPreviewCard(plan: plan)
     }
 
     // MARK: - Calendar status

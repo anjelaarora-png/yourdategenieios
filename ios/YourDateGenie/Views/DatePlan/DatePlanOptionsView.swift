@@ -336,17 +336,26 @@ struct DatePlanOptionsView: View {
                         .transition(.opacity.combined(with: .scale(scale: 0.96)))
                 } else {
                     let plan = plans[index]
-                    LoveLetterItineraryBackground(cornerRadius: 20) {
-                        VStack(spacing: 0) {
-                            planHeaderView(plan: plan)
-                            planItineraryView(plan: plan)
-                            genieSecretTouchView(plan: plan)
-                            giftSuggestionsView(plan: plan)
-                            packingAndWeatherView(plan: plan)
-                            routeSectionView(plan: plan)
-                        }
-                        .padding(.horizontal, 4)
-                        .padding(.vertical, 16)
+                    ItineraryCreamCardChrome(edgePadding: 0) {
+                        ItineraryCreamPlanDetailContent(
+                            plan: plan,
+                            partnerName: coordinator.currentPlanPartnerNames?.1,
+                            onOpenRoute: {
+                                coordinator.showRouteMap(
+                                    stops: ItineraryPlanFormatting.itineraryStops(for: plan),
+                                    startingPoint: plan.startingPoint
+                                )
+                            },
+                            onGetMoreGiftIdeas: {
+                                access.require(.gifting) {
+                                    coordinator.showGiftFinder(
+                                        datePlan: plan,
+                                        dateLocation: plan.stops.first?.address
+                                    )
+                                }
+                            },
+                            canAccessGiftIdeas: access.canAccess(.gifting)
+                        )
                     }
                     .padding(.horizontal, 16)
                     .id(index)
