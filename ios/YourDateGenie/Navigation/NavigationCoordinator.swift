@@ -752,12 +752,22 @@ class NavigationCoordinator: ObservableObject {
 
     /// Move a saved plan to Past Dates (date already happened).
     func markPlanAsPast(_ plan: DatePlan) {
+        let wasFirstEver = RoseManager.shared.lifetimeCompletedCount == 0
         savedPlans.removeAll { $0.id == plan.id }
         if !pastPlans.contains(where: { $0.id == plan.id }) {
             pastPlans.append(plan)
         }
         saveState()
+        syncRoseProgress(rewardForNewPlanId: plan.id)
         Task { await uploadPlanToCloud(plan, status: "completed") }
+        if wasFirstEver {
+            NotificationManager.shared.addNotification(AppNotification(
+                type: .dateMilestone,
+                title: "First bud opened 🌹",
+                message: "Your rose is blooming — keep going toward \(RoseManager.shared.monthlyGoal) nights this month.",
+                timestamp: Date()
+            ))
+        }
         NotificationManager.shared.addNotification(AppNotification(
             type: .memoryCapture,
             title: "Capture your memory from \"\(plan.title)\"",
@@ -1118,14 +1128,21 @@ class NavigationCoordinator: ObservableObject {
                 self.pastPlans = past
                 self.experiencesWaiting = experiences
                 self.migratePastDuePlans()
+                self.syncRoseProgress()
             }
         }
+    }
+
+    /// Keeps the rose gamification in sync with completed date history.
+    func syncRoseProgress(rewardForNewPlanId: UUID? = nil) {
+        RoseManager.shared.syncFromCompletedPlans(pastPlans, rewardForNewPlanId: rewardForNewPlanId)
     }
     
     /// Call when home tab appears or app becomes active so "Use & Generate" visibility stays correct after async preference load.
     func refreshPreferencesState() {
         hasCompletedPreferences = UserProfileManager.shared.hasCompletedPreferences || UserDefaults.standard.bool(forKey: "hasCompletedPreferences")
         migratePastDuePlans()
+        syncRoseProgress()
     }
 
     /// Moves any saved plan whose date has already passed into pastPlans automatically.
@@ -1146,6 +1163,7 @@ class NavigationCoordinator: ObservableObject {
         let existingPastIds = Set(pastPlans.map(\.id))
         pastPlans = pastPlans + overdue.filter { !existingPastIds.contains($0.id) }
         saveState()
+        syncRoseProgress()
     }
     
     /// Build a single Date from questionnaire date + start time for display and calendar.
@@ -1239,6 +1257,7 @@ class NavigationCoordinator: ObservableObject {
             pastPlans = remotePast + unsyncedPast
             saveState()
             migratePastDuePlans()
+            syncRoseProgress()
         }
         await uploadAllLocalDatePlansToCloud()
     }
@@ -1575,6 +1594,13 @@ struct RootNavigationView: View {
         .animation(.easeInOut(duration: 0.4), value: coordinator.hasCompletedPreferences)
         .animation(.easeInOut(duration: 0.4), value: coordinator.hasDeferredInitialPreferences)
         .onAppear {
+            #if DEBUG
+            if ScreenshotDemo.isActive {
+                showSplash = false
+                ScreenshotDemo.apply(to: coordinator)
+                return
+            }
+            #endif
             Task {
                 // Record when the splash appeared so we can enforce a minimum display duration.
                 let launchTime = Date()

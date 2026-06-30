@@ -13,6 +13,7 @@ struct LuxuryHomeTabView: View {
     @EnvironmentObject var userProfileManager: UserProfileManager
     @EnvironmentObject private var access: AccessManager
     @StateObject private var notificationManager = NotificationManager.shared
+    @ObservedObject private var rose = RoseManager.shared
     @EnvironmentObject private var memoryManager: MemoryManager
     @Environment(\.scenePhase) private var scenePhase
     @State private var planForCalendar: DatePlan?
@@ -39,31 +40,8 @@ struct LuxuryHomeTabView: View {
     // Sheet for reviewing > 3 unsaved plans
     @State private var showUnsavedPlansSheet = false
     @State private var heroPlanOverride: DatePlan?
+    @State private var pinnedHeroPlanId: UUID?
     @State private var swapContext: SwapStopContext?
-
-    private var heroPlan: DatePlan? {
-        if let tonight = planForTonight { return tonight }
-        let sortedSaved = coordinator.savedPlans.sorted {
-            ($0.scheduledDate ?? $0.createdAt) < ($1.scheduledDate ?? $1.createdAt)
-        }
-        if let first = sortedSaved.first { return first }
-        return allUnsavedPlans.first
-    }
-
-    private var heroPlanIsUnsaved: Bool {
-        guard let plan = heroPlan else { return false }
-        return allUnsavedPlans.contains(where: { $0.id == plan.id })
-    }
-
-    private var partnerDisplayName: String? {
-        let name = PartnerSessionManager.shared.inviteInfo?.partnerName
-            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        return name.isEmpty ? nil : name
-    }
-
-    private var displayHeroPlan: DatePlan? {
-        heroPlanOverride ?? heroPlan
-    }
 
     private var planForTonight: DatePlan? {
         let calendar = Calendar.current
@@ -73,10 +51,93 @@ struct LuxuryHomeTabView: View {
         }
     }
 
-    /// All unsaved plans: prefers experiencesWaiting; falls back to generatedPlans.
+    /// Merges in-session generated plans with waiting queue (generated first so new plans stay visible).
     private var allUnsavedPlans: [DatePlan] {
-        let waiting = coordinator.experiencesWaiting
-        return waiting.isEmpty ? coordinator.generatedPlans : waiting
+        var combined: [DatePlan] = []
+        var seen = Set<UUID>()
+        for plan in coordinator.generatedPlans + coordinator.experiencesWaiting {
+            guard seen.insert(plan.id).inserted else { continue }
+            combined.append(plan)
+        }
+        return combined
+    }
+
+    private var heroPlanCandidates: [DatePlan] {
+        var candidates: [DatePlan] = []
+        if let tonight = planForTonight {
+            candidates.append(tonight)
+        }
+        let sortedSaved = coordinator.savedPlans.sorted {
+            ($0.scheduledDate ?? $0.createdAt) < ($1.scheduledDate ?? $1.createdAt)
+        }
+        for plan in sortedSaved where !candidates.contains(where: { $0.id == plan.id }) {
+            candidates.append(plan)
+        }
+        for plan in allUnsavedPlans where !candidates.contains(where: { $0.id == plan.id }) {
+            candidates.append(plan)
+        }
+        return candidates
+    }
+
+    private var defaultHeroPlan: DatePlan? {
+        heroPlanCandidates.first
+    }
+
+    private var displayHeroPlan: DatePlan? {
+        if let override = heroPlanOverride { return override }
+        let candidates = heroPlanCandidates
+        if let pinned = pinnedHeroPlanId,
+           let match = candidates.first(where: { $0.id == pinned }) {
+            return match
+        }
+        return defaultHeroPlan
+    }
+
+    private var heroPlanIsUnsaved: Bool {
+        guard let plan = displayHeroPlan else { return false }
+        return allUnsavedPlans.contains(where: { $0.id == plan.id })
+    }
+
+    private var partnerDisplayName: String? {
+        let name = PartnerSessionManager.shared.inviteInfo?.partnerName
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return name.isEmpty ? nil : name
+    }
+
+    /// Tracks plan-list changes without reacting to in-place content updates (e.g. stop swaps).
+    private var heroPlanListFingerprint: String {
+        let generated = coordinator.generatedPlans.map(\.id.uuidString).joined(separator: ",")
+        let waiting = coordinator.experiencesWaiting.map(\.id.uuidString).joined(separator: ",")
+        let saved = coordinator.savedPlans.map(\.id.uuidString).joined(separator: ",")
+        return "\(generated)|\(waiting)|\(saved)"
+    }
+
+    private func reconcilePinnedHeroPlan() {
+        if heroPlanOverride != nil { return }
+
+        let candidates = heroPlanCandidates
+        guard !candidates.isEmpty else {
+            pinnedHeroPlanId = nil
+            return
+        }
+
+        if let tonight = planForTonight {
+            pinnedHeroPlanId = tonight.id
+            return
+        }
+
+        // While options are open, keep the lead generated plan on Home (not stale waiting rows).
+        if let active = coordinator.generatedPlans.first {
+            pinnedHeroPlanId = active.id
+            return
+        }
+
+        if let pinned = pinnedHeroPlanId,
+           candidates.contains(where: { $0.id == pinned }) {
+            return
+        }
+
+        pinnedHeroPlanId = defaultHeroPlan?.id
     }
 
     init(tutorialStep: Binding<Int> = .constant(0), isTutorialActive: Bool = false) {
@@ -95,6 +156,7 @@ struct LuxuryHomeTabView: View {
                         VStack(spacing: 28) {
                             HomeAppHeaderBar(notificationManager: notificationManager)
                             headerSection
+                            roseProgressSection
                             proactiveNudgeSection
                             heroSection
                                 .id(HomeTutorialAnchor.heroPlan.rawValue)
@@ -124,7 +186,18 @@ struct LuxuryHomeTabView: View {
             }
             .onAppear {
                 coordinator.refreshPreferencesState()
+                reconcilePinnedHeroPlan()
+                coordinator.syncRoseProgress()
+                if let partner = partnerDisplayName {
+                    rose.partnerName = partner
+                }
                 Task { await loadTrendingPlaces() }
+            }
+            .onChange(of: coordinator.pastPlans.count) { _, _ in
+                coordinator.syncRoseProgress()
+            }
+            .onChange(of: heroPlanListFingerprint) { _, _ in
+                reconcilePinnedHeroPlan()
             }
             .confirmationDialog("Open route in which app?", isPresented: $showMapsAppPicker, titleVisibility: .visible) {
                 Button("Apple Maps") {
@@ -168,9 +241,6 @@ struct LuxuryHomeTabView: View {
                 }
                 .presentationDetents([.medium])
                 .presentationDragIndicator(.visible)
-            }
-            .onChange(of: heroPlan?.id) { _, _ in
-                heroPlanOverride = nil
             }
             .alert("Calendar", isPresented: $showCalendarAlert) {
                 Button("OK") { calendarMessage = nil }
@@ -217,10 +287,18 @@ struct LuxuryHomeTabView: View {
     }
     
     private var greetingLine2: String {
-        if heroPlan != nil {
+        if displayHeroPlan != nil {
             return "Tonight's plan is ready for review."
         }
         return "One tap to a finished plan your partner will love."
+    }
+
+    /// Subtle rose progress pill — taps through to the full Your Journey flow.
+    private var roseProgressSection: some View {
+        RoseHomePill(rose: rose) {
+            coordinator.activeSheet = .roseRewards
+        }
+        .padding(.horizontal, 20)
     }
     
     private var heroSection: some View {
@@ -351,6 +429,7 @@ struct LuxuryHomeTabView: View {
         guard !alternative.isCurrent else { return }
         let updated = plan.replacingStop(at: stopIndex, with: alternative)
         heroPlanOverride = updated
+        pinnedHeroPlanId = updated.id
         // Persist locally + to Supabase so the swapped stop survives reload.
         coordinator.persistEditedPlan(updated)
     }
@@ -1182,7 +1261,7 @@ struct LuxuryHomeTabView: View {
                 }
                 LuxuryQuickTile(icon: "heart", title: "Send to partner", color: Color.luxuryGoldLight, isLocked: !access.canAccess(.datePlan)) {
                     access.require(.datePlan) {
-                        if let plan = heroPlan ?? coordinator.currentDatePlan {
+                        if let plan = displayHeroPlan ?? coordinator.currentDatePlan {
                             coordinator.activeSheet = .partnerShare(plan: plan)
                         }
                     }

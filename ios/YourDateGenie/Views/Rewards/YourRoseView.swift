@@ -15,16 +15,18 @@ struct YourRoseView: View {
     /// Navigate to G5.
     var onShowRecap: () -> Void
 
+    @State private var showScienceInfo = false
+
     var body: some View {
         ZStack {
             Color.backgroundPrimary.ignoresSafeArea()
 
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 0) {
-                    RosePlantView(mode: .blooming(open: rose.datesThisMonth, total: rose.monthlyGoal))
+                    RosePlantView(mode: rose.plantDisplayMode)
                         .padding(.top, 8)
 
-                    Text("Your rose is blooming")
+                    Text(roseHeadline)
                         .font(Font.displaySerif(22, weight: .bold))
                         .foregroundColor(Color.textPrimary)
                         .padding(.top, 4)
@@ -39,10 +41,19 @@ struct YourRoseView: View {
                         .padding(.top, 14)
                         .padding(.horizontal, 4)
 
-                    Text("Research target: 2–4 dates / month 🌹")
-                        .font(Font.inter(12))
+                    Button {
+                        showScienceInfo = true
+                    } label: {
+                        HStack(spacing: 5) {
+                            Image(systemName: "info.circle")
+                                .font(.system(size: 12))
+                            Text("Why \(rose.monthlyGoal) nights a month?")
+                                .font(Font.inter(12, weight: .medium))
+                        }
                         .foregroundColor(Color.luxuryMuted)
-                        .padding(.top, 10)
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.top, 10)
 
                     streakCard
                         .padding(.top, 18)
@@ -72,16 +83,38 @@ struct YourRoseView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
+        .sheet(isPresented: $showScienceInfo) {
+            RoseScienceInfoSheet(monthlyGoal: rose.monthlyGoal)
+        }
+    }
+
+    private var roseHeadline: String {
+        if rose.datesThisMonth >= rose.monthlyGoal {
+            return "Your rose is in full bloom"
+        }
+        if !rose.hasEverCompletedDate {
+            return "Your rose is ready"
+        }
+        if rose.datesThisMonth == 0 {
+            return "Open your first bud this month"
+        }
+        return "Your rose is blooming"
     }
 
     private var progressLine: String {
+        if !rose.hasEverCompletedDate {
+            return "0 of \(rose.monthlyGoal) nights · \(rose.monthlyGoal) buds waiting to open"
+        }
         let buds = rose.budsRemaining
         let budText = buds == 1 ? "1 bud left to open" : "\(buds) buds left to open"
         return "\(rose.datesThisMonth) of \(rose.monthlyGoal) nights this month · \(budText)"
     }
 
     private var ctaTitle: String {
-        rose.budsRemaining == 0
+        if !rose.hasEverCompletedDate {
+            return "Plan your first date → open bud 1"
+        }
+        return rose.budsRemaining == 0
             ? "Full bloom — plan a bonus night"
             : "Open the next bud → plan night \(rose.datesThisMonth + 1)"
     }

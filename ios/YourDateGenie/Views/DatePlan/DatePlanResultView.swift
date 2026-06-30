@@ -49,7 +49,7 @@ struct DatePlanResultView: View {
                                 bothLoveSection
                             }
                         }
-                        .padding(.horizontal, 16)
+                        .padding(.horizontal, 20)
                         .padding(.top, 8)
                         .padding(.bottom, 100)
                     }
@@ -325,33 +325,119 @@ struct DatePlanResultView: View {
         }
     }
     
-    // MARK: - Main Plan Card (love letter paper style)
+    // MARK: - Main Plan Card (matches Home hero cream card)
     private var mainPlanCard: some View {
-        LoveLetterItineraryBackground(cornerRadius: 24) {
-            VStack(spacing: 0) {
-                cardHeader
-                Divider()
-                    .background(Color.luxuryGold.opacity(0.4))
-                    .padding(.horizontal, 20)
-                titleSection
+        ItineraryCreamCardChrome(edgePadding: 0) {
+            VStack(alignment: .leading, spacing: 0) {
+                ItineraryGradientBanner(plan: plan)
+                ItineraryPlanHeaderBlock(plan: plan, partnerName: partnerDisplayName)
+
                 if let start = plan.startingPoint {
-                    startingPointSection(firstStop: itineraryStops.first, start: start)
+                    startingPointCreamSection(firstStop: itineraryStops.first, start: start)
                 }
-                stopsTimeline
-                Divider()
-                    .background(Color.luxuryGold.opacity(0.4))
-                    .padding(.horizontal, 20)
-                statsRow
-                weatherNote
+
+                ForEach(Array(itineraryStops.enumerated()), id: \.element.id) { index, stop in
+                    if index > 0, let time = stop.travelTimeFromPrevious, !time.isEmpty {
+                        ItineraryCreamTravelLeg(
+                            travelMode: stop.travelMode,
+                            timeText: time,
+                            distanceText: stop.travelDistanceFromPrevious
+                        )
+                    }
+                    ItineraryCreamStopRow(
+                        stop: stop,
+                        onReserve: isReservable(stop) ? {
+                            platformPickerPayload = ReservationPlatformPickerPayload(
+                                venueName: stop.name,
+                                phoneNumber: stop.phoneNumber,
+                                address: stop.address,
+                                reservationPlatforms: stop.reservationPlatforms,
+                                bookingUrl: stop.bookingUrl
+                            )
+                        } : nil
+                    )
+                }
+
+                ItineraryPlanFooterBlock(plan: plan)
+                genieSecretCreamSection
                 conversationStartersSection
                 giftSuggestionsSection
                 packingChips
-                pageDots
             }
         }
         .opacity(mainPlanCardAppeared ? 1 : 0)
         .offset(y: mainPlanCardAppeared ? 0 : 8)
         .animation(.easeOut(duration: 0.4), value: mainPlanCardAppeared)
+    }
+
+    private var partnerDisplayName: String? {
+        if let names = coordinator.currentPlanPartnerNames {
+            return names.1
+        }
+        let name = PartnerSessionManager.shared.inviteInfo?.partnerName
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return name.isEmpty ? nil : name
+    }
+
+    private func startingPointCreamSection(firstStop: DatePlanStop?, start: StartingPoint) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .top, spacing: 8) {
+                Image(systemName: "mappin.circle.fill")
+                    .font(.system(size: 14))
+                    .foregroundColor(Color.accentMaroon)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Starting point")
+                        .font(Font.bodySans(12, weight: .semibold))
+                        .foregroundColor(Color.textOnCard)
+                    Text(start.address)
+                        .font(Font.bodySans(11, weight: .regular))
+                        .foregroundColor(Color.textMutedOnCard)
+                }
+                Spacer(minLength: 0)
+            }
+            if let first = firstStop, let url = MapURLHelper.directionsURL(origin: start, destination: first) {
+                Button {
+                    UIApplication.shared.open(url)
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "arrow.triangle.turn.up.right.diamond.fill")
+                            .font(.system(size: 11))
+                        Text("Get to stop 1: \(first.name)")
+                            .font(Font.bodySans(12, weight: .medium))
+                    }
+                    .foregroundColor(Color.accentMaroon)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .overlay(alignment: .top) {
+            Rectangle().fill(Color.black.opacity(0.06)).frame(height: 1)
+        }
+    }
+
+    @ViewBuilder
+    private var genieSecretCreamSection: some View {
+        if !plan.genieSecretTouch.description.isEmpty {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Genie's secret touch")
+                    .font(Font.bodySans(11, weight: .semibold))
+                    .foregroundColor(Color.textMutedOnCard)
+                    .textCase(.uppercase)
+                    .tracking(0.5)
+                Text(plan.genieSecretTouch.description)
+                    .font(Font.bodySans(13, weight: .regular))
+                    .foregroundColor(Color.textOnCard)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .overlay(alignment: .top) {
+                Rectangle().fill(Color.black.opacity(0.06)).frame(height: 1)
+            }
+        }
     }
     
     // MARK: - Partner badge ("Made for A & B")
@@ -397,295 +483,116 @@ struct DatePlanResultView: View {
         )
     }
     
-    // MARK: - Card Header (on paper: dark text)
-    private var cardHeader: some View {
-        HStack {
-            HStack(spacing: 8) {
-                Image(systemName: "sparkles")
-                    .font(.system(size: 14))
-                    .foregroundColor(Color.luxuryGoldDark)
-                
-                Text("Your Date Plan")
-                    .font(Font.inter(14, weight: .semibold))
-                    .foregroundColor(Color.accentMaroon)
-            }
-            
-            Spacer()
-            
-            if isSaved {
-                Image(systemName: "checkmark")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(Color.luxuryGold)
-            }
-        }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 16)
-    }
-    
-    // MARK: - Title Section
-    private var titleSection: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(plan.title)
-                .font(Font.header(28, weight: .semibold))
-                .foregroundColor(Color(hex: "3D2C2C"))
-            
-            Text(plan.tagline)
-                .font(Font.playfair(15, weight: .regular))
-                .foregroundColor(Color.luxuryGoldDark)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 20)
-        .padding(.vertical, 16)
-    }
-    
     /// Itinerary = venues only (step 1, 2, 3...). Starting point is not a step.
     private var itineraryStops: [DatePlanStop] {
         plan.stops.filter { $0.venueType != "Starting point" && $0.name != "Your location" }
     }
-    
-    // MARK: - Starting Point (before timeline)
-    private func startingPointSection(firstStop: DatePlanStop?, start: StartingPoint) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .top, spacing: 8) {
-                Image(systemName: "mappin.circle.fill")
-                    .font(.system(size: 16))
-                    .foregroundColor(Color.luxuryGoldDark)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Starting point")
-                        .font(Font.inter(14, weight: .semibold))
-                        .foregroundColor(Color(hex: "3D2C2C"))
-                    Text(start.address)
-                        .font(Font.inter(12, weight: .regular))
-                        .foregroundColor(Color.luxuryGoldDark)
-                }
-                Spacer(minLength: 0)
-            }
-            if let first = firstStop, let url = MapURLHelper.directionsURL(origin: start, destination: first) {
-                Button {
-                    UIApplication.shared.open(url)
-                } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "arrow.triangle.turn.up.right.diamond.fill")
-                            .font(.system(size: 12))
-                        Text("Get to stop 1: \(first.name)")
-                            .font(Font.inter(13, weight: .medium))
-                    }
-                    .foregroundColor(Color.luxuryGold)
-                }
-            }
-        }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 8)
-    }
-    
-    // MARK: - Stops Timeline (on paper: dark style)
-    private var stopsTimeline: some View {
-        VStack(spacing: 0) {
-            ForEach(Array(itineraryStops.enumerated()), id: \.element.id) { index, stop in
-                if index > 0, let time = stop.travelTimeFromPrevious, !time.isEmpty {
-                    TravelLegRow(
-                        travelMode: stop.travelMode,
-                        timeText: time,
-                        distanceText: stop.travelDistanceFromPrevious,
-                        useDarkStyle: true
-                    )
-                }
-                CompactStopRow(
-                    stop: stop,
-                    isLast: index == itineraryStops.count - 1,
-                    useDarkStyle: true,
-                    onTap: {
-                        if isReservable(stop) {
-                            platformPickerPayload = ReservationPlatformPickerPayload(
-                                venueName: stop.name,
-                                phoneNumber: stop.phoneNumber,
-                                address: stop.address,
-                                reservationPlatforms: stop.reservationPlatforms,
-                                bookingUrl: stop.bookingUrl
-                            )
-                        }
-                    }
-                )
-            }
-        }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 8)
-    }
-    
-    // MARK: - Stats Row (on paper: dark text)
-    private var statsRow: some View {
-        HStack(spacing: 0) {
-            HStack(spacing: 6) {
-                Image(systemName: "clock")
-                    .font(.system(size: 13))
-                    .foregroundColor(Color.luxuryGoldDark)
-                Text(plan.totalDuration)
-                    .font(Font.inter(13, weight: .medium))
-                    .foregroundColor(Color(hex: "3D2C2C"))
-            }
-            if !plan.estimatedCost.isEmpty {
-                Text("·")
-                    .foregroundColor(Color(hex: "6B5344"))
-                    .padding(.horizontal, 12)
-                Text(plan.estimatedCost)
-                    .font(Font.inter(13, weight: .medium))
-                    .foregroundColor(Color(hex: "3D2C2C"))
-            }
-            Spacer()
-        }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 14)
-    }
-    
-    // MARK: - Weather Note (on paper: dark text)
-    private var weatherNote: some View {
-        Group {
-            if !plan.weatherNote.isEmpty {
-                HStack(spacing: 10) {
-                    Image(systemName: "sun.max.fill")
-                        .font(.system(size: 14))
-                        .foregroundColor(Color.luxuryGoldDark)
-                    
-                    Text(plan.weatherNote)
-                        .font(Font.inter(13, weight: .regular))
-                        .foregroundColor(Color(hex: "5C4A3D"))
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .padding(14)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.luxuryGold.opacity(0.12))
-                .cornerRadius(12)
-                .padding(.horizontal, 20)
-                .padding(.vertical, 8)
-            }
-        }
-    }
-    
-    // MARK: - Conversation Starters Section (on paper: all starters when selected)
+
+    // MARK: - Conversation Starters Section
     private var conversationStartersSection: some View {
         Group {
             if let starters = plan.conversationStarters, !starters.isEmpty {
-                VStack(alignment: .leading, spacing: 10) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "bubble.left.fill")
-                            .font(.system(size: 12))
-                        Text("Conversation Starters")
-                            .font(Font.inter(12, weight: .semibold))
-                    }
-                    .foregroundColor(Color.luxuryGoldDark)
-                    
+                creamInsetSection(title: "Conversation Starters", icon: "bubble.left.fill") {
                     ForEach(starters) { starter in
                         Text("\"\(starter.question)\"")
-                            .font(Font.playfairItalic(14))
-                            .foregroundColor(Color(hex: "5C4A3D"))
+                            .font(Font.bodySerif(14, weight: .regular))
+                            .italic()
+                            .foregroundColor(Color.textOnCard)
                             .fixedSize(horizontal: false, vertical: true)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
-                .padding(14)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.luxuryGold.opacity(0.12))
-                .cornerRadius(12)
-                .padding(.horizontal, 20)
-                .padding(.vertical, 8)
             }
         }
     }
-    
-    // MARK: - Gift Suggestions Section (on paper: when selected)
+
+    // MARK: - Gift Suggestions Section
     private var giftSuggestionsSection: some View {
         Group {
             if let gifts = plan.giftSuggestions, !gifts.isEmpty {
-                VStack(alignment: .leading, spacing: 10) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "gift.fill")
-                            .font(.system(size: 12))
-                        Text("Gift Suggestions")
-                            .font(Font.inter(12, weight: .semibold))
-                    }
-                    .foregroundColor(Color.luxuryGoldDark)
-                    
+                creamInsetSection(title: "Gift Suggestions", icon: "gift.fill") {
                     ForEach(gifts) { gift in
                         VStack(alignment: .leading, spacing: 4) {
                             HStack(alignment: .top) {
                                 Text(gift.emoji)
                                     .font(.system(size: 16))
                                 Text(gift.name)
-                                    .font(Font.inter(13, weight: .semibold))
-                                    .foregroundColor(Color(hex: "3D2C2C"))
+                                    .font(Font.bodySans(13, weight: .semibold))
+                                    .foregroundColor(Color.textOnCard)
                                 Spacer(minLength: 8)
                                 Text(gift.priceRange)
-                                    .font(Font.inter(11, weight: .medium))
-                                    .foregroundColor(Color.luxuryGoldDark)
+                                    .font(Font.bodySans(11, weight: .medium))
+                                    .foregroundColor(Color.textMutedOnCard)
                             }
                             Text(gift.description)
-                                .font(Font.inter(12, weight: .regular))
-                                .foregroundColor(Color(hex: "5C4A3D"))
+                                .font(Font.bodySans(12, weight: .regular))
+                                .foregroundColor(Color.textMutedOnCard)
                                 .fixedSize(horizontal: false, vertical: true)
                             if !gift.whereToBuy.isEmpty {
                                 Text("Where: \(gift.whereToBuy)")
-                                    .font(Font.inter(11, weight: .regular))
-                                    .foregroundColor(Color.luxuryGoldDark)
+                                    .font(Font.bodySans(11, weight: .regular))
+                                    .foregroundColor(Color.textMutedOnCard)
                             }
                         }
-                        .padding(12)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(Color.luxuryGold.opacity(0.08))
-                        .cornerRadius(10)
+                        .padding(.vertical, 4)
                     }
                 }
-                .padding(14)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.luxuryGold.opacity(0.12))
-                .cornerRadius(12)
-                .padding(.horizontal, 20)
-                .padding(.vertical, 8)
             }
         }
     }
-    
-    // MARK: - Packing Chips (on paper: dark text)
+
+    // MARK: - Packing Chips
     private var packingChips: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 10) {
-                ForEach(plan.packingList.prefix(4), id: \.self) { item in
-                    HStack(spacing: 6) {
-                        Image(systemName: packingIcon(for: item))
-                            .font(.system(size: 11))
-                        Text(item)
-                            .font(Font.inter(12, weight: .medium))
+        Group {
+            if !plan.packingList.isEmpty {
+                creamInsetSection(title: "Pack", icon: "bag.fill") {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(plan.packingList.prefix(6), id: \.self) { item in
+                                HStack(spacing: 5) {
+                                    Image(systemName: packingIcon(for: item))
+                                        .font(.system(size: 10))
+                                    Text(item)
+                                        .font(Font.bodySans(11, weight: .medium))
+                                }
+                                .foregroundColor(Color.textOnCard)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 6)
+                                .background(Color.black.opacity(0.05))
+                                .clipShape(Capsule())
+                            }
+                        }
                     }
-                    .foregroundColor(Color(hex: "5C4A3D"))
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .background(Color.luxuryGold.opacity(0.15))
-                    .cornerRadius(20)
                 }
             }
-            .padding(.horizontal, 20)
         }
-        .padding(.vertical, 12)
     }
-    
-    // MARK: - Decorative bottom ornament (visual flourish only, not pagination)
-    private var pageDots: some View {
-        HStack(spacing: 6) {
-            Circle()
-                .fill(Color.luxuryGold.opacity(0.3))
-                .frame(width: 6, height: 6)
-            
-            Capsule()
-                .fill(Color.luxuryGoldDark)
-                .frame(width: 20, height: 6)
-            
-            Circle()
-                .fill(Color.luxuryGold.opacity(0.3))
-                .frame(width: 6, height: 6)
+
+    private func creamInsetSection<Content: View>(
+        title: String,
+        icon: String,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 6) {
+                Image(systemName: icon)
+                    .font(.system(size: 11))
+                Text(title)
+                    .font(Font.bodySans(11, weight: .semibold))
+                    .textCase(.uppercase)
+                    .tracking(0.4)
+            }
+            .foregroundColor(Color.textMutedOnCard)
+            content()
         }
-        .padding(.vertical, 16)
-        .accessibilityHidden(true)
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.black.opacity(0.04))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
     }
-    
+
     // MARK: - Bottom Action Bar
     private var bottomActionBar: some View {
         VStack(spacing: 12) {

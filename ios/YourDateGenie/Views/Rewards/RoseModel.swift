@@ -103,19 +103,29 @@ final class RoseManager: ObservableObject {
     /// A pending variable reward to present (G4), if any.
     @Published var pendingReward: HiddenDateReward?
 
+    /// Lifetime completed dates (synced from `pastPlans`). Used for new-user grace (no droop before first date).
+    private(set) var lifetimeCompletedCount: Int = 0
+
+    var hasEverCompletedDate: Bool { lifetimeCompletedCount > 0 }
+
+    /// Drives `RosePlantView` on Home and in Your Rose.
+    var plantDisplayMode: RosePlantView.Mode {
+        if needsRevive { return .drooping }
+        return .blooming(open: min(datesThisMonth, monthlyGoal), total: monthlyGoal)
+    }
+
     private init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
 
-        // Seed sensible first-run values that match the spec mockup
-        // (2 of 4 this month · 6-week streak · Level 4 · 3 badges).
+        // First-run defaults — counts sync from real completed plans via `syncFromCompletedPlans`.
         if defaults.object(forKey: Key.seeded.rawValue) == nil {
             defaults.set(true, forKey: Key.seeded.rawValue)
-            defaults.set(2, forKey: Key.datesThisMonth.rawValue)
+            defaults.set(0, forKey: Key.datesThisMonth.rawValue)
             defaults.set(4, forKey: Key.monthlyGoal.rawValue)
-            defaults.set(6, forKey: Key.streakWeeks.rawValue)
+            defaults.set(0, forKey: Key.streakWeeks.rawValue)
             defaults.set(true, forKey: Key.streakFreeze.rawValue)
-            defaults.set(3 * RoseManager.xpPerLevel + 820, forKey: Key.totalXP.rawValue)
-            defaults.set(Date().addingTimeInterval(-5 * 24 * 3600), forKey: Key.lastDateAt.rawValue)
+            defaults.set(0, forKey: Key.totalXP.rawValue)
+            defaults.set(0, forKey: Key.badgesEarned.rawValue)
         }
 
         self.datesThisMonth = defaults.integer(forKey: Key.datesThisMonth.rawValue)
@@ -124,6 +134,7 @@ final class RoseManager: ObservableObject {
         self.streakFreezeAvailable = defaults.bool(forKey: Key.streakFreeze.rawValue)
         self.totalXP = defaults.integer(forKey: Key.totalXP.rawValue)
         self.lastDateAt = defaults.object(forKey: Key.lastDateAt.rawValue) as? Date
+        self.lifetimeCompletedCount = defaults.integer(forKey: Key.lifetimeCompletedCount.rawValue)
     }
 
     // MARK: Derived state
@@ -139,14 +150,15 @@ final class RoseManager: ObservableObject {
 
     /// Weeks since the last completed date (used for the droop guardrail).
     var weeksSinceLastDate: Int {
-        guard let last = lastDateAt else { return RoseManager.droopAfterWeeks + 1 }
+        guard let last = lastDateAt else { return 0 }
         let days = Calendar.current.dateComponents([.day], from: last, to: Date()).day ?? 0
         return max(0, days / 7)
     }
 
-    /// The rose droops (never dies) once the couple has been quiet a while.
+    /// The rose droops once a couple has dated before and been quiet ~2 weeks — never on day one.
     var health: RoseHealth {
-        weeksSinceLastDate >= RoseManager.droopAfterWeeks ? .needsRevive : .blooming
+        guard hasEverCompletedDate else { return .blooming }
+        return weeksSinceLastDate >= RoseManager.droopAfterWeeks ? .needsRevive : .blooming
     }
 
     var needsRevive: Bool { health == .needsRevive }
@@ -264,8 +276,36 @@ final class RoseManager: ObservableObject {
 
     // MARK: Mutations (local only)
 
+    /// Night-out date used for monthly rose progress (scheduled night, else when the plan was created).
+    static func completionDate(for plan: DatePlan) -> Date {
+        plan.scheduledDate ?? plan.createdAt
+    }
+
+    /// Reconcile rose progress from the app's completed-date history (`pastPlans`).
+    /// Call after any change to completed plans (mark past, auto-migrate, cloud sync).
+    func syncFromCompletedPlans(_ plans: [DatePlan], rewardForNewPlanId: UUID? = nil) {
+        let cal = Calendar.current
+        let now = Date()
+        let dated = plans.map { (id: $0.id, date: Self.completionDate(for: $0)) }
+
+        datesThisMonth = dated.filter { cal.isDate($0.date, equalTo: now, toGranularity: .month) }.count
+        lastDateAt = dated.map(\.date).max()
+        streakWeeks = Self.computeStreakWeeks(from: dated.map(\.date))
+        totalXP = plans.count * Self.xpPerNight
+        lifetimeCompletedCount = plans.count
+        defaults.set(plans.count, forKey: Key.lifetimeCompletedCount.rawValue)
+
+        let badgeCount = min(7, plans.count)
+        defaults.set(badgeCount, forKey: Key.badgesEarned.rawValue)
+
+        if let newId = rewardForNewPlanId, !hasRewardedPlan(newId) {
+            markPlanRewarded(newId)
+            maybeUnlockReward()
+        }
+    }
+
     /// Mark a date completed: opens a bud, bumps XP, refreshes the streak, and
-    /// may unlock a variable reward. Called by the parent's plan flow on completion.
+    /// may unlock a variable reward. Prefer `syncFromCompletedPlans` from the plan coordinator.
     func completeDate() {
         datesThisMonth += 1
         totalXP += RoseManager.xpPerNight
@@ -303,6 +343,41 @@ final class RoseManager: ObservableObject {
         case lastDateAt = "rose_last_date_at"
         case badgesEarned = "rose_badges_earned"
         case lastReviveID = "rose_last_revive_id"
+        case rewardedPlanPrefix = "rose_rewarded_plan_"
+        case lifetimeCompletedCount = "rose_lifetime_completed_count"
+    }
+
+    private func hasRewardedPlan(_ id: UUID) -> Bool {
+        defaults.bool(forKey: Key.rewardedPlanPrefix.rawValue + id.uuidString)
+    }
+
+    private func markPlanRewarded(_ id: UUID) {
+        defaults.set(true, forKey: Key.rewardedPlanPrefix.rawValue + id.uuidString)
+    }
+
+    /// Consecutive weeks (Mon-start) with at least one completed date, counting back from this week or last.
+    static func computeStreakWeeks(from dates: [Date]) -> Int {
+        guard !dates.isEmpty else { return 0 }
+        let cal = Calendar.current
+        var weeksWithDates = Set<Date>()
+        for date in dates {
+            if let weekStart = cal.dateInterval(of: .weekOfYear, for: date)?.start {
+                weeksWithDates.insert(weekStart)
+            }
+        }
+        guard let currentWeek = cal.dateInterval(of: .weekOfYear, for: Date())?.start else { return 0 }
+
+        var checkWeek = weeksWithDates.contains(currentWeek)
+            ? currentWeek
+            : (cal.date(byAdding: .weekOfYear, value: -1, to: currentWeek) ?? currentWeek)
+
+        var streak = 0
+        while weeksWithDates.contains(checkWeek) {
+            streak += 1
+            guard let previous = cal.date(byAdding: .weekOfYear, value: -1, to: checkWeek) else { break }
+            checkWeek = previous
+        }
+        return streak
     }
 
     private func persist(_ value: Int, _ key: Key) { defaults.set(value, forKey: key.rawValue) }

@@ -22,7 +22,13 @@ struct YourDateGenieApp: App {
                 .onAppear {
                     FirebaseBootstrap.configureIfNeeded()
                     PurchaseManager.shared.checkSubscriptionOnAppLaunch()
+                    #if DEBUG
+                    if !ScreenshotDemo.isActive {
+                        notificationManager.requestAuthorization()
+                    }
+                    #else
                     notificationManager.requestAuthorization()
+                    #endif
                     validateConfiguration()
                 }
                 .onOpenURL { url in

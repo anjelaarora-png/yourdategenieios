@@ -84,9 +84,21 @@ struct LuxuryMainAppView: View {
                     .animation(.easeInOut(duration: 0.35), value: network.isConnected)
             }
         }
+        .onAppear {
+            #if DEBUG
+            if ScreenshotDemo.isActive {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                    ScreenshotDemo.apply(to: coordinator)
+                }
+            }
+            #endif
+        }
         .coordinateSpace(name: "homeTutorialSpace")
         .onPreferenceChange(HomeTutorialAnchorPreferenceKey.self) { tutorialAnchors = $0 }
         .onAppear {
+            #if DEBUG
+            if ScreenshotDemo.isActive { return }
+            #endif
             guard !hasSeenHomeTutorial else { return }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.85) {
                 beginHomeTutorial()
@@ -265,9 +277,13 @@ struct LuxuryMainAppView: View {
                 .environmentObject(access)
         case .roseRewards:
             RoseRewardsView(
-                partnerName: nil,
+                partnerName: {
+                    let name = PartnerSessionManager.shared.inviteInfo?.partnerName
+                        .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                    return name.isEmpty ? nil : name
+                }(),
                 onPlanDate: { coordinator.startDatePlanning(mode: .fresh) },
-                onReviveTonight: { _ in coordinator.startDatePlanning(mode: .fresh) }
+                onReviveTonight: { _ in coordinator.activeSheet = .lowKey }
             )
         case .lowKey:
             LowKeyDateView(
