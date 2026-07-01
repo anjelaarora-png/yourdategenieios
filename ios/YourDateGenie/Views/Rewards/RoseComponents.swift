@@ -164,6 +164,32 @@ struct RoseLabel: View {
     }
 }
 
+// MARK: Compact bud dots — at-a-glance monthly progress (cream fill, maroon outline)
+
+struct RoseBudDots: View {
+    let open: Int
+    let total: Int
+
+    var body: some View {
+        HStack(spacing: 5) {
+            ForEach(0..<total, id: \.self) { index in
+                Circle()
+                    .fill(index < open ? Color.textPrimary : Color.clear)
+                    .overlay(
+                        Circle().stroke(
+                            index < open
+                                ? Color.textPrimary.opacity(0.45)
+                                : Color.accentMaroon.opacity(0.55),
+                            lineWidth: 1.25
+                        )
+                    )
+                    .frame(width: 7, height: 7)
+            }
+        }
+        .accessibilityHidden(true)
+    }
+}
+
 // MARK: Home pill — subtle rose progress (spec §8: one small pill on Home)
 
 struct RoseHomePill: View {
@@ -172,37 +198,68 @@ struct RoseHomePill: View {
 
     @State private var showScienceInfo = false
 
+    private let roseSize: CGFloat = 64
+    private let roseFrame: CGFloat = 72
+
     private var progressText: String {
         if rose.needsRevive {
             return "Tap for a gentle 15-min revive"
         }
         if !rose.hasEverCompletedDate {
-            return "0 of \(rose.monthlyGoal) · plant your first bud"
+            return "\(rose.monthlyGoal) buds waiting · complete a date to open the first"
         }
         if rose.datesThisMonth >= rose.monthlyGoal {
-            return "In full bloom · \(rose.datesThisMonth) of \(rose.monthlyGoal) this month"
+            return "In full bloom this month"
         }
-        return "\(rose.datesThisMonth) of \(rose.monthlyGoal) dates this month"
+        let remaining = rose.budsRemaining
+        let budWord = remaining == 1 ? "bud" : "buds"
+        return "\(remaining) \(budWord) left to full bloom"
     }
 
     private var titleText: String {
         if rose.needsRevive { return "Your rose misses you" }
-        if !rose.hasEverCompletedDate { return "Your rose" }
+        if !rose.hasEverCompletedDate { return "Your rose is ready" }
+        if rose.datesThisMonth >= rose.monthlyGoal { return "Full bloom" }
         return "Your rose"
     }
 
     var body: some View {
         HStack(spacing: 0) {
             Button(action: onTap) {
-                HStack(spacing: 12) {
-                    RosePlantView(mode: rose.plantDisplayMode, size: 52)
-                        .frame(width: 52, height: 52)
-                        .accessibilityHidden(true)
+                HStack(spacing: 14) {
+                    ZStack {
+                        Circle()
+                            .fill(Color.creamCard.opacity(0.14))
+                        Circle()
+                            .stroke(Color.accentMaroon.opacity(0.28), lineWidth: 1)
+                        RosePlantView(mode: rose.plantDisplayMode, size: roseSize)
+                    }
+                    .frame(width: roseFrame, height: roseFrame)
+                    .accessibilityHidden(true)
 
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(titleText)
-                            .font(Font.bodySans(13, weight: .semibold))
-                            .foregroundColor(Color.textPrimary)
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack(alignment: .firstTextBaseline, spacing: 8) {
+                            Text(titleText)
+                                .font(Font.bodySans(14, weight: .semibold))
+                                .foregroundColor(Color.textPrimary)
+                            Spacer(minLength: 0)
+                            if !rose.needsRevive {
+                                Text("\(rose.datesThisMonth)/\(rose.monthlyGoal)")
+                                    .font(Font.displaySerif(17, weight: .bold))
+                                    .foregroundColor(Color.textPrimary)
+                                    .monospacedDigit()
+                            }
+                        }
+
+                        if !rose.needsRevive {
+                            RoseBudDots(
+                                open: min(rose.datesThisMonth, rose.monthlyGoal),
+                                total: rose.monthlyGoal
+                            )
+                            RoseProgressBar(progress: rose.monthProgress, height: 4)
+                                .frame(maxWidth: .infinity)
+                        }
+
                         Text(progressText)
                             .font(Font.bodySans(11, weight: .regular))
                             .foregroundColor(Color.luxuryCreamMuted)
@@ -210,17 +267,18 @@ struct RoseHomePill: View {
                             .multilineTextAlignment(.leading)
                     }
 
-                    Spacer(minLength: 4)
-
                     Image(systemName: "chevron.right")
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundColor(Color.luxuryCreamMuted.opacity(0.8))
+                        .padding(.leading, 2)
                 }
-                .padding(.leading, 14)
+                .padding(.leading, 12)
                 .padding(.trailing, 10)
-                .padding(.vertical, 10)
+                .padding(.vertical, 12)
             }
             .buttonStyle(.plain)
+            .accessibilityLabel(homeAccessibilityLabel)
+            .accessibilityHint("Opens your rose progress")
 
             Button {
                 showScienceInfo = true
@@ -228,7 +286,7 @@ struct RoseHomePill: View {
                 Image(systemName: "info.circle")
                     .font(.system(size: 15, weight: .medium))
                     .foregroundColor(Color.luxuryCreamMuted.opacity(0.65))
-                    .frame(width: 36, height: 44)
+                    .frame(width: 36, height: 52)
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Why four dates a month")
@@ -244,6 +302,11 @@ struct RoseHomePill: View {
         .sheet(isPresented: $showScienceInfo) {
             RoseScienceInfoSheet(monthlyGoal: rose.monthlyGoal)
         }
+    }
+
+    private var homeAccessibilityLabel: String {
+        if rose.needsRevive { return "Your rose misses you. Tap for a gentle revive." }
+        return "Your rose, \(rose.datesThisMonth) of \(rose.monthlyGoal) dates this month"
     }
 }
 
