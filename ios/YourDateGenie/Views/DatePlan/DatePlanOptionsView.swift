@@ -1,5 +1,10 @@
 import SwiftUI
 
+private struct PendingSavePlan: Identifiable {
+    let plan: DatePlan
+    var id: UUID { plan.id }
+}
+
 struct DatePlanOptionsView: View {
     let plans: [DatePlan]
     var loadingPlanIndices: Set<Int> = []
@@ -15,14 +20,12 @@ struct DatePlanOptionsView: View {
     @State private var showExport = false
     @State private var savedPlanIds: Set<UUID> = []
     @State private var showAddToCalendar = false
-    @State private var calendarDate = Date()
     @State private var calendarMessage: String?
     @State private var showCalendarAlert = false
     @State private var itineraryAppeared = false
     @State private var loadingSpinnerRotation: Double = 0
     @State private var showSavedBanner = false
     @State private var showCloseConfirmation = false
-    @State private var showSaveDatePicker = false
     @State private var pendingPlanForSave: DatePlan? = nil
 
     @State private var inviterFirstChoiceIndex: Int?
@@ -186,20 +189,40 @@ struct DatePlanOptionsView: View {
             PartnerShareView(plan: selectedPlan)
         }
         .sheet(isPresented: $showAddToCalendar) {
-            addToCalendarSheet(plan: selectedPlan)
+            AddToCalendarSheet(
+                plan: selectedPlan,
+                onDismiss: { showAddToCalendar = false }
+            ) { result, date in
+                switch result {
+                case .success:
+                    calendarMessage = "Added to your calendar."
+                    showCalendarAlert = true
+                    showAddToCalendar = false
+                    if coordinator.savedPlans.contains(where: { $0.id == selectedPlan.id }) {
+                        coordinator.updateScheduledDate(for: selectedPlan.id, date: date)
+                    }
+                case .denied:
+                    calendarMessage = "Calendar access was denied. Enable it in Settings to add date plans."
+                    showCalendarAlert = true
+                case .failed(let msg):
+                    calendarMessage = "Could not add: \(msg)"
+                    showCalendarAlert = true
+                }
+            }
         }
-        .sheet(isPresented: $showSaveDatePicker) {
-            if let plan = pendingPlanForSave, let onSave = onSave {
-                DatePickerSheet(planTitle: plan.title) { date in
-                    var updatedPlan = plan
+        .sheet(item: Binding(
+            get: { pendingPlanForSave.map { PendingSavePlan(plan: $0) } },
+            set: { pendingPlanForSave = $0?.plan }
+        )) { wrapper in
+            if let onSave = onSave {
+                DatePickerSheet(planTitle: wrapper.plan.title) { date in
+                    var updatedPlan = wrapper.plan
                     updatedPlan.scheduledDate = date
-                    showSaveDatePicker = false
                     pendingPlanForSave = nil
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                         commitSave(updatedPlan, using: onSave)
                     }
                 } onCancel: {
-                    showSaveDatePicker = false
                     pendingPlanForSave = nil
                 }
             }
@@ -238,74 +261,6 @@ struct DatePlanOptionsView: View {
         }
     }
 
-    // MARK: - Add to Calendar Sheet
-    private func addToCalendarSheet(plan: DatePlan) -> some View {
-        NavigationStack {
-            VStack(spacing: 24) {
-                Text("Choose the date for your plan")
-                    .font(Font.bodySans(15, weight: .medium))
-                    .foregroundColor(Color.luxuryCreamMuted)
-                
-                DatePicker("Date", selection: $calendarDate, displayedComponents: .date)
-                    .datePickerStyle(.graphical)
-                    .tint(Color.luxuryGold)
-                    .padding(.horizontal)
-                
-                Button {
-                    Task {
-                        let result = await CalendarSyncManager.shared.addDatePlan(plan, on: calendarDate)
-                        await MainActor.run {
-                            switch result {
-                            case .success:
-                                calendarMessage = "Added to your calendar."
-                                showCalendarAlert = true
-                                showAddToCalendar = false
-                                if coordinator.savedPlans.contains(where: { $0.id == plan.id }) {
-                                    coordinator.updateScheduledDate(for: plan.id, date: calendarDate)
-                                }
-                            case .denied:
-                                calendarMessage = "Calendar access was denied. Enable it in Settings to add date plans."
-                                showCalendarAlert = true
-                            case .failed(let msg):
-                                calendarMessage = "Could not add: \(msg)"
-                                showCalendarAlert = true
-                            }
-                        }
-                    }
-                } label: {
-                    HStack(spacing: 10) {
-                        Image(systemName: "calendar.badge.plus")
-                            .font(.system(size: 16))
-                        Text("Add to Calendar")
-                            .font(Font.bodySans(16, weight: .semibold))
-                    }
-                    .foregroundColor(Color.luxuryMaroon)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
-                    .background(LinearGradient.goldShimmer)
-                    .cornerRadius(16)
-                }
-                .padding(.horizontal, 20)
-                
-                Spacer()
-            }
-            .padding(.top, 24)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Color.backgroundPrimary)
-            .navigationTitle("Add to Calendar")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") {
-                        showAddToCalendar = false
-                    }
-                    .foregroundColor(Color.luxuryGold)
-                }
-            }
-            .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
-        }
-    }
-    
     // MARK: - Main content (swipeable TabView: one page per plan + Regenerate page)
     private var mainContentArea: some View {
         TabView(selection: $selectedPlanIndex) {
@@ -547,7 +502,6 @@ struct DatePlanOptionsView: View {
                     } else {
                         // No date yet — ask the user before saving
                         pendingPlanForSave = plan
-                        showSaveDatePicker = true
                     }
                 } label: {
                     HStack(spacing: 10) {

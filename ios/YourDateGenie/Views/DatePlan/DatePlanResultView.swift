@@ -17,7 +17,6 @@ struct DatePlanResultView: View {
     @State private var showGiftFinder = false
     @State private var isSaved = false
     @State private var showAddToCalendar = false
-    @State private var calendarDate = Date()
     @State private var calendarMessage: String?
     @State private var showCalendarAlert = false
     @State private var mainPlanCardAppeared = false
@@ -141,7 +140,10 @@ struct DatePlanResultView: View {
         }
         .sheet(isPresented: $showMap) {
             NavigationStack {
-                RouteMapView(stops: itineraryStops, startingPoint: plan.startingPoint)
+                RouteMapView(
+                    stops: ItineraryPlanFormatting.itineraryStops(for: plan),
+                    startingPoint: plan.startingPoint
+                )
                     .navigationTitle("Route")
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar {
@@ -159,7 +161,26 @@ struct DatePlanResultView: View {
             GiftFinderView(datePlan: plan, dateLocation: plan.stops.first?.address)
         }
         .sheet(isPresented: $showAddToCalendar) {
-            addToCalendarSheet
+            AddToCalendarSheet(
+                plan: plan,
+                onDismiss: { showAddToCalendar = false }
+            ) { result, date in
+                switch result {
+                case .success:
+                    calendarMessage = "Added to your calendar."
+                    showCalendarAlert = true
+                    showAddToCalendar = false
+                    if coordinator.savedPlans.contains(where: { $0.id == plan.id }) {
+                        coordinator.updateScheduledDate(for: plan.id, date: date)
+                    }
+                case .denied:
+                    calendarMessage = "Calendar access was denied. Enable it in Settings to add date plans."
+                    showCalendarAlert = true
+                case .failed(let msg):
+                    calendarMessage = "Could not add: \(msg)"
+                    showCalendarAlert = true
+                }
+            }
         }
         .sheet(isPresented: $showReserveVenuePicker) {
             NavigationStack {
@@ -254,74 +275,6 @@ struct DatePlanResultView: View {
         hasSeenPostResultPaywall = true
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.1) {
             showPostResultPaywall = true
-        }
-    }
-    
-    // MARK: - Add to Calendar Sheet
-    private var addToCalendarSheet: some View {
-        NavigationStack {
-            VStack(spacing: 24) {
-                Text("Choose the date for your plan")
-                    .font(Font.bodySans(15, weight: .medium))
-                    .foregroundColor(Color.luxuryCreamMuted)
-                
-                DatePicker("Date", selection: $calendarDate, displayedComponents: .date)
-                    .datePickerStyle(.graphical)
-                    .tint(Color.luxuryGold)
-                    .padding(.horizontal)
-                
-                Button {
-                    Task {
-                        let result = await CalendarSyncManager.shared.addDatePlan(plan, on: calendarDate)
-                        await MainActor.run {
-                            switch result {
-                            case .success:
-                                calendarMessage = "Added to your calendar."
-                                showCalendarAlert = true
-                                showAddToCalendar = false
-                                if coordinator.savedPlans.contains(where: { $0.id == plan.id }) {
-                                    coordinator.updateScheduledDate(for: plan.id, date: calendarDate)
-                                }
-                            case .denied:
-                                calendarMessage = "Calendar access was denied. Enable it in Settings to add date plans."
-                                showCalendarAlert = true
-                            case .failed(let msg):
-                                calendarMessage = "Could not add: \(msg)"
-                                showCalendarAlert = true
-                            }
-                        }
-                    }
-                } label: {
-                    HStack(spacing: 10) {
-                        Image(systemName: "calendar.badge.plus")
-                            .font(.system(size: 16))
-                        Text("Add to Calendar")
-                            .font(Font.inter(16, weight: .semibold))
-                    }
-                    .foregroundColor(Color.luxuryMaroon)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
-                    .background(LinearGradient.goldShimmer)
-                    .cornerRadius(16)
-                }
-                .padding(.horizontal, 20)
-                
-                Spacer()
-            }
-            .padding(.top, 24)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Color.backgroundPrimary)
-            .navigationTitle("Add to Calendar")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") {
-                        showAddToCalendar = false
-                    }
-                    .foregroundColor(Color.luxuryGold)
-                }
-            }
-            .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
         }
     }
     

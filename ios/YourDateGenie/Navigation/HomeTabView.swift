@@ -17,7 +17,6 @@ struct LuxuryHomeTabView: View {
     @EnvironmentObject private var memoryManager: MemoryManager
     @Environment(\.scenePhase) private var scenePhase
     @State private var planForCalendar: DatePlan?
-    @State private var calendarDate = Date()
     @State private var calendarMessage: String?
     @State private var showCalendarAlert = false
     @State private var trendingPlaces: [GooglePlacesService.PlaceSearchResult] = []
@@ -230,7 +229,24 @@ struct LuxuryHomeTabView: View {
                 get: { planForCalendar.map { IdentifiablePlan(plan: $0) } },
                 set: { planForCalendar = $0?.plan }
             )) { wrapper in
-                addToCalendarSheet(plan: wrapper.plan)
+                AddToCalendarSheet(
+                    plan: wrapper.plan,
+                    onDismiss: { planForCalendar = nil }
+                ) { result, date in
+                    switch result {
+                    case .success:
+                        coordinator.updateScheduledDate(for: wrapper.plan.id, date: date)
+                        calendarMessage = "Added to your calendar."
+                        showCalendarAlert = true
+                        planForCalendar = nil
+                    case .denied:
+                        calendarMessage = "Calendar access was denied. Enable it in Settings to add date plans."
+                        showCalendarAlert = true
+                    case .failed(let msg):
+                        calendarMessage = "Could not add: \(msg)"
+                        showCalendarAlert = true
+                    }
+                }
             }
             .sheet(isPresented: $showUnsavedPlansSheet) {
                 unsavedPlansSheet
@@ -500,7 +516,6 @@ struct LuxuryHomeTabView: View {
             coordinator.savePlan(plan)
         } else {
             planForCalendar = plan
-            calendarDate = plan.scheduledDate ?? Date()
         }
     }
     
@@ -815,7 +830,6 @@ struct LuxuryHomeTabView: View {
                     } else {
                         Button {
                             planForCalendar = plan
-                            calendarDate = plan.scheduledDate ?? Date()
                         } label: {
                             Image(systemName: "calendar.badge.plus")
                                 .font(.system(size: 16, weight: .medium))
@@ -880,72 +894,6 @@ struct LuxuryHomeTabView: View {
         .overlay(Capsule().stroke(Color.luxuryGold.opacity(0.35), lineWidth: 0.5))
     }
 
-    // MARK: - Add to Calendar Sheet (from Upcoming Magic cards)
-    private func addToCalendarSheet(plan: DatePlan) -> some View {
-        NavigationStack {
-            VStack(spacing: 24) {
-                Text("Choose the date for your plan")
-                    .font(Font.bodySans(15, weight: .medium))
-                    .foregroundColor(Color.luxuryCreamMuted)
-                
-                DatePicker("Date", selection: $calendarDate, displayedComponents: .date)
-                    .datePickerStyle(.graphical)
-                    .tint(Color.luxuryGold)
-                    .padding(.horizontal)
-                
-                Button {
-                    Task {
-                        let result = await CalendarService.addDatePlan(plan, on: calendarDate)
-                        await MainActor.run {
-                            switch result {
-                            case .success:
-                                coordinator.updateScheduledDate(for: plan.id, date: calendarDate)
-                                calendarMessage = "Added to your calendar."
-                                showCalendarAlert = true
-                                planForCalendar = nil
-                            case .denied:
-                                calendarMessage = "Calendar access was denied. Enable it in Settings to add date plans."
-                                showCalendarAlert = true
-                            case .failed(let msg):
-                                calendarMessage = "Could not add: \(msg)"
-                                showCalendarAlert = true
-                            }
-                        }
-                    }
-                } label: {
-                    HStack(spacing: 10) {
-                        Image(systemName: "calendar.badge.plus")
-                            .font(.system(size: 16))
-                        Text("Add to Calendar")
-                            .font(Font.bodySans(16, weight: .semibold))
-                    }
-                    .foregroundColor(Color.luxuryMaroon)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
-                    .background(LinearGradient.goldShimmer)
-                    .cornerRadius(16)
-                }
-                .padding(.horizontal, 20)
-                
-                Spacer()
-            }
-            .padding(.top, 24)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Color.backgroundPrimary)
-            .navigationTitle("Add to Calendar")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") {
-                        planForCalendar = nil
-                    }
-                    .foregroundColor(Color.luxuryGold)
-                }
-            }
-            .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
-        }
-    }
-    
     // MARK: - Your Upcoming Dates (saved + merged unsaved)
     private var yourUpcomingDatesSection: some View {
         let unsaved = allUnsavedPlans
