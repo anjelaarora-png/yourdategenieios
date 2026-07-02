@@ -34,16 +34,8 @@ struct AddToCalendarSheet: View {
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 20)
 
-                DatePicker(
-                    "Date",
-                    selection: $selectedDate,
-                    in: Calendar.current.startOfDay(for: Date())...,
-                    displayedComponents: .date
-                )
-                .datePickerStyle(.graphical)
-                .tint(Color.luxuryGold)
-                .labelsHidden()
-                .padding(.horizontal, 8)
+                CreamGraphicalDatePicker(selection: $selectedDate)
+                    .padding(.horizontal, 12)
 
                 Button(action: submit) {
                     HStack(spacing: 10) {

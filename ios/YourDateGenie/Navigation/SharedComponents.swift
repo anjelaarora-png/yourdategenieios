@@ -147,6 +147,47 @@ struct LuxuryFeatureTile: View {
     }
 }
 
+// MARK: - Cream graphical date picker (readable on charcoal screens)
+
+/// Graphical `DatePicker` on a cream card with light color scheme so month/day labels
+/// are not black-on-black when the app uses a dark charcoal background.
+struct CreamGraphicalDatePicker: View {
+    @Binding var selection: Date
+    var minimumDate: Date
+
+    init(selection: Binding<Date>, minimumDate: Date = Calendar.current.startOfDay(for: Date())) {
+        self._selection = selection
+        self.minimumDate = minimumDate
+    }
+
+    var body: some View {
+        DatePicker(
+            "Date",
+            selection: $selection,
+            in: minimumDate...,
+            displayedComponents: .date
+        )
+        .datePickerStyle(.graphical)
+        .labelsHidden()
+        .tint(Color.accentMaroon)
+        .colorScheme(.light)
+        .padding(.horizontal, 4)
+        .padding(.vertical, 6)
+        .background(Color.creamCard)
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(Color.maroonBorderTint, lineWidth: 1)
+        )
+        .overlay(alignment: .leading) {
+            RoundedRectangle(cornerRadius: 1.5)
+                .fill(Color.accentMaroon)
+                .frame(width: 3)
+                .padding(.vertical, 1)
+        }
+    }
+}
+
 // MARK: - Love Letter Itinerary Background
 /// Paper/parchment-style background for date plan itinerary (matches LoveLetterCardView aesthetic).
 struct LoveLetterItineraryBackground<Content: View>: View {

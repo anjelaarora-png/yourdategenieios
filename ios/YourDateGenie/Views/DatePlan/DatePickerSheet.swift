@@ -62,15 +62,8 @@ struct DatePickerSheet: View {
     }
 
     private var datePicker: some View {
-        DatePicker(
-            "Date",
-            selection: $selectedDate,
-            in: Calendar.current.startOfDay(for: Date())...,
-            displayedComponents: .date
-        )
-        .datePickerStyle(.graphical)
-        .tint(Color.luxuryGold)
-        .padding(.horizontal)
+        CreamGraphicalDatePicker(selection: $selectedDate)
+            .padding(.horizontal, 16)
     }
 
     private var actionButtons: some View {

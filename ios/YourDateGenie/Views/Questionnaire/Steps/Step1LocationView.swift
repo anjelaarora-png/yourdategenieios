@@ -117,27 +117,11 @@ struct Step1LocationView: View {
                 VStack(alignment: .leading, spacing: 16) {
                     SectionHeader(emoji: "📅", title: "When?", subtitle: "Pick your date and preferred time")
                     
-                    // Date Picker
-                    DatePicker(
-                        "",
+                    CreamGraphicalDatePicker(
                         selection: Binding(
                             get: { data.dateScheduled ?? Date() },
                             set: { data.dateScheduled = $0 }
-                        ),
-                        in: Date()...,
-                        displayedComponents: .date
-                    )
-                    .datePickerStyle(.compact)
-                    .labelsHidden()
-                    .tint(Color.luxuryGold)
-                    .colorScheme(.dark)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 12)
-                    .background(Color.luxuryMaroonLight)
-                    .cornerRadius(14)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 14)
-                            .stroke(Color.luxuryGold.opacity(0.3), lineWidth: 1)
+                        )
                     )
                     
                     // Part of day + time — one seamless selection
