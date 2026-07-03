@@ -719,6 +719,37 @@ struct LuxurySlideHomeFlow: View {
             .offset(y: showContent ? 0 : 30)
             .animation(.easeOut(duration: 0.5).delay(0.2), value: showContent)
 
+            HStack(alignment: .top, spacing: 12) {
+                ZStack {
+                    Circle()
+                        .fill(Color.luxuryGold.opacity(0.14))
+                        .frame(width: 40, height: 40)
+                    Text("🌹")
+                        .font(.system(size: 18))
+                }
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Your relationship rose")
+                        .font(Font.bodySans(13, weight: .semibold))
+                        .foregroundColor(Color.luxuryCream)
+                    Text("On Home, your rose grows as you complete date nights — one bud per night, blooming toward 4 a month. Gentle encouragement, never guilt.")
+                        .font(Font.bodySans(12, weight: .regular))
+                        .foregroundColor(Color.luxuryCreamMuted)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(14)
+            .background(Color.luxuryMaroonLight.opacity(0.45))
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+            .overlay(
+                RoundedRectangle(cornerRadius: 14)
+                    .stroke(Color.luxuryGold.opacity(0.22), lineWidth: 1)
+            )
+            .padding(.horizontal, 24)
+            .padding(.top, 16)
+            .opacity(showContent ? 1 : 0)
+            .animation(.easeOut(duration: 0.5).delay(0.45), value: showContent)
+
             Spacer()
         }
         .onAppear { scheduleAutoPlay() }

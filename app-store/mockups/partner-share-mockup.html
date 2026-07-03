@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Partner Share — Your Date Genie Mockup</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #1a1412;
+      --text: #f4efe7;
+      --text-muted: rgba(244, 239, 231, 0.6);
+      --gold: #c8924a;
+      --maroon: #8b2942;
+      --maroon-border: rgba(139, 41, 66, 0.35);
+      --surface: #2a2220;
+      --cream: #efe7da;
+      --cream-dark: #e8dfd0;
+      --text-on-card: #2c2420;
+      --text-muted-card: #6b5f58;
+      --banner-a: #5c3a2e;
+      --banner-b: #8b5e4a;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      min-height: 100vh;
+      background: radial-gradient(ellipse at 50% 0%, #2a1818 0%, var(--bg) 55%);
+      font-family: 'DM Sans', system-ui, sans-serif;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .phone {
+      width: 390px;
+      max-width: 100%;
+      min-height: 844px;
+      background: var(--bg);
+      border-radius: 44px;
+      border: 1px solid rgba(200, 146, 74, 0.15);
+      box-shadow: 0 40px 80px rgba(0,0,0,0.55);
+      overflow: hidden;
+      position: relative;
+    }
+    .status {
+      display: flex;
+      justify-content: space-between;
+      padding: 14px 28px 8px;
+      font-size: 15px;
+      font-weight: 600;
+    }
+    .nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 20px 12px;
+    }
+    .nav button {
+      width: 32px; height: 32px;
+      border: none; background: transparent;
+      color: var(--gold); font-size: 18px;
+    }
+    .nav h1 {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 18px;
+      font-weight: 600;
+    }
+    .scroll { padding: 0 20px 40px; }
+    .hero { text-align: center; margin-bottom: 28px; }
+    .hero-icon {
+      width: 80px; height: 80px;
+      border: 2px solid rgba(201,169,110,0.55);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 14px;
+      font-size: 28px;
+      color: var(--gold);
+    }
+    .hero h2 {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 32px;
+      font-weight: 600;
+      line-height: 1.15;
+      margin-bottom: 10px;
+    }
+    .hero p { font-size: 14px; color: var(--text-muted); line-height: 1.45; }
+    .section-label {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 11px; font-weight: 700; letter-spacing: 0.12em;
+      color: rgba(244,239,231,0.55);
+      margin-bottom: 10px;
+    }
+    .section-label span { color: var(--maroon); }
+    .cream-card {
+      background: var(--cream);
+      border-radius: 16px;
+      border: 1px solid var(--maroon-border);
+      position: relative;
+      overflow: hidden;
+      margin-bottom: 28px;
+    }
+    .cream-card::before {
+      content: '';
+      position: absolute; left: 0; top: 0; bottom: 0;
+      width: 3px; background: var(--maroon);
+    }
+    .banner {
+      height: 72px;
+      background: linear-gradient(135deg, var(--banner-a), var(--banner-b), #4a3028);
+      display: flex; align-items: flex-end;
+      padding: 0 12px 8px;
+      font-size: 10px; font-weight: 600; letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: rgba(255,248,240,0.85);
+    }
+    .card-head { padding: 12px 16px; }
+    .card-head h3 {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 17px;
+      color: var(--text-on-card);
+      margin-bottom: 4px;
+    }
+    .card-head .meta { font-size: 11px; color: var(--text-muted-card); }
+    .stop {
+      padding: 10px 16px;
+      border-top: 1px solid rgba(44,36,32,0.08);
+      display: flex; gap: 10px; align-items: flex-start;
+    }
+    .stop-emoji { font-size: 18px; }
+    .stop-time { font-size: 10px; font-weight: 600; color: var(--maroon); letter-spacing: 0.04em; }
+    .stop-name { font-size: 13px; font-weight: 600; color: var(--text-on-card); }
+    .stop-sub { font-size: 11px; color: var(--text-muted-card); }
+    .card-foot {
+      padding: 10px 16px;
+      border-top: 1px solid rgba(44,36,32,0.08);
+      font-size: 11px; color: var(--text-muted-card);
+      display: flex; gap: 16px;
+    }
+    .note-banner {
+      height: 44px;
+      background: linear-gradient(135deg, var(--banner-a), var(--banner-b), #4a3028);
+      display: flex; align-items: flex-end;
+      padding: 0 12px 8px;
+      font-size: 10px; font-weight: 600; letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: rgba(255,248,240,0.85);
+    }
+    .note-body {
+      padding: 16px;
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 15px;
+      color: var(--text-muted-card);
+      font-style: italic;
+      min-height: 88px;
+    }
+    .rewrite-label {
+      font-size: 11px; font-weight: 700; letter-spacing: 0.14em;
+      color: rgba(244,239,231,0.45);
+      margin: 14px 0 10px;
+    }
+    .style-row {
+      display: flex; gap: 8px; overflow-x: auto;
+      margin-bottom: 12px; padding-bottom: 2px;
+    }
+    .style-chip {
+      flex-shrink: 0;
+      padding: 8px 12px;
+      border-radius: 20px;
+      font-size: 12px; font-weight: 600;
+      border: 1px solid var(--maroon-border);
+      background: var(--surface);
+      color: rgba(244,239,231,0.82);
+    }
+    .style-chip.on {
+      background: var(--gold);
+      color: var(--bg);
+      border-color: transparent;
+    }
+    .btn-rewrite {
+      width: 100%;
+      padding: 12px;
+      border: none;
+      border-radius: 12px;
+      background: var(--gold);
+      color: var(--bg);
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 28px;
+    }
+    .btn-gold {
+      width: 100%;
+      padding: 16px;
+      border: none;
+      border-radius: 16px;
+      background: var(--gold);
+      color: var(--bg);
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 12px;
+    }
+    .btn-outline {
+      width: 100%;
+      padding: 14px;
+      border-radius: 12px;
+      background: transparent;
+      border: 1.5px solid rgba(201,169,110,0.55);
+      color: var(--gold);
+      font-size: 15px;
+      font-weight: 600;
+      margin-bottom: 18px;
+    }
+    .quick-label {
+      font-size: 11px; font-weight: 700; letter-spacing: 0.14em;
+      color: rgba(244,239,231,0.45);
+      margin-bottom: 10px;
+    }
+    .quick-row { display: flex; gap: 12px; }
+    .quick-btn {
+      flex: 1;
+      text-align: center;
+    }
+    .quick-icon {
+      height: 52px;
+      background: var(--gold);
+      border: none;
+      border-radius: 14px;
+      display: flex; align-items: center; justify-content: center;
+      color: var(--bg);
+      font-size: 20px;
+      margin-bottom: 8px;
+    }
+    .quick-btn span { font-size: 11px; font-weight: 600; color: var(--gold); }
+    .caption {
+      text-align: center;
+      margin-top: 20px;
+      font-size: 12px;
+      color: rgba(244,239,231,0.35);
+    }
+  </style>
+</head>
+<body>
+  <div>
+    <div class="phone">
+      <div class="status"><span>9:41</span><span>●●● ▮ WiFi 🔋</span></div>
+      <div class="nav">
+        <button>✕</button>
+        <h1>Share Plan</h1>
+        <button style="visibility:hidden">✕</button>
+      </div>
+      <div class="scroll">
+        <div class="hero">
+          <div class="hero-icon">✈️</div>
+          <h2>Share with your partner</h2>
+          <p>Send tonight's plan — they'll see every stop, timing, and your personal note.</p>
+        </div>
+
+        <div class="section-label"><span>✦</span> TONIGHT'S PLAN</div>
+        <div class="cream-card">
+          <div class="banner">West Village · Tonight · 6:30 PM</div>
+          <div class="card-head">
+            <h3>Classic SoHo Romance</h3>
+            <div class="meta">3 stops · 4 hr · ~$120</div>
+          </div>
+          <div class="stop">
+            <div class="stop-emoji">🍝</div>
+            <div>
+              <div class="stop-time">6:30 PM</div>
+              <div class="stop-name">L'Artusi</div>
+              <div class="stop-sub">Italian · West Village</div>
+            </div>
+          </div>
+          <div class="stop">
+            <div class="stop-emoji">🎨</div>
+            <div>
+              <div class="stop-time">8:15 PM</div>
+              <div class="stop-name">Whitney Museum</div>
+              <div class="stop-sub">Gallery walk · Meatpacking</div>
+            </div>
+          </div>
+          <div class="stop">
+            <div class="stop-emoji">🍨</div>
+            <div>
+              <div class="stop-time">9:45 PM</div>
+              <div class="stop-name">L'Arte del Gelato</div>
+              <div class="stop-sub">Dessert · Chelsea</div>
+            </div>
+          </div>
+          <div class="card-foot"><span>🕐 4 hours</span><span>💰 ~$120</span></div>
+        </div>
+
+        <div class="section-label"><span>♡</span> ADD A PERSONAL NOTE</div>
+        <div class="cream-card">
+          <div class="note-banner">Love Note · Your words</div>
+          <div class="note-body">excited for tonight, been thinking about you all day</div>
+        </div>
+        <div class="rewrite-label">REWRITE STYLE</div>
+        <div class="style-row">
+          <div class="style-chip on">💕 Romantic</div>
+          <div class="style-chip">✨ Poetic</div>
+          <div class="style-chip">😄 Funny</div>
+          <div class="style-chip">🍬 Sweet</div>
+          <div class="style-chip">🎉 Playful</div>
+        </div>
+        <button class="btn-rewrite">✦ Rewrite note</button>
+
+        <button class="btn-gold">↑ Share plan</button>
+        <button class="btn-outline">⎘ Copy plan text</button>
+        <div class="quick-label">QUICK SEND</div>
+        <div class="quick-row">
+          <div class="quick-btn"><div class="quick-icon">💬</div><span>Message</span></div>
+          <div class="quick-btn"><div class="quick-icon">✉️</div><span>Email</span></div>
+          <div class="quick-btn"><div class="quick-icon">📝</div><span>Notes</span></div>
+        </div>
+      </div>
+    </div>
+    <p class="caption">Mockup — PartnerShareView (cream card system) · Jul 3, 2026</p>
+  </div>
+</body>
+</html>

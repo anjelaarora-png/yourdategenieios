@@ -155,10 +155,10 @@ struct LuxuryHomeTabView: View {
                         VStack(spacing: 28) {
                             HomeAppHeaderBar(notificationManager: notificationManager)
                             headerSection
-                            roseProgressSection
                             proactiveNudgeSection
                             heroSection
                                 .id(HomeTutorialAnchor.heroPlan.rawValue)
+                            roseProgressSection
                             lowKeyLink
                             shortcutsCollapsibleSection
                             yourUpcomingDatesSection
@@ -277,12 +277,14 @@ struct LuxuryHomeTabView: View {
                 .foregroundColor(Color.textPrimary)
                 .multilineTextAlignment(.leading)
                 .frame(maxWidth: .infinity, alignment: .leading)
-            
+
             Text(greetingLine2)
                 .font(Font.bodySans(13, weight: .regular))
                 .foregroundColor(Color.luxuryCreamMuted)
                 .multilineTextAlignment(.leading)
                 .frame(maxWidth: .infinity, alignment: .leading)
+
+            missionTagline
         }
         .frame(maxWidth: .infinity)
         .padding(.horizontal, 20)
@@ -304,16 +306,51 @@ struct LuxuryHomeTabView: View {
     
     private var greetingLine2: String {
         if displayHeroPlan != nil {
-            return "Tonight's plan is ready for review."
+            return "Tonight's itinerary is ready."
         }
-        return "One tap to a finished plan your partner will love."
+        return "Build a complete date night in about two minutes."
     }
 
-    /// Subtle rose progress pill — taps through to the full Your Journey flow.
+    /// Gold action line — what to do next on Home.
+    @ViewBuilder
+    private var missionTagline: some View {
+        Text(displayHeroPlan != nil
+             ? "Make tonight happen — approve your plan or share it in one tap."
+             : "You bring the connection. We handle the planning.")
+            .font(Font.displaySerif(16, weight: .semibold))
+            .foregroundColor(Color.accentGold.opacity(0.92))
+            .multilineTextAlignment(.leading)
+            .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// Rose progress — below hero so planning stays the primary focus for new users.
+    @ViewBuilder
     private var roseProgressSection: some View {
-        RoseHomePill(rose: rose) {
-            coordinator.activeSheet = .roseRewards
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Image(systemName: "chart.line.uptrend.xyaxis")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(Color.accentGold)
+                Text("YOUR PROGRESS")
+                    .font(Font.bodySans(11, weight: .bold))
+                    .tracking(1.4)
+                    .foregroundColor(Color.textPrimary.opacity(0.55))
+            }
+
+            Group {
+                if rose.hasEverCompletedDate {
+                    RoseHomePill(rose: rose) {
+                        coordinator.activeSheet = .roseRewards
+                    }
+                } else {
+                    RoseNewUserIntroCard(rose: rose) {
+                        coordinator.activeSheet = .roseRewards
+                    }
+                }
+            }
         }
+        .homeTutorialAnchor(.rose)
+        .id(HomeTutorialAnchor.rose.rawValue)
         .padding(.horizontal, 20)
     }
     
@@ -343,6 +380,10 @@ struct LuxuryHomeTabView: View {
                 proxy.scrollTo(HomeTutorialAnchor.planButton.rawValue, anchor: .center)
             case 1:
                 proxy.scrollTo(HomeTutorialAnchor.heroPlan.rawValue, anchor: .center)
+            case 2:
+                proxy.scrollTo(HomeTutorialAnchor.rose.rawValue, anchor: .center)
+            case 3:
+                proxy.scrollTo(HomeTutorialAnchor.planDateButton.rawValue, anchor: .bottom)
             default:
                 break
             }

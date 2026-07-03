@@ -4,8 +4,8 @@ import SwiftUI
 enum LuxuryTabBarMetrics {
     /// Icon + label row height.
     static let barRowHeight: CGFloat = 56
-    /// Center + button rises above the bar row.
-    static let planButtonProtrusion: CGFloat = 22
+    /// Center plan button rises above the bar row (icon + label).
+    static let planButtonProtrusion: CGFloat = 28
     /// Total chrome height above the home-indicator safe area.
     static var barShellHeight: CGFloat { barRowHeight + planButtonProtrusion }
     /// Padding so the last scroll item clears the bar when scrolled to the end.
@@ -41,7 +41,7 @@ struct LuxuryTabBar: View {
                 }
 
                 Color.clear
-                    .frame(width: 72)
+                    .frame(width: 80)
 
                 ForEach(rightTabs, id: \.self) { tab in
                     tabButton(tab)
@@ -95,23 +95,32 @@ struct LuxuryTabBar: View {
 
     private var planButton: some View {
         Button(action: onPlanTapped) {
-            ZStack {
-                Circle()
-                    .fill(Color.accentGold)
-                    .frame(width: 60, height: 60)
-                    .shadow(color: Color.accentGold.opacity(0.35), radius: 12, y: 4)
-                    .overlay(
-                        Circle()
-                            .stroke(Color.backgroundPrimary, lineWidth: 4)
-                    )
+            VStack(spacing: 5) {
+                ZStack {
+                    Circle()
+                        .fill(Color.accentGold)
+                        .frame(width: 58, height: 58)
+                        .shadow(color: Color.accentGold.opacity(0.4), radius: 12, y: 4)
+                        .overlay(
+                            Circle()
+                                .stroke(Color.backgroundPrimary, lineWidth: 3)
+                        )
 
-                Image(systemName: "plus")
-                    .font(.system(size: 26, weight: .semibold))
-                    .foregroundColor(Color.backgroundPrimary)
+                    Image(systemName: "wand.and.stars")
+                        .font(.system(size: 22, weight: .semibold))
+                        .foregroundColor(Color.backgroundPrimary)
+                }
+
+                Text("Plan Date")
+                    .font(Font.bodySans(10, weight: .bold))
+                    .tracking(0.2)
+                    .foregroundColor(Color.accentGold)
             }
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Plan a date")
+        .accessibilityLabel("Plan Date")
+        .accessibilityHint("Start planning a new date night")
+        .homeTutorialAnchor(.planDateButton)
     }
 
     private var tabBarBackground: some View {

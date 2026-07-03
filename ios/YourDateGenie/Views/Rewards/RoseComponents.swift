@@ -192,6 +192,76 @@ struct RoseBudDots: View {
 
 // MARK: Home pill — subtle rose progress (spec §8: one small pill on Home)
 
+/// Explains the rose mechanic for users who haven't completed a date yet — clearer than the full progress pill.
+struct RoseNewUserIntroCard: View {
+    @ObservedObject var rose: RoseManager
+    var onTap: () -> Void
+
+    @State private var showScienceInfo = false
+
+    var body: some View {
+        HStack(spacing: 0) {
+            Button(action: onTap) {
+                HStack(spacing: 12) {
+                    ZStack {
+                        Circle()
+                            .fill(Color.creamCard.opacity(0.12))
+                        Circle()
+                            .stroke(Color.accentGold.opacity(0.35), lineWidth: 1)
+                        RosePlantView(
+                            mode: .blooming(open: 0, total: rose.monthlyGoal),
+                            size: 40
+                        )
+                    }
+                    .frame(width: 48, height: 48)
+                    .accessibilityHidden(true)
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Your progress")
+                            .font(Font.bodySans(14, weight: .semibold))
+                            .foregroundColor(Color.textPrimary)
+                        Text("0 of \(rose.monthlyGoal) date nights this month · complete one to open your first bud.")
+                            .font(Font.bodySans(11, weight: .regular))
+                            .foregroundColor(Color.luxuryCreamMuted)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .multilineTextAlignment(.leading)
+                    }
+
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(Color.luxuryCreamMuted.opacity(0.75))
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 12)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Your progress. Zero of \(rose.monthlyGoal) date nights this month.")
+            .accessibilityHint("Each completed date opens a bud on your relationship rose.")
+
+            Button {
+                showScienceInfo = true
+            } label: {
+                Image(systemName: "info.circle")
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundColor(Color.accentGold.opacity(0.75))
+                    .frame(width: 36, height: 48)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Why track date nights with a rose")
+            .padding(.trailing, 8)
+        }
+        .background(Color.luxuryMaroonLight.opacity(0.15))
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(Color.accentGold.opacity(0.22), lineWidth: 1)
+        )
+        .sheet(isPresented: $showScienceInfo) {
+            RoseScienceInfoSheet(monthlyGoal: rose.monthlyGoal)
+        }
+    }
+}
+
 struct RoseHomePill: View {
     @ObservedObject var rose: RoseManager
     var onTap: () -> Void
@@ -206,21 +276,21 @@ struct RoseHomePill: View {
             return "Tap for a gentle 15-min revive"
         }
         if !rose.hasEverCompletedDate {
-            return "\(rose.monthlyGoal) buds waiting · complete a date to open the first"
+            return "Complete your first date to open bud 1 of \(rose.monthlyGoal)"
         }
         if rose.datesThisMonth >= rose.monthlyGoal {
-            return "In full bloom this month"
+            return "Goal reached — \(rose.monthlyGoal) date nights this month"
         }
         let remaining = rose.budsRemaining
         let budWord = remaining == 1 ? "bud" : "buds"
-        return "\(remaining) \(budWord) left to full bloom"
+        return "\(rose.datesThisMonth) of \(rose.monthlyGoal) date nights · \(remaining) \(budWord) to full bloom"
     }
 
     private var titleText: String {
-        if rose.needsRevive { return "Your rose misses you" }
-        if !rose.hasEverCompletedDate { return "Your rose is ready" }
-        if rose.datesThisMonth >= rose.monthlyGoal { return "Full bloom" }
-        return "Your rose"
+        if rose.needsRevive { return "Your progress" }
+        if !rose.hasEverCompletedDate { return "Your progress" }
+        if rose.datesThisMonth >= rose.monthlyGoal { return "Progress: full bloom" }
+        return "Your progress"
     }
 
     var body: some View {
@@ -231,7 +301,7 @@ struct RoseHomePill: View {
                         Circle()
                             .fill(Color.creamCard.opacity(0.14))
                         Circle()
-                            .stroke(Color.accentMaroon.opacity(0.28), lineWidth: 1)
+                            .stroke(Color.accentGold.opacity(0.35), lineWidth: 1)
                         RosePlantView(mode: rose.plantDisplayMode, size: roseSize)
                     }
                     .frame(width: roseFrame, height: roseFrame)
@@ -292,11 +362,11 @@ struct RoseHomePill: View {
             .accessibilityLabel("Why four dates a month")
             .padding(.trailing, 8)
         }
-        .background(Color.luxuryMaroonLight.opacity(0.22))
+        .background(Color.luxuryMaroonLight.opacity(0.15))
         .clipShape(RoundedRectangle(cornerRadius: 14))
         .overlay(
             RoundedRectangle(cornerRadius: 14)
-                .stroke(Color.accentMaroon.opacity(0.45), lineWidth: 1)
+                .stroke(Color.accentGold.opacity(0.22), lineWidth: 1)
         )
         .accessibilityElement(children: .contain)
         .sheet(isPresented: $showScienceInfo) {
@@ -305,8 +375,8 @@ struct RoseHomePill: View {
     }
 
     private var homeAccessibilityLabel: String {
-        if rose.needsRevive { return "Your rose misses you. Tap for a gentle revive." }
-        return "Your rose, \(rose.datesThisMonth) of \(rose.monthlyGoal) dates this month"
+        if rose.needsRevive { return "Your progress. Tap for a gentle revive." }
+        return "Your progress, \(rose.datesThisMonth) of \(rose.monthlyGoal) date nights this month"
     }
 }
 

@@ -6,7 +6,6 @@ struct LoveNoteGeneratorView: View {
     @EnvironmentObject var coordinator: NavigationCoordinator
     @StateObject private var storage = LoveNoteStorageManager.shared
     @State private var noteText = ""
-    @State private var poeticText = "" // AI-rewritten loving & poetic version
     @State private var selectedPromptIndex = 0
     @State private var selectedSavedNote: SavedLoveNote?
     @State private var showSaveSuccess = false
@@ -14,13 +13,7 @@ struct LoveNoteGeneratorView: View {
     @State private var showSaveError = false
     @State private var saveErrorMessage = ""
     @State private var isSaving = false
-    @State private var isGeneratingPoetic = false
-    @State private var poeticErrorMessage: String?
-    @State private var showPoeticError = false
     /// Name to sign the love note with; defaults to profile display name.
-    @State private var signOffName: String = ""
-    /// Selected rewrite style for the Rewrite button.
-    @State private var selectedRewriteStyle: LoveNoteRewriteStyle = .romantic
     /// When non-nil, we show "Draft saved" above the editor; cleared after a few seconds.
     @State private var draftSavedAt: Date?
     @State private var draftSaveWorkItem: DispatchWorkItem?
@@ -46,8 +39,7 @@ struct LoveNoteGeneratorView: View {
                         draftIndicatorSection
                         promptsSection
                         writerSection
-                        rewriteStyleSection
-                        makeItPoeticButton
+                        LoveNoteRewriteSection(text: $noteText, skin: .charcoal)
                         signOffSection
                         previewSection
                         saveButton
@@ -57,21 +49,26 @@ struct LoveNoteGeneratorView: View {
                 }
                 .mainTabBarScrollInset()
             }
-            .navigationTitle("Love Notes")
+            .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
             .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Text("Love Notes")
+                        .font(Font.displaySerif(18, weight: .semibold))
+                        .foregroundColor(Color.textPrimary)
+                }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") {
                         storage.clearDraft()
                         noteText = ""
-                        poeticText = ""
                         signOffName = UserProfileManager.shared.currentUser?.displayName ?? ""
                         coordinator.currentTab = .home
                     }
-                    .foregroundColor(Color.luxuryGold)
+                    .foregroundColor(Color.accentGold)
                 }
             }
+            .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
             .onAppear {
                 if signOffName.isEmpty {
                     signOffName = UserProfileManager.shared.currentUser?.displayName ?? ""
@@ -80,8 +77,6 @@ struct LoveNoteGeneratorView: View {
             }
             .onChange(of: noteText) { _, _ in scheduleDraftSave() }
             .onChange(of: signOffName) { _, _ in scheduleDraftSave() }
-            .onChange(of: poeticText) { _, _ in scheduleDraftSave() }
-            .onChange(of: selectedRewriteStyle) { _, _ in scheduleDraftSave() }
             .alert("Love Note Saved!", isPresented: $showSaveSuccess) {
                 Button("OK") { showSaveSuccess = false }
             } message: {
@@ -125,18 +120,16 @@ struct LoveNoteGeneratorView: View {
     }
 
     private var hasDraftContent: Bool {
-        !noteText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
-        !poeticText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        !noteText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     private func loadDraftIfNeeded() {
         guard let draft = storage.loadDraft(), !draft.isEmpty else { return }
         noteText = draft.noteText
-        if !draft.signOffName.isEmpty { signOffName = draft.signOffName }
-        poeticText = draft.poeticText
-        if let raw = draft.selectedRewriteStyleRaw, let style = LoveNoteRewriteStyle(rawValue: raw) {
-            selectedRewriteStyle = style
+        if noteText.isEmpty, !draft.poeticText.isEmpty {
+            noteText = draft.poeticText
         }
+        if !draft.signOffName.isEmpty { signOffName = draft.signOffName }
     }
 
     private func scheduleDraftSave() {
@@ -145,8 +138,8 @@ struct LoveNoteGeneratorView: View {
             let draft = LoveNoteDraft(
                 noteText: noteText,
                 signOffName: signOffName,
-                poeticText: poeticText,
-                selectedRewriteStyleRaw: selectedRewriteStyle.rawValue,
+                poeticText: "",
+                selectedRewriteStyleRaw: nil,
                 updatedAt: Date()
             )
             storage.saveDraft(draft)
@@ -165,21 +158,9 @@ struct LoveNoteGeneratorView: View {
         Group {
             if !storage.savedNotes.isEmpty {
                 VStack(alignment: .leading, spacing: 12) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "heart.text.square.fill")
-                            .font(.system(size: 22))
-                            .foregroundColor(Color.luxuryGold)
-                        Text("Saved")
-                            .font(Font.bodySerif(28, weight: .bold))
-                            .italic()
-                            .foregroundColor(Color.luxuryGold)
-                        Text("Love Notes")
-                            .font(Font.bodySerif(28, weight: .bold))
-                            .italic()
-                            .foregroundColor(Color.luxuryGold)
-                    }
+                    sectionLabel(title: "Saved love notes", icon: "heart.text.square")
                     Text("Tap to view or save to photos again.")
-                        .font(Font.bodySans(13, weight: .regular))
+                        .font(Font.bodySans(12, weight: .regular))
                         .foregroundColor(Color.luxuryCreamMuted)
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 12) {
@@ -198,18 +179,14 @@ struct LoveNoteGeneratorView: View {
 
     private var headerSection: some View {
         VStack(spacing: 10) {
-            HStack(spacing: 8) {
-                Image(systemName: "heart.text.square.fill")
-                    .font(.system(size: 22))
-                    .foregroundStyle(LinearGradient.goldShimmer)
-                Text("Write a Love Note")
-                    .font(Font.bodySerif(28, weight: .regular))
-                    .foregroundColor(Color.accentGold)
-            }
-            .multilineTextAlignment(.center)
+            Text("Write a Love Note")
+                .font(Font.displaySerif(28, weight: .semibold))
+                .foregroundColor(Color.textPrimary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity)
 
-            Text("Pour your heart out, rewrite with AI, then save or send your Love Note.")
-                .font(Font.bodySans(15, weight: .regular))
+            Text("Pour your heart out, rewrite with AI, then save or send.")
+                .font(Font.bodySans(13, weight: .regular))
                 .foregroundColor(Color.luxuryCreamMuted)
                 .multilineTextAlignment(.center)
         }
@@ -218,16 +195,7 @@ struct LoveNoteGeneratorView: View {
 
     private var promptsSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 6) {
-                Text("Need")
-                    .font(Font.bodySerif(28, weight: .bold))
-                    .italic()
-                    .foregroundColor(Color.luxuryGold)
-                Text("inspiration?")
-                    .font(Font.bodySerif(28, weight: .bold))
-                    .italic()
-                    .foregroundColor(Color.luxuryGold)
-            }
+            sectionLabel(title: "Need inspiration?", icon: "lightbulb")
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 10) {
                     ForEach(Array(prompts.enumerated()), id: \.offset) { index, prompt in
@@ -235,16 +203,20 @@ struct LoveNoteGeneratorView: View {
                             selectedPromptIndex = index
                         } label: {
                             Text(prompt.title)
-                                .font(Font.bodySans(13, weight: .medium))
-                                .foregroundColor(selectedPromptIndex == index ? Color.luxuryMaroon : Color.luxuryCream)
+                                .font(Font.bodySans(12, weight: .semibold))
+                                .foregroundColor(selectedPromptIndex == index ? Color.backgroundPrimary : Color.textPrimary.opacity(0.82))
                                 .padding(.horizontal, 14)
                                 .padding(.vertical, 10)
                                 .background(
                                     selectedPromptIndex == index
-                                        ? LinearGradient.goldShimmer
-                                        : LinearGradient(colors: [Color.luxuryGold.opacity(0.2)], startPoint: .leading, endPoint: .trailing)
+                                        ? Color.accentGold
+                                        : Color.surfaceElevated
                                 )
                                 .cornerRadius(20)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 20)
+                                        .stroke(selectedPromptIndex == index ? Color.clear : Color.maroonBorderTint, lineWidth: 1)
+                                )
                         }
                         .buttonStyle(.plain)
                     }
@@ -255,28 +227,19 @@ struct LoveNoteGeneratorView: View {
     }
 
     private var writerSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 6) {
-                Text("Your")
-                    .font(Font.bodySerif(28, weight: .bold))
-                    .italic()
-                    .foregroundColor(Color.luxuryGold)
-                Text("words")
-                    .font(Font.bodySerif(28, weight: .bold))
-                    .italic()
-                    .foregroundColor(Color.luxuryGold)
-            }
+        VStack(alignment: .leading, spacing: 10) {
+            sectionLabel(title: "Your words", icon: "pencil.line")
             LoveNoteCreamCard(bannerSubtitle: "Your words") {
                 ZStack(alignment: .topLeading) {
                     if noteText.isEmpty {
                         Text(prompts[selectedPromptIndex].placeholder)
-                            .font(Font.bodySans(16, weight: .regular))
-                            .foregroundColor(Color.textMutedOnCard)
+                            .font(Font.bodySerif(15, weight: .regular))
+                            .foregroundColor(Color.textMutedOnCard.opacity(0.55))
                             .padding(.horizontal, 16)
                             .padding(.vertical, 14)
                     }
                     TextEditor(text: $noteText)
-                        .font(Font.bodySans(16, weight: .regular))
+                        .font(Font.bodySerif(15, weight: .regular))
                         .foregroundColor(Color.textOnCard)
                         .scrollContentBackground(.hidden)
                         .padding(12)
@@ -287,20 +250,11 @@ struct LoveNoteGeneratorView: View {
     }
 
     private var signOffSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 6) {
-                Text("Sign")
-                    .font(Font.bodySerif(28, weight: .bold))
-                    .italic()
-                    .foregroundColor(Color.luxuryGold)
-                Text("as")
-                    .font(Font.bodySerif(28, weight: .bold))
-                    .italic()
-                    .foregroundColor(Color.luxuryGold)
-            }
+        VStack(alignment: .leading, spacing: 10) {
+            sectionLabel(title: "Sign as", icon: "signature")
             LoveNoteCreamCard(bannerSubtitle: "Sign as") {
                 TextField("Your name", text: $signOffName)
-                    .font(Font.bodySans(16, weight: .regular))
+                    .font(Font.bodySerif(15, weight: .regular))
                     .foregroundColor(Color.textOnCard)
                     .padding(14)
                     .autocapitalization(.words)
@@ -308,135 +262,76 @@ struct LoveNoteGeneratorView: View {
         }
     }
 
-    private var rewriteStyleSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 6) {
-                Text("Rewrite")
-                    .font(Font.bodySerif(28, weight: .bold))
-                    .italic()
-                    .foregroundColor(Color.luxuryGold)
-                Text("style")
-                    .font(Font.bodySerif(28, weight: .bold))
-                    .italic()
-                    .foregroundColor(Color.luxuryGold)
-            }
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 10) {
-                    ForEach(LoveNoteRewriteStyle.allCases) { style in
-                        Button {
-                            selectedRewriteStyle = style
-                        } label: {
-                            HStack(spacing: 6) {
-                                Image(systemName: style.icon)
-                                    .font(.system(size: 14, weight: .medium))
-                                    .foregroundStyle(selectedRewriteStyle == style ? Color.luxuryMaroon : Color.luxuryGold)
-                                Text(style.displayName)
-                                    .font(Font.bodySans(13, weight: .medium))
-                                    .foregroundColor(selectedRewriteStyle == style ? Color.luxuryMaroon : Color.luxuryCream)
-                            }
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 10)
-                            .background(
-                                selectedRewriteStyle == style
-                                    ? LinearGradient.goldShimmer
-                                    : LinearGradient(colors: [Color.luxuryGold.opacity(0.2)], startPoint: .leading, endPoint: .trailing)
-                            )
-                            .cornerRadius(20)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(.horizontal, 2)
-            }
-        }
-    }
-
-    private var makeItPoeticButton: some View {
-        Button {
-            generatePoeticVersion()
-        } label: {
-            HStack(spacing: 10) {
-                if isGeneratingPoetic {
-                    ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle(tint: Color.luxuryMaroon))
-                    Text("Rewriting...")
-                        .font(Font.bodySans(15, weight: .medium))
-                } else {
-                    Image(systemName: "heart.text.square.fill")
-                        .font(.system(size: 18))
-                    Text(poeticText.isEmpty ? "Rewrite" : "Rewrite again")
-                        .font(Font.bodySans(15, weight: .medium))
-                }
-            }
-            .foregroundColor(Color.luxuryMaroon)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 14)
-            .background(LinearGradient.goldShimmer)
-            .cornerRadius(14)
-            .shadow(color: Color.luxuryGold.opacity(0.3), radius: 6, y: 2)
-        }
-        .buttonStyle(.plain)
-        .disabled(noteText.trimmingCharacters(in: .whitespaces).isEmpty || isGeneratingPoetic)
-        .opacity(noteText.trimmingCharacters(in: .whitespaces).isEmpty ? 0.6 : 1)
-        .alert("Couldn't rewrite", isPresented: $showPoeticError) {
-            Button("OK") {
-                showPoeticError = false
-                poeticErrorMessage = nil
-            }
-        } message: {
-            if let msg = poeticErrorMessage { Text(msg) }
-        }
-    }
-
-    private func generatePoeticVersion() {
-        let raw = noteText.trimmingCharacters(in: .whitespaces)
-        guard !raw.isEmpty else { return }
-        isGeneratingPoetic = true
-        poeticErrorMessage = nil
-        let style = selectedRewriteStyle
-        Task {
-            do {
-                let rewritten = try await LoveNoteAIService.rewrite(userText: raw, style: style)
-                await MainActor.run {
-                    poeticText = rewritten
-                    isGeneratingPoetic = false
-                }
-            } catch {
-                await MainActor.run {
-                    poeticErrorMessage = error.localizedDescription
-                    showPoeticError = true
-                    isGeneratingPoetic = false
-                }
-            }
-        }
-    }
-
     private var previewSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 6) {
-                Text("Love Note")
-                    .font(Font.bodySerif(28, weight: .bold))
-                    .italic()
-                    .foregroundColor(Color.luxuryGold)
-                Text("preview")
-                    .font(Font.bodySerif(28, weight: .bold))
-                    .italic()
-                    .foregroundColor(Color.luxuryGold)
-            }
+            sectionLabel(title: "Preview", icon: "eye")
             LoveLetterCardView(
                 message: displayMessage,
                 signOffName: signOffName.trimmingCharacters(in: .whitespaces).isEmpty ? nil : signOffName.trimmingCharacters(in: .whitespaces),
                 placeholder: displayMessage.isEmpty || displayMessage == "Your words will appear here..."
             )
-            .padding(4)
         }
     }
 
-    /// Text to show in preview and to save: use rewritten version if available, otherwise raw note.
+    /// Text to show in preview and to save.
     private var displayMessage: String {
-        if !poeticText.isEmpty { return poeticText }
-        if noteText.isEmpty { return "Your words will appear here..." }
+        let trimmed = noteText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty { return "Your words will appear here..." }
         return noteText
+    }
+
+    private func sectionLabel(title: String, icon: String) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundColor(Color.accentMaroon)
+            Text(title.uppercased())
+                .font(Font.bodySans(11, weight: .bold))
+                .tracking(1.4)
+                .foregroundColor(Color.textPrimary.opacity(0.55))
+        }
+    }
+
+    private func goldPrimaryButton(title: String, icon: String, disabled: Bool = false, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 10) {
+                Image(systemName: icon)
+                    .font(.system(size: 16, weight: .semibold))
+                Text(title)
+                    .font(Font.bodySans(15, weight: .semibold))
+                Spacer(minLength: 0)
+            }
+            .foregroundColor(Color.backgroundPrimary)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            .background(Color.accentGold)
+            .cornerRadius(14)
+        }
+        .buttonStyle(.plain)
+        .disabled(disabled)
+        .opacity(disabled ? 0.5 : 1)
+    }
+
+    private func goldOutlineButton(title: String, icon: String, disabled: Bool = false, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 10) {
+                Image(systemName: icon)
+                    .font(.system(size: 15, weight: .medium))
+                Text(title)
+                    .font(Font.bodySans(15, weight: .semibold))
+                Spacer(minLength: 0)
+            }
+            .foregroundColor(Color.accentGold)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            .overlay(
+                RoundedRectangle(cornerRadius: 14)
+                    .stroke(Color.accentGold.opacity(0.55), lineWidth: 1.5)
+            )
+        }
+        .buttonStyle(.plain)
+        .disabled(disabled)
+        .opacity(disabled ? 0.5 : 1)
     }
 
     private var hasContentToSave: Bool {
@@ -445,83 +340,49 @@ struct LoveNoteGeneratorView: View {
     }
 
     private var saveButton: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 6) {
-                Text("Save")
-                    .font(Font.bodySerif(28, weight: .bold))
-                    .italic()
-                    .foregroundColor(Color.luxuryGold)
-                Text("or send")
-                    .font(Font.bodySerif(28, weight: .bold))
-                    .italic()
-                    .foregroundColor(Color.luxuryGold)
-            }
+        VStack(alignment: .leading, spacing: 12) {
+            sectionLabel(title: "Save or send", icon: "square.and.arrow.up")
             VStack(spacing: 10) {
-                Button {
-                    saveLoveNoteInApp()
-                } label: {
-                    HStack(spacing: 10) {
-                        Image(systemName: "heart.text.square.fill")
-                            .font(.system(size: 18))
-                        Text("Save Love Note")
-                            .font(Font.bodySans(15, weight: .semibold))
-                        Spacer()
-                    }
-                    .foregroundColor(Color.luxuryMaroon)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 14)
-                    .background(LinearGradient.goldShimmer)
-                    .cornerRadius(14)
-                }
-                .buttonStyle(.plain)
-                .disabled(!hasContentToSave)
+                goldPrimaryButton(
+                    title: "Save Love Note",
+                    icon: "heart.text.square.fill",
+                    disabled: !hasContentToSave,
+                    action: saveLoveNoteInApp
+                )
 
-                Button {
-                    saveLoveNoteAsImage()
-                } label: {
+                if isSaving {
                     HStack(spacing: 10) {
-                        if isSaving {
-                            ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle(tint: Color.luxuryMaroon))
-                            Text("Saving...")
-                                .font(Font.bodySans(15, weight: .semibold))
-                        } else {
-                            Image(systemName: "photo.fill")
-                                .font(.system(size: 18))
-                            Text("Save as photo")
-                                .font(Font.bodySans(15, weight: .semibold))
-                        }
-                        Spacer()
-                    }
-                    .foregroundColor(Color.luxuryMaroon)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 14)
-                    .background(LinearGradient.goldShimmer)
-                    .cornerRadius(14)
-                }
-                .buttonStyle(.plain)
-                .disabled(!hasContentToSave || isSaving)
-
-                Button {
-                    sendToPartner()
-                } label: {
-                    HStack(spacing: 10) {
-                        Image(systemName: "paperplane.fill")
-                            .font(.system(size: 18))
-                        Text("Send to partner")
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: Color.accentGold))
+                        Text("Saving…")
                             .font(Font.bodySans(15, weight: .semibold))
-                        Spacer()
+                        Spacer(minLength: 0)
                     }
-                    .foregroundColor(Color.luxuryMaroon)
+                    .foregroundColor(Color.accentGold)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 14)
-                    .background(LinearGradient.goldShimmer)
-                    .cornerRadius(14)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14)
+                            .stroke(Color.accentGold.opacity(0.55), lineWidth: 1.5)
+                    )
+                } else {
+                    goldOutlineButton(
+                        title: "Save as photo",
+                        icon: "photo.fill",
+                        disabled: !hasContentToSave,
+                        action: saveLoveNoteAsImage
+                    )
                 }
-                .buttonStyle(.plain)
-                .disabled(!hasContentToSave)
+
+                goldOutlineButton(
+                    title: "Send to partner",
+                    icon: "paperplane.fill",
+                    disabled: !hasContentToSave,
+                    action: sendToPartner
+                )
             }
         }
+        .padding(.bottom, 24)
     }
 
     private func saveLoveNoteInApp() {
@@ -680,7 +541,7 @@ struct SavedLoveNoteDetailSheet: View {
                                 HStack(spacing: 10) {
                                     if isSavingToPhotos {
                                         ProgressView()
-                                            .progressViewStyle(CircularProgressViewStyle(tint: Color.luxuryMaroon))
+                                            .progressViewStyle(CircularProgressViewStyle(tint: Color.backgroundPrimary))
                                     } else {
                                         Image(systemName: "square.and.arrow.down.fill")
                                         Text("Save to Photos Again")
@@ -688,11 +549,11 @@ struct SavedLoveNoteDetailSheet: View {
                                             .multilineTextAlignment(.center)
                                     }
                                 }
-                                .font(Font.bodySans(16, weight: .semibold))
-                                .foregroundColor(Color.luxuryMaroon)
+                                .font(Font.bodySans(15, weight: .semibold))
+                                .foregroundColor(Color.backgroundPrimary)
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 14)
-                                .background(LinearGradient.goldShimmer)
+                                .background(Color.accentGold)
                                 .cornerRadius(14)
                             }
                             .buttonStyle(.plain)
@@ -716,15 +577,20 @@ struct SavedLoveNoteDetailSheet: View {
                     .padding(.bottom, 40)
                 }
             }
-            .navigationTitle("Saved Love Note")
+            .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
             .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Text("Saved Love Note")
+                        .font(Font.displaySerif(18, weight: .semibold))
+                        .foregroundColor(Color.textPrimary)
+                }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") {
                         onDismiss()
                     }
-                    .foregroundColor(Color.luxuryGold)
+                    .foregroundColor(Color.accentGold)
                 }
             }
             .alert("Love Note Saved!", isPresented: $showSaveSuccess) {
@@ -793,16 +659,15 @@ struct LoveLetterCardView: View {
 
             VStack(alignment: .leading, spacing: 16) {
                 Text(message)
-                    .font(Font.bodySans(16, weight: .regular))
-                    .foregroundColor(placeholder ? Color.textMutedOnCard : Color.textOnCard)
-                    .lineSpacing(8)
+                    .font(Font.bodySerif(15, weight: .regular))
+                    .foregroundColor(placeholder ? Color.textMutedOnCard.opacity(0.55) : Color.textOnCard)
+                    .lineSpacing(6)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                     .fixedSize(horizontal: false, vertical: true)
 
                 if !placeholder {
                     Text(signOffLine)
-                        .font(Font.bodySerif(16, weight: .bold))
-                        .italic()
+                        .font(Font.bodySerif(14, weight: .semibold))
                         .foregroundColor(Color.textMutedOnCard)
                         .frame(maxWidth: .infinity, alignment: .trailing)
                 }
