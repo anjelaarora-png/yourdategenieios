@@ -1255,8 +1255,20 @@ class NavigationCoordinator: ObservableObject {
             let remoteIds = Set(remoteSaved.map(\.id)).union(Set(remotePast.map(\.id)))
             let unsyncedSaved = savedPlans.filter { !remoteIds.contains($0.id) }
             let unsyncedPast = pastPlans.filter { !remoteIds.contains($0.id) }
-            savedPlans = remoteSaved + unsyncedSaved
-            pastPlans = remotePast + unsyncedPast
+            savedPlans = Self.mergeExperiencesWaitingPreservingOrder(
+                local: savedPlans,
+                remote: remoteSaved
+            )
+            for plan in unsyncedSaved where !savedPlans.contains(where: { $0.id == plan.id }) {
+                savedPlans.append(plan)
+            }
+            pastPlans = Self.mergeExperiencesWaitingPreservingOrder(
+                local: pastPlans,
+                remote: remotePast
+            )
+            for plan in unsyncedPast where !pastPlans.contains(where: { $0.id == plan.id }) {
+                pastPlans.append(plan)
+            }
             saveState()
             migratePastDuePlans()
             syncRoseProgress()
@@ -1310,10 +1322,11 @@ class NavigationCoordinator: ObservableObject {
         do {
             let rows = try await SupabaseService.shared.getExperiencesWaiting(coupleId: coupleId)
             let remote = rows.map(\.plan)
-            let remoteIds = Set(remote.map(\.id))
             await MainActor.run {
-                let unsynced = experiencesWaiting.filter { !remoteIds.contains($0.id) }
-                experiencesWaiting = remote + unsynced
+                experiencesWaiting = Self.mergeExperiencesWaitingPreservingOrder(
+                    local: experiencesWaiting,
+                    remote: remote
+                )
                 saveState()
                 self.experiencesCloudPullCompleted = true
                 self.scheduleSyncAllUnsavedExperiencesToCloud()
@@ -1332,10 +1345,11 @@ class NavigationCoordinator: ObservableObject {
         do {
             let rows = try await SupabaseService.shared.getExperiencesWaiting(userId: userId)
             let remote = rows.map(\.plan)
-            let remoteIds = Set(remote.map(\.id))
             await MainActor.run {
-                let unsynced = experiencesWaiting.filter { !remoteIds.contains($0.id) }
-                experiencesWaiting = remote + unsynced
+                experiencesWaiting = Self.mergeExperiencesWaitingPreservingOrder(
+                    local: experiencesWaiting,
+                    remote: remote
+                )
                 saveState()
                 self.experiencesCloudPullCompleted = true
                 self.scheduleSyncAllUnsavedExperiencesToCloud()
@@ -1346,6 +1360,26 @@ class NavigationCoordinator: ObservableObject {
                 self.scheduleSyncAllUnsavedExperiencesToCloud()
             }
         }
+    }
+
+    /// Keeps local row order; refreshes content from remote; appends genuinely new rows at the end.
+    private static func mergeExperiencesWaitingPreservingOrder(local: [DatePlan], remote: [DatePlan]) -> [DatePlan] {
+        let remoteById = Dictionary(uniqueKeysWithValues: remote.map { ($0.id, $0) })
+        var merged: [DatePlan] = []
+        var seen = Set<UUID>()
+
+        for plan in local {
+            let latest = remoteById[plan.id] ?? plan
+            merged.append(latest)
+            seen.insert(plan.id)
+        }
+
+        for plan in remote where !seen.contains(plan.id) {
+            merged.append(plan)
+            seen.insert(plan.id)
+        }
+
+        return merged
     }
     
     /// Upload or update a single plan on Supabase so history persists across reinstalls.
@@ -1484,7 +1518,7 @@ class NavigationCoordinator: ObservableObject {
         }
         // Single reconcile pass: append to waiting and clear generated together.
         if !newlyAdded.isEmpty {
-            experiencesWaiting = updatedWaiting.sorted { $0.createdAt > $1.createdAt }
+            experiencesWaiting = updatedWaiting
             saveState()
         }
         if !newlyAdded.isEmpty {

@@ -45,6 +45,10 @@ struct LuxuryHomeTabView: View {
     @State private var heroScrollToken = UUID()
     /// User explicitly picked a hero plan (Upcoming unsaved tap); don't auto-switch on list reorder.
     @State private var heroSelectionIsManual = false
+    /// Frozen row order for Upcoming — only changes when plans are added or removed.
+    @State private var stableUnsavedOrder: [UUID] = []
+    @State private var stableSavedOrder: [UUID] = []
+    @State private var lastPlansMembershipKey = ""
 
     private var planForTonight: DatePlan? {
         let calendar = Calendar.current
@@ -54,44 +58,54 @@ struct LuxuryHomeTabView: View {
         }
     }
 
-    /// Merges in-session generated plans with waiting queue (generated first, then stable sort by createdAt).
-    private var allUnsavedPlans: [DatePlan] {
+    /// Unsaved plans in coordinator order (generated first, then waiting) — no resort on every render.
+    private var rawUnsavedPlans: [DatePlan] {
         var combined: [DatePlan] = []
         var seen = Set<UUID>()
         for plan in coordinator.generatedPlans + coordinator.experiencesWaiting {
             guard seen.insert(plan.id).inserted else { continue }
             combined.append(plan)
         }
-        return combined.sorted { $0.createdAt > $1.createdAt }
+        return combined
     }
 
-    private var heroPlanCandidates: [DatePlan] {
-        var candidates: [DatePlan] = []
-        if let tonight = planForTonight {
-            candidates.append(tonight)
-        }
-        let sortedSaved = coordinator.savedPlans.sorted {
-            ($0.scheduledDate ?? $0.createdAt) < ($1.scheduledDate ?? $1.createdAt)
-        }
-        for plan in sortedSaved where !candidates.contains(where: { $0.id == plan.id }) {
-            candidates.append(plan)
-        }
-        for plan in allUnsavedPlans where !candidates.contains(where: { $0.id == plan.id }) {
-            candidates.append(plan)
-        }
-        return candidates
+    /// Unsaved plans in stable Upcoming row order (falls back to raw order before first sync).
+    private var allUnsavedPlans: [DatePlan] {
+        plansInStableOrder(stableUnsavedOrder, raw: rawUnsavedPlans)
+    }
+
+    private var stableSavedPlans: [DatePlan] {
+        plansInStableOrder(stableSavedOrder, raw: coordinator.savedPlans)
+    }
+
+    private func plansInStableOrder(_ order: [UUID], raw: [DatePlan]) -> [DatePlan] {
+        guard !raw.isEmpty else { return [] }
+        guard !order.isEmpty else { return raw }
+        let ordered = stableOrderedPlans(order, from: raw)
+        return ordered.isEmpty ? raw : ordered
+    }
+
+    private func resolvedPlan(id: UUID) -> DatePlan? {
+        if let override = heroPlanOverride, override.id == id { return override }
+        if let plan = coordinator.generatedPlans.first(where: { $0.id == id }) { return plan }
+        if let plan = coordinator.experiencesWaiting.first(where: { $0.id == id }) { return plan }
+        if let plan = coordinator.savedPlans.first(where: { $0.id == id }) { return plan }
+        return nil
     }
 
     private var defaultHeroPlan: DatePlan? {
-        heroPlanCandidates.first
+        if let tonight = planForTonight { return tonight }
+        if let first = stableSavedPlans.first { return first }
+        return allUnsavedPlans.first
     }
 
     private var displayHeroPlan: DatePlan? {
         if let override = heroPlanOverride { return override }
-        let candidates = heroPlanCandidates
-        if let pinned = pinnedHeroPlanId,
-           let match = candidates.first(where: { $0.id == pinned }) {
-            return match
+        if let pinned = pinnedHeroPlanId, let plan = resolvedPlan(id: pinned) {
+            return plan
+        }
+        if let fallback = defaultHeroPlan?.id, let plan = resolvedPlan(id: fallback) {
+            return plan
         }
         return defaultHeroPlan
     }
@@ -122,15 +136,31 @@ struct LuxuryHomeTabView: View {
     private func reconcilePinnedHeroPlan() {
         if heroPlanOverride != nil { return }
 
-        let candidates = heroPlanCandidates
-        guard !candidates.isEmpty else {
+        let knownIds = Set(
+            coordinator.savedPlans.map(\.id)
+                + rawUnsavedPlans.map(\.id)
+        )
+        guard !knownIds.isEmpty else {
             pinnedHeroPlanId = nil
             heroSelectionIsManual = false
             return
         }
 
+        // User tapped a row — keep that plan until it leaves the list or is saved.
+        if heroSelectionIsManual,
+           let pinned = pinnedHeroPlanId,
+           knownIds.contains(pinned) {
+            return
+        }
+
+        // Valid pin — never auto-switch just because arrays reordered.
+        if let pinned = pinnedHeroPlanId, knownIds.contains(pinned) {
+            return
+        }
+
         if let tonight = planForTonight {
             pinnedHeroPlanId = tonight.id
+            heroSelectionIsManual = false
             return
         }
 
@@ -141,18 +171,39 @@ struct LuxuryHomeTabView: View {
             return
         }
 
-        if heroSelectionIsManual,
-           let pinned = pinnedHeroPlanId,
-           candidates.contains(where: { $0.id == pinned }) {
-            return
-        }
-
-        if let pinned = pinnedHeroPlanId,
-           candidates.contains(where: { $0.id == pinned }) {
-            return
-        }
-
         pinnedHeroPlanId = defaultHeroPlan?.id
+        heroSelectionIsManual = false
+    }
+
+    private func refreshStablePlanOrders() {
+        refreshStableOrder(&stableUnsavedOrder, from: rawUnsavedPlans)
+        refreshStableOrder(&stableSavedOrder, from: coordinator.savedPlans)
+    }
+
+    private func syncPlanListsIfNeeded() {
+        let key = heroPlanListFingerprint
+        guard key != lastPlansMembershipKey else { return }
+        lastPlansMembershipKey = key
+        refreshStablePlanOrders()
+        reconcilePinnedHeroPlan()
+    }
+
+    private func refreshStableOrder(_ order: inout [UUID], from plans: [DatePlan]) {
+        let byId = Dictionary(uniqueKeysWithValues: plans.map { ($0.id, $0) })
+        order.removeAll { byId[$0] == nil }
+        if order.isEmpty {
+            order = plans.map(\.id)
+            return
+        }
+        let known = Set(order)
+        for plan in plans where !known.contains(plan.id) {
+            order.append(plan.id)
+        }
+    }
+
+    private func stableOrderedPlans(_ order: [UUID], from plans: [DatePlan]) -> [DatePlan] {
+        let byId = Dictionary(uniqueKeysWithValues: plans.map { ($0.id, $0) })
+        return order.compactMap { byId[$0] }
     }
 
     /// Pin an unsaved plan on the Home hero (Upcoming / waiting list taps).
@@ -219,7 +270,8 @@ struct LuxuryHomeTabView: View {
             }
             .onAppear {
                 coordinator.refreshPreferencesState()
-                reconcilePinnedHeroPlan()
+                lastPlansMembershipKey = ""
+                syncPlanListsIfNeeded()
                 coordinator.syncRoseProgress()
                 if let partner = partnerDisplayName {
                     rose.partnerName = partner
@@ -230,7 +282,7 @@ struct LuxuryHomeTabView: View {
                 coordinator.syncRoseProgress()
             }
             .onChange(of: heroPlanListFingerprint) { _, _ in
-                reconcilePinnedHeroPlan()
+                syncPlanListsIfNeeded()
             }
             .confirmationDialog("Open route in which app?", isPresented: $showMapsAppPicker, titleVisibility: .visible) {
                 Button("Apple Maps") {
@@ -954,35 +1006,10 @@ struct LuxuryHomeTabView: View {
     // MARK: - Your Upcoming Dates (saved + merged unsaved)
     private var yourUpcomingDatesSection: some View {
         let unsaved = allUnsavedPlans
-        let heroId = displayHeroPlan?.id
-        // Don't duplicate the plan already featured in the hero card.
-        let unsavedToMerge = (unsaved.count <= 3 ? unsaved : [])
-            .filter { $0.id != heroId }
+        let unsavedToMerge = unsaved.count <= 3 ? unsaved : []
+        let savedPreview = Array(stableSavedPlans.prefix(3))
         let savedCount = coordinator.savedPlans.count
         let badgeCount = savedCount + unsavedToMerge.count
-
-        // Group saved plans by city, sorted soonest first
-        let cityGroups: [(city: String, plans: [DatePlan])] = {
-            let grouped = Dictionary(grouping: coordinator.savedPlans) { plan -> String in
-                let c = MapURLHelper.cityStateOrRegionFromAddress(plan.stops.first?.address)
-                return c.isEmpty ? "No Location" : c
-            }
-            return grouped
-                .map { key, plans -> (city: String, plans: [DatePlan]) in
-                    let sorted = plans.sorted {
-                        let a = $0.scheduledDate ?? $0.createdAt
-                        let b = $1.scheduledDate ?? $1.createdAt
-                        return a < b
-                    }
-                    return (city: key, plans: sorted)
-                }
-                .sorted { a, b in
-                    let aDate = a.plans.first.map { $0.scheduledDate ?? $0.createdAt } ?? .distantFuture
-                    let bDate = b.plans.first.map { $0.scheduledDate ?? $0.createdAt } ?? .distantFuture
-                    return aDate < bDate
-                }
-        }()
-        let isMultiCity = cityGroups.count > 1
 
         return VStack(alignment: .leading, spacing: 0) {
             // Gold section divider
@@ -1015,9 +1042,7 @@ struct LuxuryHomeTabView: View {
                                     .clipShape(Capsule())
                             }
                         }
-                        Text(isMultiCity
-                             ? "\(cityGroups.count) cities · tap a plan to view"
-                             : "Saved plans · tap to view · unsaved open on Home")
+                        Text("Saved plans · tap to view · unsaved open on Home")
                             .font(Font.bodySans(11, weight: .regular))
                             .foregroundColor(Color.textPrimary.opacity(0.5))
                     }
@@ -1030,114 +1055,110 @@ struct LuxuryHomeTabView: View {
             .buttonStyle(.plain)
             .padding(.horizontal, 20)
 
-            VStack(alignment: .leading, spacing: 12) {
-                // Banner: > 3 unsaved plans waiting
-                if unsaved.count > 3 {
-                    Button { showUnsavedPlansSheet = true } label: {
-                        HStack(spacing: 10) {
-                            Image(systemName: "sparkles")
-                                .font(.system(size: 14))
-                                .foregroundColor(Color.accentGold)
-                            Text("\(unsaved.count) date plans waiting to be saved")
-                                .font(Font.bodySans(13, weight: .semibold))
-                                .foregroundColor(Color.accentGold)
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundColor(Color.accentGold)
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 12)
-                        .background(Color.accentMaroon)
-                        .cornerRadius(14)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 14)
-                                .stroke(Color.accentGold.opacity(0.3), lineWidth: 1)
-                        )
-                    }
-                    .buttonStyle(.plain)
-                    .padding(.horizontal, 20)
-                    .padding(.top, 14)
-                }
-
-                // Saved plans — city-grouped when multi-city, flat list for single city
-                if !coordinator.savedPlans.isEmpty {
-                    if isMultiCity {
-                        VStack(alignment: .leading, spacing: 16) {
-                            ForEach(cityGroups, id: \.city) { group in
-                                upcomingCityGroupView(city: group.city, plans: Array(group.plans.prefix(2)))
-                            }
-                        }
-                        .padding(.horizontal, 20)
-                        .padding(.top, unsaved.count > 3 ? 8 : 14)
-                    } else {
-                        VStack(spacing: 10) {
-                            ForEach(Array(coordinator.savedPlans.prefix(3))) { plan in
-                                upcomingDateRow(plan: plan, isUnsaved: false)
-                            }
-                        }
-                        .padding(.horizontal, 20)
-                        .padding(.top, unsaved.count > 3 ? 8 : 14)
-                    }
-                }
-
-                // Unsaved plans merged in (≤ 3) with dashed-border styling
-                if !unsavedToMerge.isEmpty {
-                    HStack(spacing: 8) {
-                        Rectangle().fill(Color.luxuryGold.opacity(0.2)).frame(height: 1)
-                        Text("UNSAVED")
-                            .font(Font.bodySans(10, weight: .bold))
-                            .foregroundColor(Color.luxuryGold.opacity(0.6))
-                            .tracking(1.5)
-                        Rectangle().fill(Color.luxuryGold.opacity(0.2)).frame(height: 1)
-                    }
-                    .padding(.horizontal, 20)
-                    .padding(.top, coordinator.savedPlans.isEmpty ? 14 : 6)
-
-                    VStack(spacing: 10) {
-                        ForEach(unsavedToMerge) { plan in
-                            upcomingDateRow(plan: plan, isUnsaved: true)
-                        }
-                    }
-                    .padding(.horizontal, 20)
-                }
-
-                if coordinator.savedPlans.isEmpty && unsaved.isEmpty {
-                    Text("Save a plan and it will appear here.")
-                        .font(Font.bodySans(13, weight: .regular))
-                        .foregroundColor(Color.luxuryCreamMuted)
-                        .padding(.horizontal, 20)
-                        .padding(.top, 14)
-                }
-
-                // "View all" footer — shown when preview doesn't cover all saved plans
-                let previewCount = isMultiCity
-                    ? cityGroups.reduce(0) { $0 + min($1.plans.count, 2) }
-                    : min(coordinator.savedPlans.count, 3)
-                if !coordinator.savedPlans.isEmpty && coordinator.savedPlans.count > previewCount {
-                    Button { coordinator.activeSheet = .savedPlansList } label: {
-                        HStack(spacing: 6) {
-                            Text("View all \(coordinator.savedPlans.count) saved plans")
-                                .font(Font.bodySans(13, weight: .semibold))
-                                .foregroundColor(Color.luxuryGold)
-                            Image(systemName: "arrow.right")
-                                .font(.system(size: 11, weight: .semibold))
-                                .foregroundColor(Color.luxuryGold)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 11)
-                        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.luxuryGold.opacity(0.3), lineWidth: 1))
-                    }
-                    .buttonStyle(.plain)
-                    .padding(.horizontal, 20)
-                    .padding(.top, 4)
-                }
+            if upcomingExpanded {
+                upcomingDatesExpandedContent(
+                    savedPreview: savedPreview,
+                    unsavedPreview: unsavedToMerge,
+                    totalUnsavedCount: unsaved.count,
+                    totalSavedCount: savedCount
+                )
+                .padding(.top, 14)
+                .transaction { $0.disablesAnimations = true }
             }
-            .padding(.top, upcomingExpanded ? 14 : 0)
-            .frame(maxHeight: upcomingExpanded ? .infinity : 0, alignment: .top)
-            .clipped()
-            .allowsHitTesting(upcomingExpanded)
-            .accessibilityHidden(!upcomingExpanded)
+        }
+        .animation(nil, value: stableUnsavedOrder)
+        .animation(nil, value: stableSavedOrder)
+    }
+
+    @ViewBuilder
+    private func upcomingDatesExpandedContent(
+        savedPreview: [DatePlan],
+        unsavedPreview: [DatePlan],
+        totalUnsavedCount: Int,
+        totalSavedCount: Int
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if totalUnsavedCount > 3 {
+                Button { showUnsavedPlansSheet = true } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: "sparkles")
+                            .font(.system(size: 14))
+                            .foregroundColor(Color.accentGold)
+                        Text("\(totalUnsavedCount) date plans waiting to be saved")
+                            .font(Font.bodySans(13, weight: .semibold))
+                            .foregroundColor(Color.accentGold)
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(Color.accentGold)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+                    .background(Color.accentMaroon)
+                    .cornerRadius(14)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14)
+                            .stroke(Color.accentGold.opacity(0.3), lineWidth: 1)
+                    )
+                }
+                .buttonStyle(.plain)
+                .padding(.horizontal, 20)
+            }
+
+            if !savedPreview.isEmpty {
+                VStack(spacing: 10) {
+                    ForEach(savedPreview) { plan in
+                        upcomingDateRow(plan: plan, isUnsaved: false)
+                    }
+                }
+                .padding(.horizontal, 20)
+            }
+
+            if !unsavedPreview.isEmpty {
+                HStack(spacing: 8) {
+                    Rectangle().fill(Color.luxuryGold.opacity(0.2)).frame(height: 1)
+                    Text("UNSAVED")
+                        .font(Font.bodySans(10, weight: .bold))
+                        .foregroundColor(Color.luxuryGold.opacity(0.6))
+                        .tracking(1.5)
+                    Rectangle().fill(Color.luxuryGold.opacity(0.2)).frame(height: 1)
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, savedPreview.isEmpty ? 0 : 6)
+
+                VStack(spacing: 10) {
+                    ForEach(unsavedPreview) { plan in
+                        upcomingDateRow(plan: plan, isUnsaved: true)
+                    }
+                }
+                .padding(.horizontal, 20)
+            }
+
+            if totalSavedCount == 0 && totalUnsavedCount == 0 {
+                Text("Save a plan and it will appear here.")
+                    .font(Font.bodySans(13, weight: .regular))
+                    .foregroundColor(Color.luxuryCreamMuted)
+                    .padding(.horizontal, 20)
+            }
+
+            if totalSavedCount > savedPreview.count {
+                Button { coordinator.activeSheet = .savedPlansList } label: {
+                    HStack(spacing: 6) {
+                        Text("View all \(totalSavedCount) saved plans")
+                            .font(Font.bodySans(13, weight: .semibold))
+                            .foregroundColor(Color.luxuryGold)
+                        Image(systemName: "arrow.right")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundColor(Color.luxuryGold)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 11)
+                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.luxuryGold.opacity(0.3), lineWidth: 1))
+                }
+                .buttonStyle(.plain)
+                .padding(.horizontal, 20)
+                .padding(.top, 4)
+            }
         }
     }
 
@@ -1196,6 +1217,7 @@ struct LuxuryHomeTabView: View {
 
                     ForEach(allUnsavedPlans) { plan in
                         upcomingDateRow(plan: plan, isUnsaved: true)
+                            .id(plan.id)
                             .padding(.horizontal, 20)
                     }
                 }
