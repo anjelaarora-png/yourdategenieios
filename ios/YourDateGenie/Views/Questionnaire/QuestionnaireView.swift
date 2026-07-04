@@ -513,9 +513,14 @@ struct QuestionnaireView: View {
             errorMessage = "Supabase is not configured. Please check that SUPABASE_URL and SUPABASE_ANON_KEY are set in ios/Secrets.xcconfig and rebuild the app."
             showRetryOption = false
             
+        case .timeout:
+            errorTitle = "Still Working"
+            errorMessage = "This one took longer than expected. Stay on Wi‑Fi and tap Try Again — your answers are saved."
+            showRetryOption = true
+            
         case .networkError:
-            errorTitle = "Network Error"
-            errorMessage = "Unable to connect to the server. Please check your internet connection and try again."
+            errorTitle = "Connection Interrupted"
+            errorMessage = "The plan was still generating but the connection dropped. Stay on Wi‑Fi, keep the app open, and tap Try Again — we automatically retry once."
             showRetryOption = true
             
         case .apiError(let msg):
@@ -545,11 +550,6 @@ struct QuestionnaireView: View {
         case .invalidResponse:
             errorTitle = "Invalid Response"
             errorMessage = "The AI returned an invalid response. Please try again."
-            showRetryOption = true
-            
-        case .timeout:
-            errorTitle = "Request Timed Out"
-            errorMessage = "The request took too long to complete. This might be due to high server load. Please try again."
             showRetryOption = true
 
         case .unauthorized:

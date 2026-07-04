@@ -127,11 +127,22 @@ class DatePlanGeneratorService: ObservableObject {
             return try plansArray.map { try parseDatePlan(from: $0) }
         } catch let supabaseError as SupabaseError {
             switch supabaseError {
-            case .unauthorized: throw GenerationError.unauthorized
+            case .unauthorized, .sessionExpired: throw GenerationError.unauthorized
             case .authFailed(let msg):
                 if msg.lowercased().contains("rate") { throw GenerationError.rateLimited }
                 throw GenerationError.apiError(msg)
+            case .networkError(let err):
+                throw GenerationError.networkError(err.localizedDescription)
             default: throw GenerationError.networkError(supabaseError.localizedDescription)
+            }
+        } catch let urlError as URLError {
+            switch urlError.code {
+            case .timedOut:
+                throw GenerationError.timeout
+            case .notConnectedToInternet, .networkConnectionLost, .cannotConnectToHost:
+                throw GenerationError.networkError(urlError.localizedDescription)
+            default:
+                throw GenerationError.networkError(urlError.localizedDescription)
             }
         }
     }

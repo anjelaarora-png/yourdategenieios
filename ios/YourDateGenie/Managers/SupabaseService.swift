@@ -16,6 +16,8 @@ final class SupabaseService: ObservableObject {
     private let anonKey: String
     private let supabaseClient: SupabaseClient
     private let session: URLSession
+    /// Dedicated session for long Edge Function calls (date-plan generation can take 60–120s).
+    private let longRunningSession: URLSession
     private let decoder: JSONDecoder
     private let encoder: JSONEncoder
     
@@ -39,6 +41,7 @@ final class SupabaseService: ObservableObject {
             self.supabaseClient = SupabaseClient(supabaseURL: URL(string: "https://localhost")!, supabaseKey: "")
             let fallbackConfig = URLSessionConfiguration.ephemeral
             self.session = URLSession(configuration: fallbackConfig)
+            self.longRunningSession = URLSession(configuration: fallbackConfig)
             self.decoder = JSONDecoder()
             self.encoder = JSONEncoder()
             return
@@ -53,12 +56,20 @@ final class SupabaseService: ObservableObject {
         )
         
         let config = URLSessionConfiguration.ephemeral
-        config.timeoutIntervalForRequest = 60
-        config.timeoutIntervalForResource = 120
+        config.timeoutIntervalForRequest = 90
+        config.timeoutIntervalForResource = 180
         config.waitsForConnectivity = false
         config.allowsCellularAccess = true
         config.requestCachePolicy = .reloadIgnoringLocalCacheData
         self.session = URLSession(configuration: config)
+
+        let longConfig = URLSessionConfiguration.default
+        longConfig.timeoutIntervalForRequest = 240
+        longConfig.timeoutIntervalForResource = 300
+        longConfig.waitsForConnectivity = true
+        longConfig.allowsCellularAccess = true
+        longConfig.requestCachePolicy = .reloadIgnoringLocalCacheData
+        self.longRunningSession = URLSession(configuration: longConfig)
         
         // Single strategy for every `/rest/v1` table row (`users`, `couples`, `preferences`, `date_plans`, `playlists`, etc.).
         self.decoder = JSONDecoder.supabasePostgresREST()
@@ -1161,6 +1172,36 @@ final class SupabaseService: ObservableObject {
     /// Calls the generate-date-plan edge function with the full QuestionnaireData and returns
     /// the raw response Data containing `{ "datePlans": [...] }`.
     func generateDatePlanEdge(preferences: QuestionnaireData) async throws -> Data {
+        var lastError: Error?
+        for attempt in 1...2 {
+            do {
+                return try await performGenerateDatePlanEdgeRequest(preferences: preferences)
+            } catch let urlError as URLError {
+                lastError = urlError
+                let retryable: Bool = switch urlError.code {
+                case .networkConnectionLost, .timedOut, .cannotConnectToHost, .dnsLookupFailed, .secureConnectionFailed:
+                    true
+                default:
+                    false
+                }
+                if attempt == 1, retryable {
+                    AppLogger.info(
+                        "generate-date-plan network retry (URLError \(urlError.code.rawValue))",
+                        category: .network
+                    )
+                    try await Task.sleep(nanoseconds: 2_000_000_000)
+                    try await ensureSessionForEdgeFunction()
+                    continue
+                }
+                throw SupabaseError.networkError(urlError)
+            } catch {
+                throw error
+            }
+        }
+        throw lastError ?? SupabaseError.invalidResponse
+    }
+
+    private func performGenerateDatePlanEdgeRequest(preferences: QuestionnaireData) async throws -> Data {
         try await ensureSessionForEdgeFunction()
         let urlString = baseURL.hasSuffix("/")
             ? "\(baseURL)functions/v1/generate-date-plan"
@@ -1169,9 +1210,8 @@ final class SupabaseService: ObservableObject {
         guard let token = accessToken, !token.isEmpty else { throw SupabaseError.unauthorized }
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        request.timeoutInterval = 120
+        applyEdgeFunctionHeaders(to: &request, bearerToken: token)
+        request.timeoutInterval = 240
 
         // Encode QuestionnaireData → wrap in { "preferences": {...} }
         let preferencesData = try encoder.encode(preferences)
@@ -1189,9 +1229,16 @@ final class SupabaseService: ObservableObject {
         }
         request.httpBody = try JSONSerialization.data(withJSONObject: ["preferences": preferencesJson])
 
-        let (data, response) = try await session.data(for: request)
+        let (data, response) = try await longRunningSession.data(for: request)
         guard let http = response as? HTTPURLResponse else { throw SupabaseError.invalidResponse }
         if http.statusCode != 200 {
+            let bodyPreview = String(data: data, encoding: .utf8)?
+                .prefix(400)
+                .description ?? "<empty>"
+            AppLogger.error(
+                "generate-date-plan HTTP \(http.statusCode): \(bodyPreview)",
+                category: .network
+            )
             if http.statusCode == 401 { throw SupabaseError.unauthorized }
             if http.statusCode == 429 { throw SupabaseError.authFailed("Rate limited. Try again in a moment.") }
             if http.statusCode == 422 {
@@ -1655,14 +1702,27 @@ final class SupabaseService: ObservableObject {
     /// Refreshes the Supabase session and fails if there is no user JWT for Edge Functions.
     func ensureSessionForEdgeFunction() async throws {
         invalidateAuthRefreshCache()
+        // SDK auto-refreshes expired access tokens when fetching `auth.session`.
         let session = try await supabaseClient.auth.session
         guard !session.isExpired else {
+            throw SupabaseError.sessionExpired
+        }
+        guard Self.hasConfirmedEmailIfNeeded(user: session.user) else {
             throw SupabaseError.unauthorized
         }
-        await syncSessionFromSDK(session)
+        // Set the JWT synchronously for this request — do not rely on syncSessionFromSDK's
+        // async refresh path, which can leave accessToken nil when called off the main actor.
+        await MainActor.run {
+            accessToken = session.accessToken
+            refreshToken = session.refreshToken
+            lastAuthRefreshDate = Date()
+            currentUser = mapToSupabaseUser(session.user, defaultName: nil)
+            isAuthenticated = true
+        }
         guard let token = accessToken, !token.isEmpty else {
             throw SupabaseError.unauthorized
         }
+        AppLogger.debug("Edge auth ready (token prefix: \(String(token.prefix(12)))…)", category: .network)
     }
 
     /// PostgREST RLS uses `auth.uid()` from the JWT. Manual `URLRequest` must use the same access token as `supabaseClient.auth` (it can be nil/stale right after launch or in background `Task`s).
@@ -1861,6 +1921,13 @@ final class SupabaseService: ObservableObject {
         if let token = accessToken {
             request.addValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         }
+    }
+
+    /// Headers required by Supabase Edge Functions gateway (apikey + user JWT).
+    private func applyEdgeFunctionHeaders(to request: inout URLRequest, bearerToken: String) {
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(bearerToken)", forHTTPHeaderField: "Authorization")
     }
     
     private func authRequest<T: Decodable>(endpoint: String, body: [String: Any]) async throws -> T {

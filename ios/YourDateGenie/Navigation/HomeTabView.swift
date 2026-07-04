@@ -271,20 +271,19 @@ struct LuxuryHomeTabView: View {
     }
     
     private var headerSection: some View {
-        VStack(spacing: 8) {
+        VStack(alignment: .leading, spacing: 6) {
             Text(greetingLine1)
-                .font(Font.bodySerif(22, weight: .regular))
+                .font(Font.displaySerif(24, weight: .semibold))
                 .foregroundColor(Color.textPrimary)
                 .multilineTextAlignment(.leading)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
             Text(greetingLine2)
-                .font(Font.bodySans(13, weight: .regular))
+                .font(Font.bodySans(14, weight: .regular))
                 .foregroundColor(Color.luxuryCreamMuted)
                 .multilineTextAlignment(.leading)
                 .frame(maxWidth: .infinity, alignment: .leading)
-
-            missionTagline
+                .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity)
         .padding(.horizontal, 20)
@@ -301,26 +300,17 @@ struct LuxuryHomeTabView: View {
         }
         let name = userProfileManager.currentUser?.firstName
         let nameDisplay = (name?.isEmpty == false) ? name! : "there"
-        return "\(timeWord) \(nameDisplay)"
+        if displayHeroPlan != nil {
+            return "\(timeWord), \(nameDisplay)"
+        }
+        return "Date night, without the group chat"
     }
     
     private var greetingLine2: String {
         if displayHeroPlan != nil {
-            return "Tonight's itinerary is ready."
+            return "Tonight's ready — review your itinerary or share it in one tap."
         }
-        return "Build a complete date night in about two minutes."
-    }
-
-    /// Gold action line — what to do next on Home.
-    @ViewBuilder
-    private var missionTagline: some View {
-        Text(displayHeroPlan != nil
-             ? "Make tonight happen — approve your plan or share it in one tap."
-             : "You bring the connection. We handle the planning.")
-            .font(Font.displaySerif(16, weight: .semibold))
-            .foregroundColor(Color.accentGold.opacity(0.92))
-            .multilineTextAlignment(.leading)
-            .frame(maxWidth: .infinity, alignment: .leading)
+        return "Tell us the vibe — we build the plan."
     }
 
     /// Rose progress — below hero so planning stays the primary focus for new users.
@@ -330,7 +320,7 @@ struct LuxuryHomeTabView: View {
             HStack(spacing: 8) {
                 Image(systemName: "chart.line.uptrend.xyaxis")
                     .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(Color.accentGold)
+                    .foregroundColor(Color.accentMaroon.opacity(0.85))
                 Text("YOUR PROGRESS")
                     .font(Font.bodySans(11, weight: .bold))
                     .tracking(1.4)
@@ -521,7 +511,7 @@ struct LuxuryHomeTabView: View {
                      ? "\(access.freePlansRemaining) free date plans included — no card needed"
                      : "\(access.freePlansRemaining) free plan remaining · subscribe for unlimited")
                     .font(Font.bodySans(12, weight: .regular))
-                    .foregroundColor(Color.accentGold.opacity(0.85))
+                    .foregroundColor(Color.luxuryCreamMuted)
                     .multilineTextAlignment(.center)
             }
 
@@ -531,7 +521,7 @@ struct LuxuryHomeTabView: View {
                 } label: {
                     Text("or reuse your last plan")
                         .font(Font.bodySans(13, weight: .semibold))
-                        .foregroundColor(Color.accentGold)
+                        .foregroundColor(Color.textPrimary.opacity(0.72))
                         .underline()
                 }
                 .buttonStyle(.plain)

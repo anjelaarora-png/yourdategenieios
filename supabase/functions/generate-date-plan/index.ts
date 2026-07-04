@@ -5,7 +5,6 @@ import { generateMultipleDatePlans } from "./multiPlanAi.ts";
 import { validateAllStops, geocodeAddress } from "./places.ts";
 import { getDirections, toGoogleTravelMode, toAppTravelMode } from "./directions.ts";
 import { enrichPlanPresentation } from "./planPresentation.ts";
-import { enrichGiftImages } from "../_shared/linkPreview.ts";
 import { requireAuthenticatedUser } from "../_shared/jwtAuth.ts";
 import { checkRateLimit } from "../_shared/rateLimit.ts";
 import { filterHardNoStops } from "./hardNos.ts";
@@ -233,28 +232,26 @@ serve(async (req) => {
     }));
 
     if (GOOGLE_PLACES_API_KEY && city) {
-      sanitizedPlans = sanitizedPlans.filter((plan: any) => {
+      const venueCheckedPlans = sanitizedPlans.filter((plan: any) => {
         const validatedCount = (plan.stops || []).filter((s: any) => s?.validated).length;
         if (validatedCount >= MIN_VALIDATED_STOPS_PER_PLAN) return true;
         console.warn(
-          `[Validation] Dropping plan "${plan.title}" — only ${validatedCount} verified stops (need ${MIN_VALIDATED_STOPS_PER_PLAN})`,
+          `[Validation] Plan "${plan.title}" only has ${validatedCount} verified stops (need ${MIN_VALIDATED_STOPS_PER_PLAN})`,
         );
         return false;
       });
 
-      if (sanitizedPlans.length === 0) {
-        return jsonResponse(422, {
-          error:
-            "We couldn't verify enough real, open venues for your area. Please try again or adjust your city/radius.",
-        });
+      if (venueCheckedPlans.length > 0) {
+        sanitizedPlans = venueCheckedPlans;
+      } else {
+        console.warn("[Validation] No plans met the verified-stop threshold; returning AI-generated plans as unverified.");
       }
     }
 
     for (const plan of sanitizedPlans) {
       enrichPlanPresentation(plan);
-      if (Array.isArray(plan.giftSuggestions) && plan.giftSuggestions.length > 0) {
-        plan.giftSuggestions = await enrichGiftImages(plan.giftSuggestions);
-      }
+      // Skip gift link-preview fetches here — they add 10–30s and can push the function
+      // past client/proxy timeouts. Gift cards render fine without imageUrl.
     }
 
     // Set starting point separately for route map; do NOT add it as step 1 of the itinerary.

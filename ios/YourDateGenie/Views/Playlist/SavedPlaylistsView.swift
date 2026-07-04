@@ -1,193 +1,151 @@
 import SwiftUI
 
-/// Saved playlists grouped by genre; empty state with spinning record; optional "Explore more genres" section.
+/// Saved playlists — recent first, then grouped by vibe.
 struct SavedPlaylistsView: View {
     @Environment(\.dismiss) private var dismiss
-    @StateObject private var storage = PlaylistStorageManager.shared
-    @State private var selectedPlaylist: SavedPlaylist?
-    @State private var exploreGenresExpanded = false
-    
-    private let genreLabels: [String: String] = [
-        "romantic": "Romantic", "pop": "Pop", "upbeat": "Upbeat", "chill": "Chill", "adventurous": "Eclectic",
-        "jazzy": "Jazzy", "indie": "Indie", "classic": "Classic", "rnb": "R&B",
-        "latin": "Latin", "afrobeats": "Afrobeats", "kpop": "K-Pop", "reggae": "Reggae", "country": "Country",
-        "bollywood": "Bollywood", "arabic": "Arabic", "jpop": "J-Pop", "rock": "Rock", "electronic": "Electronic", "blues": "Blues"
-    ]
-    
+    @ObservedObject private var storage = PlaylistStorageManager.shared
+    @State private var selectedPlaylistId: String?
+
     private let vibeEmojis: [String: String] = [
         "romantic": "💕", "pop": "🎵", "upbeat": "🎉", "chill": "🌙", "adventurous": "✨",
         "jazzy": "🎷", "indie": "🎸", "classic": "🎻", "rnb": "🎤",
         "latin": "🌴", "afrobeats": "🔥", "kpop": "💜", "reggae": "🎵", "country": "🤠",
         "bollywood": "🎬", "arabic": "🕌", "jpop": "🌸", "rock": "🤘", "electronic": "⚡", "blues": "🎸"
     ]
-    
+
     var body: some View {
         NavigationStack {
             ZStack {
                 Color.backgroundPrimary.ignoresSafeArea()
-                
+
                 if storage.playlists.isEmpty {
                     emptyState
                 } else {
                     ScrollView(showsIndicators: false) {
-                        VStack(alignment: .leading, spacing: 24) {
-                            ForEach(storage.playlistsByGenre, id: \.genre) { section in
-                                sectionView(section)
+                        VStack(alignment: .leading, spacing: 12) {
+                            PlaylistScreenStyle.sectionLabel(title: "Saved playlists", icon: "music.note.list")
+                            ForEach(storage.recentPlaylists) { playlist in
+                                playlistRow(playlist)
                             }
-                            exploreMoreGenresSection
                         }
+                        .padding(.horizontal, 20)
+                        .padding(.top, 8)
                         .padding(.bottom, 40)
                     }
                 }
             }
+            .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .principal) {
                     Text("Your Playlists")
-                        .font(Font.bodySerif(26, weight: .bold))
-                        .foregroundColor(Color.luxuryGold)
+                        .font(Font.displaySerif(18, weight: .semibold))
+                        .foregroundColor(Color.textPrimary)
                 }
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Close") { dismiss() }
-                        .foregroundColor(Color.luxuryGold)
+                        .foregroundColor(Color.accentGold)
                 }
             }
             .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
-            .sheet(item: $selectedPlaylist) { playlist in
-                SavedPlaylistDetailView(
-                    playlist: binding(for: playlist),
-                    onDismiss: { selectedPlaylist = nil }
-                )
-            }
-            .onAppear {
-                Task {
-                    let list: [DBPlaylist]?
-                    if let coupleId = UserProfileManager.shared.coupleId {
-                        list = try? await SupabaseService.shared.getPlaylists(coupleId: coupleId)
-                    } else if let userId = UserProfileManager.shared.userId {
-                        list = try? await SupabaseService.shared.getPlaylists(userId: userId)
-                    } else {
-                        list = nil
-                    }
-                    if let list, !list.isEmpty {
-                        await MainActor.run { storage.mergeFromSupabase(dbPlaylists: list) }
+            .sheet(isPresented: Binding(
+                get: { selectedPlaylistId != nil },
+                set: { if !$0 { selectedPlaylistId = nil } }
+            )) {
+                if let id = selectedPlaylistId {
+                    SavedPlaylistDetailView(playlistId: id) {
+                        selectedPlaylistId = nil
                     }
                 }
             }
+            .task { await refreshFromCloud() }
         }
     }
-    
+
     private var emptyState: some View {
-        VStack(spacing: 24) {
+        VStack(spacing: 20) {
             MusicRecordAnimationView(size: 88, showNotes: true)
-            Text("No Playlists Yet")
-                .font(Font.displayTitle())
-                .foregroundColor(Color.luxuryGold)
-            Text("Create a playlist from your date plan to save and listen to your perfect date night music.")
-                .font(Font.playfair(15))
+            Text("No playlists yet")
+                .font(Font.displaySerif(24, weight: .semibold))
+                .foregroundColor(Color.textPrimary)
+            Text("Generate a soundtrack from your date plan, name it, and it'll show up here.")
+                .font(Font.bodySans(14, weight: .regular))
                 .foregroundColor(Color.luxuryCreamMuted)
                 .multilineTextAlignment(.center)
-                .padding(.horizontal, 32)
+                .padding(.horizontal, 28)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
-    
-    private func sectionView(_ section: (genre: String, list: [SavedPlaylist])) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 6) {
-                Text(vibeEmojis[section.genre] ?? "🎵")
-                Text(genreLabels[section.genre] ?? section.genre.capitalized)
-                    .font(Font.bodySerif(22, weight: .bold))
-                    .foregroundColor(Color.luxuryMuted)
-            }
-            .padding(.horizontal, 20)
-            
-            ForEach(section.list) { p in
-                Button {
-                    selectedPlaylist = p
-                } label: {
-                    HStack(spacing: 14) {
-                        Text(vibeEmojis[p.vibe] ?? "🎵")
-                            .font(.system(size: 28))
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(p.name)
-                                .font(Font.bodySerif(22, weight: .bold))
-                                .foregroundColor(Color.luxuryCream)
-                                .lineLimit(1)
-                            Text("From: \(p.datePlanTitle)")
-                                .font(Font.inter(12))
-                                .foregroundColor(Color.luxuryMuted)
-                                .lineLimit(1)
-                            Text("\(p.songs.count) songs")
-                                .font(Font.inter(11))
-                                .foregroundColor(Color.luxuryMuted)
-                        }
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 12))
-                            .foregroundColor(Color.luxuryGold)
-                    }
-                    .padding(16)
-                    .background(Color.luxuryMaroonLight)
-                    .cornerRadius(14)
+
+    private func playlistRow(_ playlist: SavedPlaylist) -> some View {
+        Button {
+            selectedPlaylistId = playlist.id
+        } label: {
+            HStack(spacing: 14) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(Color.creamCard.opacity(0.12))
+                        .frame(width: 44, height: 44)
+                    Text(vibeEmojis[playlist.vibe] ?? "🎵")
+                        .font(.system(size: 22))
                 }
-                .buttonStyle(ScaleButtonStyle())
-                .padding(.horizontal, 20)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(playlist.name)
+                        .font(Font.bodySerif(16, weight: .semibold))
+                        .foregroundColor(Color.textPrimary)
+                        .lineLimit(1)
+                    Text(playlist.datePlanTitle)
+                        .font(Font.bodySans(12, weight: .regular))
+                        .foregroundColor(Color.luxuryCreamMuted)
+                        .lineLimit(1)
+                    Text("\(playlist.songs.count) songs")
+                        .font(Font.bodySans(11, weight: .medium))
+                        .foregroundColor(Color.textPrimary.opacity(0.45))
+                }
+                Spacer(minLength: 8)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(Color.luxuryCreamMuted.opacity(0.7))
             }
+            .padding(14)
+            .background(Color.surfaceElevated)
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+            .overlay(
+                RoundedRectangle(cornerRadius: 14)
+                    .stroke(Color.luxeSurfaceBorder, lineWidth: 1)
+            )
         }
+        .buttonStyle(.plain)
     }
-    
-    private var exploreMoreGenresSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Button {
-                withAnimation(.spring(response: 0.3)) {
-                    exploreGenresExpanded.toggle()
-                }
-            } label: {
-                HStack {
-                    Text("Explore more genres")
-                        .font(Font.playfair(15, weight: .semibold))
-                        .foregroundColor(Color.luxuryCream)
-                    Spacer()
-                    Image(systemName: exploreGenresExpanded ? "chevron.up" : "chevron.down")
-                        .foregroundColor(Color.luxuryGold)
-                }
-                .padding(16)
-                .background(Color.luxuryMaroonLight.opacity(0.8))
-                .cornerRadius(14)
-            }
-            .padding(.horizontal, 20)
-            
-            if exploreGenresExpanded {
-                Text("Create playlists from the Date Playlist button on your date plan to discover Romantic, Upbeat, Chill, Jazzy, Indie, Classic, R&B, and Eclectic vibes.")
-                    .font(Font.inter(13))
-                    .foregroundColor(Color.luxuryCreamMuted)
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 8)
-            }
+
+    private func refreshFromCloud() async {
+        let list: [DBPlaylist]?
+        if let coupleId = UserProfileManager.shared.coupleId {
+            list = try? await SupabaseService.shared.getPlaylists(coupleId: coupleId)
+        } else if let userId = UserProfileManager.shared.userId {
+            list = try? await SupabaseService.shared.getPlaylists(userId: userId)
+        } else {
+            list = nil
         }
-    }
-    
-    private func binding(for playlist: SavedPlaylist) -> Binding<SavedPlaylist> {
-        Binding(
-            get: { storage.getPlaylist(id: playlist.id) ?? playlist },
-            set: { storage.updatePlaylist($0) }
-        )
+        if let list, !list.isEmpty {
+            await MainActor.run { storage.mergeFromSupabase(dbPlaylists: list) }
+        }
     }
 }
 
-// MARK: - Saved Playlist Detail (Regenerate, Add, Replace, Delete)
+// MARK: - Saved Playlist Detail
+
 private struct ReplaceSongItem: Identifiable {
     let songId: String
     var id: String { songId }
 }
 
 struct SavedPlaylistDetailView: View {
-    @Binding var playlist: SavedPlaylist
+    let playlistId: String
     let onDismiss: () -> Void
-    
-    @StateObject private var storage = PlaylistStorageManager.shared
+
+    @ObservedObject private var storage = PlaylistStorageManager.shared
     @State private var showAddSong = false
     @State private var replaceSongItem: ReplaceSongItem?
     @State private var isEditingTitle = false
@@ -195,175 +153,189 @@ struct SavedPlaylistDetailView: View {
     @State private var isRegenerating = false
     @StateObject private var previewPlayer = PreviewPlayerManager()
     @State private var currentPlayingKey: String?
-    
-    /// Always show data from storage so regenerate/updates reflect immediately.
-    private var displayedPlaylist: SavedPlaylist {
-        storage.getPlaylist(id: playlist.id) ?? playlist
+
+    private var displayedPlaylist: SavedPlaylist? {
+        storage.getPlaylist(id: playlistId)
     }
-    
-    /// Song list from storage so the view re-renders when storage.playlists changes (regenerate, add, delete).
-    private var currentSongs: [SavedPlaylistSong] {
-        storage.playlists.first(where: { $0.id == playlist.id })?.songs ?? displayedPlaylist.songs
-    }
-    
+
     private let vibeEmojis: [String: String] = [
         "romantic": "💕", "pop": "🎵", "upbeat": "🎉", "chill": "🌙", "adventurous": "✨",
         "jazzy": "🎷", "indie": "🎸", "classic": "🎻", "rnb": "🎤",
         "latin": "🌴", "afrobeats": "🔥", "kpop": "💜", "reggae": "🎵", "country": "🤠",
         "bollywood": "🎬", "arabic": "🕌", "jpop": "🌸", "rock": "🤘", "electronic": "⚡", "blues": "🎸"
     ]
-    
+
     var body: some View {
         NavigationStack {
-            ZStack {
-                Color.backgroundPrimary.ignoresSafeArea()
-                
-                ScrollView(showsIndicators: false) {
-                    VStack(spacing: 20) {
-                        // Editable playlist title (display serif)
-                        VStack(spacing: 8) {
-                            if isEditingTitle {
-                                HStack(spacing: 10) {
-                                    TextField("Playlist name", text: $editingTitleText)
-                                        .font(Font.bodySerif(26, weight: .bold))
-                                        .foregroundColor(Color.luxuryCream)
-                                        .padding(.horizontal, 14)
-                                        .padding(.vertical, 10)
-                                        .background(Color.luxuryMaroonLight)
-                                        .cornerRadius(12)
-                                        .overlay(
-                                            RoundedRectangle(cornerRadius: 12)
-                                                .stroke(Color.luxuryGold.opacity(0.4), lineWidth: 1)
-                                        )
-                                        .onSubmit { savePlaylistTitle() }
-                                    Button {
-                                        savePlaylistTitle()
-                                    } label: {
-                                        Image(systemName: "checkmark.circle.fill")
-                                            .font(.system(size: 28))
-                                            .foregroundColor(Color.luxuryGold)
-                                    }
-                                }
-                                .padding(.horizontal, 20)
-                            } else {
-                                VStack(spacing: 6) {
-                                    Button {
-                                        editingTitleText = displayedPlaylist.name
-                                        isEditingTitle = true
-                                    } label: {
-                                        HStack(spacing: 8) {
-                                            Text(displayedPlaylist.name)
-                                                .font(Font.bodySerif(28, weight: .bold))
-                                                .foregroundColor(Color.luxuryGold)
-                                                .multilineTextAlignment(.center)
-                                            Image(systemName: "pencil.circle")
-                                                .font(.system(size: 18))
-                                                .foregroundColor(Color.luxuryGold.opacity(0.8))
-                                        }
-                                        .frame(maxWidth: .infinity)
-                                    }
-                                    .buttonStyle(.plain)
-                                    let subtitleParts: [String] = [
-                                        displayedPlaylist.energy.flatMap { EnergyLevel(rawValue: $0) }.map { $0.label },
-                                        displayedPlaylist.era.flatMap { EraOption.fromStored($0) }.flatMap { $0 != .any ? $0.label : nil },
-                                        displayedPlaylist.mood.flatMap { MoodOption(rawValue: $0) }.flatMap { $0 != .none ? $0.label : nil }
-                                    ].compactMap { $0 }
-                                    if !subtitleParts.isEmpty {
-                                        Text(subtitleParts.joined(separator: " · "))
-                                            .font(Font.inter(12))
-                                            .foregroundColor(Color.luxuryCreamMuted)
-                                    }
-                                }
-                            }
-                        }
-                        .padding(.top, 8)
-                        
-                        Button {
-                            regeneratePlaylist()
-                        } label: {
-                            HStack(spacing: 8) {
-                                if isRegenerating {
-                                    ProgressView()
-                                        .tint(Color.luxuryGold)
-                                    Text("Regenerating…")
-                                } else {
-                                    Image(systemName: "arrow.clockwise")
-                                    Text("Regenerate playlist")
-                                }
-                            }
-                            .frame(maxWidth: .infinity)
-                        }
-                        .buttonStyle(LuxuryOutlineButtonStyle(isSmall: true))
-                        .disabled(isRegenerating)
-                        .padding(.horizontal, 20)
-                        
-                        Button {
-                            showAddSong = true
-                        } label: {
-                            HStack(spacing: 8) {
-                                Image(systemName: "plus.circle")
-                                Text("Add Song")
-                            }
-                            .frame(maxWidth: .infinity)
-                        }
-                        .buttonStyle(LuxuryOutlineButtonStyle(isSmall: true))
-                        .padding(.horizontal, 20)
-                        
-                        VStack(spacing: 2) {
-                            ForEach(Array(currentSongs.enumerated()), id: \.element.id) { index, song in
-                                SavedSongRow(
-                                    song: song,
-                                    index: index + 1,
-                                    isPlaying: currentPlayingKey == "\(song.title)|\(song.artist)",
-                                    onPlayPreview: { playPreview(for: song) },
-                                    onReplace: { replaceSongItem = ReplaceSongItem(songId: song.id) },
-                                    onDelete: {
-                                        storage.removeSong(playlistId: playlist.id, songId: song.id)
-                                        if let p = storage.getPlaylist(id: playlist.id) { playlist = p }
-                                    }
-                                )
-                            }
-                        }
-                        .luxuryCard(hasBorder: false)
-                        .padding(.horizontal, 20)
+            Group {
+                if let playlist = displayedPlaylist {
+                    detailContent(playlist)
+                } else {
+                    VStack(spacing: 16) {
+                        ProgressView().tint(Color.accentGold)
+                        Text("Playlist not found")
+                            .font(Font.bodySans(14))
+                            .foregroundColor(Color.luxuryCreamMuted)
+                        Button("Close", action: onDismiss)
+                            .foregroundColor(Color.accentGold)
                     }
-                    .padding(.bottom, 40)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Color.backgroundPrimary)
                 }
             }
+            .background(Color.backgroundPrimary)
+            .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .principal) {
-                    Text(displayedPlaylist.name)
-                        .font(Font.bodySerif(24, weight: .bold))
-                        .foregroundColor(Color.luxuryGold)
+                    Text(displayedPlaylist?.name ?? "Playlist")
+                        .font(Font.displaySerif(18, weight: .semibold))
+                        .foregroundColor(Color.textPrimary)
                         .lineLimit(1)
                 }
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Done") { onDismiss() }
-                        .foregroundColor(Color.luxuryGold)
+                    Button("Done", action: onDismiss)
+                        .foregroundColor(Color.accentGold)
                 }
             }
             .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
-            .sheet(isPresented: $showAddSong) {
-                SongSearchView(title: "Add Song") { title, artist in
-                    storage.addSong(playlistId: displayedPlaylist.id, title: title, artist: artist)
-                    if let p = storage.getPlaylist(id: playlist.id) { playlist = p }
-                }
-            }
-            .sheet(item: $replaceSongItem) { item in
-                SongSearchView(title: "Replace Song") { title, artist in
-                    storage.replaceSong(playlistId: displayedPlaylist.id, songId: item.songId, newTitle: title, newArtist: artist)
-                    if let p = storage.getPlaylist(id: playlist.id) { playlist = p }
-                    replaceSongItem = nil
-                }
-            }
-            .onChange(of: previewPlayer.isPlaying) { _, isPlaying in
-                if !isPlaying { currentPlayingKey = nil }
-            }
         }
     }
-    
+
+    @ViewBuilder
+    private func detailContent(_ playlist: SavedPlaylist) -> some View {
+        ScrollView(showsIndicators: false) {
+            VStack(spacing: 20) {
+                VStack(spacing: 8) {
+                    if isEditingTitle {
+                        LoveNoteCreamCard(bannerSubtitle: "Playlist name") {
+                            HStack(spacing: 10) {
+                                TextField("Playlist name", text: $editingTitleText)
+                                    .font(Font.bodySerif(16, weight: .regular))
+                                    .foregroundColor(Color.textOnCard)
+                                    .submitLabel(.done)
+                                    .onSubmit { savePlaylistTitle() }
+                                Button(action: savePlaylistTitle) {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .font(.system(size: 24))
+                                        .foregroundColor(Color.accentGold)
+                                }
+                            }
+                            .padding(12)
+                        }
+                    } else {
+                        Button {
+                            editingTitleText = playlist.name
+                            isEditingTitle = true
+                        } label: {
+                            HStack(spacing: 8) {
+                                Text(playlist.name)
+                                    .font(Font.displaySerif(24, weight: .semibold))
+                                    .foregroundColor(Color.textPrimary)
+                                    .multilineTextAlignment(.center)
+                                Image(systemName: "pencil")
+                                    .font(.system(size: 14))
+                                    .foregroundColor(Color.accentGold.opacity(0.85))
+                            }
+                        }
+                        .buttonStyle(.plain)
+
+                        let subtitleParts: [String] = [
+                            playlist.vibe.capitalized,
+                            playlist.energy.flatMap { EnergyLevel(rawValue: $0) }.map { $0.label },
+                            playlist.era.flatMap { EraOption.fromStored($0) }.flatMap { $0 != .any ? $0.label : nil },
+                            playlist.mood.flatMap { MoodOption(rawValue: $0) }.flatMap { $0 != .none ? $0.label : nil }
+                        ].compactMap { $0 }
+                        if !subtitleParts.isEmpty {
+                            Text(subtitleParts.joined(separator: " · "))
+                                .font(Font.bodySans(12, weight: .regular))
+                                .foregroundColor(Color.luxuryCreamMuted)
+                        }
+                        Text("From: \(playlist.datePlanTitle)")
+                            .font(Font.bodySans(12, weight: .regular))
+                            .foregroundColor(Color.luxuryCreamMuted.opacity(0.85))
+                            .lineLimit(2)
+                            .multilineTextAlignment(.center)
+                    }
+                }
+                .padding(.top, 8)
+
+                HStack(spacing: 10) {
+                    outlineAction(title: isRegenerating ? "Regenerating…" : "Regenerate", icon: "arrow.clockwise") {
+                        regeneratePlaylist(playlist)
+                    }
+                    .disabled(isRegenerating)
+                    outlineAction(title: "Add Song", icon: "plus.circle") {
+                        showAddSong = true
+                    }
+                }
+
+                PlaylistScreenStyle.sectionLabel(title: "Tracks", icon: "music.note")
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                LoveNoteCreamCard(bannerSubtitle: "\(playlist.songs.count) songs") {
+                    VStack(spacing: 0) {
+                        ForEach(Array(playlist.songs.enumerated()), id: \.element.id) { index, song in
+                            SavedSongRow(
+                                song: song,
+                                index: index + 1,
+                                isPlaying: currentPlayingKey == "\(song.title)|\(song.artist)",
+                                onPlayPreview: { playPreview(for: song) },
+                                onReplace: { replaceSongItem = ReplaceSongItem(songId: song.id) },
+                                onDelete: {
+                                    storage.removeSong(playlistId: playlistId, songId: song.id)
+                                }
+                            )
+                            if index < playlist.songs.count - 1 {
+                                Divider().background(Color.maroonBorderTint)
+                            }
+                        }
+                    }
+                }
+
+                Button(role: .destructive) {
+                    storage.deletePlaylist(id: playlistId)
+                    onDismiss()
+                } label: {
+                    Label("Delete Playlist", systemImage: "trash")
+                        .font(Font.bodySans(14, weight: .medium))
+                        .frame(maxWidth: .infinity)
+                }
+                .padding(.top, 4)
+            }
+            .padding(.horizontal, 20)
+            .padding(.bottom, 40)
+        }
+        .sheet(isPresented: $showAddSong) {
+            SongSearchView(title: "Add Song") { title, artist in
+                storage.addSong(playlistId: playlistId, title: title, artist: artist)
+            }
+        }
+        .sheet(item: $replaceSongItem) { item in
+            SongSearchView(title: "Replace Song") { title, artist in
+                storage.replaceSong(playlistId: playlistId, songId: item.songId, newTitle: title, newArtist: artist)
+                replaceSongItem = nil
+            }
+        }
+        .onChange(of: previewPlayer.isPlaying) { _, isPlaying in
+            if !isPlaying { currentPlayingKey = nil }
+        }
+    }
+
+    private func outlineAction(title: String, icon: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                Image(systemName: icon)
+                Text(title)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
+            }
+            .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(LuxuryOutlineButtonStyle(isSmall: true))
+    }
+
     private func playPreview(for song: SavedPlaylistSong) {
         let key = "\(song.title)|\(song.artist)"
         if previewPlayer.currentTrackKey == key, previewPlayer.isPlaying {
@@ -380,24 +352,23 @@ struct SavedPlaylistDetailView: View {
             }
         }
     }
-    
-    private func regeneratePlaylist() {
+
+    private func regeneratePlaylist(_ playlist: SavedPlaylist) {
         guard !isRegenerating else { return }
         isRegenerating = true
-        let normalizedVibe = normalizeVibe(displayedPlaylist.vibe)
+        let normalizedVibe = normalizeVibe(playlist.vibe)
         guard let vibeOption = PlaylistWidgetView.VibeOption(rawValue: normalizedVibe) else {
             isRegenerating = false
             return
         }
-        let energy = (displayedPlaylist.energy.flatMap { EnergyLevel(rawValue: $0) }) ?? .balanced
-        let era = EraOption.fromStored(displayedPlaylist.era)
-        let mood = (displayedPlaylist.mood.flatMap { MoodOption(rawValue: $0) }) ?? .none
-        let playlistId = displayedPlaylist.id
+        let energy = (playlist.energy.flatMap { EnergyLevel(rawValue: $0) }) ?? .balanced
+        let era = EraOption.fromStored(playlist.era)
+        let mood = (playlist.mood.flatMap { MoodOption(rawValue: $0) }) ?? .none
         Task {
             do {
                 let result = try await SupabaseService.shared.generatePlaylist(
                     vibe: vibeOption.rawValue,
-                    datePlanTitle: displayedPlaylist.datePlanTitle,
+                    datePlanTitle: playlist.datePlanTitle,
                     stops: nil,
                     era: era == .any ? nil : era.rawValue,
                     mood: mood == .none ? nil : mood.rawValue,
@@ -409,50 +380,48 @@ struct SavedPlaylistDetailView: View {
                 }
                 await MainActor.run {
                     storage.updateSongs(playlistId: playlistId, songs: newSongs)
-                    if let updated = storage.getPlaylist(id: playlist.id) { playlist = updated }
                     isRegenerating = false
                 }
             } catch {
                 await MainActor.run {
+                    let currentKeys = Set(playlist.songs.map { "\($0.title)|\($0.artist)" })
                     let datePlaylist = PlaylistWidgetView.generateSongsForVibeStatic(
                         vibe: vibeOption,
                         energy: energy,
                         era: era,
                         mood: mood,
-                        excludingSongKeys: Set(currentSongs.map { "\($0.title)|\($0.artist)" })
+                        excludingSongKeys: currentKeys
                     )
                     let fallbackSongs = datePlaylist.songs.map { s in
                         SavedPlaylistSong(title: s.title, artist: s.artist, isCustom: false, addedAt: ISO8601DateFormatter().string(from: Date()))
                     }
                     storage.updateSongs(playlistId: playlistId, songs: fallbackSongs)
-                    if let updated = storage.getPlaylist(id: playlist.id) { playlist = updated }
                     isRegenerating = false
                 }
             }
         }
     }
-    
+
     private func normalizeVibe(_ vibe: String) -> String {
         let v = vibe.lowercased()
         if v == "classical" { return "classic" }
         return v
     }
-    
+
     private func savePlaylistTitle() {
         let trimmed = editingTitleText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else {
+        guard !trimmed.isEmpty, var updated = displayedPlaylist else {
             isEditingTitle = false
             return
         }
-        var updated = displayedPlaylist
         updated.name = trimmed
         storage.updatePlaylist(updated)
-        if let p = storage.getPlaylist(id: playlist.id) { playlist = p }
         isEditingTitle = false
     }
 }
 
-// MARK: - Saved Song Row (title, artist, play preview, Replace, Delete)
+// MARK: - Saved Song Row
+
 struct SavedSongRow: View {
     let song: SavedPlaylistSong
     let index: Int
@@ -460,52 +429,44 @@ struct SavedSongRow: View {
     let onPlayPreview: () -> Void
     let onReplace: () -> Void
     let onDelete: () -> Void
-    
+
     var body: some View {
-        HStack(spacing: 14) {
-            RoundedRectangle(cornerRadius: 8)
-                .fill(Color.luxuryMaroonLight)
-                .frame(width: 40, height: 40)
-                .overlay(
-                    Text("\(index)")
-                        .font(Font.inter(13, weight: .medium))
-                        .foregroundColor(Color.luxuryMuted)
-                )
-            
+        HStack(spacing: 12) {
+            Text("\(index)")
+                .font(Font.bodySans(12, weight: .semibold))
+                .foregroundColor(Color.textMutedOnCard)
+                .frame(width: 24, alignment: .leading)
+
             VStack(alignment: .leading, spacing: 2) {
                 Text(song.title)
-                    .font(Font.playfair(14, weight: .semibold))
-                    .foregroundColor(Color.luxuryCream)
+                    .font(Font.bodySerif(14, weight: .semibold))
+                    .foregroundColor(Color.textOnCard)
                     .lineLimit(1)
                 Text(song.artist)
-                    .font(Font.inter(12))
-                    .foregroundColor(Color.luxuryMuted)
+                    .font(Font.bodySans(12, weight: .regular))
+                    .foregroundColor(Color.textMutedOnCard)
                     .lineLimit(1)
             }
-            
-            Spacer()
-            
+
+            Spacer(minLength: 4)
+
             Button(action: onPlayPreview) {
                 Image(systemName: isPlaying ? "stop.circle.fill" : "play.circle.fill")
                     .font(.system(size: 22))
-                    .foregroundColor(Color.luxuryGold)
-                    .frame(width: 32, height: 32)
+                    .foregroundColor(Color.accentMaroon)
             }
             Button(action: onReplace) {
                 Image(systemName: "arrow.triangle.2.circlepath")
-                    .font(.system(size: 12))
-                    .foregroundColor(Color.luxuryGold)
-                    .frame(width: 28, height: 28)
+                    .font(.system(size: 13))
+                    .foregroundColor(Color.accentGold)
             }
             Button(action: onDelete) {
                 Image(systemName: "xmark.circle")
-                    .font(.system(size: 12))
+                    .font(.system(size: 13))
                     .foregroundColor(Color.luxuryError)
-                    .frame(width: 28, height: 28)
             }
         }
-        .padding(.horizontal, 14)
+        .padding(.horizontal, 12)
         .padding(.vertical, 10)
     }
 }
-

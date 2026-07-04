@@ -22,6 +22,8 @@ struct PlaylistWidgetView: View {
     @State private var showAddSong = false
     @State private var replaceSongItem: IdentifiableInt?
     @State private var showSavedPlaylists = false
+    @State private var showSaveNameSheet = false
+    @State private var pendingSaveName = ""
     @State private var savedMessage = false
     @State private var moreVibesExpanded = false
     @State private var playlistGenerationError: String?
@@ -217,28 +219,52 @@ struct PlaylistWidgetView: View {
                     .padding(.horizontal, 0)
                 }
             }
-            .navigationTitle("Smart Playlists")
+            .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Text("Smart Playlists")
+                        .font(Font.displaySerif(18, weight: .semibold))
+                        .foregroundColor(Color.textPrimary)
+                }
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Close") {
                         dismiss()
                     }
-                    .font(Font.inter(16, weight: .medium))
-                    .foregroundColor(Color.luxuryGold)
+                    .font(Font.bodySans(16, weight: .medium))
+                    .foregroundColor(Color.accentGold)
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Your Playlists") {
+                    Button {
                         showSavedPlaylists = true
+                    } label: {
+                        HStack(spacing: 4) {
+                            Text("Saved")
+                            if !storage.playlists.isEmpty {
+                                Text("(\(storage.playlists.count))")
+                                    .font(Font.bodySans(12, weight: .semibold))
+                            }
+                        }
                     }
-                    .font(Font.inter(14, weight: .medium))
-                    .foregroundColor(Color.luxuryGold)
+                    .font(Font.bodySans(14, weight: .medium))
+                    .foregroundColor(Color.accentGold)
                 }
             }
             .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .sheet(isPresented: $showSavedPlaylists) {
                 SavedPlaylistsView()
+            }
+            .sheet(isPresented: $showSaveNameSheet) {
+                PlaylistSaveNameSheet(
+                    name: $pendingSaveName,
+                    subtitle: planTitle,
+                    onSave: {
+                        savePlaylistToStorage(customName: pendingSaveName)
+                        showSaveNameSheet = false
+                    },
+                    onCancel: { showSaveNameSheet = false }
+                )
             }
             .sheet(isPresented: $showAddSong) {
                 SongSearchView(title: "Add Song") { title, artist in
@@ -253,6 +279,26 @@ struct PlaylistWidgetView: View {
             }
             .onChange(of: previewPlayer.isPlaying) { _, isPlaying in
                 if !isPlaying { currentlyPlaying = nil }
+            }
+            .onAppear {
+                #if DEBUG
+                if ScreenshotDemo.isActive && ScreenshotDemo.scene == .playlist, playlist == nil {
+                    selectedVibe = .romantic
+                    selectedEnergy = .chill
+                    selectedEra = .any
+                    selectedMood = .romanticDinner
+                    playlist = Self.generateSongsForVibeStatic(
+                        vibe: .romantic,
+                        energy: .chill,
+                        era: .any,
+                        mood: .romanticDinner
+                    )
+                    generatedVibe = .romantic
+                    generatedEnergy = .chill
+                    generatedEra = .any
+                    generatedMood = .romanticDinner
+                }
+                #endif
             }
         }
     }
@@ -289,11 +335,21 @@ struct PlaylistWidgetView: View {
         return parts.joined(separator: " · ")
     }
 
-    private func savePlaylistToStorage() {
+    private var defaultSavePlaylistName: String {
+        let vibe = displayedVibe.label
+        let trimmedPlan = planTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmedPlan.isEmpty { return "\(vibe) Mix" }
+        if trimmedPlan.count <= 28 { return "\(vibe) · \(trimmedPlan)" }
+        return "\(vibe) Mix"
+    }
+
+    private func savePlaylistToStorage(customName: String) {
         guard let current = playlist else { return }
+        let trimmedName = customName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedName.isEmpty else { return }
         let songTuples = current.songs.map { (title: $0.title, artist: $0.artist, duration: $0.duration) }
         _ = storage.savePlaylist(
-            name: "\(displayedVibe.label) Playlist",
+            name: trimmedName,
             datePlanTitle: planTitle,
             vibe: displayedVibe.rawValue,
             songs: songTuples,
@@ -316,11 +372,11 @@ struct PlaylistWidgetView: View {
                     MusicRecordAnimationView(size: 100, showNotes: true)
                     
                     Text("Create Your Soundtrack")
-                        .font(Font.bodySerif(28, weight: .regular))
-                        .foregroundColor(Color.luxuryGold)
+                        .font(Font.displaySerif(28, weight: .semibold))
+                        .foregroundColor(Color.textPrimary)
                     
-                    Text("Curated for your moment — pick a vibe and we’ll set the mood.")
-                        .font(Font.playfair(15, weight: .regular))
+                    Text("Curated for your moment — pick a vibe and we'll set the mood.")
+                        .font(Font.bodySans(14, weight: .regular))
                         .foregroundColor(Color.luxuryCreamMuted)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, 24)
@@ -329,9 +385,7 @@ struct PlaylistWidgetView: View {
                 
                 // Step 1: Energy
                 VStack(alignment: .leading, spacing: 14) {
-                    Text("How's the energy?")
-                        .font(Font.playfair(16, weight: .semibold))
-                        .foregroundColor(Color.luxuryCream)
+                    PlaylistScreenStyle.sectionLabel(title: "Energy", icon: "bolt.fill")
                         .padding(.horizontal, 20)
                     HStack(spacing: 12) {
                         ForEach(EnergyLevel.allCases, id: \.self) { level in
@@ -339,12 +393,16 @@ struct PlaylistWidgetView: View {
                                 selectedEnergy = level
                             } label: {
                                 Text(level.label)
-                                    .font(Font.inter(14, weight: .medium))
-                                    .foregroundColor(selectedEnergy == level ? Color.luxuryMaroon : Color.luxuryCream)
+                                    .font(Font.bodySans(14, weight: .medium))
+                                    .foregroundColor(selectedEnergy == level ? Color.backgroundPrimary : Color.textPrimary.opacity(0.82))
                                     .padding(.horizontal, 16)
                                     .padding(.vertical, 10)
-                                    .background(selectedEnergy == level ? Color.luxuryGold : Color.luxuryMaroonLight)
+                                    .background(selectedEnergy == level ? Color.accentGold : Color.surfaceElevated)
                                     .cornerRadius(10)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 10)
+                                            .stroke(selectedEnergy == level ? Color.clear : Color.maroonBorderTint, lineWidth: 1)
+                                    )
                             }
                             .buttonStyle(.plain)
                         }
@@ -355,9 +413,7 @@ struct PlaylistWidgetView: View {
                 // Step 2: Genre (when energy selected)
                 if selectedEnergy != nil {
                     VStack(alignment: .leading, spacing: 14) {
-                        Text("Pick a genre")
-                            .font(Font.playfair(16, weight: .semibold))
-                            .foregroundColor(Color.luxuryCream)
+                        PlaylistScreenStyle.sectionLabel(title: "Genre", icon: "music.note.list")
                             .padding(.horizontal, 20)
                         LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
                             ForEach(VibeOption.keyVibes, id: \.self) { vibe in
@@ -374,7 +430,7 @@ struct PlaylistWidgetView: View {
                                         .font(.system(size: 12, weight: .semibold))
                                         .foregroundColor(Color.luxuryGold)
                                     Text("More vibes")
-                                        .font(Font.playfair(15, weight: .medium))
+                                        .font(Font.bodySans(14, weight: .medium))
                                         .foregroundColor(Color.luxuryCreamMuted)
                                 }
                                 .padding(.horizontal, 20)
@@ -394,20 +450,18 @@ struct PlaylistWidgetView: View {
                     
                     // Optional: Era
                     VStack(alignment: .leading, spacing: 10) {
-                        Text("Era")
-                            .font(Font.playfair(14, weight: .semibold))
-                            .foregroundColor(Color.luxuryCreamMuted)
+                        PlaylistScreenStyle.sectionLabel(title: "Era", icon: "calendar")
                             .padding(.horizontal, 20)
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 8) {
                                 ForEach(EraOption.allCases, id: \.self) { era in
                                     Button { selectedEra = era } label: {
                                         Text(era.label)
-                                            .font(Font.inter(12, weight: .medium))
-                                            .foregroundColor(selectedEra == era ? Color.luxuryMaroon : Color.luxuryCreamMuted)
+                                            .font(Font.bodySans(12, weight: .medium))
+                                            .foregroundColor(selectedEra == era ? Color.backgroundPrimary : Color.luxuryCreamMuted)
                                             .padding(.horizontal, 12)
                                             .padding(.vertical, 8)
-                                            .background(selectedEra == era ? Color.luxuryGold : Color.luxuryMaroonLight.opacity(0.6))
+                                            .background(selectedEra == era ? Color.accentGold : Color.surfaceElevated)
                                             .cornerRadius(8)
                                     }
                                     .buttonStyle(.plain)
@@ -419,20 +473,18 @@ struct PlaylistWidgetView: View {
                     
                     // Optional: Mood
                     VStack(alignment: .leading, spacing: 10) {
-                        Text("Mood")
-                            .font(Font.playfair(14, weight: .semibold))
-                            .foregroundColor(Color.luxuryCreamMuted)
+                        PlaylistScreenStyle.sectionLabel(title: "Mood", icon: "heart")
                             .padding(.horizontal, 20)
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 8) {
                                 ForEach(MoodOption.allCases, id: \.self) { mood in
                                     Button { selectedMood = mood } label: {
                                         Text(mood.label)
-                                            .font(Font.inter(12, weight: .medium))
-                                            .foregroundColor(selectedMood == mood ? Color.luxuryMaroon : Color.luxuryCreamMuted)
+                                            .font(Font.bodySans(12, weight: .medium))
+                                            .foregroundColor(selectedMood == mood ? Color.backgroundPrimary : Color.luxuryCreamMuted)
                                             .padding(.horizontal, 12)
                                             .padding(.vertical, 8)
-                                            .background(selectedMood == mood ? Color.luxuryGold : Color.luxuryMaroonLight.opacity(0.6))
+                                            .background(selectedMood == mood ? Color.accentGold : Color.surfaceElevated)
                                             .cornerRadius(8)
                                     }
                                     .buttonStyle(.plain)
@@ -472,45 +524,31 @@ struct PlaylistWidgetView: View {
             VStack(spacing: 24) {
                 // Header
                 VStack(spacing: 14) {
-                    ZStack {
-                        Circle()
-                            .fill(Color.luxuryGold.opacity(0.1))
-                            .frame(width: 80, height: 80)
-                        
-                        Image(systemName: "music.note.list")
-                            .font(.system(size: 36))
-                            .foregroundStyle(LinearGradient.goldShimmer)
-                    }
-                    
+                    Text(displayedVibe.emoji)
+                        .font(.system(size: 40))
+
                     VStack(spacing: 6) {
                         Text(currentPlaylist.name)
-                            .font(Font.displayTitle())
-                            .foregroundColor(Color.luxuryGold)
-                        
-                        HStack(spacing: 8) {
-                            Text(displayedVibe.emoji)
-                            Text(currentPlaylist.mood)
-                                .font(Font.playfair(15, weight: .regular))
-                                .foregroundColor(Color.luxuryCreamMuted)
-                        }
+                            .font(Font.displaySerif(26, weight: .semibold))
+                            .foregroundColor(Color.textPrimary)
+                            .multilineTextAlignment(.center)
 
                         Text(selectionSubtitle)
-                            .font(Font.inter(11, weight: .medium))
-                            .foregroundColor(Color.luxuryMuted)
-                        
+                            .font(Font.bodySans(13, weight: .regular))
+                            .foregroundColor(Color.luxuryCreamMuted)
+
                         Text("\(currentPlaylist.songs.count) songs · \(currentPlaylist.totalDuration)")
-                            .font(Font.inter(12, weight: .medium))
-                            .foregroundColor(Color.luxuryMuted)
+                            .font(Font.bodySans(12, weight: .medium))
+                            .foregroundColor(Color.textPrimary.opacity(0.45))
                     }
                 }
-                .padding(.top, 20)
+                .padding(.top, 12)
                 
                 // Platform buttons - Open All
                 VStack(spacing: 12) {
-                    Text("Open all songs on:")
-                        .font(Font.playfair(15, weight: .semibold))
-                        .foregroundColor(Color.luxuryCream)
-                    
+                    PlaylistScreenStyle.sectionLabel(title: "Open on", icon: "arrow.up.forward.app")
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 20)
                     HStack(spacing: 12) {
                         ForEach(MusicPlatform.allCases, id: \.self) { platform in
                             PlatformButton(platform: platform) {
@@ -524,7 +562,8 @@ struct PlaylistWidgetView: View {
                 // Save & Copy
                 HStack(spacing: 12) {
                     Button {
-                        savePlaylistToStorage()
+                        pendingSaveName = defaultSavePlaylistName
+                        showSaveNameSheet = true
                     } label: {
                         HStack(spacing: 8) {
                             Image(systemName: savedMessage ? "checkmark.circle.fill" : "square.and.arrow.down")
@@ -532,7 +571,7 @@ struct PlaylistWidgetView: View {
                         }
                         .frame(maxWidth: .infinity)
                     }
-                    .buttonStyle(LuxuryOutlineButtonStyle(isSmall: true))
+                    .buttonStyle(LuxuryGoldButtonStyle())
                     .disabled(savedMessage)
                     
                     Button {
@@ -547,6 +586,31 @@ struct PlaylistWidgetView: View {
                     .buttonStyle(LuxuryOutlineButtonStyle(isSmall: true))
                 }
                 .padding(.horizontal, 20)
+
+                if !storage.playlists.isEmpty {
+                    Button {
+                        showSavedPlaylists = true
+                    } label: {
+                        HStack {
+                            Image(systemName: "music.note.list")
+                            Text("View \(storage.playlists.count) saved playlist\(storage.playlists.count == 1 ? "" : "s")")
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 12, weight: .semibold))
+                        }
+                        .font(Font.bodySans(14, weight: .medium))
+                        .foregroundColor(Color.textPrimary.opacity(0.85))
+                        .padding(14)
+                        .background(Color.surfaceElevated)
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 14)
+                                .stroke(Color.luxeSurfaceBorder, lineWidth: 1)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.horizontal, 20)
+                }
                 
                 Button {
                     showAddSong = true
@@ -561,38 +625,47 @@ struct PlaylistWidgetView: View {
                 .padding(.horizontal, 20)
                 
                 // Song list
-                VStack(spacing: 2) {
-                    ForEach(Array(currentPlaylist.songs.enumerated()), id: \.element.id) { index, song in
-                        SongRow(
-                            song: song,
-                            index: index + 1,
-                            isPlaying: currentlyPlaying == song.id.uuidString,
-                            onTap: {
-                                let key = "\(song.title)|\(song.artist)"
-                                if previewPlayer.currentTrackKey == key, previewPlayer.isPlaying {
-                                    previewPlayer.stop()
-                                    currentlyPlaying = nil
-                                } else {
-                                    Task {
-                                        if let url = await ITunesSearchService.getPreviewUrl(title: song.title, artist: song.artist) {
-                                            await MainActor.run {
-                                                previewPlayer.play(url: url, trackKey: key)
-                                                withAnimation { currentlyPlaying = song.id.uuidString }
+                VStack(alignment: .leading, spacing: 10) {
+                    PlaylistScreenStyle.sectionLabel(title: "Tracks", icon: "music.note")
+                        .padding(.horizontal, 20)
+
+                    LoveNoteCreamCard(bannerSubtitle: "\(currentPlaylist.songs.count) songs") {
+                        VStack(spacing: 0) {
+                            ForEach(Array(currentPlaylist.songs.enumerated()), id: \.element.id) { index, song in
+                                SongRow(
+                                    song: song,
+                                    index: index + 1,
+                                    isPlaying: currentlyPlaying == song.id.uuidString,
+                                    onTap: {
+                                        let key = "\(song.title)|\(song.artist)"
+                                        if previewPlayer.currentTrackKey == key, previewPlayer.isPlaying {
+                                            previewPlayer.stop()
+                                            currentlyPlaying = nil
+                                        } else {
+                                            Task {
+                                                if let url = await ITunesSearchService.getPreviewUrl(title: song.title, artist: song.artist) {
+                                                    await MainActor.run {
+                                                        previewPlayer.play(url: url, trackKey: key)
+                                                        withAnimation { currentlyPlaying = song.id.uuidString }
+                                                    }
+                                                }
                                             }
                                         }
-                                    }
+                                    },
+                                    onOpenPlatform: { platform in
+                                        openSongOnPlatform(song, platform: platform)
+                                    },
+                                    onReplace: { replaceSongItem = IdentifiableInt(value: index) },
+                                    onDelete: { removeSong(at: index) }
+                                )
+                                if index < currentPlaylist.songs.count - 1 {
+                                    Divider().background(Color.maroonBorderTint)
                                 }
-                            },
-                            onOpenPlatform: { platform in
-                                openSongOnPlatform(song, platform: platform)
-                            },
-                            onReplace: { replaceSongItem = IdentifiableInt(value: index) },
-                            onDelete: { removeSong(at: index) }
-                        )
+                            }
+                        }
                     }
+                    .padding(.horizontal, 20)
                 }
-                .luxuryCard(hasBorder: false)
-                .padding(.horizontal, 20)
                 
                 // Actions
                 HStack(spacing: 12) {
@@ -1247,18 +1320,16 @@ struct VibeCard: View {
                     .font(.system(size: 24))
                 
                 Text(vibe.label)
-                    .font(Font.inter(11, weight: .semibold))
-                    .foregroundColor(isSelected ? Color.luxuryMaroon : Color.luxuryCream)
+                    .font(Font.bodySans(11, weight: .semibold))
+                    .foregroundColor(isSelected ? Color.backgroundPrimary : Color.textPrimary.opacity(0.82))
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 12)
-            .background(
-                isSelected ? LinearGradient.goldShimmer : LinearGradient(colors: [Color.luxuryMaroonLight], startPoint: .top, endPoint: .bottom)
-            )
+            .background(isSelected ? Color.accentGold : Color.surfaceElevated)
             .cornerRadius(12)
             .overlay(
                 RoundedRectangle(cornerRadius: 12)
-                    .stroke(isSelected ? Color.clear : Color.luxuryGold.opacity(0.3), lineWidth: 1)
+                    .stroke(isSelected ? Color.clear : Color.maroonBorderTint, lineWidth: 1)
             )
         }
         .buttonStyle(ScaleButtonStyle())
@@ -1278,16 +1349,16 @@ struct PlatformButton: View {
                     .foregroundColor(platform.color)
                 
                 Text(platform.name)
-                    .font(Font.inter(10, weight: .medium))
-                    .foregroundColor(Color.luxuryCream)
+                    .font(Font.bodySans(10, weight: .medium))
+                    .foregroundColor(Color.textPrimary.opacity(0.85))
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 14)
-            .background(Color.luxuryMaroonLight)
+            .background(Color.surfaceElevated)
             .cornerRadius(14)
             .overlay(
                 RoundedRectangle(cornerRadius: 14)
-                    .stroke(platform.color.opacity(0.4), lineWidth: 1)
+                    .stroke(Color.luxeSurfaceBorder, lineWidth: 1)
             )
         }
         .buttonStyle(ScaleButtonStyle())
@@ -1318,32 +1389,32 @@ struct SongRow: View {
                 ZStack {
                     if isPlaying {
                         RoundedRectangle(cornerRadius: 8)
-                            .fill(Color.luxuryGold)
+                            .fill(Color.accentGold.opacity(0.25))
                             .frame(width: 40, height: 40)
                         
                         Image(systemName: "waveform")
                             .font(.system(size: 14))
-                            .foregroundColor(Color.luxuryMaroon)
+                            .foregroundColor(Color.accentMaroon)
                     } else {
                         RoundedRectangle(cornerRadius: 8)
-                            .fill(Color.luxuryMaroonLight)
+                            .fill(Color.creamParchmentMid.opacity(0.5))
                             .frame(width: 40, height: 40)
                         
                         Text("\(index)")
-                            .font(Font.inter(13, weight: .medium))
-                            .foregroundColor(Color.luxuryMuted)
+                            .font(Font.bodySans(13, weight: .medium))
+                            .foregroundColor(Color.textMutedOnCard)
                     }
                 }
                 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(song.title)
-                        .font(Font.playfair(14, weight: .semibold))
-                        .foregroundColor(isPlaying ? Color.luxuryGold : Color.luxuryCream)
+                        .font(Font.bodySerif(14, weight: .semibold))
+                        .foregroundColor(isPlaying ? Color.accentMaroon : Color.textOnCard)
                         .lineLimit(1)
                     
                     Text(song.artist)
-                        .font(Font.inter(12, weight: .regular))
-                        .foregroundColor(Color.luxuryMuted)
+                        .font(Font.bodySans(12, weight: .regular))
+                        .foregroundColor(Color.textMutedOnCard)
                         .lineLimit(1)
                 }
                 
@@ -1381,9 +1452,9 @@ struct SongRow: View {
                         .frame(width: 28, height: 28)
                 }
             }
-            .padding(.horizontal, 14)
+            .padding(.horizontal, 12)
             .padding(.vertical, 10)
-            .background(isPlaying ? Color.luxuryGold.opacity(0.1) : Color.clear)
+            .background(isPlaying ? Color.accentGold.opacity(0.08) : Color.clear)
             .contentShape(Rectangle())
             .onTapGesture(perform: onTap)
             

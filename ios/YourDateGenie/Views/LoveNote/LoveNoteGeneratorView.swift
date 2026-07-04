@@ -14,6 +14,7 @@ struct LoveNoteGeneratorView: View {
     @State private var saveErrorMessage = ""
     @State private var isSaving = false
     /// Name to sign the love note with; defaults to profile display name.
+    @State private var signOffName = ""
     /// When non-nil, we show "Draft saved" above the editor; cleared after a few seconds.
     @State private var draftSavedAt: Date?
     @State private var draftSaveWorkItem: DispatchWorkItem?
