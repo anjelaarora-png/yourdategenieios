@@ -13,6 +13,26 @@ const MIN_VALIDATED_STOPS_PER_PLAN = 2;
 const RATE_LIMIT_MAX = 20;
 const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000;
 
+/** A stop counts as verified only with an explicit flag AND a Google place_id. */
+function isVerifiedGoogleStop(stop: any): boolean {
+  return (
+    stop?.validated === true &&
+    typeof stop?.placeId === "string" &&
+    stop.placeId.trim().length > 0
+  );
+}
+
+/** Drop any stop that did not pass Google Places verification; re-number orders. */
+function onlyVerifiedStops(stops: any[]): any[] {
+  return (Array.isArray(stops) ? stops : [])
+    .filter(isVerifiedGoogleStop)
+    .map((stop, index) => ({ ...stop, validated: true, order: index + 1 }));
+}
+
+function planHasEnoughVerifiedStops(plan: any): boolean {
+  return onlyVerifiedStops(plan?.stops).length >= MIN_VALIDATED_STOPS_PER_PLAN;
+}
+
 function jsonResponse(status: number, body: unknown, extraHeaders: Record<string, string> = {}) {
   return new Response(JSON.stringify(body), {
     status,
@@ -61,6 +81,22 @@ serve(async (req) => {
     }
 
     const GOOGLE_PLACES_API_KEY = Deno.env.get("GOOGLE_PLACES_API_KEY");
+    const city = (preferences.city || preferences.location || "").trim();
+
+    if (!GOOGLE_PLACES_API_KEY) {
+      console.error("[Validation] GOOGLE_PLACES_API_KEY is not configured");
+      return jsonResponse(503, {
+        error:
+          "Venue verification is temporarily unavailable. We only include verified Google businesses in date plans — please try again shortly.",
+      });
+    }
+
+    if (!city) {
+      return jsonResponse(422, {
+        error:
+          "City or location is required so we can verify every venue on Google Maps. Check Step 1 of the questionnaire.",
+      });
+    }
 
     const prompt = buildPrompt(preferences);
 
@@ -166,87 +202,60 @@ serve(async (req) => {
       plans.push(...survivingPlans);
     }
 
-    // Validate venues using Google Places API if available
-    const city = preferences.city || preferences.location || "";
-    console.log(`[Validation] City: "${city}", Has API Key: ${!!GOOGLE_PLACES_API_KEY}`);
-    
-    if (GOOGLE_PLACES_API_KEY && city) {
-      console.log(`[Validation] Starting venue validation for ${plans.length} plans (parallel)`);
+    // Validate every stop against Google Places — unverified venues are excluded, never returned.
+    console.log(`[Validation] City: "${city}" — verifying all venues via Google Places`);
 
-      // Validate all plans in parallel — each plan's stops are already parallelised inside validateAllStops.
-      await Promise.all(plans.map(async (plan: any) => {
-        if (plan.stops && Array.isArray(plan.stops) && plan.stops.length > 0) {
-          const originalStops = plan.stops.map((stop: any, index: number) => ({
-            ...stop,
-            validated: false,
-            order: index + 1,
-          }));
-          try {
-            console.log(`[Validation] Validating ${plan.stops.length} stops for plan: ${plan.title || 'Untitled'}`);
-            const validatedStops = await validateAllStops(plan.stops, city, GOOGLE_PLACES_API_KEY);
-            plan.stops = validatedStops;
-            const verified = plan.stops.filter((s: any) => s?.validated).length;
-            const unverified = plan.stops.filter((s: any) => !s?.validated).length;
-            const withWebsite = plan.stops.filter((s: any) => s?.websiteUrl).length;
-            console.log(`[Validation] Results - Verified: ${verified}, Unverified: ${unverified}, With Website: ${withWebsite}`);
-          } catch (validationError) {
-            console.error(`[Validation] Error validating plan "${plan.title || 'Untitled'}":`, validationError);
-            plan.stops = originalStops;
-          }
-        } else if (!plan.stops || !Array.isArray(plan.stops)) {
-          plan.stops = [];
-        }
-      }));
-    } else {
-      console.log(`[Validation] Cannot verify venues - missing ${!GOOGLE_PLACES_API_KEY ? 'API key' : 'city'}`);
-      // Keep AI-generated stops as unverified - app works anywhere
-      for (const plan of plans) {
-        if (plan.stops && Array.isArray(plan.stops)) {
-          plan.stops = plan.stops.map((stop: any, index: number) => ({
-            ...stop,
-            validated: false,
-            order: index + 1,
-          }));
-        }
+    await Promise.all(plans.map(async (plan: any) => {
+      if (!plan.stops || !Array.isArray(plan.stops) || plan.stops.length === 0) {
+        plan.stops = [];
+        return;
       }
-    }
-
-    // Ensure all plans have required fields. Stops = itinerary venues only (step 1 = first venue, not starting point).
-    let sanitizedPlans = plans.map((plan: any) => ({
-      ...plan,
-      title: plan.title || "Your Date Plan",
-      tagline: plan.tagline || "A special experience awaits",
-      totalDuration: plan.totalDuration || "3-4 hours",
-      estimatedCost: plan.estimatedCost || "$50-100",
-      stops: Array.isArray(plan.stops) ? plan.stops : [],
-      startingPoint: plan.startingPoint ?? undefined,
-      genieSecretTouch: plan.genieSecretTouch || {
-        title: "Special Touch",
-        description: "Make this date memorable with your unique presence.",
-        emoji: "✨",
-      },
-      packingList: Array.isArray(plan.packingList) ? plan.packingList : [],
-      weatherNote: plan.weatherNote || "",
-      giftSuggestions: Array.isArray(plan.giftSuggestions) ? plan.giftSuggestions : [],
-      conversationStarters: Array.isArray(plan.conversationStarters) ? plan.conversationStarters : [],
+      try {
+        console.log(`[Validation] Validating ${plan.stops.length} stops for plan: ${plan.title || "Untitled"}`);
+        const validatedStops = await validateAllStops(plan.stops, city, GOOGLE_PLACES_API_KEY);
+        plan.stops = onlyVerifiedStops(validatedStops);
+        console.log(
+          `[Validation] Plan "${plan.title || "Untitled"}": ${plan.stops.length} verified Google stops`,
+        );
+      } catch (validationError) {
+        console.error(`[Validation] Error validating plan "${plan.title || "Untitled"}":`, validationError);
+        plan.stops = [];
+      }
     }));
 
-    if (GOOGLE_PLACES_API_KEY && city) {
-      const venueCheckedPlans = sanitizedPlans.filter((plan: any) => {
-        const validatedCount = (plan.stops || []).filter((s: any) => s?.validated).length;
-        if (validatedCount >= MIN_VALIDATED_STOPS_PER_PLAN) return true;
-        console.warn(
-          `[Validation] Plan "${plan.title}" only has ${validatedCount} verified stops (need ${MIN_VALIDATED_STOPS_PER_PLAN})`,
-        );
-        return false;
-      });
+    // Ensure all plans have required fields. Stops = verified itinerary venues only.
+    const sanitizedPlans = plans
+      .map((plan: any) => ({
+        ...plan,
+        title: plan.title || "Your Date Plan",
+        tagline: plan.tagline || "A special experience awaits",
+        totalDuration: plan.totalDuration || "3-4 hours",
+        estimatedCost: plan.estimatedCost || "$50-100",
+        stops: onlyVerifiedStops(plan.stops),
+        startingPoint: plan.startingPoint ?? undefined,
+        genieSecretTouch: plan.genieSecretTouch || {
+          title: "Special Touch",
+          description: "Make this date memorable with your unique presence.",
+          emoji: "✨",
+        },
+        packingList: Array.isArray(plan.packingList) ? plan.packingList : [],
+        weatherNote: plan.weatherNote || "",
+        giftSuggestions: Array.isArray(plan.giftSuggestions) ? plan.giftSuggestions : [],
+        conversationStarters: Array.isArray(plan.conversationStarters) ? plan.conversationStarters : [],
+      }))
+      .filter(planHasEnoughVerifiedStops);
 
-      if (venueCheckedPlans.length > 0) {
-        sanitizedPlans = venueCheckedPlans;
-      } else {
-        console.warn("[Validation] No plans met the verified-stop threshold; returning AI-generated plans as unverified.");
-      }
+    if (sanitizedPlans.length === 0) {
+      console.warn("[Validation] No plans with enough verified Google businesses for this location");
+      return jsonResponse(422, {
+        error:
+          "We couldn't verify enough real venues near you on Google Maps. Try a nearby city, broaden your travel radius, or generate again.",
+      });
     }
+
+    console.log(
+      `[Validation] Returning ${sanitizedPlans.length} plan(s) with verified Google businesses only`,
+    );
 
     for (const plan of sanitizedPlans) {
       enrichPlanPresentation(plan);
@@ -280,9 +289,10 @@ serve(async (req) => {
       }
     }
 
-    // Enrich stops with accurate travel time/distance from Directions API (all plans in parallel).
+    // Enrich stops with travel time/distance (best-effort — cap wait so clients don't time out).
+    const DIRECTIONS_BUDGET_MS = 18_000;
     if (GOOGLE_PLACES_API_KEY && sanitizedPlans.length > 0) {
-      await Promise.all(sanitizedPlans.map(async (plan: any) => {
+      const directionsWork = Promise.all(sanitizedPlans.map(async (plan: any) => {
         const stops = Array.isArray(plan.stops) ? plan.stops : [];
         const start = plan.startingPoint;
         const withCoords = stops.filter(
@@ -319,7 +329,12 @@ serve(async (req) => {
           stop.travelMode = appTravelMode;
         }
       }));
-      console.log(`[Directions] Enriched travel legs using ${transportationMode}`);
+
+      await Promise.race([
+        directionsWork,
+        new Promise<void>((resolve) => setTimeout(resolve, DIRECTIONS_BUDGET_MS)),
+      ]);
+      console.log(`[Directions] Enriched travel legs using ${transportationMode} (budget ${DIRECTIONS_BUDGET_MS}ms)`);
     }
 
     return jsonResponse(200, { datePlans: sanitizedPlans });

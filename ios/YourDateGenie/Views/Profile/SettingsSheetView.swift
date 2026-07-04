@@ -35,7 +35,7 @@ struct SettingsSheetView: View {
                         VStack(alignment: .leading, spacing: 16) {
                             HStack {
                                 Text("Account")
-                                    .font(Font.header(18, weight: .semibold))
+                                    .font(Font.bodySerif(18, weight: .semibold))
                                     .foregroundColor(Color.luxuryCream)
                                 Spacer()
                                 Button {
@@ -71,7 +71,7 @@ struct SettingsSheetView: View {
                         // MARK: - Subscription (StoreKit 2)
                         VStack(alignment: .leading, spacing: 16) {
                             Text("Subscription")
-                                .font(Font.header(18, weight: .semibold))
+                                .font(Font.bodySerif(18, weight: .semibold))
                                 .foregroundColor(Color.luxuryCream)
 
                             HStack(alignment: .top, spacing: 12) {
@@ -164,7 +164,7 @@ struct SettingsSheetView: View {
                             VStack(alignment: .leading, spacing: 14) {
                                 HStack {
                                     Text("Cloud preferences")
-                                        .font(Font.header(18, weight: .semibold))
+                                        .font(Font.bodySerif(18, weight: .semibold))
                                         .foregroundColor(Color.luxuryCream)
                                     Spacer()
                                     if isLoadingRemotePreferences {

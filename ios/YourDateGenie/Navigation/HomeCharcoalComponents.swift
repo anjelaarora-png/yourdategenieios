@@ -89,9 +89,11 @@ struct CollapsibleHomeSection<Content: View, Trailing: View>: View {
             .padding(.horizontal, 20)
 
             content()
-                .opacity(isExpanded ? 1 : 0)
-                .frame(height: isExpanded ? nil : 0)
+                .padding(.top, isExpanded ? 14 : 0)
+                .frame(maxHeight: isExpanded ? .infinity : 0, alignment: .top)
                 .clipped()
+                .allowsHitTesting(isExpanded)
+                .accessibilityHidden(!isExpanded)
         }
     }
 }
@@ -265,7 +267,7 @@ struct ItineraryCreamStopRow: View {
                                 Text("Reserve")
                                     .font(Font.bodySans(11, weight: .semibold))
                             }
-                            .foregroundColor(Color.accentMaroon)
+                            .foregroundColor(Color.accentGold)
                         }
                         .buttonStyle(.plain)
                     }
@@ -519,47 +521,52 @@ struct ItineraryCreamPlanDetailContent: View {
     @ViewBuilder
     private var giftSuggestionsSection: some View {
         if let gifts = plan.giftSuggestions, !gifts.isEmpty {
-            ItineraryCreamInsetSection(title: "Gift Suggestions", icon: "gift.fill") {
-                if onGetMoreGiftIdeas != nil {
-                    Button(action: { onGetMoreGiftIdeas?() }) {
-                        HStack(spacing: 4) {
-                            Image(systemName: "sparkles")
-                                .font(.system(size: 10))
-                            Text("Get More Ideas")
-                                .font(Font.bodySans(11, weight: .semibold))
+            ItineraryCreamInsetSection(
+                title: "Gift Suggestions",
+                icon: "gift.fill",
+                trailing: {
+                    if onGetMoreGiftIdeas != nil {
+                        Button(action: { onGetMoreGiftIdeas?() }) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "sparkles")
+                                    .font(.system(size: 10))
+                                Text("Get More Ideas")
+                                    .font(Font.bodySans(11, weight: .semibold))
+                            }
+                            .foregroundColor(Color.accentGold)
+                            .opacity(canAccessGiftIdeas ? 1 : 0.5)
                         }
-                        .foregroundColor(Color.accentMaroon)
-                        .opacity(canAccessGiftIdeas ? 1 : 0.5)
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
-                }
-            } content: {
-                ForEach(gifts) { gift in
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack(alignment: .top) {
-                            Text(gift.emoji)
-                                .font(.system(size: 16))
-                            Text(gift.name)
-                                .font(Font.bodySans(13, weight: .semibold))
-                                .foregroundColor(Color.textOnCard)
-                            Spacer(minLength: 8)
-                            Text(gift.priceRange)
-                                .font(Font.bodySans(11, weight: .medium))
+                },
+                content: {
+                    ForEach(gifts) { gift in
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack(alignment: .top) {
+                                Text(gift.emoji)
+                                    .font(.system(size: 16))
+                                Text(gift.name)
+                                    .font(Font.bodySans(13, weight: .semibold))
+                                    .foregroundColor(Color.textOnCard)
+                                Spacer(minLength: 8)
+                                Text(gift.priceRange)
+                                    .font(Font.bodySans(11, weight: .medium))
+                                    .foregroundColor(Color.textMutedOnCard)
+                            }
+                            Text(gift.description)
+                                .font(Font.bodySans(12, weight: .regular))
                                 .foregroundColor(Color.textMutedOnCard)
+                                .fixedSize(horizontal: false, vertical: true)
+                            if !gift.whereToBuy.isEmpty {
+                                Text("Where: \(gift.whereToBuy)")
+                                    .font(Font.bodySans(11, weight: .regular))
+                                    .foregroundColor(Color.textMutedOnCard)
+                            }
                         }
-                        Text(gift.description)
-                            .font(Font.bodySans(12, weight: .regular))
-                            .foregroundColor(Color.textMutedOnCard)
-                            .fixedSize(horizontal: false, vertical: true)
-                        if !gift.whereToBuy.isEmpty {
-                            Text("Where: \(gift.whereToBuy)")
-                                .font(Font.bodySans(11, weight: .regular))
-                                .foregroundColor(Color.textMutedOnCard)
-                        }
+                        .padding(.vertical, 4)
                     }
-                    .padding(.vertical, 4)
                 }
-            }
+            )
         }
     }
 
@@ -708,14 +715,44 @@ struct ItineraryHeroCard: View {
     var onSwap: () -> Void
     var onView: () -> Void
 
+    private var itineraryStops: [DatePlanStop] {
+        ItineraryPlanFormatting.itineraryStops(for: plan)
+    }
+
+    private var previewStops: [DatePlanStop] {
+        Array(itineraryStops.prefix(3))
+    }
+
     var body: some View {
         ItineraryCreamCardChrome {
             VStack(alignment: .leading, spacing: 0) {
                 ItineraryGradientBanner(plan: plan)
                 ItineraryPlanHeaderBlock(plan: plan, partnerName: partnerName)
 
-                ForEach(Array(plan.stops.prefix(3))) { stop in
+                if let start = plan.startingPoint {
+                    ItineraryStartingPointCreamSection(
+                        startingPoint: start,
+                        firstStop: itineraryStops.first
+                    )
+                }
+
+                ForEach(Array(previewStops.enumerated()), id: \.element.id) { index, stop in
+                    if index > 0, let time = stop.travelTimeFromPrevious, !time.isEmpty {
+                        ItineraryCreamTravelLeg(
+                            travelMode: stop.travelMode,
+                            timeText: time,
+                            distanceText: stop.travelDistanceFromPrevious
+                        )
+                    }
                     ItineraryCreamStopRow(stop: stop)
+                }
+
+                if itineraryStops.count > previewStops.count {
+                    Text("+ \(itineraryStops.count - previewStops.count) more stop\(itineraryStops.count - previewStops.count == 1 ? "" : "s")")
+                        .font(Font.bodySans(11, weight: .medium))
+                        .foregroundColor(Color.textMutedOnCard)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
                 }
 
                 ItineraryPlanFooterBlock(plan: plan)

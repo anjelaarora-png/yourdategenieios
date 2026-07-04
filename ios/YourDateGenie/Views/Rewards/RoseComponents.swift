@@ -17,7 +17,7 @@ struct RosePrimaryButton: View {
     var body: some View {
         Button(action: action) {
             Text(title)
-                .font(Font.inter(16, weight: .semibold))
+                .font(Font.bodySans(16, weight: .semibold))
                 .foregroundColor(Color.backgroundPrimary)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 16)
@@ -48,7 +48,7 @@ struct RoseGhostLink: View {
     var body: some View {
         Button(action: action) {
             Text(title)
-                .font(Font.inter(14, weight: .medium))
+                .font(Font.bodySans(14, weight: .medium))
                 .foregroundColor(Color.luxuryCreamMuted)
                 .underline()
         }
@@ -99,7 +99,7 @@ struct RosePill: View {
     let text: String
     var body: some View {
         Text(text)
-            .font(Font.inter(11, weight: .semibold))
+            .font(Font.bodySans(11, weight: .semibold))
             .foregroundColor(Color.textPrimary)
             .padding(.horizontal, 12)
             .padding(.vertical, 6)
@@ -140,7 +140,7 @@ struct RoseStatCard: View {
                 .font(Font.displaySerif(24, weight: .bold))
                 .foregroundColor(Color.textOnCard)
             Text(label)
-                .font(Font.inter(11, weight: .regular))
+                .font(Font.bodySans(11, weight: .regular))
                 .foregroundColor(Color.textMutedOnCard)
                 .multilineTextAlignment(.center)
         }
@@ -158,7 +158,7 @@ struct RoseLabel: View {
     let text: String
     var body: some View {
         Text(text.uppercased())
-            .font(Font.inter(11, weight: .semibold))
+            .font(Font.bodySans(11, weight: .semibold))
             .tracking(1.5)
             .foregroundColor(Color.luxuryCreamMuted)
     }

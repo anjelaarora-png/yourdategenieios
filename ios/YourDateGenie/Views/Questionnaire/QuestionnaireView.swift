@@ -81,17 +81,10 @@ struct QuestionnaireView: View {
                                 Image(systemName: "checkmark.circle")
                                     .font(.system(size: 14, weight: .medium))
                                 Text("Save & Exit")
-                                    .font(Font.inter(14, weight: .medium))
+                                    .font(Font.bodySans(14, weight: .medium))
                             }
                             .foregroundColor(Color.luxuryGold)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 8)
-                            .background(Color.luxuryMaroonLight.opacity(0.8))
-                            .cornerRadius(20)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 20)
-                                    .stroke(Color.luxuryGold.opacity(0.4), lineWidth: 1)
-                            )
+                            .charcoalToolbarPill()
                         }
                         .buttonStyle(.plain)
                         .accessibilityLabel("Save progress and exit")
@@ -611,7 +604,7 @@ struct StepProgressView: View {
                         
                         if step == currentStep {
                             Text(stepLabels[step - 1])
-                                .font(Font.inter(10, weight: .medium))
+                                .font(Font.bodySans(10, weight: .medium))
                                 .foregroundColor(Color.luxuryGold)
                         }
                     }

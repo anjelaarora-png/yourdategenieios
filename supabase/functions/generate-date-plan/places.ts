@@ -752,8 +752,8 @@ export async function validateAllStops(
   }
   
   if (!city || !apiKey) {
-    console.error("[Validation] Missing city or API key - returning stops as unverified");
-    return stops.map((stop, index) => ({ ...stop, validated: false, order: index + 1 }));
+    console.error("[Validation] Missing city or API key — cannot verify venues");
+    return [];
   }
 
   // Geocode city once so we can bias and verify all venues are in the right place (avoid e.g. Dubai when user asked Chennai)

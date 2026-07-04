@@ -53,7 +53,7 @@ struct PreferencesSetupView: View {
             
             HStack(spacing: 6) {
                 Text("Your")
-                    .font(Font.header(24, weight: .regular))
+                    .font(Font.bodySerif(24, weight: .regular))
                     .foregroundColor(Color.luxuryCream)
                 Text("Preferences")
                     .font(Font.displaySerif(42, weight: .bold))
@@ -161,7 +161,7 @@ struct PreferencesProgressView: View {
                         
                         if step == currentStep {
                             Text(stepLabels[step - 1])
-                                .font(Font.inter(10, weight: .medium))
+                                .font(Font.bodySans(10, weight: .medium))
                                 .foregroundColor(Color.luxuryGold)
                         }
                     }
@@ -185,7 +185,7 @@ struct PreferencesPersonalStep: View {
             VStack(alignment: .leading, spacing: 24) {
                 HStack(spacing: 6) {
                     Text("About you &")
-                        .font(Font.header(20, weight: .regular))
+                        .font(Font.bodySerif(20, weight: .regular))
                         .foregroundColor(Color.luxuryCream)
                     Text("your partner")
                         .font(Font.displaySerif(32, weight: .bold))
@@ -258,7 +258,7 @@ struct PreferencesActivitiesStep: View {
                         .font(Font.displaySerif(32, weight: .bold))
                         .foregroundColor(Color.luxuryGold)
                     Text("Activities")
-                        .font(Font.header(20, weight: .regular))
+                        .font(Font.bodySerif(20, weight: .regular))
                         .foregroundColor(Color.luxuryCream)
                 }
                 
@@ -291,7 +291,7 @@ struct PreferencesActivitiesStep: View {
                     }
                     .padding(14)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color.luxuryMaroonLight.opacity(0.5))
+                    .background(Color.luxeSurfaceTintStrong)
                     .cornerRadius(12)
                     .overlay(
                         RoundedRectangle(cornerRadius: 12)
@@ -321,7 +321,7 @@ struct PreferencesLocationStep: View {
                         .font(Font.displaySerif(32, weight: .bold))
                         .foregroundColor(Color.luxuryGold)
                     Text("location settings")
-                        .font(Font.header(20, weight: .regular))
+                        .font(Font.bodySerif(20, weight: .regular))
                         .foregroundColor(Color.luxuryCream)
                 }
                 
@@ -390,7 +390,7 @@ struct PreferencesCuisineStep: View {
             VStack(alignment: .leading, spacing: 24) {
                 HStack(spacing: 6) {
                     Text("Food &")
-                        .font(Font.header(20, weight: .regular))
+                        .font(Font.bodySerif(20, weight: .regular))
                         .foregroundColor(Color.luxuryCream)
                     Text("Drinks")
                         .font(Font.displaySerif(32, weight: .bold))
@@ -471,7 +471,7 @@ struct PreferencesAccessibilityStep: View {
             VStack(alignment: .leading, spacing: 24) {
                 HStack(spacing: 6) {
                     Text("Comfort &")
-                        .font(Font.header(20, weight: .regular))
+                        .font(Font.bodySerif(20, weight: .regular))
                         .foregroundColor(Color.luxuryCream)
                     Text("Accessibility")
                         .font(Font.displaySerif(32, weight: .bold))
@@ -526,7 +526,7 @@ struct PreferencesAccessibilityStep: View {
                         .lineSpacing(4)
                 }
                 .padding(16)
-                .background(Color.luxuryMaroonLight.opacity(0.5))
+                .background(Color.luxeSurfaceTintStrong)
                 .cornerRadius(12)
                 .overlay(
                     RoundedRectangle(cornerRadius: 12)
@@ -596,7 +596,7 @@ struct PreferenceOptionCard: View {
             .padding(.vertical, 16)
             .padding(.horizontal, 12)
             .background(
-                isSelected ? LinearGradient.goldShimmer : LinearGradient(colors: [Color.luxuryMaroonLight], startPoint: .top, endPoint: .bottom)
+                isSelected ? LinearGradient.goldShimmer : LinearGradient(colors: [Color.luxeSurfaceTintStrong], startPoint: .top, endPoint: .bottom)
             )
             .cornerRadius(14)
             .overlay(
@@ -661,7 +661,7 @@ struct MultiSelectChip: View {
             .padding(.vertical, 10)
             .frame(maxWidth: .infinity)
             .background(
-                isSelected ? Color.luxuryGold : Color.luxuryMaroonLight
+                isSelected ? Color.luxuryGold : Color.luxeSurfaceTintStrong
             )
             .cornerRadius(20)
             .overlay(
@@ -709,7 +709,7 @@ struct LoveLanguageCard: View {
                     .font(.system(size: 28))
                     .frame(width: 44, height: 44)
                     .background(
-                        isSelected ? Color.luxuryMaroon.opacity(0.3) : Color.luxuryMaroonLight
+                        isSelected ? Color.luxuryMaroon.opacity(0.3) : Color.luxeSurfaceTintStrong
                     )
                     .cornerRadius(12)
                 
@@ -733,7 +733,7 @@ struct LoveLanguageCard: View {
             }
             .padding(14)
             .background(
-                isSelected ? LinearGradient.goldShimmer : LinearGradient(colors: [Color.luxuryMaroonLight], startPoint: .top, endPoint: .bottom)
+                isSelected ? LinearGradient.goldShimmer : LinearGradient(colors: [Color.luxeSurfaceTintStrong], startPoint: .top, endPoint: .bottom)
             )
             .cornerRadius(14)
             .overlay(

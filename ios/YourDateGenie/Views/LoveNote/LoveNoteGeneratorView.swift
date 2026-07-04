@@ -55,8 +55,8 @@ struct LoveNoteGeneratorView: View {
             .toolbar {
                 ToolbarItem(placement: .principal) {
                     Text("Love Notes")
-                        .font(Font.displaySerif(18, weight: .semibold))
-                        .foregroundColor(Color.textPrimary)
+                        .font(Font.bodySerif(18, weight: .regular))
+                        .foregroundColor(Color.accentGold)
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") {
@@ -181,8 +181,8 @@ struct LoveNoteGeneratorView: View {
     private var headerSection: some View {
         VStack(spacing: 10) {
             Text("Write a Love Note")
-                .font(Font.displaySerif(28, weight: .semibold))
-                .foregroundColor(Color.textPrimary)
+                .font(Font.bodySerif(28, weight: .regular))
+                .foregroundColor(Color.accentGold)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: .infinity)
 
@@ -211,7 +211,7 @@ struct LoveNoteGeneratorView: View {
                                 .background(
                                     selectedPromptIndex == index
                                         ? Color.accentGold
-                                        : Color.surfaceElevated
+                                        : Color.luxeSurfaceTintStrong
                                 )
                                 .cornerRadius(20)
                                 .overlay(
@@ -282,15 +282,7 @@ struct LoveNoteGeneratorView: View {
     }
 
     private func sectionLabel(title: String, icon: String) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: icon)
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundColor(Color.accentMaroon)
-            Text(title.uppercased())
-                .font(Font.bodySans(11, weight: .bold))
-                .tracking(1.4)
-                .foregroundColor(Color.textPrimary.opacity(0.55))
-        }
+        ExtrasSectionHeader(icon: icon, title: title)
     }
 
     private func goldPrimaryButton(title: String, icon: String, disabled: Bool = false, action: @escaping () -> Void) -> some View {
@@ -584,8 +576,8 @@ struct SavedLoveNoteDetailSheet: View {
             .toolbar {
                 ToolbarItem(placement: .principal) {
                     Text("Saved Love Note")
-                        .font(Font.displaySerif(18, weight: .semibold))
-                        .foregroundColor(Color.textPrimary)
+                        .font(Font.bodySerif(18, weight: .regular))
+                        .foregroundColor(Color.accentGold)
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") {

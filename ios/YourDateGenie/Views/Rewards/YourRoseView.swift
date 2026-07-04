@@ -32,7 +32,7 @@ struct YourRoseView: View {
                         .padding(.top, 4)
 
                     Text(progressLine)
-                        .font(Font.inter(13))
+                        .font(Font.bodySans(13))
                         .foregroundColor(Color.luxuryCreamMuted)
                         .multilineTextAlignment(.center)
                         .padding(.top, 6)
@@ -48,7 +48,7 @@ struct YourRoseView: View {
                             Image(systemName: "info.circle")
                                 .font(.system(size: 12))
                             Text("Why \(rose.monthlyGoal) nights a month?")
-                                .font(Font.inter(12, weight: .medium))
+                                .font(Font.bodySans(12, weight: .medium))
                         }
                         .foregroundColor(Color.luxuryMuted)
                     }
@@ -124,10 +124,10 @@ struct YourRoseView: View {
             HStack {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(streakText)
-                        .font(Font.inter(13, weight: .medium))
+                        .font(Font.bodySans(13, weight: .medium))
                         .foregroundColor(Color.textPrimary)
                     Text(rose.partnerName == nil ? "tend your rose nightly" : "you both tend this rose")
-                        .font(Font.inter(11))
+                        .font(Font.bodySans(11))
                         .foregroundColor(Color.luxuryMuted)
                 }
                 Spacer()
@@ -148,10 +148,10 @@ struct YourRoseView: View {
             HStack {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("⭐ Your journey")
-                        .font(Font.inter(13, weight: .medium))
+                        .font(Font.bodySans(13, weight: .medium))
                         .foregroundColor(Color.textPrimary)
                     Text("Lvl \(rose.level) · 🔥 \(rose.streakWeeks)-week streak")
-                        .font(Font.inter(11))
+                        .font(Font.bodySans(11))
                         .foregroundColor(Color.luxuryMuted)
                 }
                 Spacer()
@@ -167,10 +167,10 @@ struct YourRoseView: View {
             HStack {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("📅 Your month together")
-                        .font(Font.inter(13, weight: .medium))
+                        .font(Font.bodySans(13, weight: .medium))
                         .foregroundColor(Color.textPrimary)
                     Text("A little proof you showed up")
-                        .font(Font.inter(11))
+                        .font(Font.bodySans(11))
                         .foregroundColor(Color.luxuryMuted)
                 }
                 Spacer()

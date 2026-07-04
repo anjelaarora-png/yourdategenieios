@@ -565,13 +565,13 @@ class NavigationCoordinator: ObservableObject {
             .store(in: &cancellables)
     }
     
-    /// Merge in verified plans from the generator. Match by index so verified B/C (new structs with new ids) replace the originals.
+    /// Merge in verified plans from the generator. Match by index and preserve existing ids so Home hero / pins stay stable.
     private func mergeGeneratedPlans(from newPlans: [DatePlan]) {
         guard !newPlans.isEmpty else { return }
         var updated = generatedPlans
         for (index, genPlan) in newPlans.enumerated() {
             if index < updated.count {
-                updated[index] = genPlan
+                updated[index] = genPlan.preservingIdentity(from: updated[index])
             } else if index == updated.count {
                 updated.append(genPlan)
             }
@@ -657,7 +657,9 @@ class NavigationCoordinator: ObservableObject {
         generatedPlans = resolvedPlans
         generatedPlansSelectedIndex = 0
 
-        let nextSheet: ActiveSheet = resolvedPlans.count >= 3 ? .datePlanOptions : .datePlanResult
+        // Always present the options picker when we have plans — even 1–2 results
+        // should let the user compare, swipe, regenerate, or save (not skip to result).
+        let nextSheet: ActiveSheet = .datePlanOptions
         let replacingQuestionnaireSheet: Bool = {
             if case .questionnaire? = activeSheet { return true }
             return false
@@ -1472,29 +1474,28 @@ class NavigationCoordinator: ObservableObject {
     func moveUnsavedPlansToExperiencesWaiting() {
         let savedIds = Set(savedPlans.map(\.id))
         let unsaved = generatedPlans.filter { !savedIds.contains($0.id) }
-        if !unsaved.isEmpty {
-            var updated = experiencesWaiting
-            var newlyAdded: [DatePlan] = []
-            for plan in unsaved {
-                if !updated.contains(where: { $0.id == plan.id }) {
-                    updated.append(plan)
-                    newlyAdded.append(plan)
-                }
+        var updatedWaiting = experiencesWaiting
+        var newlyAdded: [DatePlan] = []
+        for plan in unsaved {
+            if !updatedWaiting.contains(where: { $0.id == plan.id }) {
+                updatedWaiting.append(plan)
+                newlyAdded.append(plan)
             }
-            if updated != experiencesWaiting {
-                experiencesWaiting = updated
-                saveState()
-            }
-            if !newlyAdded.isEmpty {
-                let count = newlyAdded.count
-                let label = count == 1 ? "1 unsaved date idea" : "\(count) unsaved date ideas"
-                NotificationManager.shared.addNotification(AppNotification(
-                    type: .unsavedDateWaiting,
-                    title: "\(label) waiting for you",
-                    message: "Save them before they disappear — your perfect date is in there!",
-                    timestamp: Date()
-                ))
-            }
+        }
+        // Single reconcile pass: append to waiting and clear generated together.
+        if !newlyAdded.isEmpty {
+            experiencesWaiting = updatedWaiting.sorted { $0.createdAt > $1.createdAt }
+            saveState()
+        }
+        if !newlyAdded.isEmpty {
+            let count = newlyAdded.count
+            let label = count == 1 ? "1 unsaved date idea" : "\(count) unsaved date ideas"
+            NotificationManager.shared.addNotification(AppNotification(
+                type: .unsavedDateWaiting,
+                title: "\(label) waiting for you",
+                message: "Save them before they disappear — your perfect date is in there!",
+                timestamp: Date()
+            ))
         }
         generatedPlans = []
         generatedPlansSelectedIndex = 0

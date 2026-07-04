@@ -478,6 +478,51 @@ extension View {
             )
             .maroonLeadingAccent(width: 2)
     }
+
+    /// Questionnaire toggles / inset panels — flat charcoal tint (matches Home section insets).
+    func questionnaireInsetSurface(cornerRadius: CGFloat = 12) -> some View {
+        padding(16)
+            .background(Color.luxeSurfaceTintStrong)
+            .cornerRadius(cornerRadius)
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerRadius)
+                    .stroke(Color.luxeSurfaceBorder, lineWidth: 1)
+            )
+    }
+
+    /// Navigation toolbar pill (Close, Add to Calendar, etc.).
+    func charcoalToolbarPill(cornerRadius: CGFloat = 20) -> some View {
+        padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(Color.luxeSurfaceTintStrong)
+            .cornerRadius(cornerRadius)
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerRadius)
+                    .stroke(Color.luxeSurfaceBorder, lineWidth: 1)
+            )
+    }
+}
+
+// MARK: - Extras screens section header (Gift Finder, Playlist, Love Notes, etc.)
+
+/// Matches Home `SectionHeader`: gold icon + Georgia section title — not maroon / uppercase sans.
+struct ExtrasSectionHeader: View {
+    var icon: String? = nil
+    let title: String
+
+    var body: some View {
+        HStack(spacing: 8) {
+            if let icon {
+                Image(systemName: icon)
+                    .font(.system(size: 13, weight: .semibold))
+                    .symbolRenderingMode(.monochrome)
+                    .foregroundColor(Color.accentGold)
+            }
+            Text(title)
+                .font(Font.bodySerif(20, weight: .regular))
+                .foregroundColor(Color.accentGold)
+        }
+    }
 }
 
 // MARK: - Typography Helpers

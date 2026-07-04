@@ -28,6 +28,20 @@ struct DatePlanResultView: View {
     // Screen 23 · paywall appears AFTER the user has seen their first result (spec §10), once, dismissible.
     @State private var showPostResultPaywall = false
     @AppStorage("hasSeenPostResultPaywall") private var hasSeenPostResultPaywall = false
+    @State private var swapContext: SwapStopContext?
+
+    /// Live plan from coordinator after edits (e.g. stop swap); falls back to the passed-in plan.
+    private var displayPlan: DatePlan {
+        if let match = coordinator.generatedPlans.first(where: { $0.id == plan.id }) { return match }
+        if let match = coordinator.savedPlans.first(where: { $0.id == plan.id }) { return match }
+        if let match = coordinator.experiencesWaiting.first(where: { $0.id == plan.id }) { return match }
+        if coordinator.currentDatePlan?.id == plan.id, let current = coordinator.currentDatePlan { return current }
+        return plan
+    }
+
+    private var hasMultipleGeneratedOptions: Bool {
+        coordinator.generatedPlans.count > 1
+    }
     
     var body: some View {
         NavigationStack {
@@ -44,9 +58,7 @@ struct DatePlanResultView: View {
                                 partnerBadgeView(names: names)
                             }
                             mainPlanCard
-                            if coordinator.currentPlanPartnerNames != nil {
-                                bothLoveSection
-                            }
+                            planSecondaryActions
                         }
                         .padding(.horizontal, 20)
                         .padding(.top, 8)
@@ -65,17 +77,10 @@ struct DatePlanResultView: View {
                             Image(systemName: "xmark")
                                 .font(.system(size: 14, weight: .medium))
                             Text("Close")
-                                .font(Font.inter(14, weight: .medium))
+                                .font(Font.bodySans(14, weight: .medium))
                         }
                         .foregroundColor(Color.luxuryGold)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
-                        .background(Color.luxuryMaroonLight.opacity(0.8))
-                        .cornerRadius(20)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 20)
-                                .stroke(Color.luxuryGold.opacity(0.4), lineWidth: 1)
-                        )
+                        .charcoalToolbarPill()
                     }
                     .buttonStyle(.plain)
                 }
@@ -197,7 +202,7 @@ struct DatePlanResultView: View {
                                 onAction: { showReserveVenuePicker = false }
                             )
                             .padding(.vertical, 4)
-                            .listRowBackground(Color.luxuryMaroonLight.opacity(0.5))
+                            .listRowBackground(Color.luxeSurfaceTintStrong)
                             .listRowSeparatorTint(Color.luxuryGold.opacity(0.28))
                         }
                     }
@@ -266,6 +271,13 @@ struct DatePlanResultView: View {
                 showPostResultPaywall = false
             }
         }
+        .sheet(item: $swapContext) { context in
+            SwapStopSheet(plan: context.plan, stopIndex: context.stopIndex) { alternative in
+                applySwap(alternative, to: context.plan, stopIndex: context.stopIndex)
+            }
+            .presentationDetents([.medium])
+            .presentationDragIndicator(.visible)
+        }
     }
 
     /// Show the paywall once, shortly after the first result renders, for non-subscribers.
@@ -282,7 +294,7 @@ struct DatePlanResultView: View {
     private var mainPlanCard: some View {
         ItineraryCreamCardChrome(edgePadding: 0) {
             ItineraryCreamPlanDetailContent(
-                plan: plan,
+                plan: displayPlan,
                 partnerName: partnerDisplayName,
                 onReserveStop: { stop in
                     platformPickerPayload = ReservationPlatformPickerPayload(
@@ -292,12 +304,74 @@ struct DatePlanResultView: View {
                         reservationPlatforms: stop.reservationPlatforms,
                         bookingUrl: stop.bookingUrl
                     )
-                }
+                },
+                onOpenRoute: {
+                    coordinator.showRouteMap(
+                        stops: ItineraryPlanFormatting.itineraryStops(for: displayPlan),
+                        startingPoint: displayPlan.startingPoint
+                    )
+                },
+                onGetMoreGiftIdeas: {
+                    access.require(.gifting) {
+                        showGiftFinder = true
+                    }
+                },
+                canAccessGiftIdeas: access.canAccess(.gifting)
             )
         }
         .opacity(mainPlanCardAppeared ? 1 : 0)
         .offset(y: mainPlanCardAppeared ? 0 : 8)
         .animation(.easeOut(duration: 0.4), value: mainPlanCardAppeared)
+    }
+
+    private var planSecondaryActions: some View {
+        HStack(spacing: 8) {
+            if SwapStopLogic.dinnerStopIndex(in: displayPlan) != nil {
+                Button {
+                    presentSwapSheet(for: displayPlan)
+                } label: {
+                    Text("Swap stop")
+                        .font(Font.bodySans(13, weight: .medium))
+                        .foregroundColor(Color.luxuryCream)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10)
+                                .stroke(Color.luxuryGold.opacity(0.35), lineWidth: 1)
+                        )
+                }
+                .buttonStyle(.plain)
+            }
+
+            if hasMultipleGeneratedOptions {
+                Button {
+                    if let idx = coordinator.generatedPlans.firstIndex(where: { $0.id == displayPlan.id }) {
+                        coordinator.generatedPlansSelectedIndex = idx
+                    }
+                    coordinator.activeSheet = .datePlanOptions
+                } label: {
+                    Text("Compare options")
+                        .font(Font.bodySans(13, weight: .medium))
+                        .foregroundColor(Color.backgroundPrimary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(Color.accentGold)
+                        .cornerRadius(10)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private func presentSwapSheet(for plan: DatePlan) {
+        guard let stopIndex = SwapStopLogic.dinnerStopIndex(in: plan) else { return }
+        swapContext = SwapStopContext(plan: plan, stopIndex: stopIndex)
+    }
+
+    private func applySwap(_ alternative: SwapStopAlternative, to plan: DatePlan, stopIndex: Int) {
+        guard !alternative.isCurrent else { return }
+        let updated = plan.replacingStop(at: stopIndex, with: alternative)
+        coordinator.persistEditedPlan(updated)
     }
 
     private var partnerDisplayName: String? {
@@ -313,43 +387,8 @@ struct DatePlanResultView: View {
     private func partnerBadgeView(names: (String, String)) -> some View {
         Text("Made for \(names.0) & \(names.1)")
             .font(Font.bodySans(14, weight: .semibold))
-            .foregroundColor(Color.luxuryGold)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
-            .background(
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(Color.luxuryMaroonLight.opacity(0.8))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 20)
-                    .stroke(Color.luxuryGold, lineWidth: 1.5)
-            )
-    }
-    
-    // MARK: - Both of you will love this because...
-    private var bothLoveSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Both of you will love this because...")
-                .font(Font.bodySans(15, weight: .semibold))
-                .foregroundColor(Color.luxuryCream)
-            Text(plan.tagline)
-                .font(Font.bodySans(14, weight: .regular))
-                .foregroundColor(Color.luxuryCreamMuted)
-            Text(plan.genieSecretTouch.description)
-                .font(Font.bodySans(13, weight: .regular))
-                .foregroundColor(Color.luxuryCreamMuted)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(18)
-        .background(
-            RoundedRectangle(cornerRadius: 20)
-                .fill(Color.luxuryMaroonLight.opacity(0.7))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 20)
-                        .stroke(Color.luxuryGold.opacity(0.25), lineWidth: 1)
-                )
-                .shadow(color: Color.luxuryGold.opacity(0.15), radius: 12, y: 4)
-        )
+            .foregroundColor(Color.accentGold)
+            .charcoalToolbarPill()
     }
     
     // MARK: - Bottom Action Bar
@@ -424,7 +463,7 @@ struct DatePlanResultView: View {
                         Image(systemName: isSaved ? "checkmark.circle.fill" : "bookmark.fill")
                             .font(.system(size: 14))
                         Text(isSaved ? "Saved" : "Save Date Plan")
-                            .font(Font.inter(14, weight: .semibold))
+                            .font(Font.bodySans(14, weight: .semibold))
                     }
                     .foregroundColor(isSaved ? Color.luxuryCream : Color.luxuryGold)
                     .frame(maxWidth: .infinity)
@@ -432,7 +471,7 @@ struct DatePlanResultView: View {
                     .background(
                         Capsule()
                             .stroke(Color.luxuryGold.opacity(0.5), lineWidth: 1)
-                            .background(Capsule().fill(isSaved ? Color.luxuryGold.opacity(0.4) : Color.luxuryMaroonLight))
+                            .background(Capsule().fill(isSaved ? Color.luxuryGold.opacity(0.4) : Color.luxeSurfaceTintStrong))
                     )
                 }
                 .disabled(isSaved)
@@ -448,7 +487,7 @@ struct DatePlanResultView: View {
                         Image(systemName: "clock.arrow.circlepath")
                             .font(.system(size: 14))
                         Text("We did this date — move to Past Dates")
-                            .font(Font.inter(13, weight: .medium))
+                            .font(Font.bodySans(13, weight: .medium))
                     }
                     .foregroundColor(Color.luxuryGold.opacity(0.9))
                 }
@@ -481,13 +520,13 @@ struct TravelLegRow: View {
                 .font(.system(size: 12))
                 .foregroundColor(accentColor)
             Text(timeText)
-                .font(Font.inter(11, weight: .medium))
+                .font(Font.bodySans(11, weight: .medium))
                 .foregroundColor(secondaryText)
             if let dist = distanceText, !dist.isEmpty {
                 Text("·")
                     .foregroundColor(secondaryText)
                 Text(dist)
-                    .font(Font.inter(11, weight: .regular))
+                    .font(Font.bodySans(11, weight: .regular))
                     .foregroundColor(secondaryText)
             }
         }
@@ -550,7 +589,7 @@ struct CompactStopRow: View {
                         Image(systemName: "clock")
                             .font(.system(size: 10))
                         Text(stop.timeSlot)
-                            .font(Font.inter(12, weight: .regular))
+                            .font(Font.bodySans(12, weight: .regular))
                     }
                     .foregroundColor(secondaryText)
                     
@@ -558,7 +597,7 @@ struct CompactStopRow: View {
                         .foregroundColor(secondaryText)
                     
                     Text(stop.formattedAddress)
-                        .font(Font.inter(12, weight: .regular))
+                        .font(Font.bodySans(12, weight: .regular))
                         .foregroundColor(secondaryText)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -571,7 +610,7 @@ struct CompactStopRow: View {
                             Image(systemName: "clock")
                                 .font(.system(size: 9))
                             Text("Hours")
-                                .font(Font.inter(10, weight: .medium))
+                                .font(Font.bodySans(10, weight: .medium))
                             Image(systemName: hoursExpanded ? "chevron.up" : "chevron.down")
                                 .font(.system(size: 9, weight: .semibold))
                         }
@@ -582,7 +621,7 @@ struct CompactStopRow: View {
                         VStack(alignment: .leading, spacing: 1) {
                             ForEach(hours, id: \.self) { line in
                                 Text(line)
-                                    .font(Font.inter(10, weight: .regular))
+                                    .font(Font.bodySans(10, weight: .regular))
                                     .foregroundColor(secondaryText)
                             }
                         }
@@ -596,7 +635,7 @@ struct CompactStopRow: View {
                                 Image(systemName: "phone.fill")
                                     .font(.system(size: 9))
                                 Text(phone)
-                                    .font(Font.inter(10, weight: .regular))
+                                    .font(Font.bodySans(10, weight: .regular))
                             }
                             .foregroundColor(linkColor)
                         }
@@ -606,7 +645,7 @@ struct CompactStopRow: View {
                                     Image(systemName: "globe")
                                         .font(.system(size: 9))
                                     Text("Website")
-                                        .font(Font.inter(10, weight: .regular))
+                                        .font(Font.bodySans(10, weight: .regular))
                                 }
                                 .foregroundColor(linkColor)
                             }
@@ -620,7 +659,7 @@ struct CompactStopRow: View {
                         .font(.system(size: 10))
                         .padding(.top, 1)
                     Text(stop.romanticTip)
-                        .font(Font.inter(11, weight: .medium))
+                        .font(Font.bodySans(11, weight: .medium))
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 .foregroundColor(accentColor)
@@ -667,7 +706,7 @@ struct VerifiedBadge: View {
                 .foregroundColor(Color(hex: "4CAF50"))
             
             Text("Verified")
-                .font(Font.inter(9, weight: .semibold))
+                .font(Font.bodySans(9, weight: .semibold))
                 .foregroundColor(Color(hex: "4CAF50"))
         }
         .padding(.horizontal, 6)
@@ -698,32 +737,35 @@ struct QuickActionButton: View {
     
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 6) {
+            VStack(spacing: 8) {
                 ZStack(alignment: .topTrailing) {
-                    Image(systemName: icon)
-                        .font(.system(size: 18))
-                        .foregroundColor(Color.luxuryGold)
-                        .frame(width: 44, height: 44)
-                        .background(Color.luxuryMaroonLight)
-                        .cornerRadius(12)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(Color.luxuryGold.opacity(0.3), lineWidth: 1)
-                        )
+                    ZStack {
+                        Circle()
+                            .fill(Color.accentGold.opacity(0.2))
+                            .frame(width: 48, height: 48)
+                        Image(systemName: icon)
+                            .font(.system(size: 20))
+                            .symbolRenderingMode(.monochrome)
+                            .foregroundColor(Color.accentGold)
+                    }
                     if isLocked {
                         Image(systemName: "lock.fill")
-                            .font(.system(size: 8, weight: .bold))
-                            .foregroundColor(Color.luxuryGold)
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundColor(Color.accentGold)
                             .offset(x: 4, y: -4)
                     }
                 }
                 
                 Text(label)
-                    .font(Font.inter(10, weight: .medium))
-                    .foregroundColor(Color.luxuryMuted)
+                    .font(Font.bodySans(11, weight: .medium))
+                    .foregroundColor(Color.luxuryCream)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.center)
+                    .minimumScaleFactor(0.85)
             }
             .opacity(isLocked ? 0.5 : 1)
         }
+        .buttonStyle(.plain)
         .frame(maxWidth: .infinity)
     }
 }
@@ -740,10 +782,10 @@ struct LuxuryStatBadge: View {
                 .font(.system(size: 16))
                 .foregroundColor(Color.luxuryGold)
             Text(value)
-                .font(Font.inter(13, weight: .semibold))
+                .font(Font.bodySans(13, weight: .semibold))
                 .foregroundColor(Color.luxuryCream)
             Text(label)
-                .font(Font.inter(9, weight: .medium))
+                .font(Font.bodySans(9, weight: .medium))
                 .foregroundColor(Color.luxuryMuted)
         }
     }
@@ -762,7 +804,7 @@ struct LuxuryQuickAction: View {
                     .font(.system(size: 20))
                     .foregroundColor(color)
                     .frame(width: 48, height: 48)
-                    .background(Color.luxuryMaroonLight)
+                    .background(Color.luxeSurfaceTintStrong)
                     .cornerRadius(12)
                     .overlay(
                         RoundedRectangle(cornerRadius: 12)
@@ -770,7 +812,7 @@ struct LuxuryQuickAction: View {
                     )
                 
                 Text(title)
-                    .font(Font.inter(10, weight: .medium))
+                    .font(Font.bodySans(10, weight: .medium))
                     .foregroundColor(Color.luxuryCream)
             }
         }
@@ -812,7 +854,7 @@ struct LuxuryGiftCard: View {
                     .font(.system(size: 28))
                 Spacer()
                 Text(gift.priceRange)
-                    .font(Font.inter(10, weight: .semibold))
+                    .font(Font.bodySans(10, weight: .semibold))
                     .foregroundColor(Color.luxuryGold)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
@@ -826,13 +868,13 @@ struct LuxuryGiftCard: View {
                 .lineLimit(1)
             
             Text(gift.description)
-                .font(Font.inter(11, weight: .regular))
+                .font(Font.bodySans(11, weight: .regular))
                 .foregroundColor(Color.luxuryCreamMuted)
                 .lineLimit(2)
         }
         .padding(14)
         .frame(width: 160)
-        .background(Color.luxuryMaroonLight)
+        .background(Color.luxeSurfaceTintStrong)
         .cornerRadius(14)
         .overlay(
             RoundedRectangle(cornerRadius: 14)
@@ -855,13 +897,13 @@ struct LuxuryConversationCard: View {
                     .foregroundColor(Color.luxuryCream)
                 
                 Text(starter.category)
-                    .font(Font.inter(10, weight: .medium))
+                    .font(Font.bodySans(10, weight: .medium))
                     .foregroundColor(Color.luxuryMuted)
             }
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.luxuryMaroonLight)
+        .background(Color.luxeSurfaceTintStrong)
         .cornerRadius(14)
         .overlay(
             RoundedRectangle(cornerRadius: 14)

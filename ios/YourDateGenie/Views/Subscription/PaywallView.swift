@@ -190,7 +190,7 @@ struct PaywallView: View {
     private func priceCard(price: String, period: String, note: String?) -> some View {
         VStack(spacing: 6) {
             Text(price)
-                .font(Font.header(32, weight: .bold))
+                .font(Font.bodySerif(32, weight: .bold))
                 .foregroundColor(Color.luxuryGold)
             Text(period)
                 .font(Font.bodySans(13, weight: .regular))

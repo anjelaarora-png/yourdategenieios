@@ -59,7 +59,7 @@ struct PlacesAutocompleteField: View {
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 14)
-                .background(Color.luxuryMaroonLight)
+                .background(Color.luxeSurfaceTintStrong)
                 .cornerRadius(12)
                 .overlay(
                     RoundedRectangle(cornerRadius: 12)
@@ -87,11 +87,11 @@ struct PlacesAutocompleteField: View {
                                     
                                     VStack(alignment: .leading, spacing: 2) {
                                         Text(prediction.mainText)
-                                            .font(Font.inter(15, weight: .medium))
+                                            .font(Font.bodySans(15, weight: .medium))
                                             .foregroundColor(Color.luxuryCream)
                                         if let secondary = prediction.secondaryText {
                                             Text(secondary)
-                                                .font(Font.inter(12, weight: .regular))
+                                                .font(Font.bodySans(12, weight: .regular))
                                                 .foregroundColor(Color.luxuryMuted)
                                         }
                                     }
@@ -99,12 +99,12 @@ struct PlacesAutocompleteField: View {
                                 }
                                 .padding(.horizontal, 16)
                                 .padding(.vertical, 12)
-                                .background(Color.luxuryMaroonLight)
+                                .background(Color.luxeSurfaceTintStrong)
                             }
                             .buttonStyle(.plain)
                         }
                     }
-                    .background(Color.luxuryMaroonLight)
+                    .background(Color.luxeSurfaceTintStrong)
                     .cornerRadius(14)
                     .overlay(
                         RoundedRectangle(cornerRadius: 14)
@@ -117,12 +117,12 @@ struct PlacesAutocompleteField: View {
             
             if !Config.isGooglePlacesConfigured {
                 Text("Add GOOGLE_PLACES_API_KEY (Places API + Geocoding) to enable address search.")
-                    .font(Font.inter(11, weight: .regular))
+                    .font(Font.bodySans(11, weight: .regular))
                     .foregroundColor(Color.luxuryGold.opacity(0.85))
                     .fixedSize(horizontal: false, vertical: true)
             } else if let err = fetchErrorMessage, isFocused {
                 Text(err)
-                    .font(Font.inter(11, weight: .regular))
+                    .font(Font.bodySans(11, weight: .regular))
                     .foregroundColor(Color.luxuryMuted)
                     .fixedSize(horizontal: false, vertical: true)
             }

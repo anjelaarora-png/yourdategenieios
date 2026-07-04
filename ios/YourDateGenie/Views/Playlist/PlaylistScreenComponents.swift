@@ -1,18 +1,10 @@
 import SwiftUI
 
-// MARK: - Shared playlist screen typography (matches Love Notes / Home)
+// MARK: - Shared playlist screen typography (matches Home / Gift Finder / Love Notes)
 
 enum PlaylistScreenStyle {
     static func sectionLabel(title: String, icon: String) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: icon)
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundColor(Color.accentMaroon)
-            Text(title.uppercased())
-                .font(Font.bodySans(11, weight: .bold))
-                .tracking(1.4)
-                .foregroundColor(Color.textPrimary.opacity(0.55))
-        }
+        ExtrasSectionHeader(icon: icon, title: title)
     }
 }
 
@@ -69,8 +61,8 @@ struct PlaylistSaveNameSheet: View {
             .toolbar {
                 ToolbarItem(placement: .principal) {
                     Text("Name Your Playlist")
-                        .font(Font.displaySerif(18, weight: .semibold))
-                        .foregroundColor(Color.textPrimary)
+                        .font(Font.bodySerif(18, weight: .regular))
+                        .foregroundColor(Color.accentGold)
                 }
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel", action: onCancel)
@@ -79,18 +71,14 @@ struct PlaylistSaveNameSheet: View {
             }
             .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
-            .onAppear {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-                    nameFocused = true
-                }
-            }
+            .onAppear { nameFocused = true }
         }
-        .presentationDetents([.medium])
-        .presentationDragIndicator(.visible)
     }
 
     private func saveIfValid() {
-        guard !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        name = trimmed
         onSave()
     }
 }

@@ -87,12 +87,7 @@ struct Step5DealBreakersView: View {
                         .padding(12)
                         .scrollContentBackground(.hidden)
                         .foregroundColor(Color.luxuryCream)
-                        .background(Color.luxuryMaroonLight)
-                        .cornerRadius(12)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(Color.luxuryGold.opacity(0.3), lineWidth: 1)
-                        )
+                        .luxeInsetSurface(cornerRadius: 12)
                         .overlay(
                             Group {
                                 if data.additionalNotes.isEmpty {

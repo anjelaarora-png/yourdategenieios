@@ -61,7 +61,7 @@ struct ConversationStartersView: View {
                             .padding(.bottom, 2)
                         HStack(alignment: .firstTextBaseline, spacing: 4) {
                             Text("Find the spark made for ")
-                                .font(Font.displaySerif(22, weight: .regular))
+                                .font(Font.bodySerif(22, weight: .regular))
                                 .foregroundColor(Color.luxuryCream)
                             Text("you")
                                 .font(Font.bodySerif(24, weight: .regular))
@@ -142,7 +142,7 @@ struct ConversationStartersView: View {
 
                 HStack(alignment: .firstTextBaseline, spacing: 4) {
                     Text("Find the spark made for ")
-                        .font(Font.displaySerif(26, weight: .regular))
+                        .font(Font.bodySerif(26, weight: .regular))
                         .foregroundColor(Color.luxuryCream)
                     Text("you")
                         .font(Font.bodySerif(28, weight: .regular))
@@ -189,7 +189,7 @@ struct ConversationStartersView: View {
                             .foregroundColor(Color.luxuryGold)
                     }
                     .padding(18)
-                    .background(Color.luxuryMaroonLight.opacity(0.9))
+                    .background(Color.luxeSurfaceTintStrong)
                     .cornerRadius(20)
                     .overlay(
                         RoundedRectangle(cornerRadius: 20)
@@ -524,7 +524,7 @@ private struct VibeRowCard: View {
                 Image(systemName: icon)
                     .font(Font.bodySans(20, weight: .medium))
                     .symbolRenderingMode(.monochrome)
-                    .foregroundColor(isSelected ? Color.luxuryMaroon : Color.luxuryGold)
+                    .foregroundColor(Color.accentGold)
                     .frame(width: 28, alignment: .center)
                 VStack(alignment: .leading, spacing: 4) {
                     Text(title)
@@ -543,7 +543,7 @@ private struct VibeRowCard: View {
             .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(
-                isSelected ? LinearGradient.goldShimmer : LinearGradient(colors: [Color.luxuryMaroonLight], startPoint: .top, endPoint: .bottom)
+                isSelected ? LinearGradient.goldShimmer : LinearGradient(colors: [Color.luxeSurfaceTintStrong], startPoint: .top, endPoint: .bottom)
             )
             .cornerRadius(16)
             .overlay(
@@ -617,7 +617,7 @@ private struct PastSessionCard: View {
             }
             .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.luxuryMaroonLight.opacity(0.9))
+            .background(Color.luxeSurfaceTintStrong)
             .cornerRadius(16)
             .overlay(
                 RoundedRectangle(cornerRadius: 16)
@@ -684,7 +684,7 @@ private struct SavedStarterCard: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.luxuryMaroonLight.opacity(0.9))
+        .background(Color.luxeSurfaceTintStrong)
         .cornerRadius(16)
         .overlay(
             RoundedRectangle(cornerRadius: 16)
@@ -721,7 +721,7 @@ private struct RelationshipStageCard: View {
             .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(
-                isSelected ? LinearGradient.goldShimmer : LinearGradient(colors: [Color.luxuryMaroonLight], startPoint: .top, endPoint: .bottom)
+                isSelected ? LinearGradient.goldShimmer : LinearGradient(colors: [Color.luxeSurfaceTintStrong], startPoint: .top, endPoint: .bottom)
             )
             .cornerRadius(16)
             .overlay(

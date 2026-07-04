@@ -139,7 +139,7 @@ struct BigGiftUnwrapView: View {
                         .scaleEffect(titleScale)
                     
                     Text("Thoughtful ideas, tailored to them")
-                        .font(Font.inter(15, weight: .regular))
+                        .font(Font.bodySans(15, weight: .regular))
                         .foregroundColor(Color.luxuryCreamMuted)
                         .padding(.top, 10)
                         .opacity(titleOpacity)

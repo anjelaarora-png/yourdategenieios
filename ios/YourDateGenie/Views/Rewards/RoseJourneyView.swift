@@ -55,12 +55,12 @@ struct RoseJourneyView: View {
                         .foregroundColor(Color.textPrimary)
                     Spacer()
                     Text("\(rose.xpIntoLevel) / \(rose.xpForLevel)")
-                        .font(Font.inter(11))
+                        .font(Font.bodySans(11))
                         .foregroundColor(Color.luxuryMuted)
                 }
                 RoseProgressBar(progress: rose.levelProgress)
                 Text(nextLevelLine)
-                    .font(Font.inter(11))
+                    .font(Font.bodySans(11))
                     .foregroundColor(Color.luxuryMuted)
             }
         }
@@ -77,10 +77,10 @@ struct RoseJourneyView: View {
             HStack {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("🔥 \(rose.streakWeeks)-week connection streak")
-                        .font(Font.inter(13, weight: .medium))
+                        .font(Font.bodySans(13, weight: .medium))
                         .foregroundColor(Color.textPrimary)
                     Text("your longest yet")
-                        .font(Font.inter(11))
+                        .font(Font.bodySans(11))
                         .foregroundColor(Color.luxuryMuted)
                 }
                 Spacer()
@@ -102,7 +102,7 @@ struct RoseJourneyView: View {
             }
             .frame(height: 42)
             Text(badge.title)
-                .font(Font.inter(10))
+                .font(Font.bodySans(10))
                 .foregroundColor(badge.isEarned ? Color.luxuryCreamMuted : Color.luxuryMuted)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)

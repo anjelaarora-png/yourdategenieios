@@ -167,20 +167,15 @@ struct LoveNoteRewriteSection: View {
 
     // MARK: - Styling
 
-    private func chipForeground(isSelected: Bool) -> Color {
-        switch skin {
-        case .charcoal:
-            return isSelected ? Color.backgroundPrimary : Color.textPrimary.opacity(0.82)
-        case .luxury:
-            return isSelected ? Color.luxuryMaroon : Color.luxuryCream
-        }
-    }
-
     @ViewBuilder
     private func chipBackground(isSelected: Bool) -> some View {
         switch skin {
         case .charcoal:
-            (isSelected ? Color.accentGold : Color.surfaceElevated)
+            if isSelected {
+                LinearGradient.goldShimmer
+            } else {
+                Color.luxeSurfaceTintStrong
+            }
         case .luxury:
             if isSelected {
                 LinearGradient.goldShimmer
@@ -190,10 +185,19 @@ struct LoveNoteRewriteSection: View {
         }
     }
 
+    private func chipForeground(isSelected: Bool) -> Color {
+        switch skin {
+        case .charcoal:
+            return isSelected ? Color.luxuryMaroon : Color.luxuryCream
+        case .luxury:
+            return isSelected ? Color.luxuryMaroon : Color.luxuryCream
+        }
+    }
+
     private func chipBorder(isSelected: Bool) -> Color {
         switch skin {
         case .charcoal:
-            return isSelected ? Color.clear : Color.maroonBorderTint
+            return isSelected ? Color.clear : Color.luxeSurfaceBorder
         case .luxury:
             return Color.clear
         }

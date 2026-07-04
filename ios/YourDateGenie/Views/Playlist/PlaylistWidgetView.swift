@@ -199,17 +199,17 @@ struct PlaylistWidgetView: View {
                         Image(systemName: "exclamationmark.triangle.fill")
                             .foregroundColor(Color.luxuryGold)
                         Text("Showing suggestions. \(err)")
-                            .font(Font.inter(12, weight: .medium))
+                            .font(Font.bodySans(12, weight: .medium))
                             .foregroundColor(Color.luxuryCreamMuted)
                             .lineLimit(2)
                         Spacer(minLength: 8)
                         Button("OK") { playlistGenerationError = nil }
-                            .font(Font.inter(12, weight: .semibold))
+                            .font(Font.bodySans(12, weight: .semibold))
                             .foregroundColor(Color.luxuryGold)
                     }
                     .padding(.horizontal, 16)
                     .padding(.vertical, 12)
-                    .background(Color.luxuryMaroonLight.opacity(0.95))
+                    .background(Color.luxeSurfaceTintStrong.opacity(0.95))
                     .overlay(
                         Rectangle()
                             .frame(height: 1)
@@ -224,8 +224,8 @@ struct PlaylistWidgetView: View {
             .toolbar {
                 ToolbarItem(placement: .principal) {
                     Text("Smart Playlists")
-                        .font(Font.displaySerif(18, weight: .semibold))
-                        .foregroundColor(Color.textPrimary)
+                        .font(Font.bodySerif(18, weight: .regular))
+                        .foregroundColor(Color.accentGold)
                 }
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Close") {
@@ -372,8 +372,8 @@ struct PlaylistWidgetView: View {
                     MusicRecordAnimationView(size: 100, showNotes: true)
                     
                     Text("Create Your Soundtrack")
-                        .font(Font.displaySerif(28, weight: .semibold))
-                        .foregroundColor(Color.textPrimary)
+                        .font(Font.bodySerif(28, weight: .regular))
+                        .foregroundColor(Color.accentGold)
                     
                     Text("Curated for your moment — pick a vibe and we'll set the mood.")
                         .font(Font.bodySans(14, weight: .regular))
@@ -397,7 +397,7 @@ struct PlaylistWidgetView: View {
                                     .foregroundColor(selectedEnergy == level ? Color.backgroundPrimary : Color.textPrimary.opacity(0.82))
                                     .padding(.horizontal, 16)
                                     .padding(.vertical, 10)
-                                    .background(selectedEnergy == level ? Color.accentGold : Color.surfaceElevated)
+                                    .background(selectedEnergy == level ? AnyShapeStyle(LinearGradient.goldShimmer) : AnyShapeStyle(Color.luxeSurfaceTintStrong))
                                     .cornerRadius(10)
                                     .overlay(
                                         RoundedRectangle(cornerRadius: 10)
@@ -461,7 +461,7 @@ struct PlaylistWidgetView: View {
                                             .foregroundColor(selectedEra == era ? Color.backgroundPrimary : Color.luxuryCreamMuted)
                                             .padding(.horizontal, 12)
                                             .padding(.vertical, 8)
-                                            .background(selectedEra == era ? Color.accentGold : Color.surfaceElevated)
+                                            .background(selectedEra == era ? AnyShapeStyle(LinearGradient.goldShimmer) : AnyShapeStyle(Color.luxeSurfaceTintStrong))
                                             .cornerRadius(8)
                                     }
                                     .buttonStyle(.plain)
@@ -484,7 +484,7 @@ struct PlaylistWidgetView: View {
                                             .foregroundColor(selectedMood == mood ? Color.backgroundPrimary : Color.luxuryCreamMuted)
                                             .padding(.horizontal, 12)
                                             .padding(.vertical, 8)
-                                            .background(selectedMood == mood ? Color.accentGold : Color.surfaceElevated)
+                                            .background(selectedMood == mood ? AnyShapeStyle(LinearGradient.goldShimmer) : AnyShapeStyle(Color.luxeSurfaceTintStrong))
                                             .cornerRadius(8)
                                     }
                                     .buttonStyle(.plain)
@@ -529,8 +529,8 @@ struct PlaylistWidgetView: View {
 
                     VStack(spacing: 6) {
                         Text(currentPlaylist.name)
-                            .font(Font.displaySerif(26, weight: .semibold))
-                            .foregroundColor(Color.textPrimary)
+                            .font(Font.bodySerif(26, weight: .regular))
+                            .foregroundColor(Color.accentGold)
                             .multilineTextAlignment(.center)
 
                         Text(selectionSubtitle)
@@ -601,7 +601,7 @@ struct PlaylistWidgetView: View {
                         .font(Font.bodySans(14, weight: .medium))
                         .foregroundColor(Color.textPrimary.opacity(0.85))
                         .padding(14)
-                        .background(Color.surfaceElevated)
+                        .background(Color.luxeSurfaceTintStrong)
                         .clipShape(RoundedRectangle(cornerRadius: 14))
                         .overlay(
                             RoundedRectangle(cornerRadius: 14)
@@ -1321,15 +1321,15 @@ struct VibeCard: View {
                 
                 Text(vibe.label)
                     .font(Font.bodySans(11, weight: .semibold))
-                    .foregroundColor(isSelected ? Color.backgroundPrimary : Color.textPrimary.opacity(0.82))
+                    .foregroundColor(isSelected ? Color.luxuryMaroon : Color.luxuryCream)
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 12)
-            .background(isSelected ? Color.accentGold : Color.surfaceElevated)
+            .background(isSelected ? AnyShapeStyle(LinearGradient.goldShimmer) : AnyShapeStyle(Color.luxeSurfaceTintStrong))
             .cornerRadius(12)
             .overlay(
                 RoundedRectangle(cornerRadius: 12)
-                    .stroke(isSelected ? Color.clear : Color.maroonBorderTint, lineWidth: 1)
+                    .stroke(isSelected ? Color.clear : Color.luxeSurfaceBorder, lineWidth: 1)
             )
         }
         .buttonStyle(ScaleButtonStyle())
@@ -1354,7 +1354,7 @@ struct PlatformButton: View {
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 14)
-            .background(Color.surfaceElevated)
+            .background(Color.luxeSurfaceTintStrong)
             .cornerRadius(14)
             .overlay(
                 RoundedRectangle(cornerRadius: 14)
@@ -1394,7 +1394,7 @@ struct SongRow: View {
                         
                         Image(systemName: "waveform")
                             .font(.system(size: 14))
-                            .foregroundColor(Color.accentMaroon)
+                            .foregroundColor(Color.accentGold)
                     } else {
                         RoundedRectangle(cornerRadius: 8)
                             .fill(Color.creamParchmentMid.opacity(0.5))
@@ -1409,7 +1409,7 @@ struct SongRow: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(song.title)
                         .font(Font.bodySerif(14, weight: .semibold))
-                        .foregroundColor(isPlaying ? Color.accentMaroon : Color.textOnCard)
+                        .foregroundColor(isPlaying ? Color.accentGold : Color.textOnCard)
                         .lineLimit(1)
                     
                     Text(song.artist)
@@ -1421,7 +1421,7 @@ struct SongRow: View {
                 Spacer()
                 
                 Text(song.duration)
-                    .font(Font.inter(11, weight: .regular))
+                    .font(Font.bodySans(11, weight: .regular))
                     .foregroundColor(Color.luxuryMuted)
                 
                 if let onReplace = onReplace {
@@ -1469,7 +1469,7 @@ struct SongRow: View {
                                 Image(systemName: platform.icon)
                                     .font(.system(size: 12))
                                 Text(platform.name)
-                                    .font(Font.inter(10, weight: .medium))
+                                    .font(Font.bodySans(10, weight: .medium))
                             }
                             .foregroundColor(platform.color)
                             .padding(.horizontal, 10)

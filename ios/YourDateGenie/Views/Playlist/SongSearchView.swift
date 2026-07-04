@@ -28,7 +28,7 @@ struct SongSearchView: View {
                             }
                     }
                     .padding(14)
-                    .background(Color.luxuryMaroonLight)
+                    .background(Color.luxeSurfaceTintStrong)
                     .cornerRadius(12)
                     .padding(.horizontal, 20)
                     .padding(.top, 12)
@@ -39,7 +39,7 @@ struct SongSearchView: View {
                             .padding(.vertical, 24)
                     } else if results.isEmpty && query.count >= 2 {
                         Text("No songs found")
-                            .font(Font.playfair(15))
+                            .font(Font.bodySerif(15))
                             .foregroundColor(Color.luxuryMuted)
                             .padding(.vertical, 24)
                     } else {
@@ -55,23 +55,23 @@ struct SongSearchView: View {
                                             AsyncImage(url: url) { image in
                                                 image.resizable().aspectRatio(contentMode: .fill)
                                             } placeholder: {
-                                                Rectangle().fill(Color.luxuryMaroonLight)
+                                                Rectangle().fill(Color.luxeSurfaceTintStrong)
                                             }
                                             .frame(width: 44, height: 44)
                                             .cornerRadius(6)
                                         } else {
                                             RoundedRectangle(cornerRadius: 6)
-                                                .fill(Color.luxuryMaroonLight)
+                                                .fill(Color.luxeSurfaceTintStrong)
                                                 .frame(width: 44, height: 44)
                                                 .overlay(Image(systemName: "music.note").foregroundColor(Color.luxuryMuted))
                                         }
                                         VStack(alignment: .leading, spacing: 2) {
                                             Text(song.trackName ?? "—")
-                                                .font(Font.playfair(14, weight: .semibold))
+                                                .font(Font.bodySerif(14, weight: .semibold))
                                                 .foregroundColor(Color.luxuryCream)
                                                 .lineLimit(1)
                                             Text(song.artistName ?? "—")
-                                                .font(Font.inter(12))
+                                                .font(Font.bodySans(12))
                                                 .foregroundColor(Color.luxuryMuted)
                                                 .lineLimit(1)
                                         }
@@ -79,7 +79,7 @@ struct SongSearchView: View {
                                     }
                                     .padding(.vertical, 4)
                                 }
-                                .listRowBackground(Color.luxuryMaroonLight)
+                                .listRowBackground(Color.luxeSurfaceTintStrong)
                                 .listRowSeparatorTint(Color.luxuryGold.opacity(0.3))
                             }
                         }

@@ -39,8 +39,8 @@ struct SavedPlaylistsView: View {
             .toolbar {
                 ToolbarItem(placement: .principal) {
                     Text("Your Playlists")
-                        .font(Font.displaySerif(18, weight: .semibold))
-                        .foregroundColor(Color.textPrimary)
+                        .font(Font.bodySerif(18, weight: .regular))
+                        .foregroundColor(Color.accentGold)
                 }
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Close") { dismiss() }
@@ -67,8 +67,8 @@ struct SavedPlaylistsView: View {
         VStack(spacing: 20) {
             MusicRecordAnimationView(size: 88, showNotes: true)
             Text("No playlists yet")
-                .font(Font.displaySerif(24, weight: .semibold))
-                .foregroundColor(Color.textPrimary)
+                .font(Font.bodySerif(24, weight: .regular))
+                .foregroundColor(Color.accentGold)
             Text("Generate a soundtrack from your date plan, name it, and it'll show up here.")
                 .font(Font.bodySans(14, weight: .regular))
                 .foregroundColor(Color.luxuryCreamMuted)
@@ -189,8 +189,8 @@ struct SavedPlaylistDetailView: View {
             .toolbar {
                 ToolbarItem(placement: .principal) {
                     Text(displayedPlaylist?.name ?? "Playlist")
-                        .font(Font.displaySerif(18, weight: .semibold))
-                        .foregroundColor(Color.textPrimary)
+                        .font(Font.bodySerif(18, weight: .regular))
+                        .foregroundColor(Color.accentGold)
                         .lineLimit(1)
                 }
                 ToolbarItem(placement: .cancellationAction) {
@@ -231,8 +231,8 @@ struct SavedPlaylistDetailView: View {
                         } label: {
                             HStack(spacing: 8) {
                                 Text(playlist.name)
-                                    .font(Font.displaySerif(24, weight: .semibold))
-                                    .foregroundColor(Color.textPrimary)
+                                    .font(Font.bodySerif(24, weight: .regular))
+                                    .foregroundColor(Color.accentGold)
                                     .multilineTextAlignment(.center)
                                 Image(systemName: "pencil")
                                     .font(.system(size: 14))
@@ -453,7 +453,7 @@ struct SavedSongRow: View {
             Button(action: onPlayPreview) {
                 Image(systemName: isPlaying ? "stop.circle.fill" : "play.circle.fill")
                     .font(.system(size: 22))
-                    .foregroundColor(Color.accentMaroon)
+                    .foregroundColor(Color.accentGold)
             }
             Button(action: onReplace) {
                 Image(systemName: "arrow.triangle.2.circlepath")

@@ -31,7 +31,7 @@ struct RoseReviveView: View {
                     .padding(.top, 6)
 
                 Text(missCopy)
-                    .font(Font.inter(14))
+                    .font(Font.bodySans(14))
                     .foregroundColor(Color.luxuryCreamMuted)
                     .multilineTextAlignment(.center)
                     .lineSpacing(3)
@@ -41,17 +41,17 @@ struct RoseReviveView: View {
                 RoseCard {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("\(idea.title) \(idea.emoji)")
-                            .font(Font.inter(13, weight: .medium))
+                            .font(Font.bodySans(13, weight: .medium))
                             .foregroundColor(Color.textPrimary)
                         Text("\(idea.detail) 🌹")
-                            .font(Font.inter(11))
+                            .font(Font.bodySans(11))
                             .foregroundColor(Color.luxuryMuted)
                     }
                 }
                 .padding(.top, 20)
 
                 Text("1 of dozens · shuffle anytime")
-                    .font(Font.inter(11))
+                    .font(Font.bodySans(11))
                     .foregroundColor(Color.luxuryMuted)
                     .padding(.top, 10)
 

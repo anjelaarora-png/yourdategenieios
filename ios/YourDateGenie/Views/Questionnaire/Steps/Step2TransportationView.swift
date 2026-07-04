@@ -65,24 +65,24 @@ struct TravelRadiusCard: View {
                     .font(.system(size: 28))
                 
                 Text(item.label)
-                    .font(Font.inter(13, weight: .semibold))
+                    .font(Font.bodySans(13, weight: .semibold))
                     .foregroundColor(isSelected ? Color.luxuryMaroon : Color.luxuryCream)
                 
                 if let distance = item.distance {
                     Text(distance)
-                        .font(Font.inter(10, weight: .regular))
+                        .font(Font.bodySans(10, weight: .regular))
                         .foregroundColor(isSelected ? Color.luxuryMaroon.opacity(0.8) : Color.luxuryMuted)
                 }
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 16)
             .background(
-                isSelected ? LinearGradient.goldShimmer : LinearGradient(colors: [Color.luxuryMaroonLight], startPoint: .top, endPoint: .bottom)
+                isSelected ? LinearGradient.goldShimmer : LinearGradient(colors: [Color.luxeSurfaceTintStrong], startPoint: .top, endPoint: .bottom)
             )
             .cornerRadius(12)
             .overlay(
                 RoundedRectangle(cornerRadius: 12)
-                    .stroke(isSelected ? Color.clear : Color.luxuryGold.opacity(0.3), lineWidth: 1)
+                    .stroke(isSelected ? Color.clear : Color.luxeSurfaceBorder, lineWidth: 1)
             )
             .shadow(color: isSelected ? Color.brandGold.opacity(0.3) : Color.clear, radius: 6, y: 3)
         }
