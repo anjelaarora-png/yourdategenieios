@@ -145,7 +145,7 @@ final class SupabaseService: ObservableObject {
             try await ensureUserAndCoupleIfMissing(
                 userId: supabaseUser.id,
                 email: email.lowercased(),
-                name: name.isEmpty ? (email.split(separator: "@").first.map { String($0) } ?? "User") : name
+                name: name.isEmpty ? "New Member" : name
             )
         }
         
@@ -511,7 +511,9 @@ final class SupabaseService: ObservableObject {
     }
     
     private func mapToSupabaseUser(_ user: User, defaultName: String?) -> SupabaseUser {
-        let name = user.userMetadata["name"]?.stringValue ?? defaultName
+        let name = user.userMetadata["name"]?.stringValue
+            ?? user.userMetadata["full_name"]?.stringValue
+            ?? defaultName
         return SupabaseUser(
             id: user.id,
             email: user.email,
@@ -1398,18 +1400,16 @@ final class SupabaseService: ObservableObject {
         mood: String? = nil,
         energy: String? = nil
     ) async throws -> GeneratePlaylistResult {
-        try? await refreshRestAuthFromSDK()
+        try await ensureSessionForEdgeFunction()
         let urlString = baseURL.hasSuffix("/") ? "\(baseURL)functions/v1/generate-playlist" : "\(baseURL)/functions/v1/generate-playlist"
         guard let url = URL(string: urlString) else {
             throw SupabaseError.invalidResponse
         }
+        guard let token = accessToken, !token.isEmpty else { throw SupabaseError.unauthorized }
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("Bearer \(anonKey)", forHTTPHeaderField: "Authorization")
-        if let token = accessToken {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        }
+        applyEdgeFunctionHeaders(to: &request, bearerToken: token)
+        request.timeoutInterval = 45
         var body: [String: Any] = [
             "vibe": vibe,
             "datePlanTitle": datePlanTitle

@@ -465,6 +465,12 @@ class NavigationCoordinator: ObservableObject {
     func partnerDataReceivedMergeAndGenerate() {
         guard let merged = PartnerSessionManager.shared.mergedQuestionnaireData(),
               let sessionId = PartnerSessionManager.shared.sessionId else { return }
+        guard AccessManager.shared.canGenerateDatePlan() else {
+            AccessManager.shared.requireDatePlanGeneration { [weak self] in
+                self?.partnerDataReceivedMergeAndGenerate()
+            }
+            return
+        }
         let inviterDisplayName = PartnerSessionManager.shared.inviteInfo?.partnerName.trimmingCharacters(in: .whitespaces)
             ?? PartnerSessionManager.shared.inviterName ?? "You"
 
@@ -491,6 +497,7 @@ class NavigationCoordinator: ObservableObject {
                     currentPlanPartnerNames = (inviterDisplayName, "Partner")
                     partnerSessionPlanRowIds = planRowIds
                     isRegeneratingFromOptions = false
+                    AccessManager.shared.recordDatePlanGenerated()
                     // Transition phase → options ready (triggers routing in handlePartnerPhaseChange)
                     PartnerSessionManager.shared.transitionPhase(to: .optionsReadyForRanking, triggeredBy: "system")
                 }
@@ -886,6 +893,12 @@ class NavigationCoordinator: ObservableObject {
             activeSheet = .questionnaire
             return
         }
+        AccessManager.shared.requireDatePlanGeneration { [weak self] in
+            self?.performRegenerateFromOptions(with: data)
+        }
+    }
+
+    private func performRegenerateFromOptions(with data: QuestionnaireData) {
         isRegeneratingFromOptions = true
         activeSheet = nil
         let generator = DatePlanGeneratorService.shared
@@ -896,6 +909,7 @@ class NavigationCoordinator: ObservableObject {
                     generatedPlans = generator.generatedPlans
                     generatedPlansSelectedIndex = 0
                     currentDatePlan = generator.generatedPlans.first
+                    AccessManager.shared.recordDatePlanGenerated()
                     activeSheet = .datePlanOptions
                     isRegeneratingFromOptions = false
                     scheduleSyncAllUnsavedExperiencesToCloud()
@@ -1506,6 +1520,7 @@ class NavigationCoordinator: ObservableObject {
     
     /// Call when date plan options sheet is dismissed: move any unsaved generated plans into Experiences Waiting, then clear generated plans so the next generation is fresh and we never show sample (e.g. NYC) after saving all three.
     func moveUnsavedPlansToExperiencesWaiting() {
+        guard !isRegeneratingFromOptions else { return }
         let savedIds = Set(savedPlans.map(\.id))
         let unsaved = generatedPlans.filter { !savedIds.contains($0.id) }
         var updatedWaiting = experiencesWaiting
@@ -1586,6 +1601,7 @@ class NavigationCoordinator: ObservableObject {
 struct RootNavigationView: View {
     @StateObject private var coordinator = NavigationCoordinator.shared
     @StateObject private var userProfileManager = UserProfileManager.shared
+    @StateObject private var socialAuth = SocialAuthService.shared
     @EnvironmentObject private var accessManager: AccessManager
     @State private var showSplash = true
     @Environment(\.scenePhase) private var scenePhase
@@ -1600,6 +1616,17 @@ struct RootNavigationView: View {
                     .transition(.opacity)
             } else if !coordinator.hasCompletedOnboarding {
                 MobileOnboardingView()
+                    .environmentObject(coordinator)
+            } else if userProfileManager.needsDisplayName {
+                SocialDisplayNameView()
+                    .environmentObject(coordinator)
+            } else if socialAuth.isCompletingSocialSignIn {
+                // Hold on auth until hydrate finishes so we don't flash Preferences/Main first.
+                AuthenticationView(
+                    isReinstallFlow: false,
+                    onDismiss: { coordinator.skipLogin() },
+                    allowSkipToExplore: true
+                )
                     .environmentObject(coordinator)
             } else if !coordinator.isLoggedIn && !coordinator.hasSkippedLogin {
                 AuthenticationView(
@@ -1628,6 +1655,8 @@ struct RootNavigationView: View {
         .animation(.easeInOut(duration: 0.4), value: coordinator.hasSkippedLogin)
         .animation(.easeInOut(duration: 0.4), value: coordinator.hasCompletedPreferences)
         .animation(.easeInOut(duration: 0.4), value: coordinator.hasDeferredInitialPreferences)
+        .animation(.easeInOut(duration: 0.4), value: userProfileManager.needsDisplayName)
+        .animation(.easeInOut(duration: 0.4), value: socialAuth.isCompletingSocialSignIn)
         .onAppear {
             #if DEBUG
             if ScreenshotDemo.isActive {
@@ -1647,6 +1676,7 @@ struct RootNavigationView: View {
                 // `coordinator.isLoggedIn` synchronously within this same Task, so by the time
                 // the splash is dismissed below, the correct screen is already determined.
                 await SupabaseService.shared.restoreSessionOnLaunch()
+                PurchaseManager.shared.checkSubscriptionOnAppLaunch()
 
                 // Enforce a minimum splash duration (visual polish). If the session restore
                 // finished quickly the remaining time is topped up; if it was slow the splash
