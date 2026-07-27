@@ -39,7 +39,9 @@ struct AuthenticationView: View {
                 .ignoresSafeArea()
             
             Group {
-                if profileManager.pendingEmailConfirmation {
+                if profileManager.needsDisplayName {
+                    SocialDisplayNameView()
+                } else if profileManager.pendingEmailConfirmation {
                     emailConfirmationWaitScreen
                 } else {
                     ScrollView(showsIndicators: false) {
@@ -53,8 +55,15 @@ struct AuthenticationView: View {
                                 businessPanel
                                     .padding(.top, 24)
                             } else {
-                                authModeToggle
+                                // Sign in with Apple first (§4.8 prominence when Google is also offered).
+                                socialAuthButtons
                                     .padding(.top, 24)
+
+                                socialDivider
+                                    .padding(.top, 28)
+
+                                authModeToggle
+                                    .padding(.top, 20)
 
                                 if viewModel.isSignUp {
                                     signUpForm
@@ -69,12 +78,6 @@ struct AuthenticationView: View {
                                     forgotPasswordButton
                                         .padding(.top, 12)
                                 }
-
-                                socialDivider
-                                    .padding(.top, 28)
-
-                                socialAuthButtons
-                                    .padding(.top, 16)
 
                                 if viewModel.isSignUp {
                                     signUpBenefits
@@ -110,11 +113,13 @@ struct AuthenticationView: View {
                 )
             }
             
-            if viewModel.isLoading {
+            if viewModel.isLoading || socialAuth.isLoading {
                 loadingOverlay
             }
             
-            if let onDismiss = onDismiss, !profileManager.pendingEmailConfirmation {
+            if let onDismiss = onDismiss,
+               !profileManager.pendingEmailConfirmation,
+               !profileManager.needsDisplayName {
                 VStack {
                     HStack {
                         Spacer()
@@ -189,19 +194,17 @@ struct AuthenticationView: View {
         }
         .onChange(of: profileManager.isLoggedIn) { _, isLoggedIn in
             if isLoggedIn {
-                // `hasEverLoggedIn` is written to keychain on first successful auth and survives
-                // sign-out. Use it to distinguish a returning user (→ main app) from a brand-new
-                // user who has never set preferences (→ onboarding gate).
-                //
-                // We cannot rely on `profileManager.hasCompletedPreferences` here because it is
-                // cleared on sign-out and only restored once the async DB fetch finishes. Using it
-                // would incorrectly send returning users through the preferences onboarding.
-                let isReturningUser = KeychainManager.shared.getHasEverLoggedIn()
-                if isReturningUser || profileManager.hasCompletedPreferences {
-                    coordinator.completeSignIn()
-                } else {
-                    coordinator.completeSignUp()
-                }
+                finishAuthRoutingIfReady()
+            }
+        }
+        .onChange(of: socialAuth.isCompletingSocialSignIn) { _, inProgress in
+            if !inProgress && profileManager.isLoggedIn {
+                finishAuthRoutingIfReady()
+            }
+        }
+        .onChange(of: profileManager.needsDisplayName) { _, needsName in
+            if !needsName && profileManager.isLoggedIn && !socialAuth.isCompletingSocialSignIn {
+                finishAuthRoutingIfReady()
             }
         }
     }
@@ -213,7 +216,7 @@ struct AuthenticationView: View {
             Rectangle()
                 .fill(Color.luxuryMuted.opacity(0.3))
                 .frame(height: 1)
-            Text("or continue with")
+            Text("or continue with email")
                 .font(Font.bodySans(12, weight: .regular))
                 .foregroundColor(Color.luxuryMuted)
                 .fixedSize()
@@ -314,13 +317,37 @@ struct AuthenticationView: View {
                     .scaleEffect(1.5)
                     .tint(Color.luxuryGold)
                 
-                Text(viewModel.isSignUp ? "Creating your account..." : "Signing in...")
+                Text(loadingOverlayMessage)
                     .font(Font.bodySans(14, weight: .medium))
                     .foregroundColor(Color.luxuryCream)
             }
             .padding(32)
             .background(Color.luxuryMaroonLight)
             .cornerRadius(16)
+        }
+    }
+
+    private var loadingOverlayMessage: String {
+        if socialAuth.isLoading {
+            return "Signing in…"
+        }
+        return viewModel.isSignUp ? "Creating your account..." : "Signing in..."
+    }
+
+    /// Routes past auth only when social hydrate is done and a real display name exists.
+    private func finishAuthRoutingIfReady() {
+        guard profileManager.isLoggedIn else { return }
+        guard !socialAuth.isCompletingSocialSignIn else { return }
+        guard !profileManager.needsDisplayName else { return }
+
+        // `hasEverLoggedIn` is written to keychain on first successful auth and survives
+        // sign-out. Use it to distinguish a returning user (→ main app) from a brand-new
+        // user who has never set preferences (→ onboarding gate).
+        let isReturningUser = KeychainManager.shared.getHasEverLoggedIn()
+        if isReturningUser || profileManager.hasCompletedPreferences {
+            coordinator.completeSignIn()
+        } else {
+            coordinator.completeSignUp()
         }
     }
     
@@ -621,7 +648,7 @@ struct AuthenticationView: View {
             )
             .focused($focusedField, equals: .password)
         }
-        .padding(.top, 32)
+        .padding(.top, 16)
     }
     
     private var signUpForm: some View {
