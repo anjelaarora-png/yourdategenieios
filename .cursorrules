@@ -1,0 +1,142 @@
+# Cursor AI rules — Your Date Genie
+
+You are working on Your Date Genie, an AI-powered date-planning iOS app + companion marketing website. The founder (Anjela Arora) is targeting iOS App Store submission on **2026-05-18** and public launch on **2026-05-27**. Treat every change with that timeline in mind: ship fast, but don't break Apple compliance.
+
+---
+
+## Project context
+
+**The product:** AI date-planning app. Users describe their relationship and preferences; the app generates personalized date itineraries, gift suggestions, love notes, and playlists. Premium subscribers get unlimited generations and the upcoming Couple Plan (both partners share account).
+
+**Stack:**
+- **iOS:** SwiftUI app at `ios/`. Uses Supabase Swift SDK, StoreKit 2, native AVKit/PhotoKit (add-only).
+- **Web (marketing site):** Vite + React + TypeScript + Tailwind + shadcn/ui. Hosts landing, pricing, waitlist, /terms, /privacy.
+- **Backend:** Supabase project `jhpwacmsocjmzhimtbxj`. Postgres + RLS + Edge Functions (Deno) + Auth + Storage. Service-role key NEVER appears in client code.
+- **Marketing data:** Firebase project `xcode-490005`, Firestore `waitlist` collection. Pre-launch only; archived after launch.
+- **Email:** Resend (transactional)
+- **Analytics:** Plausible (web). RevenueCat planned post-launch (iOS subscription analytics).
+
+**Legal entity:** Your Date Genie **LLC** (not "Inc." — locked decision)
+**Support contact:** `hello@yourdategenie.com`
+**Pricing (locked 2026-04-29):**
+- Premium Monthly: $14.99
+- Premium Annual: $119.99
+- Free trial: 7 days
+- Free tier: 3 AI date plans/month + 5 saved plans
+- Couple Plan (post-v1): $19.99/month
+
+---
+
+## Active P0 launch blockers
+
+These must clear before App Store submission. Each has a detailed brief in `tasks/cursor/`:
+
+1. Move OpenAI calls server-side — `tasks/cursor/01-move-openai-server-side.md`
+2. Rotate Supabase anon key + remove hardcoded JWT — `tasks/cursor/02-rotate-supabase-anon-key.md`
+3. Fix `Info.plist` armv7 → arm64 — `tasks/cursor/03-fix-info-plist-arm64.md`
+4. Generate AppIcon size grid — `tasks/cursor/04-generate-appicon-size-grid.md`
+5. Paywall Privacy/Terms links (Apple §3.1.2) — `tasks/cursor/05-paywall-privacy-terms-links.md`
+6. Sign in with Apple parity (Apple §4.8) — `tasks/cursor/06-sign-in-with-apple-parity.md`
+7. Block + Report user flows (Apple §1.2) — `tasks/cursor/07-block-and-report-user-flows.md`
+8. `subscriptions` table migration — `tasks/cursor/08-subscriptions-table-migration.md`
+9. StoreKit receipt validation Edge Function + Apple S2S webhook — `tasks/cursor/09-storekit-receipt-validation-edge-fn.md`
+10. Firebase waitlist capture — `tasks/cursor/10-firebase-waitlist-capture.md`
+11. Plausible analytics — `tasks/cursor/11-install-plausible-analytics.md`
+12. Launch-mode feature flag — `tasks/cursor/12-launch-mode-feature-flag.md`
+13. Replace template Terms + Privacy — `tasks/cursor/13-replace-template-terms-and-privacy.md`
+
+Each brief is self-contained with verification checklists. When working on one, read the entire brief first, then execute step-by-step.
+
+---
+
+## Apple App Store Review Guidelines you must respect
+
+- **§1.2 (User-Generated Content / Social):** Requires block, report, contact mechanisms. → task 07
+- **§3.1.2 (Subscriptions):** Paywall must show Privacy + Terms links + auto-renewal disclosure + restore. → task 05
+- **§4.8 (Sign in with Apple):** If any third-party login exists (Google, Facebook), Sign in with Apple must be at least equally prominent. → task 06
+- **§5.1.1(v) (Account Deletion):** App must allow in-app account deletion (not just web). Already implemented via `delete-account` Edge Function. Verify UI accessible from Settings.
+- **§5.1.2(i) (Third-Party AI):** App must disclose use of third-party AI (OpenAI). Add to Privacy Policy. → task 13
+
+---
+
+## Codebase conventions
+
+**iOS (Swift):**
+- Use `@Observable` macro for view models (we're iOS 17+)
+- Async/await for all networking; no callbacks
+- All Supabase calls go through `SupabaseService.shared` (don't call `supabase-swift` SDK directly from views)
+- All AI calls go through Supabase Edge Functions (NEVER hit OpenAI from iOS — see task 01)
+- Premium gating queries the `subscriptions` table (server source of truth — see task 09)
+
+**Web (TypeScript/React):**
+- Functional components only; no class components
+- Use shadcn/ui primitives where possible
+- Use Tailwind utilities; minimal custom CSS
+- Routing via React Router or whichever the project uses (don't introduce a second router)
+- Custom hooks in `src/hooks/`
+- API/SDK wrappers in `src/lib/`
+- All analytics events go through `src/lib/analytics.ts` (typed wrapper around Plausible)
+
+**Backend (Supabase):**
+- All migrations in `supabase/migrations/` — timestamped, idempotent where possible
+- All Edge Functions in `supabase/functions/<name>/index.ts` with shared `cors.ts` pattern
+- RLS enabled on EVERY table in `public` schema; no exceptions
+- Edge Functions verify Supabase JWT via `getUser(token)` before doing anything user-specific
+- The webhook `apple-notifications-v2` is the ONE exception — deployed with `--no-verify-jwt` because Apple sends its own JWS
+- Tighten CORS: prefer specific origin (`https://yourdategenie.com`) over `*` for any function called from web. iOS doesn't need CORS.
+
+---
+
+## Files you should NEVER touch without explicit permission
+
+- `ios/Secrets.xcconfig` — local secrets, git-ignored. Anjela manages this.
+- `supabase/migrations/<existing>` — never edit migrations after they've shipped. Always add a new migration on top.
+- `legal/terms-of-service-draft.md` — entity already updated to LLC; further legal edits require lawyer review.
+- `.env.local` — local secrets, git-ignored.
+- `.env.production` — production secrets, managed in Vercel/Netlify dashboard.
+- Anything under `node_modules/`, `.next/`, `dist/`, `build/`, `Pods/`, `DerivedData/`.
+
+---
+
+## Files where you should be especially careful
+
+- `ios/Info.plist` — has Apple-mandated keys. Don't remove existing privacy strings (`NSCalendarsUsageDescription`, `NSLocationWhenInUseUsageDescription`, `NSPhotoLibraryAddUsageDescription`). Adding new keys requires audit.
+- `ios/YourDateGenie/Config.swift` — ALL secrets are read from `Secrets.xcconfig` via Info.plist substitution. NEVER add a hardcoded fallback string for any key.
+- `supabase/functions/*/index.ts` — these run on every API call. Don't introduce blocking sync I/O. Always handle CORS preflight.
+- `src/lib/firebase.ts` — only used for waitlist. Don't extend this for app data; that's Supabase's job.
+
+---
+
+## Patterns we DO use
+
+- iOS: Result-type returns from async services; views use `do { try await … } catch { … }` with user-friendly error messages
+- iOS: Pull-to-refresh on lists; loading skeletons; error toasts via `ToastManager`
+- Web: Form validation with native HTML5 + small inline error messages (no big form libraries)
+- Web: Optimistic UI updates where safe (waitlist confirmation appears immediately, then rolls back if Firestore rejects)
+- Backend: Soft-delete patterns (set `deleted_at` instead of DELETE) where audit matters; hard-delete for `delete-account` to satisfy GDPR
+
+## Patterns we DON'T use
+
+- iOS: No SwiftUI Combine publishers in new code (use async/await)
+- iOS: No third-party DI containers (Swinject, etc.) — keep `.shared` singletons for now
+- Web: No Redux / Zustand for now (state is component-local or React Query)
+- Web: No CSS-in-JS libraries (Tailwind only)
+- Backend: No raw `psql` migrations — use the Supabase CLI migration tooling
+
+---
+
+## Marketing & growth strategy (informs build decisions)
+
+- **Channel strategy: organic-first, community-led.** Reddit, IG, TikTok, in-person events. NOT paid Meta/TikTok ads at launch (founder decision).
+- **Implication for iOS:** We do NOT need `NSUserTrackingUsageDescription` in Info.plist for v1. Reddit traffic doesn't require IDFA. If we ever turn on Meta/TikTok pixel attribution post-launch, we'll add the permission string in a v1.1 update.
+- **Implication for web:** Plausible is enough; no GA4, no Facebook Pixel, no LinkedIn Insight Tag.
+
+---
+
+## Communication style
+
+When you finish a task, output a single line summary in the chat: what changed, what files, what remaining steps require Anjela (manual Supabase/App Store/Apple Developer console actions). Don't over-explain — Anjela reads the diff.
+
+When you find a problem mid-task, stop and ask. Don't silently expand scope. The task briefs are scoped intentionally; bigger changes need a refreshed brief.
+
+When you're unsure of a project convention, prefer reading existing similar files in the same directory over inventing a new pattern.

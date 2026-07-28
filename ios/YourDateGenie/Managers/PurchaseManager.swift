@@ -81,13 +81,25 @@ final class PurchaseManager: ObservableObject {
         lastErrorMessage = nil
         defer { isLoadingProducts = false }
 
+        await fetchProductsOnce()
+        // One retry after ASC / StoreKit propagation delay (common right after creating products).
+        if premiumMonthlyProduct == nil && premiumAnnualProduct == nil {
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            await fetchProductsOnce()
+        }
+        if premiumMonthlyProduct == nil && premiumAnnualProduct == nil, lastErrorMessage == nil {
+            lastErrorMessage = PurchaseManagerError.productNotFound.localizedDescription
+        }
+    }
+
+    private func fetchProductsOnce() async {
         do {
             let productIDs = [Self.premiumMonthlyProductID, Self.premiumAnnualProductID]
             let products = try await Product.products(for: productIDs)
             premiumMonthlyProduct = products.first(where: { $0.id == Self.premiumMonthlyProductID })
             premiumAnnualProduct = products.first(where: { $0.id == Self.premiumAnnualProductID })
-            if premiumMonthlyProduct == nil && premiumAnnualProduct == nil {
-                lastErrorMessage = PurchaseManagerError.productNotFound.localizedDescription
+            if premiumMonthlyProduct != nil || premiumAnnualProduct != nil {
+                lastErrorMessage = nil
             }
         } catch {
             lastErrorMessage = error.localizedDescription
@@ -151,6 +163,9 @@ final class PurchaseManager: ObservableObject {
             // subscriptions table is up to date even if S2S notifications were missed.
             await reportCurrentEntitlementsToBackend()
             await refreshEntitlements()
+            if !isSubscribed {
+                lastErrorMessage = "No active subscription found for this Apple ID."
+            }
         } catch {
             lastErrorMessage = error.localizedDescription
         }

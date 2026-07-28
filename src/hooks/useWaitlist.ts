@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { collection, addDoc, serverTimestamp, query, where, getDocs } from 'firebase/firestore'
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { Events } from '@/lib/analytics'
 
@@ -23,18 +23,11 @@ export function useWaitlist() {
     setErrorMessage(null)
 
     try {
-      const existing = await getDocs(
-        query(collection(db, 'waitlist'), where('email', '==', entry.email.toLowerCase()))
-      )
-      if (!existing.empty) {
-        setStatus('duplicate')
-        return
-      }
+      const email = entry.email.toLowerCase().trim()
 
-      // Match existing schema: email, fullName, city, phone, createdAt
-      // Plus: source (attribution), userAgent (anti-fraud), partnerEmail (optional)
-      await addDoc(collection(db, 'waitlist'), {
-        email: entry.email.toLowerCase().trim(),
+      // Email is the document ID — Firestore rules enforce !exists() so we never need a client read.
+      await setDoc(doc(db, 'waitlist', email), {
+        email,
         fullName: entry.fullName.trim(),
         city: entry.city.trim(),
         phone: entry.phone?.trim() || null,
@@ -48,6 +41,14 @@ export function useWaitlist() {
       setStatus('success')
     } catch (err: unknown) {
       console.error('Waitlist submission error:', err)
+      const code =
+        err && typeof err === 'object' && 'code' in err
+          ? String((err as { code: string }).code)
+          : ''
+      if (code === 'permission-denied') {
+        setStatus('duplicate')
+        return
+      }
       setStatus('error')
       setErrorMessage(
         err instanceof Error ? err.message : 'Something went wrong. Please try again.'

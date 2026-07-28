@@ -68,6 +68,17 @@ final class AccessManager: ObservableObject {
         UserDefaults.standard.set(freePlansUsed + 1, forKey: Self.freePlansUsedKey)
     }
 
+    /// Runs `perform` when the user has free credits or premium; otherwise presents the paywall and retries after subscribe.
+    func requireDatePlanGeneration(perform: @escaping () -> Void) {
+        if canGenerateDatePlan() {
+            perform()
+        } else {
+            pendingUnlock = perform
+            Task { await PurchaseManager.shared.refreshEntitlementsFromServer() }
+            isPaywallPresented = true
+        }
+    }
+
     // MARK: - Private
 
     private var pendingUnlock: (() -> Void)?

@@ -41,9 +41,7 @@ struct LuxuryHomeTabView: View {
     @State private var heroPlanOverride: DatePlan?
     @State private var pinnedHeroPlanId: UUID?
     @State private var swapContext: SwapStopContext?
-    /// Bumped when user taps an unsaved row — scrolls Home to the hero card.
-    @State private var heroScrollToken = UUID()
-    /// User explicitly picked a hero plan (Upcoming unsaved tap); don't auto-switch on list reorder.
+    /// User explicitly picked a hero plan; don't auto-switch on list reorder.
     @State private var heroSelectionIsManual = false
     /// Frozen row order for Upcoming — only changes when plans are added or removed.
     @State private var stableUnsavedOrder: [UUID] = []
@@ -206,8 +204,8 @@ struct LuxuryHomeTabView: View {
         return order.compactMap { byId[$0] }
     }
 
-    /// Pin an unsaved plan on the Home hero (Upcoming / waiting list taps).
-    private func focusUnsavedPlanOnHome(_ plan: DatePlan) {
+    /// Open the full plan sheet (itinerary + bottom extras) — same as post-generation result.
+    private func openPlanDetailPopup(_ plan: DatePlan) {
         heroPlanOverride = nil
         pinnedHeroPlanId = plan.id
         heroSelectionIsManual = true
@@ -216,7 +214,7 @@ struct LuxuryHomeTabView: View {
             coordinator.generatedPlansSelectedIndex = idx
         }
         showUnsavedPlansSheet = false
-        heroScrollToken = UUID()
+        coordinator.activeSheet = .datePlanResult
     }
 
     init(tutorialStep: Binding<Int> = .constant(0), isTutorialActive: Bool = false) {
@@ -250,11 +248,6 @@ struct LuxuryHomeTabView: View {
                     .mainTabBarScrollInset()
                     .scrollBounceBehavior(.basedOnSize)
                     .scrollContentBackground(.hidden)
-                    .onChange(of: heroScrollToken) { _, _ in
-                        withAnimation(.easeInOut(duration: 0.45)) {
-                            scrollProxy.scrollTo(HomeTutorialAnchor.heroPlan.rawValue, anchor: .top)
-                        }
-                    }
                     .onChange(of: tutorialStep) { _, step in
                         guard isTutorialActive else { return }
                         scrollTutorial(to: step, proxy: scrollProxy)
@@ -619,15 +612,7 @@ struct LuxuryHomeTabView: View {
     }
 
     private func openHeroPlan(_ plan: DatePlan) {
-        coordinator.currentDatePlan = plan
-        if planIsUnsaved(plan),
-           coordinator.generatedPlans.contains(where: { $0.id == plan.id }),
-           let idx = coordinator.generatedPlans.firstIndex(where: { $0.id == plan.id }) {
-            coordinator.generatedPlansSelectedIndex = idx
-            coordinator.activeSheet = .datePlanOptions
-        } else {
-            coordinator.activeSheet = .datePlanResult
-        }
+        openPlanDetailPopup(plan)
     }
 
     private func approveHeroPlan(_ plan: DatePlan) {
@@ -881,12 +866,7 @@ struct LuxuryHomeTabView: View {
         let price = plan.estimatedCost
 
         let tapAction: () -> Void = {
-            if isUnsaved {
-                focusUnsavedPlanOnHome(plan)
-            } else {
-                coordinator.currentDatePlan = plan
-                coordinator.activeSheet = .datePlanResult
-            }
+            openPlanDetailPopup(plan)
         }
 
         return HStack(spacing: 0) {
@@ -1042,7 +1022,7 @@ struct LuxuryHomeTabView: View {
                                     .clipShape(Capsule())
                             }
                         }
-                        Text("Saved plans · tap to view · unsaved open on Home")
+                        Text("Tap any plan to view details and extras")
                             .font(Font.bodySans(11, weight: .regular))
                             .foregroundColor(Color.textPrimary.opacity(0.5))
                     }
@@ -1208,7 +1188,7 @@ struct LuxuryHomeTabView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 12) {
-                    Text("Tap a plan — it opens on Home so you can review, swap, or save.")
+                    Text("Tap a plan to review the full itinerary, swap stops, or save.")
                         .font(Font.bodySans(13, weight: .regular))
                         .foregroundColor(Color.luxuryCreamMuted)
                         .frame(maxWidth: .infinity, alignment: .leading)

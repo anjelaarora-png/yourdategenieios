@@ -21,7 +21,6 @@ struct YourDateGenieApp: App {
                 .environmentObject(AccessManager.shared)
                 .onAppear {
                     FirebaseBootstrap.configureIfNeeded()
-                    PurchaseManager.shared.checkSubscriptionOnAppLaunch()
                     #if DEBUG
                     if !ScreenshotDemo.isActive {
                         notificationManager.requestAuthorization()

@@ -87,7 +87,7 @@ struct SettingsSheetView: View {
                                     Text(
                                         purchases.isSubscribed
                                             ? "Thank you for supporting Your Date Genie."
-                                            : "Start free for 7 days, then $14.99/month or $99.99/year."
+                                            : "Start free for 7 days, then $14.99/month or $119.99/year."
                                     )
                                     .font(Font.bodySans(13, weight: .regular))
                                     .foregroundColor(Color.luxuryMuted)
@@ -133,6 +133,13 @@ struct SettingsSheetView: View {
                             }
                             .buttonStyle(.plain)
                             .disabled(purchases.isRestoring)
+
+                            if let msg = purchases.lastErrorMessage, !msg.isEmpty {
+                                Text(msg)
+                                    .font(Font.bodySans(13, weight: .regular))
+                                    .foregroundColor(Color.orange.opacity(0.95))
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
 
                             if let subscriptionsURL = URL(string: "https://apps.apple.com/account/subscriptions") {
                                 Link(destination: subscriptionsURL) {

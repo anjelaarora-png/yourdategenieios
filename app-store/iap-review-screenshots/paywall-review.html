@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=1290, initial-scale=1" />
+  <title>YDG Paywall — IAP Review Screenshot</title>
+  <style>
+    :root {
+      --bg: #2a0f16;
+      --maroon: #6e1023;
+      --maroon-light: #4a1520;
+      --gold: #d4af37;
+      --gold-soft: #c9a84c;
+      --cream: #f5efe6;
+      --muted: #b8a99a;
+      --text: #f3ebe1;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      width: 1290px;
+      height: 2796px;
+      overflow: hidden;
+      background: var(--bg);
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Helvetica, Arial, sans-serif;
+      color: var(--text);
+    }
+    .screen {
+      width: 1290px;
+      height: 2796px;
+      background: var(--bg);
+      display: flex;
+      flex-direction: column;
+      padding: 120px 96px 100px;
+      justify-content: flex-start;
+    }
+    .nav {
+      display: flex;
+      justify-content: flex-end;
+      margin-bottom: 48px;
+    }
+    .nav span {
+      color: var(--gold);
+      font-size: 42px;
+      font-weight: 500;
+    }
+    .content {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+    .brand {
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 84px;
+      color: var(--gold);
+      text-align: center;
+      margin-bottom: 36px;
+    }
+    .headline {
+      font-size: 48px;
+      font-weight: 500;
+      text-align: center;
+      line-height: 1.3;
+      margin-bottom: 24px;
+      padding: 0 24px;
+    }
+    .trial {
+      font-size: 38px;
+      color: var(--gold-soft);
+      text-align: center;
+      margin-bottom: 72px;
+    }
+    .toggle {
+      display: flex;
+      background: var(--maroon-light);
+      border: 2px solid rgba(212,175,55,.3);
+      border-radius: 28px;
+      overflow: hidden;
+      margin-bottom: 56px;
+    }
+    .tab {
+      flex: 1;
+      text-align: center;
+      padding: 38px 16px;
+      font-size: 40px;
+      color: var(--cream);
+    }
+    .tab.on {
+      background: linear-gradient(135deg, #e8d48b, #c9a84c);
+      color: var(--maroon);
+      font-weight: 600;
+    }
+    .badge {
+      display: inline-block;
+      font-size: 30px;
+      font-weight: 600;
+      margin-left: 12px;
+      padding: 6px 16px;
+      border-radius: 999px;
+      background: rgba(110,16,35,.15);
+      color: var(--maroon);
+      vertical-align: middle;
+    }
+    .tab:not(.on) .badge {
+      background: rgba(212,175,55,.2);
+      color: var(--gold);
+    }
+    .price-card {
+      border: 2px solid rgba(212,175,55,.35);
+      background: linear-gradient(180deg, rgba(110,16,35,.55), rgba(42,15,22,.9));
+      border-radius: 36px;
+      padding: 56px 40px;
+      text-align: center;
+      margin-bottom: 56px;
+    }
+    .price {
+      font-family: Georgia, serif;
+      font-size: 104px;
+      font-weight: 700;
+      color: var(--gold);
+    }
+    .period { font-size: 38px; color: var(--muted); margin-top: 14px; }
+    .note { font-size: 38px; color: var(--gold-soft); margin-top: 18px; font-weight: 500; }
+    .benefits {
+      border: 2px solid rgba(212,175,55,.3);
+      border-radius: 32px;
+      padding: 48px 40px;
+      margin-bottom: 56px;
+      background: rgba(110,16,35,.35);
+    }
+    .row {
+      display: flex;
+      gap: 24px;
+      margin-bottom: 40px;
+    }
+    .row:last-child { margin-bottom: 0; }
+    .check {
+      color: var(--gold);
+      font-size: 42px;
+      line-height: 1.15;
+      flex-shrink: 0;
+    }
+    .row-title { font-size: 40px; font-weight: 600; color: var(--cream); line-height: 1.25; }
+    .row-detail { font-size: 34px; color: var(--muted); margin-top: 8px; line-height: 1.3; }
+    .cta {
+      display: block;
+      width: 100%;
+      border: none;
+      border-radius: 28px;
+      padding: 44px;
+      font-size: 44px;
+      font-weight: 700;
+      color: var(--maroon);
+      background: linear-gradient(135deg, #f0e0a0, #d4af37);
+      margin-bottom: 32px;
+      text-align: center;
+    }
+    .restore {
+      display: block;
+      width: 100%;
+      border: 2px solid rgba(212,175,55,.45);
+      border-radius: 28px;
+      padding: 40px;
+      font-size: 42px;
+      font-weight: 600;
+      color: var(--gold);
+      background: transparent;
+      margin-bottom: 48px;
+      text-align: center;
+    }
+    .legal {
+      font-size: 30px;
+      color: rgba(184,169,154,.9);
+      text-align: center;
+      line-height: 1.45;
+      margin-bottom: 32px;
+      padding: 0 8px;
+    }
+    .links {
+      display: flex;
+      justify-content: center;
+      gap: 28px;
+      font-size: 34px;
+      color: rgba(212,175,55,.9);
+    }
+    .links .dot { color: var(--muted); }
+    .spacer { display: none; }
+  </style>
+</head>
+<body>
+  <div class="screen">
+    <div class="nav"><span>Not now</span></div>
+    <div class="content">
+      <div class="brand">Your Date Genie</div>
+      <div class="headline">Wake up to a finished date plan — not a blank page</div>
+      <div class="trial">7-day free trial · Cancel anytime</div>
+
+      <div class="toggle" id="toggle"></div>
+      <div class="price-card" id="price"></div>
+
+      <div class="benefits">
+        <div class="row"><div class="check">✓</div><div><div class="row-title">Approve a complete itinerary in one tap</div><div class="row-detail">Stops, timing, and backup options — ready to go</div></div></div>
+        <div class="row"><div class="check">✓</div><div><div class="row-title">Unlimited date plans</div><div class="row-detail">Generate as many finished plans as you need</div></div></div>
+        <div class="row"><div class="check">✓</div><div><div class="row-title">Plan together with your partner</div><div class="row-detail">Invite, rank options, and lock in your match</div></div></div>
+        <div class="row"><div class="check">✓</div><div><div class="row-title">Love Notes, Gift Finder &amp; Memories</div><div class="row-detail">Every romantic detail, organized for you</div></div></div>
+        <div class="row"><div class="check">✓</div><div><div class="row-title">Conversation Starters &amp; smart playlists</div></div></div>
+        <div class="row"><div class="check">✓</div><div><div class="row-title">Route maps &amp; calendar integration</div></div></div>
+      </div>
+
+      <div class="cta">Start 7-Day Free Trial</div>
+      <div class="restore">Restore Purchases</div>
+
+      <p class="legal" id="legal"></p>
+      <div class="links">
+        <span>Privacy Policy</span>
+        <span class="dot">·</span>
+        <span>Terms of Use</span>
+      </div>
+      <div class="spacer"></div>
+    </div>
+  </div>
+  <script>
+    const plan = new URLSearchParams(location.search).get("plan") === "monthly" ? "monthly" : "annual";
+    const toggle = document.getElementById("toggle");
+    const price = document.getElementById("price");
+    const legal = document.getElementById("legal");
+
+    if (plan === "annual") {
+      toggle.innerHTML = `
+        <div class="tab on">Annual <span class="badge">Save 33%</span></div>
+        <div class="tab">Monthly</div>`;
+      price.innerHTML = `
+        <div class="price">$119.99</div>
+        <div class="period">per year</div>
+        <div class="note">~$10.00/mo · 7 days free</div>`;
+      legal.textContent = "7-day free trial, then $119.99/year. Subscription automatically renews unless cancelled at least 24 hours before the end of the current period. Manage in Settings → Subscriptions.";
+    } else {
+      toggle.innerHTML = `
+        <div class="tab">Annual <span class="badge">Save 33%</span></div>
+        <div class="tab on">Monthly</div>`;
+      price.innerHTML = `
+        <div class="price">$14.99</div>
+        <div class="period">per month after free trial</div>`;
+      legal.textContent = "7-day free trial, then $14.99/month. Subscription automatically renews unless cancelled at least 24 hours before the end of the current period. Manage in Settings → Subscriptions.";
+    }
+  </script>
+</body>
+</html>

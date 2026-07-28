@@ -74,7 +74,7 @@ ACT2_EXTRA = (
     + frame("<b>12 · Plan result</b> · all quick actions ⭐", stat("Close", "Plan", "Share") + '<div class="chips" style="margin:12px 0;"><span class="pill">Route</span><span class="pill">Calendar</span><span class="pill">Playlist</span><span class="pill">Gifts</span></div><div class="chips" style="margin-bottom:auto;"><span class="pill">Reserve</span><span class="pill">Photo</span><span class="pill">Share</span><span class="pill">Delete</span></div>' + cta("Lock it in"))
     + frame("<b>12a · Reservation</b>", stat("✕", "Reserve", "") + '<div class="card" style="margin:12px 0 8px;display:flex;justify-content:space-between;"><span class="cream note">OpenTable</span><span class="cta-sm">Book</span></div><div class="card" style="display:flex;justify-content:space-between;"><span class="cream note">Resy</span><span class="ghost">Book</span></div><div class="card" style="margin-top:8px;display:flex;justify-content:space-between;"><span class="cream note">Call</span><span class="ghost">📞</span></div>')
     + frame("<b>12b · Regenerate</b>", stat("✕", "Options", "") + '<div class="card" style="margin:12px 0;border:1px solid var(--gold);"><div class="cream note">Plan A</div></div><div class="center" style="margin-bottom:auto;"><span class="link">🔄 Regenerate</span></div>' + cta("View plan"))
-    + frame("<b>12c · Paywall 3rd plan</b>", stat("✕", "", "") + '<div class="h-display center" style="font-size:18px;margin:20px 0;">3 free plans used</div><div class="pricecard" style="margin-bottom:8px;"><div><div class="cream note">Yearly</div><div class="dim note">$99.99/yr</div></div><span class="cta-sm">Trial</span></div><div class="pricecard alt"><div><div class="cream note">Monthly</div><div class="dim note">$14.99/mo</div></div></div>')
+    + frame("<b>12c · Paywall 3rd plan</b>", stat("✕", "", "") + '<div class="h-display center" style="font-size:18px;margin:20px 0;">3 free plans used</div><div class="pricecard" style="margin-bottom:8px;"><div><div class="cream note">Yearly</div><div class="dim note">$119.99/yr</div></div><span class="cta-sm">Trial</span></div><div class="pricecard alt"><div><div class="cream note">Monthly</div><div class="dim note">$14.99/mo</div></div></div>')
     + frame("<b>16a · Undo</b>", '<div style="background:var(--surface2);padding:10px;border-radius:10px;margin:14px 0;display:flex;justify-content:space-between;"><span class="cream note">Plan saved</span><span class="link">Undo</span></div>' + tabbar("Home"))
     + frame("<b>12d · Move to past</b>", cta("Move to Past Dates"))
 )
@@ -105,7 +105,7 @@ ACT10 = (
     + frame("<b>F23 · Explore radius</b>", '<div class="label">Within 15 miles</div><div style="height:4px;background:var(--surface);margin:8px 0 12px;"><div style="width:60%;height:100%;background:var(--gold);"></div></div><div class="card"><div class="cream note">Nonna\'s</div></div>')
     + frame("<b>F24 · Relationship story</b>", '<div class="card" style="margin:14px 0;"><div class="cream note">312 days · 14 dates · 6 memories</div></div>' + tabbar("You"))
     + frame("<b>F25 · Edit account</b>", stat("Cancel", "Account", "Save") + '<div class="card" style="padding:10px;margin:12px 0;"><span class="cream note">John Arora · you@email.com</span></div>')
-    + frame("<b>F26 · Subscription</b>", '<div class="pricecard" style="margin:12px 0;"><div><div class="cream note">Annual $99.99</div></div><span class="cta-sm">Trial</span></div><div class="link">Restore purchases</div>')
+    + frame("<b>F26 · Subscription</b>", '<div class="pricecard" style="margin:12px 0;"><div><div class="cream note">Annual $119.99</div></div><span class="cta-sm">Trial</span></div><div class="link">Restore purchases</div>')
     + frame("<b>F27 · Partner share</b>", '<div class="card" style="margin:12px 0;"><div class="cream note">Pasta plan</div></div>' + cta("Send to Maya"))
     + frame("<b>F28 · Swap stop</b>", '<div class="card" style="margin:12px 0;border:1px solid var(--gold);"><div class="cream note">Rooftop bar</div></div>' + cta("Use this stop"))
     + "\n  </div>\n"
@@ -140,7 +140,7 @@ rj();
 
 def main():
     text = HTML.read_text(encoding="utf-8")
-    text = text.replace("$3.33/mo · best value", "$99.99/yr · best value")
+    text = text.replace("$3.33/mo · best value", "$119.99/yr · best value")
     text = text.replace("$5.99/mo", "$14.99/mo")
 
     if "act1b" not in text:

@@ -1,7 +1,7 @@
 # Your Date Genie — App Store Connect Screenshots
 
-**Status:** 6 marketing-style screenshots ready to upload, iPhone 6.9" (1320 × 2868 px), Apple-spec-compliant.
-**Generated:** 2026-05-20 (T-7 to submission)
+**Status:** 6 marketing screenshots + 3 how-to-use cards ready to upload at **1284 × 2778 px** (iPhone 6.5" display — App Store Connect).
+**Generated:** 2026-06-29 — also accepted: 1242 × 2688 portrait (landscape: 2778 × 1284 or 2688 × 1242).
 
 ---
 
@@ -9,14 +9,28 @@
 
 | # | File | Headline | Subtitle | Screen shown |
 |---|------|----------|----------|--------------|
-| 1 | `01_plan_tonight.png` | Plan tonight's date. | Your night, curated before you ask. | Magazine-cover reveal: issue number, ornament, italic 4-line hero title ("Pasta, Art & Late-Night Gelato."), 3-stop program list with brass hairlines, "Tailored to nut-free" callback |
-| 2 | `02_built_around_you.png` | Built around you two. | Mood, budget, allergies, interests — we plan around all of it. | Setup wizard with four sectioned controls: mood chips, budget slider with tick marks, allergy/dietary chips, interest chips |
-| 3 | `03_wishes_granted.png` | Wishes granted. | A tailored itinerary in seconds. | Magic generation orb with status items |
-| 4 | `04_three_acts.png` | Pasta. Art. Late-night gelato. | Every detail mapped, beat by beat. | Itinerary view — 3-stop date card stack |
-| 5 | `05_send_in_one_tap.png` | Send it in one tap. | Share the plan, lock the reservation, show up. | Shared confirmation with envelope + heart seal |
-| 6 | `06_never_run_out.png` | Never run out of date ideas. | Your personal genie, in your pocket. | Library grid of saved date ideas |
+| 1 | `01_plan_tonight.png` | Plan tonight's date. | Your night, curated before you ask. | Home — tonight's plan ready to lock in |
+| 2 | `02_built_around_you.png` | Built around you two. | Mood, budget, allergies, interests — we plan around all of it. | Setup questionnaire |
+| 3 | `03_wishes_granted.png` | Wishes granted. | A tailored itinerary in seconds. | Generated itinerary reveal |
+| 4 | `04_three_acts.png` | Pasta. Art. Late-night gelato. | Every detail mapped, beat by beat. | Full itinerary timeline |
+| 5 | `05_send_in_one_tap.png` | Send it in one tap. | Share the plan, lock the reservation, show up. | Locked-in plan with share actions |
+| 6 | `06_never_run_out.png` | Never run out of date ideas. | Your personal genie, in your pocket. | Convo extras — Love Notes, Gifts, Memories |
 
-The mock screens inside the device frames are **placeholder UIs that match the brand and narrative**. You can swap them for real captures later (see "Swap with real captures" below) — the marketing layer (background, headline, subtitle, brass divider, device frame) stays.
+Screens inside the device frames are **real simulator captures** composited with the marketing layer (wine gradient, headline, brass divider, device frame).
+
+---
+
+## How-to-use cards (3 static images)
+
+Use these for App Store description embeds, support docs, social, or as supplemental screenshots. Same **1284 × 2778** spec.
+
+| # | File | Step | Title |
+|---|------|------|-------|
+| 1 | `01_plan_your_date.png` | 1 of 3 | Plan your perfect date |
+| 2 | `02_your_plans_live_here.png` | 2 of 3 | Your plans live here |
+| 3 | `03_explore_the_app.png` | 3 of 3 | Explore the app |
+
+Copy matches the in-app home tutorial (`HomeTutorialOverlayView.swift`).
 
 ---
 
@@ -25,14 +39,21 @@ The mock screens inside the device frames are **placeholder UIs that match the b
 ```
 app-store/screenshots/
 ├── README.md                      ← this file
-├── iphone-6.9/                    ← upload these 6 to App Store Connect
+├── fonts/                         ← Lora + Poppins (bundled for regeneration)
+├── iphone-6.5/                    ← upload these 6 to App Store Connect (1284×2778)
 │   ├── 01_plan_tonight.png
 │   ├── 02_built_around_you.png
 │   ├── 03_wishes_granted.png
 │   ├── 04_three_acts.png
 │   ├── 05_send_in_one_tap.png
 │   └── 06_never_run_out.png
-└── generate_screenshots.py        ← regenerate any time, edit copy or colors in here
+├── iphone-6.9/                    ← legacy 1320×2868 (do not upload if Connect asks for 6.5")
+├── how-to-use/                    ← 3 tutorial cards (same dimensions)
+│   ├── 01_plan_your_date.png
+│   ├── 02_your_plans_live_here.png
+│   └── 03_explore_the_app.png
+└── generate_screenshots.py        ← regenerate: python3 generate_screenshots.py
+└── capture_screenshots.sh         ← fresh captures: ./capture_screenshots.sh
 ```
 
 ---

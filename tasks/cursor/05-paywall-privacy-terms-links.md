@@ -36,7 +36,7 @@ This is the single most common §3.1.2 rejection reason. Easy fix.
 - **Terms of Use URL:** `https://yourdategenie.com/terms` (NOT yet live — see task 13 to publish the redrafted Terms; for now, use this URL and the page will go live before submission)
 - **Pricing displayed in paywall:**
   - Monthly: **$14.99/mo**
-  - Annual: **$99.99/yr** (~44% off)
+  - Annual: **$119.99/yr** (~33% off)
   - Free trial: 7 days
   - Free tier (non-paywall context): 3 AI date plans/mo + 5 saved plans
 
@@ -139,7 +139,7 @@ Text("Subscription automatically renews unless canceled at least 24 hours before
 
 ### Step 6 — Verify pricing strings
 
-Confirm the paywall displays the correct prices ($14.99/mo, $99.99/yr). If hardcoded, update them. If pulled from StoreKit `Product.displayPrice`, verify the products are configured with these prices in App Store Connect (separate task, but flag if you find hardcoded prices that don't match).
+Confirm the paywall displays the correct prices ($14.99/mo, $119.99/yr). If hardcoded, update them. If pulled from StoreKit `Product.displayPrice`, verify the products are configured with these prices in App Store Connect (separate task, but flag if you find hardcoded prices that don't match).
 
 ---
 

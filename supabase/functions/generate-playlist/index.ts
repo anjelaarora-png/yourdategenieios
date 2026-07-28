@@ -389,7 +389,7 @@ async function fetchLastFmJson(
   const search = new URLSearchParams({ ...params, api_key: apiKey, format: "json" });
   const url = `${LASTFM_BASE}/?${search.toString()}`;
   try {
-    const opts: RequestInit = typeof AbortSignal?.timeout === "function" ? { signal: AbortSignal.timeout(12000) } : {};
+    const opts: RequestInit = typeof AbortSignal?.timeout === "function" ? { signal: AbortSignal.timeout(3500) } : {};
     const res = await fetch(url, opts);
     const text = await res.text();
     if (!res.ok) return null;
@@ -399,9 +399,9 @@ async function fetchLastFmJson(
   }
 }
 
-const TRACK_GETINFO_CAP = 28;
-const ALBUM_GETINFO_CAP = 16;
-const LASTFM_REFINE_CONCURRENCY = 4;
+const TRACK_GETINFO_CAP = 8;
+const ALBUM_GETINFO_CAP = 4;
+const LASTFM_REFINE_CONCURRENCY = 8;
 
 async function runWithConcurrency<T>(items: T[], limit: number, fn: (item: T) => Promise<void>): Promise<void> {
   const queue = items.slice();

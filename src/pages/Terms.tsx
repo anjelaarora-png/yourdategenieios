@@ -221,7 +221,7 @@ const Terms = () => {
             </p>
             <ul className="space-y-2 mt-2">
               <Bullet><strong>Monthly Plan:</strong> $14.99 per month, billed monthly.</Bullet>
-              <Bullet><strong>Annual Plan:</strong> $99.99 per year (equivalent to approximately $8.33/month).</Bullet>
+              <Bullet><strong>Annual Plan:</strong> $119.99 per year (equivalent to approximately $10.00/month).</Bullet>
             </ul>
             <p className="mt-2">
               Prices are displayed in U.S. Dollars and may vary by country due to App Store regional pricing. The price confirmed to you in the App Store at the time of purchase is the binding price for that billing period.

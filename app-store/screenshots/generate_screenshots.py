@@ -1,17 +1,26 @@
 """
 Your Date Genie — App Store Connect screenshot generator
-Output: 6 PNGs at 1320 x 2868 px (iPhone 6.9" — iPhone 16 Pro Max)
-Color: sRGB, no alpha. Apple-compliant.
-
-Brand tokens straight from website/claude-design-bundle/project/colors_and_type.css
+Output: PNGs at 1290 x 2796 px (iPhone 6.9" — App Store Connect primary)
+Also exports 1284 x 2778 for 6.5" display class. Color: sRGB, no alpha.
 """
 
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
 import os
 import math
 
+# ---------- Paths ----------
+ROOT = os.path.dirname(os.path.abspath(__file__))
+FONT_DIR = os.path.join(ROOT, "fonts")
+CAPTURES_DIR = os.path.join(ROOT, "..", "..", "_ios_screenshots")
+OUT_DIR = os.path.join(ROOT, "iphone-6.9")
+OUT_DIR_65 = os.path.join(ROOT, "iphone-6.5")
+HOWTO_DIR = os.path.join(ROOT, "how-to-use")
+
 # ---------- Canvas ----------
-W, H = 1320, 2868  # iPhone 6.9" portrait — Apple spec
+# Design canvas (layout tuned here), exported at Apple 6.9" spec below.
+W, H = 1320, 2868
+EXPORT_W, EXPORT_H = 1290, 2796  # App Store Connect 6.9" portrait (primary)
+EXPORT_W_65, EXPORT_H_65 = 1284, 2778  # 6.5" fallback
 
 # ---------- Brand tokens (from colors_and_type.css) ----------
 WINE         = (74, 14, 16)     # --ydg-wine-bg #4A0E10
@@ -27,14 +36,14 @@ INK_SOFT     = (43, 39, 34)     # --ydg-ink-soft
 GRAPHITE     = (91, 84, 77)     # --ydg-graphite
 BLUSH        = (232, 200, 184)  # --ydg-blush
 
-# ---------- Fonts ----------
-FONT_DISPLAY = "/usr/share/fonts/truetype/google-fonts/Lora-Variable.ttf"
-FONT_DISPLAY_IT = "/usr/share/fonts/truetype/google-fonts/Lora-Italic-Variable.ttf"
-FONT_UI      = "/usr/share/fonts/truetype/google-fonts/Poppins-Medium.ttf"
-FONT_UI_REG  = "/usr/share/fonts/truetype/google-fonts/Poppins-Regular.ttf"
-FONT_UI_LIGHT= "/usr/share/fonts/truetype/google-fonts/Poppins-Light.ttf"
-FONT_UI_BOLD = "/usr/share/fonts/truetype/google-fonts/Poppins-Bold.ttf"
-FONT_SC      = "/usr/share/fonts/truetype/google-fonts/Poppins-Light.ttf"  # small caps stand-in
+# ---------- Fonts (bundled in fonts/) ----------
+FONT_DISPLAY = os.path.join(FONT_DIR, "Lora-Regular.ttf")
+FONT_DISPLAY_IT = os.path.join(FONT_DIR, "Lora-Italic.ttf")
+FONT_UI      = os.path.join(FONT_DIR, "Poppins-Medium.ttf")
+FONT_UI_REG  = os.path.join(FONT_DIR, "Poppins-Regular.ttf")
+FONT_UI_LIGHT= os.path.join(FONT_DIR, "Poppins-Light.ttf")
+FONT_UI_BOLD = os.path.join(FONT_DIR, "Poppins-Bold.ttf")
+FONT_SC      = os.path.join(FONT_DIR, "Poppins-Light.ttf")  # small caps stand-in
 
 def F(path, size):
     return ImageFont.truetype(path, size)
@@ -172,6 +181,58 @@ def draw_phone_frame(img, top_y, scale=1.0, screen_renderer=None, screen_args=No
                  radius=int(di_h / 2), fill=(8, 6, 5))
 
     return fy, fy + frame_h
+
+
+def export_png(img, filename, export_w=None, export_h=None):
+    """Save RGB PNG at exact App Store Connect dimensions."""
+    export_w = export_w if export_w is not None else EXPORT_W
+    export_h = export_h if export_h is not None else EXPORT_H
+    final = img.convert("RGB")
+    if final.size != (export_w, export_h):
+        final = final.resize((export_w, export_h), Image.LANCZOS)
+    final.save(filename, "PNG", optimize=True)
+    return filename
+
+
+def export_all_sizes(img, basename):
+    """Write primary 6.9\" export plus 6.5\" fallback."""
+    os.makedirs(OUT_DIR, exist_ok=True)
+    os.makedirs(OUT_DIR_65, exist_ok=True)
+    export_png(img, os.path.join(OUT_DIR, basename))
+    export_png(img, os.path.join(OUT_DIR_65, basename), EXPORT_W_65, EXPORT_H_65)
+
+
+def capture_path(name):
+    """Resolve a simulator capture from _ios_screenshots/."""
+    path = os.path.join(CAPTURES_DIR, name)
+    if not os.path.isfile(path):
+        raise FileNotFoundError(f"Missing capture: {path}")
+    return path
+
+
+def make_capture_renderer(capture_name):
+    """Paste a real simulator screenshot into the device screen area."""
+    path = capture_path(capture_name)
+
+    def render(canvas, draw, args):
+        sw, sh = canvas.size
+        real = Image.open(path).convert("RGB")
+        rw, rh = real.size
+        target_aspect = sw / sh
+        src_aspect = rw / rh
+        if src_aspect > target_aspect:
+            new_w = int(rh * target_aspect)
+            left = (rw - new_w) // 2
+            real = real.crop((left, 0, left + new_w, rh))
+        else:
+            new_h = int(rw / target_aspect)
+            top = (rh - new_h) // 2
+            real = real.crop((0, top, rw, top + new_h))
+        real = real.resize((sw, sh), Image.LANCZOS)
+        canvas.paste(real, (0, 0))
+
+    return render
+
 
 # ---------- Mock screen renderers ----------
 def status_bar(draw, x, y, w, color=BONE):
@@ -774,30 +835,246 @@ def compose_screenshot(headline, subtitle, screen_renderer, filename, headline_s
     phone_top = div_y + 100
     draw_phone_frame(img, phone_top, scale=1.0, screen_renderer=screen_renderer)
 
-    # Ensure no alpha
-    final = img.convert("RGB")
-    final.save(filename, "PNG", optimize=True)
+    if os.path.dirname(filename):
+        os.makedirs(os.path.dirname(filename), exist_ok=True)
+        export_png(img, filename)
+        if OUT_DIR_65:
+            export_png(
+                img,
+                os.path.join(OUT_DIR_65, os.path.basename(filename)),
+                EXPORT_W_65,
+                EXPORT_H_65,
+            )
+    else:
+        export_all_sizes(img, os.path.basename(filename))
+    return filename
+
+
+def compose_how_to_use(step, total, title, body, capture_name, filename):
+    """Full-frame how-to-use card with real app capture in device frame."""
+    img = Image.new("RGB", (W, H), WINE)
+    bg = vertical_gradient(W, H, (61, 11, 13), (32, 7, 9))
+    img.paste(bg, (0, 0))
+    glow = radial_glow(W, H, (W // 2, 280), 650, CHAMPAGNE, 0.20)
+    img.paste(glow, (0, 0), glow)
+
+    draw = ImageDraw.Draw(img)
+
+    f_eye = F(FONT_UI_LIGHT, 28)
+    eyebrow = "H O W   T O   U S E"
+    ew = text_w(draw, eyebrow, f_eye)
+    draw.text(((W - ew) // 2, 140), eyebrow, font=f_eye, fill=CHAMPAGNE)
+
+    f_step = F(FONT_UI_BOLD, 34)
+    step_label = f"S T E P   {step}   O F   {total}"
+    sw = text_w(draw, step_label, f_step)
+    draw.text(((W - sw) // 2, 200), step_label, font=f_step, fill=BRASS)
+
+    f_head = F(FONT_DISPLAY_IT, 96)
+    head_lines = wrap_lines(draw, title, f_head, W - 160)
+    hy = 280
+    for line in head_lines:
+        lw = text_w(draw, line, f_head)
+        draw.text(((W - lw) // 2, hy), line, font=f_head, fill=BONE)
+        hy += int(96 * 1.12)
+
+    f_body = F(FONT_UI_LIGHT, 40)
+    body_lines = wrap_lines(draw, body, f_body, W - 200)
+    by = hy + 24
+    for line in body_lines:
+        lw = text_w(draw, line, f_body)
+        draw.text(((W - lw) // 2, by), line, font=f_body, fill=BLUSH)
+        by += 56
+
+    div_y = by + 60
+    draw.rectangle(((W - 120) // 2, div_y, (W + 120) // 2, div_y + 2), fill=CHAMPAGNE)
+
+    phone_top = div_y + 80
+    draw_phone_frame(
+        img, phone_top, scale=1.0,
+        screen_renderer=make_capture_renderer(capture_name),
+    )
+
+    export_png(img, filename)
     return filename
 
 
 # ---------- Run ----------
-OUT_DIR = "/sessions/serene-practical-lovelace/mnt/yourdategenie-main/app-store/screenshots/iphone-6.9"
-os.makedirs(OUT_DIR, exist_ok=True)
+def configure_output_dirs():
+    """Point exports at YDG_SCREENSHOT_BUNDLE/iphone-* when set."""
+    global OUT_DIR, OUT_DIR_65, HOWTO_DIR
+    bundle = os.environ.get("YDG_SCREENSHOT_BUNDLE")
+    if not bundle:
+        return
+    OUT_DIR = os.path.join(bundle, "iphone-6.9")
+    OUT_DIR_65 = os.path.join(bundle, "iphone-6.5")
+    HOWTO_DIR = os.path.join(bundle, "how-to-use")
 
-screens = [
-    ("01_plan_tonight.png",   "Plan tonight's date.",          "Your night, granted in seconds.",                  screen_home,       120),
-    ("02_built_around_you.png","Built around you two.",        "Mood, budget, allergies, interests — we plan around all of it.", screen_setup,  118),
-    ("03_wishes_granted.png", "Wishes granted.",                "A tailored itinerary in seconds.",                 screen_magic,      130),
-    ("04_three_acts.png",     "Pasta. Art. Late-night gelato.", "Every detail mapped, beat by beat.",               screen_itinerary, 100),
-    ("05_send_in_one_tap.png","Send it in one tap.",            "Share the plan, lock the reservation, show up.",   screen_share,     118),
-    ("06_never_run_out.png",  "Never run out of date ideas.",   "Your personal genie, in your pocket.",             screen_library,   108),
-]
 
-print(f"Writing screenshots to: {OUT_DIR}")
-for fname, head, sub, renderer, size in screens:
-    path = os.path.join(OUT_DIR, fname)
-    compose_screenshot(head, sub, renderer, path, headline_size=size)
-    sz = os.path.getsize(path)
-    print(f"  ✓ {fname}  ({sz // 1024} KB)")
+def main():
+    configure_output_dirs()
+    os.makedirs(OUT_DIR, exist_ok=True)
+    os.makedirs(OUT_DIR_65, exist_ok=True)
+    os.makedirs(HOWTO_DIR, exist_ok=True)
 
-print("\nDone.")
+    # App Store marketing screenshots — fresh simulator captures (run capture_screenshots.sh first)
+    screens = [
+        (
+            "01_plan_tonight.png",
+            "Plan tonight's date.",
+            "Your night, curated before you ask.",
+            make_capture_renderer("cap_02_home_plan.png"),
+            120,
+        ),
+        (
+            "02_built_around_you.png",
+            "Built around you two.",
+            "Mood, budget, allergies, interests — we plan around all of it.",
+            make_capture_renderer("cap_03_questionnaire.png"),
+            118,
+        ),
+        (
+            "03_wishes_granted.png",
+            "Wishes granted.",
+            "A tailored itinerary in seconds.",
+            make_capture_renderer("cap_04_plan_options.png"),
+            130,
+        ),
+        (
+            "04_three_acts.png",
+            "Pasta. Art. Late-night gelato.",
+            "Every detail mapped, beat by beat.",
+            make_capture_renderer("cap_02_home_plan.png"),
+            100,
+        ),
+        (
+            "05_send_in_one_tap.png",
+            "Send it in one tap.",
+            "Share the plan, lock the reservation, show up.",
+            make_capture_renderer("cap_06_partner_share.png"),
+            118,
+        ),
+        (
+            "06_never_run_out.png",
+            "Never run out of date ideas.",
+            "Your personal genie, in your pocket.",
+            make_capture_renderer("cap_07_dates.png"),
+            108,
+        ),
+        (
+            "07_one_tap_away.png",
+            "One tap away.",
+            "Your finished date plan starts here.",
+            make_capture_renderer("cap_01_home.png"),
+            115,
+        ),
+        (
+            "08_genie_at_work.png",
+            "The Genie is thinking.",
+            "Real venues. Verified. Ready in seconds.",
+            make_capture_renderer("cap_09_generating.png"),
+            118,
+        ),
+        (
+            "09_every_romantic_detail.png",
+            "Every romantic detail.",
+            "Love notes, gifts, and playlists — built into every plan.",
+            make_capture_renderer("cap_08_convo.png"),
+            105,
+        ),
+        (
+            "10_plan_together.png",
+            "Plan together.",
+            "Three curated options. Pick your perfect match.",
+            make_capture_renderer("cap_04_plan_options.png"),
+            100,
+        ),
+    ]
+
+    extras = [
+        (
+            "11_memory_gallery.png",
+            "Every date, preserved.",
+            "Polaroid memories that grow with every night out.",
+            make_capture_renderer("cap_10_memories.png"),
+            108,
+        ),
+        (
+            "12_playlist.png",
+            "Soundtrack the night.",
+            "Curated playlists matched to your date vibe.",
+            make_capture_renderer("cap_11_playlist.png"),
+            112,
+        ),
+        (
+            "13_gift_finder.png",
+            "Gifts that actually fit.",
+            "Thoughtful picks tuned to your person and your plan.",
+            make_capture_renderer("cap_12_gift_finder.png"),
+            105,
+        ),
+        (
+            "14_see_every_stop.png",
+            "See every stop.",
+            "Venues, timing, and directions — your whole night in one scroll.",
+            make_capture_renderer("cap_05_plan_detail.png"),
+            112,
+        ),
+    ]
+
+    print(f"Writing App Store screenshots to: {OUT_DIR}")
+    for fname, head, sub, renderer, size in screens:
+        path = os.path.join(OUT_DIR, fname)
+        compose_screenshot(head, sub, renderer, path, headline_size=size)
+        sz = os.path.getsize(path)
+        im = Image.open(path)
+        print(f"  ✓ {fname}  {im.size[0]}×{im.size[1]}  ({sz // 1024} KB)")
+
+    extras_dir = os.path.join(OUT_DIR, "extras")
+    os.makedirs(extras_dir, exist_ok=True)
+    print(f"\nWriting feature extras to: {extras_dir}")
+    for fname, head, sub, renderer, size in extras:
+        path = os.path.join(extras_dir, fname)
+        compose_screenshot(head, sub, renderer, path, headline_size=size)
+        sz = os.path.getsize(path)
+        im = Image.open(path)
+        print(f"  ✓ extras/{fname}  {im.size[0]}×{im.size[1]}  ({sz // 1024} KB)")
+
+    how_to = [
+        (
+            1,
+            "Plan your perfect date",
+            "Tap Plan My Next Date. Answer a few quick questions and we'll build a complete evening — venues, timing, and all the details.",
+            "cap_01_home.png",
+            "01_plan_your_date.png",
+        ),
+        (
+            2,
+            "Your plans live here",
+            "Saved and upcoming dates show up on Home. Tap any plan to view the route, reserve, or share with your partner.",
+            "cap_02_home_plan.png",
+            "02_your_plans_live_here.png",
+        ),
+        (
+            3,
+            "Explore the app",
+            "Use the tabs below — Dates, Convo, and You — plus the center + button to plan anytime. Love Notes, Gift Finder, and Memories live in Convo and Dates.",
+            "cap_08_convo.png",
+            "03_explore_the_app.png",
+        ),
+    ]
+
+    print(f"\nWriting how-to-use images to: {HOWTO_DIR}")
+    for step, title, body, capture, fname in how_to:
+        path = os.path.join(HOWTO_DIR, fname)
+        compose_how_to_use(step, 3, title, body, capture, path)
+        sz = os.path.getsize(path)
+        im = Image.open(path)
+        ok = im.size == (EXPORT_W, EXPORT_H)
+        print(f"  ✓ {fname}  {im.size[0]}×{im.size[1]}  ({sz // 1024} KB)")
+
+    print(f"\nExport sizes: {EXPORT_W}×{EXPORT_H} px (iphone-6.9/) + {EXPORT_W_65}×{EXPORT_H_65} px (iphone-6.5/)")
+
+
+if __name__ == "__main__":
+    main()
