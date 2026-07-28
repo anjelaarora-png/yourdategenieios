@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Your Date Genie — Scroll Story</title>
+<style>
+  :root{ --maroon:#3c1117; --gold:#e0bc5a; --cream:#f3e7cf;
+    --serif:"Playfair Display",Georgia,"Times New Roman",serif; }
+  *{ margin:0; padding:0; box-sizing:border-box; }
+  html,body{ background:var(--maroon); color:var(--cream); font-family:var(--serif); }
+  a{ color:inherit; text-decoration:none; }
+
+  /* NAV */
+  .nav{ position:fixed; top:0; left:0; right:0; z-index:20; display:flex; align-items:center;
+    justify-content:space-between; padding:18px 40px; }
+  .brand{ display:flex; align-items:center; gap:11px; }
+  .brand img{ width:42px; height:42px; border-radius:7px; }
+  .brand small{ display:block; font-size:10px; letter-spacing:.3em; color:var(--gold); }
+  .brand b{ display:block; font-size:18px; letter-spacing:.13em; font-weight:600; }
+  .waitlist{ border:1px solid var(--gold); color:var(--gold); padding:10px 20px; border-radius:6px;
+    font-size:12px; letter-spacing:.16em; }
+
+  /* SCROLL STORY */
+  .story{ position:relative; height:520vh; }                 /* total scroll length */
+  .stage{ position:sticky; top:0; height:100vh; overflow:hidden; display:grid;
+    grid-template-columns:1fr 1fr; align-items:center; }
+
+  /* phone column (right) — CONTAIN so the whole phone shows, never zoomed */
+  .phoneWrap{ grid-column:2; height:100vh; display:flex; align-items:center; justify-content:center; }
+  #vid{ height:84vh; width:auto; max-width:100%; object-fit:contain; display:block; }
+
+  /* caption column (left) — captions stack and crossfade on scroll */
+  .captions{ grid-column:1; position:relative; height:60vh; padding-left:7vw; }
+  .cap{ position:absolute; top:50%; transform:translateY(-40%); max-width:440px; opacity:0;
+    will-change:opacity,transform; }
+  .cap .ey{ color:var(--gold); letter-spacing:.28em; font-size:12px; margin-bottom:16px; }
+  .cap h2{ font-size:clamp(34px,4.4vw,60px); line-height:1.03; font-weight:700; }
+  .cap h2 .it{ display:block; font-style:italic; font-weight:500; color:var(--gold); }
+  .cap p{ margin-top:18px; font-size:clamp(15px,1.3vw,19px); line-height:1.6; color:#e7d6bf; }
+  .cap .chips{ margin-top:18px; display:flex; flex-wrap:wrap; gap:8px; }
+  .cap .chips span{ border:1px solid rgba(224,188,90,.5); color:var(--gold); font-size:13px;
+    padding:6px 13px; border-radius:30px; }
+  .cap .cta{ display:inline-block; margin-top:22px; border:1px solid var(--gold); color:var(--gold);
+    padding:13px 28px; border-radius:7px; letter-spacing:.14em; font-size:13px; }
+
+  .progress{ position:fixed; left:40px; bottom:34px; z-index:20; display:flex; gap:8px; }
+  .progress i{ width:26px; height:3px; background:rgba(243,231,207,.25); border-radius:2px; display:block; }
+  .progress i.on{ background:var(--gold); }
+
+  @media (max-width:860px){
+    .stage{ grid-template-columns:1fr; }
+    .phoneWrap{ grid-column:1; position:absolute; inset:0; opacity:.32; }
+    #vid{ height:100vh; width:100%; object-fit:cover; }
+    .captions{ grid-column:1; z-index:2; height:100vh; display:flex; align-items:center;
+      padding:0 8vw; text-align:center; }
+    .cap{ position:absolute; left:8vw; right:8vw; max-width:none; }
+    .cap .chips{ justify-content:center; }
+  }
+</style>
+</head>
+<body>
+
+  <nav class="nav">
+    <div class="brand"><img src="ydg_logo.png" alt=""><div><small>YOUR DATE</small><b>GENIE</b></div></div>
+    <a class="waitlist">JOIN WAITLIST</a>
+  </nav>
+
+  <section class="story" id="story">
+    <div class="stage">
+      <div class="captions">
+        <div class="cap" id="c1">
+          <div class="ey">&#10022;&nbsp; AN AI DATE-NIGHT CONCIERGE</div>
+          <h2>Stop planning.<span class="it">Start showing up.</span></h2>
+          <p>Tell your Genie what you both love — cuisine, the no-go list, what you're in the mood for, the budget.</p>
+        </div>
+        <div class="cap" id="c2">
+          <div class="ey">IT PLANS EVERYTHING</div>
+          <h2>One tap.<span class="it">The whole night.</span></h2>
+          <div class="chips"><span>Dinner</span><span>The gift</span><span>What to wear</span><span>Conversation starters</span><span>A date playlist</span></div>
+        </div>
+        <div class="cap" id="c3">
+          <div class="ey">THE POST-SWIPE ERA</div>
+          <h2>You just<span class="it">show up.</span></h2>
+          <p>No group-chat ping-pong. No "something special" that ends in takeout. Just the moment — and each other.</p>
+        </div>
+        <div class="cap" id="c4">
+          <div class="ey">YOUR DATE GENIE</div>
+          <h2>Then do<span class="it">it again.</span></h2>
+          <p>Every great night makes the next one better.</p>
+          <a class="cta">JOIN WAITLIST</a>
+        </div>
+      </div>
+
+      <div class="phoneWrap">
+        <video id="vid" src="ydg_master_hd.mp4" poster="ydg_poster.jpg" muted playsinline preload="auto"></video>
+      </div>
+    </div>
+    <div class="progress"><i data-i="0"></i><i data-i="1"></i><i data-i="2"></i><i data-i="3"></i></div>
+  </section>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+<script>
+  gsap.registerPlugin(ScrollTrigger);
+  const v = document.getElementById('vid');
+  const caps = ['c1','c2','c3','c4'].map(id=>document.getElementById(id));
+  const dots = [...document.querySelectorAll('.progress i')];
+  // each act owns a slice of the scroll [start,end]; captions fade at the edges
+  const win = [[0.00,0.23],[0.27,0.50],[0.55,0.78],[0.84,1.00]];
+  const FE = 0.05; // fade edge
+
+  function op(p,s,e){
+    if(p<=s-FE||p>=e+FE) return 0;
+    if(p<s) return (p-(s-FE))/FE;
+    if(p>e) return 1-(p-e)/FE;
+    return 1;
+  }
+  function render(p){
+    if(v.duration) v.currentTime = p * v.duration;
+    let active=0, best=-1;
+    win.forEach((w,i)=>{
+      const o=op(p,w[0],w[1]);
+      caps[i].style.opacity=o;
+      caps[i].style.transform='translateY('+(-40 + (1-o)*18)+'%)';
+      if(o>best){best=o;active=i;}
+    });
+    dots.forEach((d,i)=>d.classList.toggle('on', i===active));
+  }
+  function wire(){
+    if(!v.duration) return;
+    ScrollTrigger.create({ trigger:'#story', start:'top top', end:'bottom bottom',
+      scrub:0.6, onUpdate:s=>render(s.progress) });
+    render(0);
+  }
+  v.addEventListener('loadedmetadata', wire);
+  if(v.readyState>=1) wire();
+</script>
+</body>
+</html>

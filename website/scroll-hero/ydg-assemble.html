@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Your Date Genie — Assemble</title>
+<style>
+  :root{ --maroon:#3c1117; --gold:#e0bc5a; --cream:#f3e7cf;
+    --serif:"Playfair Display",Georgia,"Times New Roman",serif; }
+  *{ margin:0; padding:0; box-sizing:border-box; }
+  html,body{ background:var(--maroon); color:var(--cream); font-family:var(--serif); }
+  a{ color:inherit; text-decoration:none; }
+
+  .nav{ position:fixed; top:0; left:0; right:0; z-index:30; display:flex; align-items:center;
+    justify-content:space-between; padding:18px 40px; }
+  .brand{ display:flex; align-items:center; gap:11px; }
+  .brand b{ font-size:18px; letter-spacing:.13em; font-weight:600; }
+  .brand small{ display:block; font-size:10px; letter-spacing:.3em; color:var(--gold); }
+  .waitlist{ border:1px solid var(--gold); color:var(--gold); padding:10px 20px; border-radius:6px;
+    font-size:12px; letter-spacing:.16em; }
+
+  .scene{ position:relative; height:560vh; }
+  .stage{ position:sticky; top:0; height:100vh; overflow:hidden; }
+
+  /* everything floats on the page — no box, transparent */
+  .node{ position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+    will-change:transform,opacity; }
+  #phone{ width:240px; height:486px; }
+  #phone rect.body{ fill:none; stroke:var(--gold); stroke-width:2.5; }
+  #phone rect.scr{ fill:rgba(224,188,90,.06); }
+  #genie{ width:190px; height:190px; opacity:0; }
+  .icon{ width:74px; height:74px; }
+  .icon svg{ width:100%; height:100%; fill:none; stroke:var(--gold); stroke-width:2.4;
+    stroke-linecap:round; stroke-linejoin:round; }
+
+  .copy{ position:absolute; left:7vw; top:50%; transform:translateY(-50%); z-index:5; max-width:430px; }
+  .cap{ position:absolute; opacity:0; will-change:opacity; }
+  .cap .ey{ color:var(--gold); letter-spacing:.28em; font-size:12px; margin-bottom:14px; }
+  .cap h2{ font-size:clamp(32px,4.2vw,58px); line-height:1.04; font-weight:700; }
+  .cap h2 .it{ display:block; font-style:italic; font-weight:500; color:var(--gold); }
+  .cap p{ margin-top:16px; font-size:clamp(15px,1.3vw,19px); line-height:1.6; color:#e7d6bf; }
+  .cap .cta{ display:inline-block; margin-top:22px; border:1px solid var(--gold); color:var(--gold);
+    padding:13px 28px; border-radius:7px; letter-spacing:.14em; font-size:13px; }
+
+  @media (max-width:860px){
+    .copy{ left:0; right:0; top:auto; bottom:8vh; transform:none; text-align:center; padding:0 7vw; max-width:none; }
+    .cap{ left:7vw; right:7vw; }
+  }
+</style>
+</head>
+<body>
+  <nav class="nav">
+    <div class="brand"><div><small>YOUR DATE</small><b>GENIE</b></div></div>
+    <a class="waitlist">JOIN WAITLIST</a>
+  </nav>
+
+  <section class="scene" id="scene">
+    <div class="stage" id="stage">
+
+      <div class="copy">
+        <div class="cap" id="cap1"><div class="ey">&#10022;&nbsp; YOUR DATE, CONJURED</div>
+          <h2>One tap.<span class="it">It comes together.</span></h2>
+          <p>Tell your Genie what you both love — it assembles the whole night.</p></div>
+        <div class="cap" id="cap2"><div class="ey">IT PLANS EVERYTHING</div>
+          <h2>Dinner. Gift.<span class="it">All of it.</span></h2>
+          <p>Where to go, what to wear, what to say, the playlist — handled.</p></div>
+        <div class="cap" id="cap3"><div class="ey">THE POST-SWIPE ERA</div>
+          <h2>You just<span class="it">show up.</span></h2>
+          <a class="cta">JOIN WAITLIST</a></div>
+      </div>
+
+      <svg id="phone" class="node" viewBox="0 0 240 486" aria-hidden="true">
+        <rect class="body" x="2" y="2" width="236" height="482" rx="40"/>
+        <rect class="scr" x="12" y="14" width="216" height="458" rx="30"/>
+        <rect x="96" y="26" width="48" height="9" rx="4.5" fill="rgba(224,188,90,.35)"/>
+      </svg>
+      <img id="genie" class="node" src="ydg_genie_gold.png" alt="Your Date Genie">
+
+      <div class="icon node" data-a="0"><svg viewBox="0 0 48 48"><path d="M18 34V12l18-4v22"/><circle cx="14" cy="34" r="4"/><circle cx="32" cy="30" r="4"/></svg></div>
+      <div class="icon node" data-a="1"><svg viewBox="0 0 48 48"><path d="M14 8v14M10 8v8a4 4 0 008 0V8"/><path d="M34 8c-4 0-6 4-6 10s2 8 6 8"/><path d="M34 8v32"/></svg></div>
+      <div class="icon node" data-a="2"><svg viewBox="0 0 48 48"><rect x="9" y="20" width="30" height="20" rx="2"/><path d="M7 14h34v6H7zM24 14v26"/><path d="M24 14c-6-10-14-2-0 0c14-2 6-10 0 0"/></svg></div>
+      <div class="icon node" data-a="3"><svg viewBox="0 0 48 48"><path d="M24 10a3 3 0 100 6 3 3 0 000-6z"/><path d="M24 16l-9 9 4 3 5-4v14h0M24 16l9 9-4 3-5-4"/></svg></div>
+      <div class="icon node" data-a="4"><svg viewBox="0 0 48 48"><path d="M8 12h32v22H22l-9 7v-7H8z"/><path d="M16 20h16M16 26h10"/></svg></div>
+
+    </div>
+  </section>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+<script>
+  gsap.registerPlugin(ScrollTrigger);
+  const icons=[...document.querySelectorAll('.icon')];
+  const phone=document.getElementById('phone');
+  const genie=document.getElementById('genie');
+  const caps=[document.getElementById('cap1'),document.getElementById('cap2'),document.getElementById('cap3')];
+  const N=icons.length, RING=168, OUT=860;
+  const ease=t=>t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2;
+  const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
+  // assembled slot angle for each icon (even ring, starting top)
+  const ang=i=>(-90 + i*(360/N))*Math.PI/180;
+
+  function set(el,x,y,op,sc){ el.style.transform=`translate(calc(-50% + ${x}px), calc(-50% + ${y}px)) scale(${sc})`; el.style.opacity=op; }
+
+  function render(p){
+    const aP=ease(clamp(p/0.42,0,1));          // assemble  0..1
+    const dP=ease(clamp((p-0.58)/0.42,0,1));    // disassemble 0..1
+    // icons
+    icons.forEach((el,i)=>{
+      const a=ang(i);
+      let r,op,sc;
+      if(p<0.58){ r = OUT + (RING-OUT)*aP; op=aP; sc=0.6+0.4*aP; }
+      else      { r = RING + (OUT-RING)*dP; op=1-dP; sc=1+0.3*dP; }
+      set(el, Math.cos(a)*r, Math.sin(a)*r, op, sc);
+    });
+    // phone
+    const pSc = p<0.58 ? 0.7+0.3*aP : 1+0.12*dP;
+    const pOp = p<0.58 ? aP : 1-dP;
+    set(phone, 0, 0, pOp, pSc);
+    // genie appears once phone is mostly assembled, leaves on disassemble
+    const gIn = ease(clamp((p-0.30)/0.18,0,1));
+    const gOp = p<0.58 ? gIn : (1-dP);
+    set(genie, 0, -6, gOp, (p<0.58?0.85+0.15*gIn:1+0.12*dP));
+    // captions
+    const seg=(s,e)=>{const f=.05; if(p<=s-f||p>=e+f)return 0; if(p<s)return (p-(s-f))/f; if(p>e)return 1-(p-e)/f; return 1;};
+    caps[0].style.opacity=seg(0.04,0.34);
+    caps[1].style.opacity=seg(0.40,0.58);
+    caps[2].style.opacity=seg(0.74,1.00);
+  }
+  ScrollTrigger.create({ trigger:'#scene', start:'top top', end:'bottom bottom',
+    scrub:0.6, onUpdate:s=>render(s.progress) });
+  render(0);
+</script>
+</body>
+</html>

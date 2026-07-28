@@ -1,0 +1,49 @@
+/* ============================================================
+   YDG Charcoal / Gold Theme  (2026-06-22)
+   Charcoal shell + gold accents + cream cards, maroon = pops only.
+   Paste into Appearance > Customize > Additional CSS.
+   ============================================================ */
+
+:root{
+  --bg:#1A1A1A;            /* charcoal shell */
+  --surface:#242424;
+  --surface-2:#2E2E2E;
+  --card:#F5F0E8;          /* cream card */
+  --gold:#C9A84C;          /* primary CTA */
+  --gold-light:#D4B896;
+  --gold-dark:#A68B5B;
+  --maroon:#4A0E0E;        /* accent only */
+  --text:#FAFAF8;
+  --text-muted:rgba(250,250,248,0.65);
+  --text-on-card:#1A1A1A;
+  --text-muted-on-card:#888888;
+  --success:#7CB87C;
+  --error:#C75050;
+  --warning:#D4A84B;
+  --gold-gradient:linear-gradient(135deg,#C9A84C 0%,#D4B896 50%,#A68B5B 100%);
+  /* re-point the two vars the site already uses */
+  --accent:#C9A84C;
+}
+
+/* ---- Base shell ---- */
+html, body { background-color:#1A1A1A !important; }
+
+/* ---- Legal pages: charcoal + cream + gold ---- */
+.page.page--maroon, main.legal-page { background-color:#1A1A1A !important; }
+.legal-hero__title { color:#F5F0E8 !important; }
+.legal-hero__eyebrow, .legal-body h2, .legal-body h3 { color:#C9A84C !important; }
+.legal-hero__meta, .legal-body, .legal-body p, .legal-body li, .legal-body strong { color:#FAFAF8 !important; }
+.legal-body strong { color:#FFFFFF !important; }
+.legal-body a { color:#C9A84C !important; }
+.legal-body hr { border-top-color:rgba(201,168,76,0.28) !important; }
+.legal-body ul li::marker { color:#C9A84C !important; }
+
+/* ---- Fixed nav -> charcoal (replaces earlier maroon nav-lock) ---- */
+.nav, .nav--transparent { background-color:#1A1A1A !important; box-shadow:0 2px 14px rgba(0,0,0,.5) !important; }
+
+/* ---- Best-effort: inline maroon backgrounds -> charcoal ---- */
+[style*="2e0608" i],[style*="590d11" i],[style*="6b1f2b" i],[style*="3a0512" i],
+[style*="6b2a2a" i],[style*="6b1a1c" i],[style*="4a141d" i],[style*="5a1416" i],
+[style*="4a0e10" i],[style*="2a1215" i],[style*="140406" i]{
+  background-color:#1A1A1A !important; background-image:none !important;
+}

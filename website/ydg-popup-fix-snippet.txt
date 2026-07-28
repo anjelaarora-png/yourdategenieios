@@ -1,0 +1,76 @@
+<!-- YDG Popup Fix - (1) Firebase init + correct save, (2) fix literal \uXXXX text (em-dash, etc.) -->
+<script>
+(function () {
+  var cfg = {
+    apiKey: "AIzaSyAZzADxnKV0Ad5kvZLJ_EX5zc9u64HdB1U",
+    authDomain: "your-date-genie.firebaseapp.com",
+    projectId: "your-date-genie",
+    storageBucket: "your-date-genie.firebasestorage.app",
+    messagingSenderId: "710263961293",
+    appId: "1:710263961293:web:ad8f4a2cc9b23ef9261b84"
+  };
+
+  /* ---------- 1) Waitlist popup save ---------- */
+  function loadScript(src){return new Promise(function(res,rej){var s=document.createElement("script");s.src=src;s.onload=res;s.onerror=rej;document.head.appendChild(s);});}
+  async function ensureFirebase(){
+    if(!window.firebase){ await loadScript("https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"); }
+    if(window.firebase && !firebase.firestore){ await loadScript("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"); }
+    if(window.firebase && !firebase.apps.length){ try{ firebase.initializeApp(cfg); }catch(e){} }
+    return (window.firebase && firebase.apps.length) ? firebase.firestore() : null;
+  }
+  document.addEventListener("submit", function (e) {
+    var form = e.target;
+    if (!form || form.id !== "ydg-popup-form") return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    var input = form.querySelector("#ydg-popup-email, input[type=email]");
+    var email = (input && input.value || "").trim();
+    if (!/.+@.+\..+/.test(email)) { if (input) input.focus(); return; }
+    var btn = form.querySelector("button[type=submit], button");
+    if (btn) { btn.disabled = true; btn.textContent = "Saving..."; }
+    ensureFirebase().then(function (db) {
+      if (!db) throw new Error("firebase not ready");
+      return db.collection("waitlist").doc(email.toLowerCase()).set({
+        email: email.toLowerCase(),
+        source: "exit_popup",
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    }).then(function () {
+      form.innerHTML = '<p style="text-align:center;margin:0;padding:10px 0">You\'re on the list - check your inbox.</p>';
+    }).catch(function (err) {
+      console.error("YDG waitlist save failed:", err);
+      if (btn) { btn.disabled = false; btn.textContent = "Save my spot"; }
+      alert("Something went wrong - please try again.");
+    });
+  }, true);
+
+  /* ---------- 2) Fix literal \uXXXX escapes rendering as text ---------- */
+  function fixEscapes(root){
+    var walker = document.createTreeWalker(root || document.body, NodeFilter.SHOW_TEXT, {
+      acceptNode: function(node){
+        var p = node.parentNode;
+        if(!p) return NodeFilter.FILTER_REJECT;
+        var tag = p.nodeName;
+        if(tag==="SCRIPT"||tag==="STYLE"||tag==="TEXTAREA"||tag==="CODE"||tag==="PRE") return NodeFilter.FILTER_REJECT;
+        return /\\u[0-9a-fA-F]{4}/.test(node.nodeValue) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+      }
+    });
+    var nodes=[], n;
+    while((n = walker.nextNode())) nodes.push(n);
+    nodes.forEach(function(t){
+      t.nodeValue = t.nodeValue.replace(/\\u([0-9a-fA-F]{4})/g, function(m,h){ return String.fromCharCode(parseInt(h,16)); });
+    });
+  }
+  function runFix(){ try{ fixEscapes(document.body); }catch(e){} }
+  if(document.readyState === "loading"){ document.addEventListener("DOMContentLoaded", runFix); } else { runFix(); }
+  // Re-run when the exit popup (or any content) is injected later:
+  try{
+    new MutationObserver(function(muts){
+      for(var i=0;i<muts.length;i++){
+        var added = muts[i].addedNodes;
+        for(var j=0;j<added.length;j++){ if(added[j].nodeType===1){ try{ fixEscapes(added[j]); }catch(e){} } }
+      }
+    }).observe(document.documentElement, { childList:true, subtree:true });
+  }catch(e){}
+})();
+</script>

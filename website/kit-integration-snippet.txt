@@ -1,0 +1,72 @@
+========================================================================
+KIT INTEGRATION — connect the WordPress waitlist to Kit
+Form: "YDG Waitlist"  ·  Form ID: 9608336
+========================================================================
+
+WHAT THIS FIXES
+Right now signups save to Firebase but never reach Kit — so no welcome
+email goes out and your Kit list stays empty. This snippet adds each
+signup to your Kit form right after the Firebase save, which also fires
+your branded welcome email.
+
+------------------------------------------------------------------------
+STEP 1 — Get your Kit PUBLIC API key
+------------------------------------------------------------------------
+Kit  →  your account menu / Settings  →  Advanced  →  "API Key"
+Copy the PUBLIC API Key (NOT the API Secret).
+
+------------------------------------------------------------------------
+STEP 2 — Add this to WPCode snippet 68520
+------------------------------------------------------------------------
+Paste this <script> block into the snippet (top level is fine):
+
+<script>
+  const KIT_FORM_ID = "9608336";                      // YDG Waitlist
+  const KIT_API_KEY = "PASTE_YOUR_PUBLIC_API_KEY_HERE";
+
+  async function addToKit(email, firstName, lastName, phone) {
+    try {
+      await fetch("https://api.convertkit.com/v3/forms/" + KIT_FORM_ID + "/subscribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          api_key: KIT_API_KEY,
+          email: email,
+          first_name: firstName || "",
+          fields: { last_name: lastName || "", phone: phone || "" }
+        })
+      });
+    } catch (e) { console.error("Kit subscribe failed", e); }
+  }
+</script>
+
+Then, in your EXISTING submit handler, right AFTER the Firebase write
+succeeds (the setDoc/addDoc that already works), add one line:
+
+  addToKit(email, firstName, lastName, phone);
+
+(use whatever your variables are actually named for email / first / last / phone)
+
+------------------------------------------------------------------------
+STEP 3 — Turn the welcome email ON
+------------------------------------------------------------------------
+Kit → Landing Pages & Forms → YDG Waitlist → Settings:
+  • "Incentive email"  →  ON  (this is your branded welcome email)
+  • For a waitlist, set "Auto-confirm subscribers" ON so people don't
+    have to double-opt-in before they're on the list.
+
+------------------------------------------------------------------------
+STEP 4 — Backfill everyone already signed up
+------------------------------------------------------------------------
+Everyone who signed up before this is in Firebase but NOT in Kit.
+Import them once so they're emailable at launch:
+  Kit → Subscribers → Add Subscribers → upload a CSV of the emails.
+(Claude can build that CSV from your Firebase waitlist — just ask.)
+
+------------------------------------------------------------------------
+SECURITY NOTE
+------------------------------------------------------------------------
+The v3 form-subscribe endpoint uses your PUBLIC api_key, which is safe
+to use in a browser snippet — it can only ADD subscribers, never read
+or export your list. Never paste your API SECRET here.
+========================================================================

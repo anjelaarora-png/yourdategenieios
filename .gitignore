@@ -52,3 +52,6 @@ supabase-config.json
 
 # iOS Secrets - NEVER commit (contains API keys)
 ios/**/Secrets.xcconfig
+website/scroll-hero/*.mp4
+website/claude-design-bundle/
+website/build/

@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Your Date Genie — Hero Preview</title>
+<style>
+  :root{
+    --maroon:#3c1117; --maroon-2:#4a1620; --gold:#e0bc5a; --cream:#f3e7cf;
+    --serif:"Playfair Display",Georgia,"Times New Roman",serif;
+  }
+  *{ margin:0; padding:0; box-sizing:border-box; }
+  html,body{ background:var(--maroon); color:var(--cream); font-family:var(--serif); }
+  a{ color:inherit; text-decoration:none; }
+
+  /* ---------- NAV ---------- */
+  .nav{ position:absolute; top:0; left:0; right:0; z-index:5; display:flex; align-items:center;
+    justify-content:space-between; padding:22px 48px; }
+  .brand{ display:flex; align-items:center; gap:12px; }
+  .brand img{ width:46px; height:46px; border-radius:8px; }
+  .brand .wm{ line-height:1; }
+  .brand .wm small{ display:block; font-size:11px; letter-spacing:.32em; color:var(--gold); }
+  .brand .wm b{ display:block; font-size:20px; letter-spacing:.14em; color:var(--cream); font-weight:600; }
+  .menu{ display:flex; gap:30px; font-size:14px; letter-spacing:.14em; color:var(--cream); opacity:.9; }
+  .menu a:hover{ color:var(--gold); }
+  .waitlist{ border:1px solid var(--gold); color:var(--gold); padding:11px 22px; border-radius:6px;
+    font-size:12px; letter-spacing:.18em; background:linear-gradient(#5a2230,#3c1117); }
+
+  /* ---------- HERO ---------- */
+  .hero{ min-height:100vh; display:grid; grid-template-columns:1.1fr .9fr; align-items:center;
+    gap:20px; padding:120px 48px 60px;
+    background:radial-gradient(80% 60% at 78% 42%, #57202c 0%, var(--maroon) 60%); }
+  .copy{ max-width:620px; }
+  .eyebrow{ color:var(--gold); letter-spacing:.34em; font-size:13px; margin-bottom:22px; }
+  .headline{ font-size:clamp(42px,6vw,84px); line-height:1.02; font-weight:700; }
+  .headline .it{ display:block; font-style:italic; font-weight:500; color:var(--gold); }
+  .sub{ margin:26px 0 30px; font-size:clamp(16px,1.4vw,20px); line-height:1.65; color:#e7d6bf; opacity:.92; max-width:540px; }
+  .sub em{ color:var(--gold); font-style:italic; }
+  .cta{ display:inline-block; border:1px solid var(--gold); color:var(--gold); padding:15px 34px;
+    border-radius:8px; letter-spacing:.16em; font-size:14px; background:linear-gradient(#5a2230,#3c1117); }
+
+  /* ---------- PHONE / ANIMATION (the fix: contain, natural size, bg blends) ---------- */
+  .stage{ display:flex; align-items:center; justify-content:center; }
+  .stage video{
+    height:86vh; max-height:880px; width:auto; max-width:100%;
+    object-fit:contain;            /* show the WHOLE phone — no zoom/crop */
+    background:transparent; display:block;
+  }
+
+  @media (max-width:900px){
+    .menu{ display:none; }
+    .hero{ grid-template-columns:1fr; text-align:center; padding-top:96px; }
+    .copy{ margin:0 auto; }
+    .sub{ margin-left:auto; margin-right:auto; }
+    .stage video{ height:auto; width:78%; max-width:420px; }
+  }
+</style>
+</head>
+<body>
+
+  <nav class="nav">
+    <div class="brand">
+      <img src="ydg_logo.png" alt="Your Date Genie">
+      <div class="wm"><small>YOUR DATE</small><b>GENIE</b></div>
+    </div>
+    <div class="menu">
+      <a>HOW IT WORKS</a><a>ABOUT</a><a>EVENTS</a><a>OUR STORY</a><a>WORK WITH US</a>
+    </div>
+    <a class="waitlist">JOIN WAITLIST</a>
+  </nav>
+
+  <section class="hero">
+    <div class="copy">
+      <div class="eyebrow">&#10022;&nbsp; AN AI DATE-NIGHT CONCIERGE &nbsp;&#10022;</div>
+      <h1 class="headline">Stop planning.<span class="it">Start showing up.</span></h1>
+      <p class="sub">One partner plans every date. Both burn out. <em>"Something special"</em> becomes
+        takeout on the couch — again. Your Date Genie crafts the whole evening — venue, reservation,
+        route, vibe — in minutes, not hours of group-chat ping-pong.</p>
+      <a class="cta">JOIN WAITLIST</a>
+    </div>
+
+    <div class="stage">
+      <!-- seamless loop: autoplay + muted + loop; the master already ends where it starts -->
+      <video src="ydg_master_hd.mp4" poster="ydg_poster.jpg" autoplay muted loop playsinline></video>
+    </div>
+  </section>
+
+</body>
+</html>
