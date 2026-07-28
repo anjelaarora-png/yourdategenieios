@@ -116,7 +116,7 @@ struct LuxuryExploreTabView: View {
                                                 }
                                                 .padding(.horizontal, 12)
                                                 .padding(.vertical, 8)
-                                                .background(selectedExploreCategory?.id == category.id ? Color.luxuryGold : Color.luxuryMaroonLight.opacity(0.8))
+                                                .background(selectedExploreCategory?.id == category.id ? Color.luxuryGold : Color.luxeSurfaceTintStrong)
                                                 .cornerRadius(20)
                                                 .overlay(
                                                     RoundedRectangle(cornerRadius: 20)
@@ -198,7 +198,7 @@ struct LuxuryExploreTabView: View {
                                         .foregroundColor(Color.luxuryGold)
                                         .padding(.horizontal, 12)
                                         .padding(.vertical, 7)
-                                        .background(Color.luxuryMaroonLight.opacity(0.8))
+                                        .background(Color.luxeSurfaceTintStrong)
                                         .overlay(
                                             RoundedRectangle(cornerRadius: 20)
                                                 .stroke(Color.luxuryGold.opacity(0.5), lineWidth: 1)
@@ -238,7 +238,7 @@ struct LuxuryExploreTabView: View {
                                         .padding(.horizontal, 24)
                                         .padding(.vertical, 16)
                                         .frame(maxWidth: .infinity)
-                                        .background(Color.luxuryMaroonLight.opacity(0.9))
+                                        .background(Color.luxeSurfaceTintStrong)
                                         .overlay(
                                             RoundedRectangle(cornerRadius: 16)
                                                 .stroke(Color.luxuryGold.opacity(0.6), lineWidth: 1)
@@ -281,7 +281,7 @@ struct LuxuryExploreTabView: View {
                     HStack(spacing: 14) {
                         ForEach(0..<6, id: \.self) { _ in
                             RoundedRectangle(cornerRadius: 24)
-                                .fill(Color.luxuryMaroonLight.opacity(0.5))
+                                .fill(Color.luxeSurfaceTintStrong)
                                 .frame(width: 200, height: 200)
                                 .overlay(ProgressView().tint(Color.luxuryGold))
                         }
@@ -341,7 +341,7 @@ struct LuxuryExploreTabView: View {
                                 .foregroundColor(exploreRadiusMiles == option.miles ? Color.luxuryMaroon : Color.luxuryCream)
                                 .padding(.horizontal, 14)
                                 .padding(.vertical, 8)
-                                .background(exploreRadiusMiles == option.miles ? Color.luxuryGold : Color.luxuryMaroonLight.opacity(0.8))
+                                .background(exploreRadiusMiles == option.miles ? Color.luxuryGold : Color.luxeSurfaceTintStrong)
                                 .cornerRadius(20)
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 20)
@@ -365,7 +365,7 @@ struct LuxuryExploreTabView: View {
             .foregroundColor(isSelected ? Color.luxuryMaroon : Color.luxuryCream)
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
-            .background(isSelected ? Color.luxuryGold : Color.luxuryMaroonLight.opacity(0.8))
+            .background(isSelected ? Color.luxuryGold : Color.luxeSurfaceTintStrong)
             .cornerRadius(20)
             .overlay(
                 RoundedRectangle(cornerRadius: 20)
@@ -543,7 +543,7 @@ struct ExplorePlaceCard: View {
                 AsyncImage(url: URL(string: place.photoUrl ?? "https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=400&h=300&fit=crop")) { phase in
                     switch phase {
                     case .success(let image): image.resizable().aspectRatio(contentMode: .fill)
-                    case .empty, .failure: Color.luxuryMaroonLight
+                    case .empty, .failure: Color.luxeSurfaceTintStrong
                     @unknown default: EmptyView()
                     }
                 }
@@ -598,7 +598,7 @@ struct ExplorePlaceCard: View {
                 .padding(16)
             }
             .frame(maxWidth: .infinity)
-            .background(Color.luxuryMaroonLight.opacity(0.7))
+            .background(Color.luxeSurfaceTintStrong)
             .overlay(RoundedRectangle(cornerRadius: 24).stroke(Color.luxuryGold.opacity(0.3), lineWidth: 1))
             .clipShape(RoundedRectangle(cornerRadius: 24))
             .shadow(color: Color.luxuryGold.opacity(0.15), radius: 12, y: 4)
@@ -615,7 +615,7 @@ struct ExploreContinueCircleButton: View {
         Button(action: action) {
             ZStack {
                 Circle()
-                    .fill(Color.luxuryMaroonLight.opacity(0.8))
+                    .fill(Color.luxeSurfaceTintStrong)
                     .overlay(Circle().stroke(LinearGradient.goldShimmer, lineWidth: 2))
                     .shadow(color: Color.luxuryGold.opacity(0.3), radius: 16, y: 4)
                     .frame(width: 160, height: 160)
@@ -654,7 +654,7 @@ struct ExploreCategoryTile: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 20)
-        .background(Color.luxuryMaroonLight.opacity(0.8))
+        .background(Color.luxeSurfaceTintStrong)
         .cornerRadius(16)
         .overlay(
             RoundedRectangle(cornerRadius: 16)
@@ -689,7 +689,7 @@ struct LuxuryDateTypeTile: View {
                             .resizable()
                             .aspectRatio(contentMode: .fill)
                     case .empty, .failure:
-                        Color.luxuryMaroonLight
+                        Color.luxeSurfaceTintStrong
                     @unknown default:
                         EmptyView()
                     }
@@ -740,7 +740,7 @@ struct LuxuryInspirationCard: View {
                             .resizable()
                             .aspectRatio(contentMode: .fill)
                     case .empty, .failure:
-                        Color.luxuryMaroonLight
+                        Color.luxeSurfaceTintStrong
                     @unknown default:
                         EmptyView()
                     }
@@ -759,7 +759,7 @@ struct LuxuryInspirationCard: View {
             
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
-                    .font(Font.header(16, weight: .bold))
+                    .font(Font.bodySerif(16, weight: .bold))
                     .foregroundColor(Color.luxuryGold)
                     .lineLimit(2)
                     .truncationMode(.tail)

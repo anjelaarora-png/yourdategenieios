@@ -28,11 +28,11 @@ struct Step1LocationView: View {
                         )
                         if data.startingAddress.isEmpty {
                             Text("Required for your route and map")
-                                .font(Font.inter(11, weight: .regular))
+                                .font(Font.bodySans(11, weight: .regular))
                                 .foregroundColor(Color.luxuryGold.opacity(0.9))
                         } else if !data.city.isEmpty {
                             Text("Planning near \(data.city)")
-                                .font(Font.inter(11, weight: .regular))
+                                .font(Font.bodySans(11, weight: .regular))
                                 .foregroundColor(Color.luxuryMuted)
                         }
 
@@ -62,7 +62,7 @@ struct Step1LocationView: View {
                             .foregroundColor(Color.luxuryGold)
                             .frame(maxWidth: .infinity)
                             .frame(minHeight: 44)
-                            .background(Color.luxuryMaroonLight.opacity(0.7))
+                            .background(Color.luxeSurfaceTintStrong)
                             .cornerRadius(12)
                             .overlay(
                                 RoundedRectangle(cornerRadius: 12)
@@ -117,27 +117,11 @@ struct Step1LocationView: View {
                 VStack(alignment: .leading, spacing: 16) {
                     SectionHeader(emoji: "📅", title: "When?", subtitle: "Pick your date and preferred time")
                     
-                    // Date Picker
-                    DatePicker(
-                        "",
+                    CreamGraphicalDatePicker(
                         selection: Binding(
                             get: { data.dateScheduled ?? Date() },
                             set: { data.dateScheduled = $0 }
-                        ),
-                        in: Date()...,
-                        displayedComponents: .date
-                    )
-                    .datePickerStyle(.compact)
-                    .labelsHidden()
-                    .tint(Color.luxuryGold)
-                    .colorScheme(.dark)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 12)
-                    .background(Color.luxuryMaroonLight)
-                    .cornerRadius(14)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 14)
-                            .stroke(Color.luxuryGold.opacity(0.3), lineWidth: 1)
+                        )
                     )
                     
                     // Part of day + time — one seamless selection
@@ -178,7 +162,7 @@ struct Step1LocationView: View {
                         }
                     }
                     .padding(16)
-                    .background(Color.luxuryMaroonLight.opacity(0.6))
+                    .background(Color.luxeSurfaceTintStrong)
                     .cornerRadius(16)
                     .overlay(
                         RoundedRectangle(cornerRadius: 16)
@@ -234,12 +218,12 @@ private struct TimeOfDayCard: View {
                 Text(period.emoji)
                     .font(.system(size: 26))
                 Text(period.label)
-                    .font(Font.inter(13, weight: .semibold))
+                    .font(Font.bodySans(13, weight: .semibold))
                     .foregroundColor(isSelected ? Color.luxuryMaroon : Color.luxuryCream)
                     .lineLimit(1)
                 if let timeRange = period.time {
                     Text(timeRange)
-                        .font(Font.inter(10, weight: .regular))
+                        .font(Font.bodySans(10, weight: .regular))
                         .foregroundColor(isSelected ? Color.luxuryMaroon.opacity(0.8) : Color.luxuryMuted)
                 }
             }
@@ -247,7 +231,7 @@ private struct TimeOfDayCard: View {
             .padding(.vertical, 12)
             .padding(.horizontal, 8)
             .background(
-                isSelected ? LinearGradient.goldShimmer : LinearGradient(colors: [Color.luxuryMaroonLight], startPoint: .top, endPoint: .bottom)
+                isSelected ? LinearGradient.goldShimmer : LinearGradient(colors: [Color.luxeSurfaceTintStrong], startPoint: .top, endPoint: .bottom)
             )
             .cornerRadius(12)
             .overlay(
@@ -268,12 +252,12 @@ private struct TimeSlotChip: View {
     var body: some View {
         Button(action: onTap) {
             Text(time)
-                .font(Font.inter(13, weight: isSelected ? .semibold : .medium))
+                .font(Font.bodySans(13, weight: isSelected ? .semibold : .medium))
                 .foregroundColor(isSelected ? Color.luxuryMaroon : Color.luxuryCream)
                 .padding(.horizontal, 14)
                 .padding(.vertical, 10)
                 .background(
-                    isSelected ? LinearGradient.goldShimmer : LinearGradient(colors: [Color.luxuryMaroonLight], startPoint: .top, endPoint: .bottom)
+                    isSelected ? LinearGradient.goldShimmer : LinearGradient(colors: [Color.luxeSurfaceTintStrong], startPoint: .top, endPoint: .bottom)
                 )
                 .cornerRadius(20)
                 .overlay(
@@ -289,11 +273,11 @@ private struct TimeSlotChip: View {
 struct CustomTextFieldStyle: TextFieldStyle {
     func _body(configuration: TextField<Self._Label>) -> some View {
         configuration
-            .font(Font.inter(15, weight: .regular))
+            .font(Font.bodySans(15, weight: .regular))
             .foregroundColor(Color.luxuryCream)
             .padding(.horizontal, 16)
             .padding(.vertical, 14)
-            .background(Color.luxuryMaroonLight)
+            .background(Color.luxeSurfaceTintStrong)
             .cornerRadius(14)
             .overlay(
                 RoundedRectangle(cornerRadius: 14)

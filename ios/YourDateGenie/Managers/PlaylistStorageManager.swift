@@ -215,17 +215,19 @@ final class PlaylistStorageManager: ObservableObject {
         }
     }
     
-    /// Merge playlists from Supabase (account) into local list; skips ones already present by id.
+    /// Merge playlists from Supabase (account) into local list; updates existing rows when cloud is newer.
     func mergeFromSupabase(dbPlaylists: [DBPlaylist]) {
-        var existingIds = Set(playlists.map(\.id))
         let iso = ISO8601DateFormatter()
+        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        var existingIds = Set(playlists.map(\.id))
+
         for db in dbPlaylists {
             let id = db.playlistId.uuidString
-            guard !existingIds.contains(id) else { continue }
+            let cloudUpdated = db.updatedAt ?? db.generatedAt
             let songs = (db.tracks ?? []).map { t in
                 SavedPlaylistSong(title: t.title, artist: t.artist, isCustom: false, addedAt: nil)
             }
-            let saved = SavedPlaylist(
+            let incoming = SavedPlaylist(
                 id: id,
                 name: db.title ?? "Playlist",
                 datePlanTitle: db.datePlanTitle ?? db.title ?? "Date Night",
@@ -236,9 +238,20 @@ final class PlaylistStorageManager: ObservableObject {
                 era: nil,
                 mood: nil,
                 createdAt: iso.string(from: db.generatedAt),
-                updatedAt: iso.string(from: db.updatedAt ?? db.generatedAt)
+                updatedAt: iso.string(from: cloudUpdated)
             )
-            playlists.insert(saved, at: 0)
+
+            if let idx = playlists.firstIndex(where: { $0.id == id }) {
+                let localUpdated = iso.date(from: playlists[idx].updatedAt) ?? .distantPast
+                if cloudUpdated > localUpdated {
+                    playlists[idx] = incoming
+                }
+                existingIds.insert(id)
+                continue
+            }
+
+            guard !existingIds.contains(id) else { continue }
+            playlists.insert(incoming, at: 0)
             existingIds.insert(id)
         }
         save(skipSupabase: true)
@@ -257,11 +270,18 @@ final class PlaylistStorageManager: ObservableObject {
         }
         var result: [(genre: String, list: [SavedPlaylist])] = []
         for g in Self.genreOrder {
-            if let list = map[g], !list.isEmpty { result.append((g, list)) }
+            if let list = map[g], !list.isEmpty {
+                result.append((g, list.sorted { $0.updatedAt > $1.updatedAt }))
+            }
         }
         for (g, list) in map where !Self.genreOrder.contains(g) {
-            result.append((g, list))
+            result.append((g, list.sorted { $0.updatedAt > $1.updatedAt }))
         }
         return result
+    }
+
+    /// Most recently updated playlists first — for quick access on the library screen.
+    var recentPlaylists: [SavedPlaylist] {
+        playlists.sorted { $0.updatedAt > $1.updatedAt }
     }
 }

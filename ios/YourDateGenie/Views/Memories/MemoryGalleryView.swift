@@ -312,7 +312,7 @@ struct PolaroidTimelineItem: View {
     private var placeholderPhoto: some View {
         ZStack {
             LinearGradient(
-                colors: [Color.luxuryMaroonLight.opacity(0.3), Color.luxuryMaroonMedium.opacity(0.2)],
+                colors: [Color.luxeSurfaceTintStrong.opacity(0.3), Color.luxuryMaroonMedium.opacity(0.2)],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
@@ -459,7 +459,7 @@ struct AddMemorySheet: View {
     private var headerSection: some View {
         VStack(spacing: 8) {
             Text("Add Memory")
-                .font(Font.header(28, weight: .bold))
+                .font(Font.bodySerif(28, weight: .bold))
                 .foregroundColor(Color.luxuryGold)
             
             Text("Capture this beautiful moment")
@@ -472,7 +472,7 @@ struct AddMemorySheet: View {
         PhotosPicker(selection: $selectedItem, matching: .images) {
             ZStack {
                 RoundedRectangle(cornerRadius: 16)
-                    .fill(Color.luxuryMaroonLight)
+                    .fill(Color.luxeSurfaceTintStrong)
                     .frame(height: 200)
                     .overlay(
                         RoundedRectangle(cornerRadius: 16)
@@ -517,7 +517,7 @@ struct AddMemorySheet: View {
                     .labelsHidden()
                     .tint(Color.luxuryGold)
                     .padding(14)
-                    .background(Color.luxuryMaroonLight)
+                    .background(Color.luxeSurfaceTintStrong)
                     .cornerRadius(12)
                     .overlay(
                         RoundedRectangle(cornerRadius: 12)
@@ -537,7 +537,7 @@ struct AddMemorySheet: View {
                     .foregroundColor(Color.luxuryCream)
                     .lineLimit(3...6)
                     .padding(14)
-                    .background(Color.luxuryMaroonLight)
+                    .background(Color.luxeSurfaceTintStrong)
                     .cornerRadius(12)
                     .overlay(
                         RoundedRectangle(cornerRadius: 12)
@@ -557,7 +557,7 @@ struct AddMemorySheet: View {
                 .font(Font.bodySans(15, weight: .regular))
                 .foregroundColor(Color.luxuryCream)
                 .padding(14)
-                .background(Color.luxuryMaroonLight)
+                .background(Color.luxeSurfaceTintStrong)
                 .cornerRadius(12)
                 .overlay(
                     RoundedRectangle(cornerRadius: 12)
@@ -616,7 +616,7 @@ struct AddMemorySheet: View {
                                 .foregroundColor(Color.luxuryGold)
                         }
                         .padding(14)
-                        .background(Color.luxuryMaroonLight)
+                        .background(Color.luxeSurfaceTintStrong)
                         .cornerRadius(12)
                         .overlay(
                             RoundedRectangle(cornerRadius: 12)
@@ -641,7 +641,7 @@ struct AddMemorySheet: View {
             saveMemory()
         } label: {
             Text("Save Memory")
-                .font(Font.header(18, weight: .bold))
+                .font(Font.bodySerif(18, weight: .bold))
                 .foregroundColor(Color.luxuryMaroon)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 16)
@@ -876,7 +876,7 @@ private struct MemoryPhotoView: View {
     private var placeholder: some View {
         ZStack {
             LinearGradient(
-                colors: [Color.luxuryMaroonLight.opacity(0.3), Color.luxuryMaroonMedium.opacity(0.2)],
+                colors: [Color.luxeSurfaceTintStrong.opacity(0.3), Color.luxuryMaroonMedium.opacity(0.2)],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )

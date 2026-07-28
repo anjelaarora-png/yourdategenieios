@@ -34,6 +34,7 @@ CRITICAL RULES:
 IMPORTANT: The "stops" array is the MOST CRITICAL part of each plan. Never return empty stops!`;
 
 const GATEWAY_URL = "https://api.openai.com/v1/chat/completions";
+const OPENAI_TIMEOUT_MS = 90_000;
 
 const isRetryableStatus = (status: number) =>
   status === 429 || status === 500 || status === 502 || status === 503 ||
@@ -50,23 +51,38 @@ async function callGateway({
   prompt: string;
   model: string;
 }) {
-  const response = await fetch(GATEWAY_URL, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-      Accept: "application/json",
-    },
-    body: JSON.stringify({
-      model,
-      messages: [
-        { role: "system", content: SYSTEM_PROMPT },
-        { role: "user", content: prompt },
-      ],
-      tools: [multiDatePlanTool],
-      tool_choice: { type: "function", function: { name: "create_date_plans" } },
-    }),
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), OPENAI_TIMEOUT_MS);
+  let response: Response;
+  try {
+    response = await fetch(GATEWAY_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: "system", content: SYSTEM_PROMPT },
+          { role: "user", content: prompt },
+        ],
+        tools: [multiDatePlanTool],
+        tool_choice: { type: "function", function: { name: "create_date_plans" } },
+      }),
+      signal: controller.signal,
+    });
+  } catch (e) {
+    if ((e as Error)?.name === "AbortError") {
+      throw Object.assign(new Error("AI_GATEWAY_TIMEOUT"), {
+        details: { status: 504, bodyPreview: "OpenAI request timed out" },
+      });
+    }
+    throw e;
+  } finally {
+    clearTimeout(timeoutId);
+  }
 
   if (!response.ok) {
     const text = await response.text();
@@ -85,8 +101,7 @@ export async function generateMultipleDatePlans({
   apiKey: string;
   prompt: string;
 }) {
-  // Use fastest model first for quick response times
-  // Models available through Lovable AI gateway
+  // Fast path: gpt-4o-mini first (typical 20–45s). Fall back to gpt-4o only if needed.
   const models = ["gpt-4o-mini", "gpt-4o"];
 
   let lastErr: unknown;

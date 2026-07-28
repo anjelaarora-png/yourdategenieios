@@ -305,7 +305,7 @@ struct PreferencesSummaryCard: View {
             HStack {
                 HStack(spacing: 6) {
                     Text("Your")
-                        .font(Font.header(16, weight: .regular))
+                        .font(Font.bodySerif(16, weight: .regular))
                         .foregroundColor(Color.luxuryCream)
                     Text("Preferences")
                         .font(Font.bodySerif(20, weight: .regular))
@@ -558,7 +558,7 @@ struct LuxuryStatItem: View {
     var body: some View {
         VStack(spacing: 6) {
             Text(value)
-                .font(Font.header(26, weight: .bold))
+                .font(Font.bodySerif(26, weight: .bold))
                 .foregroundColor(Color.luxuryGold)
             
             Text(label)

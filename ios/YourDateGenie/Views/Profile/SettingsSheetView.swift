@@ -35,7 +35,7 @@ struct SettingsSheetView: View {
                         VStack(alignment: .leading, spacing: 16) {
                             HStack {
                                 Text("Account")
-                                    .font(Font.header(18, weight: .semibold))
+                                    .font(Font.bodySerif(18, weight: .semibold))
                                     .foregroundColor(Color.luxuryCream)
                                 Spacer()
                                 Button {
@@ -71,7 +71,7 @@ struct SettingsSheetView: View {
                         // MARK: - Subscription (StoreKit 2)
                         VStack(alignment: .leading, spacing: 16) {
                             Text("Subscription")
-                                .font(Font.header(18, weight: .semibold))
+                                .font(Font.bodySerif(18, weight: .semibold))
                                 .foregroundColor(Color.luxuryCream)
 
                             HStack(alignment: .top, spacing: 12) {
@@ -87,7 +87,7 @@ struct SettingsSheetView: View {
                                     Text(
                                         purchases.isSubscribed
                                             ? "Thank you for supporting Your Date Genie."
-                                            : "Start free for 7 days, then $14.99/month or $99.99/year."
+                                            : "Start free for 7 days, then $14.99/month or $119.99/year."
                                     )
                                     .font(Font.bodySans(13, weight: .regular))
                                     .foregroundColor(Color.luxuryMuted)
@@ -134,6 +134,13 @@ struct SettingsSheetView: View {
                             .buttonStyle(.plain)
                             .disabled(purchases.isRestoring)
 
+                            if let msg = purchases.lastErrorMessage, !msg.isEmpty {
+                                Text(msg)
+                                    .font(Font.bodySans(13, weight: .regular))
+                                    .foregroundColor(Color.orange.opacity(0.95))
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+
                             if let subscriptionsURL = URL(string: "https://apps.apple.com/account/subscriptions") {
                                 Link(destination: subscriptionsURL) {
                                     HStack {
@@ -164,7 +171,7 @@ struct SettingsSheetView: View {
                             VStack(alignment: .leading, spacing: 14) {
                                 HStack {
                                     Text("Cloud preferences")
-                                        .font(Font.header(18, weight: .semibold))
+                                        .font(Font.bodySerif(18, weight: .semibold))
                                         .foregroundColor(Color.luxuryCream)
                                     Spacer()
                                     if isLoadingRemotePreferences {

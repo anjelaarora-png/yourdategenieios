@@ -322,7 +322,7 @@ struct AuthenticationView: View {
                     .foregroundColor(Color.luxuryCream)
             }
             .padding(32)
-            .background(Color.luxuryMaroonLight)
+            .background(Color.luxeSurfaceTintStrong)
             .cornerRadius(16)
         }
     }
@@ -531,7 +531,7 @@ struct AuthenticationView: View {
                 .accessibilityAddTraits(isOn ? .isSelected : [])
             }
         }
-        .background(Color.luxuryMaroonLight)
+        .background(Color.luxeSurfaceTintStrong)
         .cornerRadius(12)
         .overlay(
             RoundedRectangle(cornerRadius: 12)
@@ -620,7 +620,7 @@ struct AuthenticationView: View {
             .accessibilityLabel("Create Account")
             .accessibilityAddTraits(viewModel.isSignUp ? .isSelected : [])
         }
-        .background(Color.luxuryMaroonLight)
+        .background(Color.luxeSurfaceTintStrong)
         .cornerRadius(12)
         .overlay(
             RoundedRectangle(cornerRadius: 12)
@@ -775,7 +775,7 @@ struct AuthenticationView: View {
                 .lineSpacing(4)
         }
         .padding(16)
-        .background(Color.luxuryMaroonLight.opacity(0.5))
+        .background(Color.luxeSurfaceTint)
         .cornerRadius(12)
         .overlay(
             RoundedRectangle(cornerRadius: 12)
@@ -997,7 +997,7 @@ private struct MailQuickActionButton: View {
                 .padding(.horizontal, 10)
                 .padding(.vertical, 7)
                 .frame(maxWidth: .infinity)
-                .background(Color.luxuryMaroonLight.opacity(0.7))
+                .background(Color.luxeSurfaceTintStrong)
                 .cornerRadius(10)
                 .overlay(
                     RoundedRectangle(cornerRadius: 10)
@@ -1027,7 +1027,7 @@ private struct ResetPasswordSheet: View {
                         .foregroundStyle(LinearGradient.goldShimmer)
                     
                     Text("Reset your password")
-                        .font(Font.header(22, weight: .semibold))
+                        .font(Font.bodySerif(22, weight: .semibold))
                         .foregroundColor(Color.luxuryCream)
                     
                     Text("Enter your email and we'll send you a link to reset your password.")
@@ -1140,7 +1140,7 @@ private struct AuthSecureField: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 14)
-            .background(Color.luxuryMaroonLight)
+            .background(Color.luxeSurfaceTintStrong)
             .cornerRadius(12)
             .overlay(
                 RoundedRectangle(cornerRadius: 12)

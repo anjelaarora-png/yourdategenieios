@@ -71,7 +71,7 @@ struct GiftsTabView: View {
                             .font(Font.bodySans(17, weight: .semibold))
                             .foregroundColor(Color.luxuryCream)
                         Text("Occasion, budget, interests — we’ll suggest ideas with links")
-                            .font(Font.inter(13, weight: .regular))
+                            .font(Font.bodySans(13, weight: .regular))
                             .foregroundColor(Color.luxuryCreamMuted)
                     }
                     Spacer()
@@ -80,12 +80,7 @@ struct GiftsTabView: View {
                         .foregroundColor(Color.luxuryGold)
                 }
                 .padding(18)
-                .background(Color.luxuryMaroonLight)
-                .cornerRadius(16)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16)
-                        .stroke(Color.luxuryGold.opacity(0.35), lineWidth: 1)
-                )
+                .goldHighlightMaroonAccent(cornerRadius: 16)
             }
             .buttonStyle(.plain)
             .padding(.horizontal, 20)

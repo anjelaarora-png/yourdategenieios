@@ -5,6 +5,8 @@ import SwiftUI
 enum HomeTutorialAnchor: String, Hashable, CaseIterable {
     case planButton
     case heroPlan
+    case rose
+    case planDateButton
     case tabBar
 }
 
@@ -52,22 +54,36 @@ struct HomeTutorialOverlayView: View {
         StepContent(
             anchor: .planButton,
             icon: "wand.and.stars",
-            title: "Plan your perfect date",
-            body: "Tap Plan My Next Date. Answer a few quick questions and we'll build a complete evening — venues, timing, and all the details.",
+            title: "Plan a full date night",
+            body: "Tap Plan My Next Date. Answer a few quick questions and we'll build a complete evening — real venues, timing, route, and a note for your partner.",
             calloutBelowSpotlight: true
         ),
         StepContent(
             anchor: .heroPlan,
             icon: "heart.fill",
             title: "Your plans live here",
-            body: "Saved and upcoming dates show up on Home. Tap any plan to view the route, reserve, or share with your partner.",
+            body: "Saved and upcoming dates show up on Home. Approve, swap a stop, get directions, or share the whole night in one tap.",
             calloutBelowSpotlight: true
+        ),
+        StepContent(
+            anchor: .rose,
+            icon: "chart.line.uptrend.xyaxis",
+            title: "Your progress",
+            body: "Track date nights you've completed — each one opens a bud on your rose. Goal: 4 meaningful nights a month.",
+            calloutBelowSpotlight: true
+        ),
+        StepContent(
+            anchor: .planDateButton,
+            icon: "wand.and.stars",
+            title: "Plan Date anytime",
+            body: "Tap the gold Plan Date button in the tab bar whenever you want a fresh itinerary — venues, timing, and share-ready details.",
+            calloutBelowSpotlight: false
         ),
         StepContent(
             anchor: .tabBar,
             icon: "sparkles",
             title: "Explore the app",
-            body: "Use the tabs below — Dates, Convo, and You — plus the center + button to plan anytime. Love Notes, Gift Finder, and Memories live in Convo and Dates.",
+            body: "Home, Dates, Convo, and You — Love Notes, Gift Finder, and Memories live in the other tabs.",
             calloutBelowSpotlight: false
         )
     ]

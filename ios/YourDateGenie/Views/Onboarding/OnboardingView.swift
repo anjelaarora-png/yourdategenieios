@@ -306,7 +306,7 @@ struct LuxurySlideChaos: View {
                             // Notch area
                             HStack {
                                 Text("9:41")
-                                    .font(Font.inter(11, weight: .semibold))
+                                    .font(Font.bodySans(11, weight: .semibold))
                                     .foregroundColor(.white)
                                 Spacer()
                                 Capsule()
@@ -362,7 +362,7 @@ struct LuxurySlideChaos: View {
                                     .tint(Color.luxuryGold)
                                     .scaleEffect(0.7)
                                 Text("Still searching...")
-                                    .font(Font.inter(10, weight: .regular))
+                                    .font(Font.bodySans(10, weight: .regular))
                                     .foregroundColor(.white.opacity(0.5))
                             }
                             .padding(.bottom, 20)
@@ -376,7 +376,7 @@ struct LuxurySlideChaos: View {
                     .frame(width: 22, height: 22)
                     .overlay(
                         Text("12")
-                            .font(Font.inter(10, weight: .bold))
+                            .font(Font.bodySans(10, weight: .bold))
                             .foregroundColor(.white)
                     )
                     .offset(x: 85, y: -150)
@@ -390,7 +390,7 @@ struct LuxurySlideChaos: View {
                         .fill(Color.red)
                         .frame(width: 8, height: 8)
                     Text("45 min searching...")
-                        .font(Font.inter(12, weight: .medium))
+                        .font(Font.bodySans(12, weight: .medium))
                         .foregroundColor(Color.luxuryCream)
                 }
                 .padding(.horizontal, 16)
@@ -719,6 +719,37 @@ struct LuxurySlideHomeFlow: View {
             .offset(y: showContent ? 0 : 30)
             .animation(.easeOut(duration: 0.5).delay(0.2), value: showContent)
 
+            HStack(alignment: .top, spacing: 12) {
+                ZStack {
+                    Circle()
+                        .fill(Color.luxuryGold.opacity(0.14))
+                        .frame(width: 40, height: 40)
+                    Text("🌹")
+                        .font(.system(size: 18))
+                }
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Your relationship rose")
+                        .font(Font.bodySans(13, weight: .semibold))
+                        .foregroundColor(Color.luxuryCream)
+                    Text("On Home, your rose grows as you complete date nights — one bud per night, blooming toward 4 a month. Gentle encouragement, never guilt.")
+                        .font(Font.bodySans(12, weight: .regular))
+                        .foregroundColor(Color.luxuryCreamMuted)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(14)
+            .background(Color.luxuryMaroonLight.opacity(0.45))
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+            .overlay(
+                RoundedRectangle(cornerRadius: 14)
+                    .stroke(Color.luxuryGold.opacity(0.22), lineWidth: 1)
+            )
+            .padding(.horizontal, 24)
+            .padding(.top, 16)
+            .opacity(showContent ? 1 : 0)
+            .animation(.easeOut(duration: 0.5).delay(0.45), value: showContent)
+
             Spacer()
         }
         .onAppear { scheduleAutoPlay() }
@@ -762,7 +793,7 @@ struct LuxurySlideHomeFlow: View {
                 Image(systemName: locked ? "checkmark.circle.fill" : "sparkles")
                     .font(.system(size: 13, weight: .semibold))
                 Text(locked ? "Locked in" : "Lock it in")
-                    .font(Font.inter(14, weight: .semibold))
+                    .font(Font.bodySans(14, weight: .semibold))
             }
             .foregroundColor(locked ? .white : Color.luxuryMaroon)
             .frame(maxWidth: .infinity)

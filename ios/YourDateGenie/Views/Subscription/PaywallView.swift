@@ -25,44 +25,59 @@ struct PaywallView: View {
     var onSubscribed: () -> Void
     /// When false, hides the navigation bar close control (e.g. embedded in another container).
     var showsNotNowButton: Bool = true
+    /// When false, omit the inner `NavigationStack` so a parent stack can own the toolbar
+    /// (avoids double nav bars on iPad sheets).
+    var embedsNavigationStack: Bool = true
 
     @State private var selectedPlan: SubscriptionPlan = .annual
     @State private var actionError: String?
 
     var body: some View {
-        NavigationStack {
-            ZStack {
-                Color.backgroundPrimary
-                    .ignoresSafeArea()
-
-                ScrollView(showsIndicators: false) {
-                    VStack(spacing: 24) {
-                        headerSection
-                        planToggle
-                        priceBlock.padding(.vertical, 4)
-                        benefitsSection
-                        errorSection
-                        ctaSection
-                        legalText
-                    }
-                    .padding(24)
-                }
+        Group {
+            if embedsNavigationStack {
+                NavigationStack { paywallChrome }
+            } else {
+                paywallChrome
             }
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
-            .toolbarBackground(.visible, for: .navigationBar)
-            .toolbarColorScheme(.dark, for: .navigationBar)
-            .toolbar {
-                if showsNotNowButton {
-                    ToolbarItem(placement: .navigationBarTrailing) {
-                        Button("Not now") { dismiss() }
-                            .font(Font.bodySans(15, weight: .medium))
-                            .foregroundColor(Color.luxuryGold)
-                    }
-                }
-            }
-            .task { await purchases.loadProducts() }
         }
+        .presentationDetents([.large])
+        .presentationDragIndicator(.visible)
+    }
+
+    private var paywallChrome: some View {
+        ZStack {
+            Color.backgroundPrimary
+                .ignoresSafeArea()
+
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: 24) {
+                    headerSection
+                    planToggle
+                    priceBlock.padding(.vertical, 4)
+                    benefitsSection
+                    errorSection
+                    ctaSection
+                    legalText
+                }
+                .padding(24)
+                .frame(maxWidth: 560)
+                .frame(maxWidth: .infinity)
+            }
+        }
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
+        .toolbarColorScheme(.dark, for: .navigationBar)
+        .toolbar {
+            if showsNotNowButton {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Not now") { dismiss() }
+                        .font(Font.bodySans(15, weight: .medium))
+                        .foregroundColor(Color.luxuryGold)
+                }
+            }
+        }
+        .task { await purchases.loadProducts() }
     }
 
     // MARK: - Header
@@ -164,7 +179,7 @@ struct PaywallView: View {
                 switch selectedPlan {
                 case .annual:
                     priceCard(
-                        price: purchases.premiumAnnualProduct?.displayPrice ?? "$99.99",
+                        price: purchases.premiumAnnualProduct?.displayPrice ?? "$119.99",
                         period: "per year",
                         note: annualPerMonthNote
                     )
@@ -184,13 +199,13 @@ struct PaywallView: View {
             let perMonth = NSDecimalNumber(decimal: annual.price).doubleValue / 12.0
             return String(format: "~$%.2f/mo · 7 days free", perMonth)
         }
-        return "~$8.33/mo · 7 days free"
+        return "~$10.00/mo · 7 days free"
     }
 
     private func priceCard(price: String, period: String, note: String?) -> some View {
         VStack(spacing: 6) {
             Text(price)
-                .font(Font.header(32, weight: .bold))
+                .font(Font.bodySerif(32, weight: .bold))
                 .foregroundColor(Color.luxuryGold)
             Text(period)
                 .font(Font.bodySans(13, weight: .regular))
@@ -296,7 +311,11 @@ struct PaywallView: View {
                 Task {
                     actionError = nil
                     await purchases.restorePurchases()
-                    if purchases.isSubscribed { onSubscribed() }
+                    if purchases.isSubscribed {
+                        onSubscribed()
+                    } else if let msg = purchases.lastErrorMessage, !msg.isEmpty {
+                        actionError = msg
+                    }
                 }
             } label: {
                 HStack(spacing: 8) {
@@ -343,7 +362,7 @@ struct PaywallView: View {
     private var selectedPlanPriceDescription: String {
         switch selectedPlan {
         case .annual:
-            return "\(purchases.premiumAnnualProduct?.displayPrice ?? "$99.99")/year"
+            return "\(purchases.premiumAnnualProduct?.displayPrice ?? "$119.99")/year"
         case .monthly:
             return "\(purchases.premiumMonthlyProduct?.displayPrice ?? "$14.99")/month"
         }

@@ -83,17 +83,13 @@ private struct SessionSparkRow: View {
                 }
             }
             Text(spark.openingQuestion)
-                .font(Font.bodySans(15, weight: .regular))
-                .foregroundColor(Color.luxuryCream)
+                .font(Font.bodySerif(15, weight: .regular))
+                .italic()
+                .foregroundColor(Color.textOnCard)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.luxuryMaroonLight.opacity(0.9))
-        .cornerRadius(16)
-        .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(Color.luxuryGold.opacity(0.25), lineWidth: 1)
-        )
+        .creamCardMaroonAccent(cornerRadius: 16)
     }
 }

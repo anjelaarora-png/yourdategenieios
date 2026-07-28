@@ -21,16 +21,14 @@ struct DatePickerSheet: View {
 
     var body: some View {
         NavigationStack {
-            ZStack {
-                Color.backgroundPrimary.ignoresSafeArea()
-                ScrollView {
-                    VStack(spacing: 28) {
-                        headerView
-                        datePicker
-                        actionButtons
-                    }
-                }
+            VStack(spacing: 28) {
+                headerView
+                datePicker
+                actionButtons
             }
+            .padding(.top, 8)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            .background(Color.backgroundPrimary)
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
@@ -44,6 +42,7 @@ struct DatePickerSheet: View {
                 }
             }
         }
+        .presentationDetents([.large])
     }
 
     // MARK: - Subviews
@@ -63,15 +62,8 @@ struct DatePickerSheet: View {
     }
 
     private var datePicker: some View {
-        DatePicker(
-            "Date",
-            selection: $selectedDate,
-            in: Calendar.current.startOfDay(for: Date())...,
-            displayedComponents: .date
-        )
-        .datePickerStyle(.graphical)
-        .tint(Color.luxuryGold)
-        .padding(.horizontal)
+        CreamGraphicalDatePicker(selection: $selectedDate)
+            .padding(.horizontal, 16)
     }
 
     private var actionButtons: some View {

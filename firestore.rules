@@ -1,12 +1,15 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /waitlist/{doc} {
+    match /waitlist/{docId} {
       // Anyone can create a new entry. Required: email, source, createdAt.
       // Optional (validated only if present): fullName, city, phone, partnerEmail, userAgent.
+      // Document ID must equal normalized email — prevents duplicates without client reads.
       // NOTE: email-only entries come from the exit-intent popup (source: "exit_popup").
       // The full waitlist form additionally sends fullName + city.
-      allow create: if request.resource.data.email is string
+      allow create: if !exists(/databases/$(database)/documents/waitlist/$(docId))
+                    && request.resource.data.email == docId
+                    && request.resource.data.email is string
                     && request.resource.data.email.matches('.+@.+\\..+')
                     && request.resource.data.source is string
                     && request.resource.data.source.size() >= 1

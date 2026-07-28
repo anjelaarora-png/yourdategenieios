@@ -25,7 +25,7 @@ struct RoseMonthlyRecapView: View {
                         .padding(.top, 8)
 
                     Text("A little proof you showed up for each other.")
-                        .font(Font.inter(14))
+                        .font(Font.bodySans(14))
                         .foregroundColor(Color.luxuryCreamMuted)
                         .padding(.top, 6)
 
@@ -40,10 +40,10 @@ struct RoseMonthlyRecapView: View {
                     RoseCard {
                         HStack(spacing: 0) {
                             Text("Most-loved night: ")
-                                .font(Font.inter(13))
+                                .font(Font.bodySans(13))
                                 .foregroundColor(Color.luxuryCreamMuted)
                             Text(recap.mostLovedNight)
-                                .font(Font.inter(13, weight: .medium))
+                                .font(Font.bodySans(13, weight: .medium))
                                 .foregroundColor(Color.textPrimary)
                         }
                     }

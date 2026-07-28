@@ -83,11 +83,11 @@ struct PlaybookView: View {
                     .padding(.horizontal, 4)
                 HStack(alignment: .firstTextBaseline, spacing: 4) {
                     Text("Find the tip made for ")
-                        .font(Font.header(26, weight: .regular))
+                        .font(Font.bodySerif(26, weight: .regular))
                         .foregroundColor(Color.luxuryCream)
                     Text("you")
-                        .font(Font.displaySerif(38, weight: .bold))
-                        .foregroundColor(Color.luxuryGold)
+                        .font(Font.bodySerif(28, weight: .regular))
+                        .foregroundColor(Color.accentGold)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 4)

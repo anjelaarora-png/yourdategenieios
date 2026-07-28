@@ -24,7 +24,7 @@ This task creates two Edge Functions: `validate-receipt` (called by iOS) and `ap
 
 - **Product IDs in App Store Connect:**
   - `com.yourdategenie.premium.monthly` — $14.99/mo
-  - `com.yourdategenie.premium.annual` — $99.99/yr
+  - `com.yourdategenie.premium.annual` — $119.99/yr
   - (Configure these in App Store Connect → Subscriptions before testing)
 - **Apple environment URLs:**
   - Sandbox JWS verification: certificates from `https://www.apple.com/certificateauthority/AppleRootCA-G3.cer` (root) + Apple's intermediate

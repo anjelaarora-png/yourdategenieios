@@ -13,14 +13,18 @@ struct StoredGiftRowView: View {
                 Text(stored.emoji)
                     .font(.system(size: 28))
                     .frame(width: 44, height: 44)
-                    .background(Color.luxuryMaroonLight)
+                    .background(Color.luxeSurfaceTintStrong)
                     .cornerRadius(10)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                            .stroke(Color.luxeSurfaceBorder, lineWidth: 1)
+                    )
                 VStack(alignment: .leading, spacing: 4) {
                     Text(stored.name)
                         .font(Font.bodySans(15, weight: .semibold))
                         .foregroundColor(Color.luxuryCream)
                     Text(stored.priceRange)
-                        .font(Font.inter(12, weight: .medium))
+                        .font(Font.bodySans(12, weight: .medium))
                         .foregroundColor(Color.luxuryGold)
                 }
                 Spacer()
@@ -31,7 +35,7 @@ struct StoredGiftRowView: View {
                         Image(systemName: "cart.fill")
                             .font(.system(size: 11))
                         Text("Shop")
-                            .font(Font.inter(12, weight: .semibold))
+                            .font(Font.bodySans(12, weight: .semibold))
                     }
                     .foregroundColor(Color.luxuryMaroon)
                     .padding(.horizontal, 12)
@@ -45,7 +49,7 @@ struct StoredGiftRowView: View {
                             .font(.system(size: 10))
                             .foregroundColor(Color.luxuryGold)
                         Text("New link")
-                            .font(Font.inter(11, weight: .semibold))
+                            .font(Font.bodySans(11, weight: .semibold))
                     }
                     .foregroundColor(Color.luxuryGold)
                     .padding(.horizontal, 10)
@@ -63,7 +67,7 @@ struct StoredGiftRowView: View {
                             Image(systemName: "checkmark.circle.fill")
                                 .font(.system(size: 11))
                             Text("Bought")
-                                .font(Font.inter(11, weight: .semibold))
+                                .font(Font.bodySans(11, weight: .semibold))
                         }
                         .foregroundColor(Color.luxuryMaroon)
                         .padding(.horizontal, 10)
@@ -75,12 +79,7 @@ struct StoredGiftRowView: View {
             }
         }
         .padding(14)
-        .background(Color.luxuryMaroonLight)
-        .cornerRadius(14)
-        .overlay(
-            RoundedRectangle(cornerRadius: 14)
-                .stroke(Color.luxuryGold.opacity(0.25), lineWidth: 1)
-        )
+        .goldHighlightMaroonAccent(cornerRadius: 14)
     }
 }
 
@@ -99,19 +98,14 @@ struct GiftListEmptyState: View {
                 .font(Font.bodySerif(17, weight: .regular))
                 .foregroundColor(Color.accentGold)
             Text(subtitle)
-                .font(Font.inter(13, weight: .regular))
+                .font(Font.bodySans(13, weight: .regular))
                 .foregroundColor(Color.luxuryMuted)
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 28)
         .padding(.horizontal, 20)
-        .background(Color.luxuryMaroonLight.opacity(0.6))
-        .cornerRadius(14)
-        .overlay(
-            RoundedRectangle(cornerRadius: 14)
-                .stroke(Color.luxuryGold.opacity(0.2), lineWidth: 1)
-        )
+        .questionnaireInsetSurface(cornerRadius: 14)
         .padding(.horizontal, 20)
     }
 }

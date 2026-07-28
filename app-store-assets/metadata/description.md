@@ -18,7 +18,7 @@ WHAT YOU GET FREE
 • Dietary preferences — vegetarian, vegan, gluten-free, halal, kosher
 • Save your plans to revisit
 
-PREMIUM ($14.99/month or $99/year)
+PREMIUM ($14.99/month or $119.99/year)
 
 • Unlimited date plans
 • Memories — save plans with photos and notes

@@ -164,12 +164,12 @@ struct MagicalLoadingView: View {
                                 .scaleEffect(titleScale)
                             
                             Text("Checking venues, timing, and your preferences")
-                                .font(Font.inter(15, weight: .regular))
+                                .font(Font.bodySans(15, weight: .regular))
                                 .foregroundColor(Color.luxuryCreamMuted)
                                 .opacity(titleOpacity)
                             
                             Text("Tip of the day: \(tipOfTheDay)")
-                                .font(Font.inter(13, weight: .regular))
+                                .font(Font.bodySans(13, weight: .regular))
                                 .foregroundColor(Color.luxuryCreamMuted.opacity(0.95))
                                 .multilineTextAlignment(.center)
                                 .lineLimit(4)
@@ -179,7 +179,7 @@ struct MagicalLoadingView: View {
                                 GeometryReader { geometry in
                                     ZStack(alignment: .leading) {
                                         Capsule()
-                                            .fill(Color.luxuryMaroonLight)
+                                            .fill(Color.luxeSurfaceTintStrong)
                                             .frame(height: 5)
                                         Capsule()
                                             .fill(LinearGradient.goldShimmer)
@@ -191,19 +191,19 @@ struct MagicalLoadingView: View {
                                 .padding(.horizontal, 24)
                                 
                                 Text("\(Int(generator.generationProgress * 100))%")
-                                    .font(Font.inter(12, weight: .medium))
+                                    .font(Font.bodySans(12, weight: .medium))
                                     .foregroundColor(Color.luxuryGold)
                             }
                             .opacity(titleOpacity)
                             
                             Text("This usually takes under a minute")
-                                .font(Font.inter(11, weight: .regular))
+                                .font(Font.bodySans(11, weight: .regular))
                                 .foregroundColor(Color.luxuryMuted)
                                 .opacity(titleOpacity)
 
                             if let onCancel {
                                 Button("Cancel", action: onCancel)
-                                    .font(Font.inter(14, weight: .medium))
+                                    .font(Font.bodySans(14, weight: .medium))
                                     .foregroundColor(Color.luxuryCreamMuted)
                                     .padding(.top, 8)
                                     .opacity(titleOpacity)
@@ -248,7 +248,7 @@ struct MagicalLoadingView: View {
             Color.luxuryGold,
             Color.luxuryGoldLight,
             Color.luxuryCream,
-            Color.luxuryMaroonLight,
+            Color.luxeSurfaceTintStrong,
             Color.luxuryGoldDark
         ]
         var pieces: [LoadingConfettiPiece] = []
@@ -406,7 +406,7 @@ private struct GenieLampHeroView: View {
                 colors: [
                     Color.luxuryGold.opacity(glowOpacity),
                     Color.luxuryGold.opacity(glowOpacity * 0.4),
-                    Color.luxuryMaroonLight.opacity(0.3),
+                    Color.luxeSurfaceTint,
                     Color.clear
                 ],
                 center: .center,
@@ -422,7 +422,7 @@ private struct GenieLampHeroView: View {
             RadialGradient(
                 colors: [
                     Color.luxuryGold.opacity(0.12),
-                    Color.luxuryMaroonLight.opacity(0.5),
+                    Color.luxeSurfaceTintStrong,
                     Color.clear
                 ],
                 center: .center,
@@ -504,7 +504,7 @@ private struct SwirlingSmokeWisp: View {
                     colors: [
                         Color.luxuryCream.opacity(opacity),
                         Color.luxuryGold.opacity(opacity * 0.5),
-                        Color.luxuryMaroonLight.opacity(opacity * 0.3),
+                        Color.luxeSurfaceTintStrong.opacity(opacity * 0.3),
                         Color.clear
                     ],
                     startPoint: .bottom,
@@ -536,11 +536,11 @@ struct GenerationErrorView: View {
                 
                 VStack(spacing: 12) {
                     Text("Something went wrong")
-                        .font(Font.header(24, weight: .semibold))
+                        .font(Font.bodySerif(24, weight: .semibold))
                         .foregroundColor(Color.luxuryGold)
                     
                     Text(error.localizedDescription)
-                        .font(Font.inter(14, weight: .regular))
+                        .font(Font.bodySans(14, weight: .regular))
                         .foregroundColor(Color.luxuryCreamMuted)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, 40)

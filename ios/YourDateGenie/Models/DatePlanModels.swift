@@ -407,6 +407,27 @@ struct DatePlan: Identifiable, Equatable, Codable {
         try c.encode(createdAt,            forKey: .createdAt)
     }
 
+    /// Keeps the stable `id` and `createdAt` from an existing plan when merging refreshed content (e.g. verification).
+    func preservingIdentity(from existing: DatePlan) -> DatePlan {
+        DatePlan(
+            id: existing.id,
+            optionLabel: optionLabel,
+            title: title,
+            tagline: tagline,
+            totalDuration: totalDuration,
+            estimatedCost: estimatedCost,
+            stops: stops,
+            startingPoint: startingPoint,
+            genieSecretTouch: genieSecretTouch,
+            packingList: packingList,
+            weatherNote: weatherNote,
+            giftSuggestions: giftSuggestions,
+            conversationStarters: conversationStarters,
+            scheduledDate: scheduledDate ?? existing.scheduledDate,
+            createdAt: existing.createdAt
+        )
+    }
+
     /// Preferred image for cards/lists: first stop's Google place photo, or a theme-based stock image.
     var displayImageUrl: String {
         if let url = stops.first?.imageUrl, !url.isEmpty { return url }

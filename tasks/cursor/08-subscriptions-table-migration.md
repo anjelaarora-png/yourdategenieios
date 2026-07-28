@@ -23,7 +23,7 @@ Web app premium gating, future Android premium gating, and any backend feature t
 
 - **Pricing tiers:**
   - Monthly: `$14.99/mo` (product ID: `com.yourdategenie.premium.monthly` — confirm in App Store Connect)
-  - Annual: `$99.99/yr` (product ID: `com.yourdategenie.premium.annual`)
+  - Annual: `$119.99/yr` (product ID: `com.yourdategenie.premium.annual`)
   - Future Couple Plan: `$19.99/mo` (product ID: `com.yourdategenie.couple.monthly`) — schema should support but not required for v1
 
 - **Free tier limits enforced server-side:**

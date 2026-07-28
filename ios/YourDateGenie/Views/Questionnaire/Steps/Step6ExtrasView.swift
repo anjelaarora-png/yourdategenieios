@@ -20,12 +20,14 @@ struct Step6ExtrasView: View {
             VStack(alignment: .leading, spacing: 24) {
                 // You & partner (gender) – saved in settings
                 VStack(alignment: .leading, spacing: 12) {
-                    Text("You & your partner")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(Color.luxuryCream)
+                    SectionHeader(
+                        emoji: "💑",
+                        title: "You & your partner",
+                        subtitle: "Saved to your profile for better personalization"
+                    )
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Your gender")
-                            .font(Font.inter(14, weight: .medium))
+                            .font(Font.bodySans(14, weight: .medium))
                             .foregroundColor(Color.luxuryMuted)
                         FlowLayout(spacing: 8) {
                             ForEach(PreferenceOptions.genderOptions, id: \.value) { option in
@@ -37,12 +39,9 @@ struct Step6ExtrasView: View {
                             }
                         }
                     }
-                    .padding(16)
-                    .background(Color.luxuryMaroonLight.opacity(0.6))
-                    .cornerRadius(12)
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Partner's gender")
-                            .font(Font.inter(14, weight: .medium))
+                            .font(Font.bodySans(14, weight: .medium))
                             .foregroundColor(Color.luxuryMuted)
                         FlowLayout(spacing: 8) {
                             ForEach(PreferenceOptions.genderOptions, id: \.value) { option in
@@ -54,36 +53,32 @@ struct Step6ExtrasView: View {
                             }
                         }
                     }
-                    .padding(16)
-                    .background(Color.luxuryMaroonLight.opacity(0.6))
-                    .cornerRadius(12)
                 }
 
                 VStack(alignment: .leading, spacing: 12) {
-                    Text("Your love languages")
-                        .font(Font.bodySans(14, weight: .medium))
-                        .foregroundColor(Color.luxuryGold)
-                    Text("Select all that resonate — we’ll tailor plans to what makes you feel loved")
-                        .font(Font.bodySans(12, weight: .regular))
-                        .foregroundColor(Color.luxuryMuted)
+                    SectionHeader(
+                        emoji: "💕",
+                        title: "Your love languages",
+                        subtitle: "Select all that resonate — we'll tailor plans to what makes you feel loved"
+                    )
                     LoveLanguageSelector(selectedLanguages: loveLanguageSetBinding)
                 }
-                .padding(16)
-                .background(Color.luxuryMaroonLight.opacity(0.6))
-                .cornerRadius(12)
                 
                 if !isPreferencesOnly {
-                // Info banner
                 HStack(spacing: 12) {
                     Image(systemName: "sparkles")
-                        .foregroundColor(.brandGold)
+                        .foregroundColor(Color.accentGold)
                     Text("Optional extras to make your date extra special")
-                        .font(.system(size: 14))
+                        .font(Font.bodySans(14, weight: .regular))
                         .foregroundColor(Color.luxuryMuted)
                 }
                 .padding(16)
-                .background(Color.brandGold.opacity(0.1))
+                .background(Color.accentGold.opacity(0.08))
                 .cornerRadius(12)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(Color.accentGold.opacity(0.18), lineWidth: 1)
+                )
                 
                 // Gift Suggestions Toggle
                 VStack(alignment: .leading, spacing: 12) {
@@ -93,30 +88,26 @@ struct Step6ExtrasView: View {
                                 .font(.system(size: 24))
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("Gift Suggestions")
-                                    .font(.system(size: 16, weight: .semibold))
+                                    .font(Font.bodySans(16, weight: .semibold))
                                     .foregroundColor(Color.luxuryCream)
                                 Text("Get personalized gift ideas")
-                                    .font(.system(size: 13))
+                                    .font(Font.bodySans(13, weight: .regular))
                                     .foregroundColor(Color.luxuryMuted)
                             }
                         }
                     }
-                    .toggleStyle(SwitchToggleStyle(tint: .brandGold))
-                    .padding(16)
-                    .background(Color.luxuryMaroonLight)
-                    .cornerRadius(12)
+                    .toggleStyle(SwitchToggleStyle(tint: Color.accentGold))
+                    .questionnaireInsetSurface()
                     
                     if data.wantGiftSuggestions {
-                        // Luxe gift-with-bow unwrap animation
                         GiftUnwrapView()
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 8)
                         
-                        // Partner Interests
                         VStack(alignment: .leading, spacing: 8) {
                             Text("What are they into?")
-                                .font(Font.displaySerif(22, weight: .bold))
-                                .foregroundColor(Color.luxuryGold)
+                                .font(Font.bodySans(15, weight: .semibold))
+                                .foregroundColor(Color.luxuryCream)
                             
                             FlowLayout(spacing: 8) {
                                 ForEach(QuestionnaireOptions.partnerInterests) { interest in
@@ -130,9 +121,6 @@ struct Step6ExtrasView: View {
                                 }
                             }
                         }
-                        .padding(16)
-                        .background(Color.luxuryMaroonLight.opacity(0.6))
-                        .cornerRadius(12)
                     }
                 }
                 
@@ -144,25 +132,22 @@ struct Step6ExtrasView: View {
                                 .font(.system(size: 24))
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("Conversation Starters")
-                                    .font(.system(size: 16, weight: .semibold))
+                                    .font(Font.bodySans(16, weight: .semibold))
                                     .foregroundColor(Color.luxuryCream)
                                 Text("Never have awkward silences")
-                                    .font(.system(size: 13))
+                                    .font(Font.bodySans(13, weight: .regular))
                                     .foregroundColor(Color.luxuryMuted)
                             }
                         }
                     }
-                    .toggleStyle(SwitchToggleStyle(tint: .brandGold))
-                    .padding(16)
-                    .background(Color.luxuryMaroonLight)
-                    .cornerRadius(12)
+                    .toggleStyle(SwitchToggleStyle(tint: Color.accentGold))
+                    .questionnaireInsetSurface()
                     
                     if data.wantConversationStarters {
-                        // Relationship Stage
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Relationship stage")
-                                .font(Font.displaySerif(22, weight: .bold))
-                                .foregroundColor(Color.luxuryGold)
+                                .font(Font.bodySans(15, weight: .semibold))
+                                .foregroundColor(Color.luxuryCream)
                             
                             FlowLayout(spacing: 8) {
                                 ForEach(QuestionnaireOptions.relationshipStages) { stage in
@@ -174,15 +159,11 @@ struct Step6ExtrasView: View {
                                 }
                             }
                         }
-                        .padding(16)
-                        .background(Color.luxuryMaroonLight.opacity(0.6))
-                        .cornerRadius(12)
                         
-                        // Conversation Topics
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Topics you'd like to explore")
-                                .font(Font.displaySerif(22, weight: .bold))
-                                .foregroundColor(Color.luxuryGold)
+                                .font(Font.bodySans(15, weight: .semibold))
+                                .foregroundColor(Color.luxuryCream)
                             
                             FlowLayout(spacing: 8) {
                                 ForEach(QuestionnaireOptions.conversationTopics) { topic in
@@ -196,9 +177,6 @@ struct Step6ExtrasView: View {
                                 }
                             }
                         }
-                        .padding(16)
-                        .background(Color.luxuryMaroonLight.opacity(0.6))
-                        .cornerRadius(12)
                     }
                 }
                 } // end if !isPreferencesOnly
@@ -207,27 +185,27 @@ struct Step6ExtrasView: View {
                 VStack(alignment: .leading, spacing: 12) {
                     if isPreferencesOnly {
                         Text("Save your preferences")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundColor(Color.luxuryGold)
+                            .font(Font.bodySans(16, weight: .semibold))
+                            .foregroundColor(Color.accentGold)
                         Text("Tap 'Save preferences' below. No date plan will be generated.")
-                            .font(.system(size: 14))
+                            .font(Font.bodySans(14, weight: .regular))
                             .foregroundColor(Color.luxuryMuted)
                     } else {
-                        Text("✨ Ready to create your plan!")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundColor(Color.luxuryGold)
-                        Text("Tap 'Generate Date Plan' below and we'll create a personalized date itinerary based on everything you've told us.")
-                            .font(.system(size: 14))
+                        Text("Ready to create your plan")
+                            .font(Font.bodySans(16, weight: .semibold))
+                            .foregroundColor(Color.accentGold)
+                        Text("Tap Generate below — we'll build three personalized options from everything you've told us.")
+                            .font(Font.bodySans(14, weight: .regular))
                             .foregroundColor(Color.luxuryMuted)
                     }
                 }
                 .padding(16)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.brandPrimary.opacity(0.05))
+                .background(Color.luxeSurfaceTintStrong)
                 .cornerRadius(12)
                 .overlay(
                     RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color.brandPrimary.opacity(0.2), lineWidth: 1)
+                        .stroke(Color.luxeSurfaceBorder, lineWidth: 1)
                 )
             }
             .padding(20)

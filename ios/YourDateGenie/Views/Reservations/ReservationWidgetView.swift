@@ -174,7 +174,7 @@ struct ReservationWidgetView: View {
                     Button("Close") {
                         dismiss()
                     }
-                    .font(Font.inter(16, weight: .medium))
+                    .font(Font.bodySans(16, weight: .medium))
                     .foregroundColor(Color.luxuryGold)
                 }
             }
@@ -207,7 +207,7 @@ struct ReservationWidgetView: View {
                             Image(systemName: "mappin.circle")
                                 .foregroundColor(Color.luxuryGold.opacity(0.7))
                             Text(address)
-                                .font(Font.inter(13, weight: .regular))
+                                .font(Font.bodySans(13, weight: .regular))
                                 .foregroundColor(Color.luxuryMuted)
                         }
                     }
@@ -216,7 +216,7 @@ struct ReservationWidgetView: View {
                             VStack(alignment: .leading, spacing: 2) {
                                 ForEach(hours, id: \.self) { line in
                                     Text(line)
-                                        .font(Font.inter(11, weight: .regular))
+                                        .font(Font.bodySans(11, weight: .regular))
                                         .foregroundColor(Color.luxuryMuted)
                                 }
                             }
@@ -227,7 +227,7 @@ struct ReservationWidgetView: View {
                                 Image(systemName: "clock")
                                     .foregroundColor(Color.luxuryGold.opacity(0.7))
                                 Text("Hours")
-                                    .font(Font.inter(12, weight: .semibold))
+                                    .font(Font.bodySans(12, weight: .semibold))
                                     .foregroundColor(Color.luxuryMuted)
                             }
                         }
@@ -241,7 +241,7 @@ struct ReservationWidgetView: View {
                                 Image(systemName: "globe")
                                     .foregroundColor(Color.luxuryGold)
                                 Text("Website")
-                                    .font(Font.inter(13, weight: .medium))
+                                    .font(Font.bodySans(13, weight: .medium))
                                     .foregroundColor(Color.luxuryGold)
                             }
                         }
@@ -264,7 +264,7 @@ struct ReservationWidgetView: View {
                             Image(systemName: "link.circle.fill")
                                 .font(.system(size: 20))
                             Text(reservationPlatformLabel(urlString))
-                                .font(Font.inter(16, weight: .semibold))
+                                .font(Font.bodySans(16, weight: .semibold))
                         }
                         .foregroundColor(Color.luxuryMaroon)
                         .frame(maxWidth: .infinity)
@@ -291,7 +291,7 @@ struct ReservationWidgetView: View {
                         .tint(Color.luxuryGold)
                         .colorScheme(.dark)
                         .padding(16)
-                        .background(Color.luxuryMaroonLight)
+                        .background(Color.luxeSurfaceTintStrong)
                         .cornerRadius(16)
                         .overlay(
                             RoundedRectangle(cornerRadius: 16)
@@ -342,10 +342,10 @@ struct ReservationWidgetView: View {
                         
                         VStack(spacing: 2) {
                             Text("\(partySize)")
-                                .font(Font.header(36, weight: .bold))
+                                .font(Font.bodySerif(36, weight: .bold))
                                 .foregroundColor(Color.luxuryGold)
                             Text(partySize == 1 ? "guest" : "guests")
-                                .font(Font.inter(12, weight: .regular))
+                                .font(Font.bodySans(12, weight: .regular))
                                 .foregroundColor(Color.luxuryMuted)
                         }
                         .frame(width: 80)
@@ -361,7 +361,7 @@ struct ReservationWidgetView: View {
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 16)
-                    .background(Color.luxuryMaroonLight)
+                    .background(Color.luxeSurfaceTintStrong)
                     .cornerRadius(16)
                     .overlay(
                             RoundedRectangle(cornerRadius: 16)
@@ -376,7 +376,7 @@ struct ReservationWidgetView: View {
                         .font(Font.playfair(16, weight: .semibold))
                         .foregroundColor(Color.luxuryCream)
                     Text("Select date & time above, then tap a platform to open it.")
-                        .font(Font.inter(12, weight: .regular))
+                        .font(Font.bodySans(12, weight: .regular))
                         .foregroundColor(Color.luxuryMuted)
                     HStack(spacing: 12) {
                         ForEach(reservedPlatforms) { platform in
@@ -387,7 +387,7 @@ struct ReservationWidgetView: View {
                                     HStack(spacing: 10) {
                                         ReservationPlatformIconView(platformId: platform.id, platformName: platform.name)
                                         Text(platform.name)
-                                            .font(Font.inter(15, weight: .semibold))
+                                            .font(Font.bodySans(15, weight: .semibold))
                                             .foregroundColor(Color.luxuryMaroon)
                                             .lineLimit(2)
                                             .minimumScaleFactor(0.85)
@@ -424,17 +424,17 @@ struct ReservationWidgetView: View {
                             .foregroundColor(Color.luxuryCream)
                         
                         Text("(optional)")
-                            .font(Font.inter(12, weight: .regular))
+                            .font(Font.bodySans(12, weight: .regular))
                             .foregroundColor(Color.luxuryMuted)
                     }
                     
                     TextEditor(text: $specialRequests)
-                        .font(Font.inter(15, weight: .regular))
+                        .font(Font.bodySans(15, weight: .regular))
                         .foregroundColor(Color.luxuryCream)
                         .scrollContentBackground(.hidden)
                         .frame(height: 100)
                         .padding(14)
-                        .background(Color.luxuryMaroonLight)
+                        .background(Color.luxeSurfaceTintStrong)
                         .cornerRadius(16)
                         .overlay(
                             RoundedRectangle(cornerRadius: 16)
@@ -444,7 +444,7 @@ struct ReservationWidgetView: View {
                             Group {
                                 if specialRequests.isEmpty {
                                     Text("Window seat, anniversary celebration...")
-                                        .font(Font.inter(15, weight: .regular))
+                                        .font(Font.bodySans(15, weight: .regular))
                                         .foregroundColor(Color.luxuryMuted.opacity(0.5))
                                         .padding(.horizontal, 18)
                                         .padding(.vertical, 22)
@@ -486,7 +486,7 @@ struct ReservationWidgetView: View {
                             Image(systemName: "phone.fill")
                             Text("Or Call Directly: \(phone)")
                         }
-                        .font(Font.inter(14, weight: .medium))
+                        .font(Font.bodySans(14, weight: .medium))
                         .foregroundColor(Color.luxuryMuted)
                     }
                 }
@@ -1069,7 +1069,7 @@ private struct ReservationPlatformIconView: View {
             }
         }
         .frame(width: 40, height: 40)
-        .background(Color.luxuryMaroonLight)
+        .background(Color.luxeSurfaceTintStrong)
         .clipShape(RoundedRectangle(cornerRadius: 8))
         .overlay(
             RoundedRectangle(cornerRadius: 8)
@@ -1079,7 +1079,7 @@ private struct ReservationPlatformIconView: View {
     
     private var fallbackView: some View {
         Text(String(platformName.prefix(1)))
-            .font(Font.inter(16, weight: .bold))
+            .font(Font.bodySans(16, weight: .bold))
             .foregroundColor(Color.luxuryGold)
     }
 }
@@ -1093,13 +1093,13 @@ struct TimeChip: View {
     var body: some View {
         Button(action: action) {
             Text(time)
-                .font(Font.inter(13, weight: isSelected ? .semibold : .regular))
+                .font(Font.bodySans(13, weight: isSelected ? .semibold : .regular))
                 .foregroundColor(isSelected ? Color.luxuryMaroon : Color.luxuryCream)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 10)
                 .frame(maxWidth: .infinity)
                 .background(
-                    isSelected ? LinearGradient.goldShimmer : LinearGradient(colors: [Color.luxuryMaroonLight], startPoint: .top, endPoint: .bottom)
+                    isSelected ? LinearGradient.goldShimmer : LinearGradient(colors: [Color.luxeSurfaceTintStrong], startPoint: .top, endPoint: .bottom)
                 )
                 .cornerRadius(10)
                 .overlay(
@@ -1124,7 +1124,7 @@ struct ReservationDetailRow: View {
                 .frame(width: 20)
             
             Text(label)
-                .font(Font.inter(14, weight: .regular))
+                .font(Font.bodySans(14, weight: .regular))
                 .foregroundColor(Color.luxuryMuted)
             
             Spacer()

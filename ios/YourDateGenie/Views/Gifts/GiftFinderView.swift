@@ -175,13 +175,13 @@ struct GiftFinderView: View {
             .toolbar {
                 ToolbarItem(placement: .principal) {
                     Text("Gift Finder")
-                        .font(Font.displaySerif(18, weight: .semibold))
-                        .foregroundColor(Color.textPrimary)
+                        .font(Font.bodySerif(18, weight: .regular))
+                        .foregroundColor(Color.accentGold)
                 }
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Close") { dismiss() }
-                        .font(Font.inter(16, weight: .medium))
-                        .foregroundColor(Color.textPrimary)
+                        .font(Font.bodySans(16, weight: .medium))
+                        .foregroundColor(Color.accentGold)
                 }
             }
             .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
@@ -189,6 +189,16 @@ struct GiftFinderView: View {
             .onAppear {
                 if reduceMotion { showUnwrapAnimation = false }
                 prefillFromProfile()
+                #if DEBUG
+                if ScreenshotDemo.isActive && ScreenshotDemo.scene == .giftFinder {
+                    showUnwrapAnimation = false
+                    selectedOccasion = "Anniversary"
+                    selectedBudget = "$50–$100"
+                    interests = "Italian food, wine, cozy nights in"
+                    gifts = ScreenshotDemo.sampleGiftSuggestions
+                    showResults = true
+                }
+                #endif
             }
             .sheet(item: $detailGift) { gift in
                 GiftDetailSheet(
@@ -213,11 +223,11 @@ struct GiftFinderView: View {
                 } label: {
                     VStack(spacing: 8) {
                         Text(tab.rawValue)
-                            .font(Font.inter(14, weight: selectedTab == tab ? .semibold : .regular))
+                            .font(Font.bodySans(14, weight: selectedTab == tab ? .semibold : .regular))
                             .foregroundColor(selectedTab == tab ? Color.textPrimary : Color.luxuryCreamMuted)
 
                         Rectangle()
-                            .fill(selectedTab == tab ? Color.accentMaroon : Color.clear)
+                            .fill(selectedTab == tab ? Color.accentGold : Color.clear)
                             .frame(height: 2)
                     }
                 }
@@ -239,33 +249,32 @@ struct GiftFinderView: View {
         VStack(spacing: 12) {
             ZStack {
                 Circle()
-                    .fill(Color.surfaceElevated)
-                    .overlay(Circle().stroke(Color.maroonBorderTint, lineWidth: 1))
+                    .fill(Color.luxeSurfaceTintStrong)
+                    .overlay(Circle().stroke(Color.luxeSurfaceBorder, lineWidth: 1))
                     .frame(width: 80, height: 80)
 
                 Image(systemName: "gift.fill")
                     .font(.system(size: 34))
-                    .foregroundColor(Color.accentMaroon)
+                    .foregroundColor(Color.accentGold)
             }
 
             Text("Find the Perfect Gift")
-                .font(Font.displaySerif(28, weight: .semibold))
-                .foregroundColor(Color.textPrimary)
+                .font(Font.bodySerif(28, weight: .regular))
+                .foregroundColor(Color.accentGold)
 
             Text("Thoughtful picks for your person, tuned to the occasion")
-                .font(Font.inter(15, weight: .regular))
+                .font(Font.bodySans(15, weight: .regular))
                 .foregroundColor(Color.luxuryCreamMuted)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 24)
 
             if prefilledFromPartner && selectedTab == .find && !showResults {
                 Text("✨ Pre-filled from \(prefillPartnerName.isEmpty ? "your profile" : prefillPartnerName)")
-                    .font(Font.inter(12, weight: .semibold))
+                    .font(Font.bodySans(12, weight: .semibold))
                     .foregroundColor(Color.textPrimary)
                     .padding(.horizontal, 14)
                     .padding(.vertical, 7)
-                    .background(Color.accentMaroon)
-                    .cornerRadius(20)
+                    .goldHighlightMaroonAccent(cornerRadius: 20)
             }
 
             if let plan = datePlan {
@@ -288,9 +297,7 @@ struct GiftFinderView: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
-            .background(Color.surfaceElevated)
-            .cornerRadius(20)
-            .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.maroonBorderTint, lineWidth: 1))
+            .goldHighlightMaroonAccent(cornerRadius: 20)
 
             Button {
                 openInAppleMaps(query: "gift shop", near: mapSearchLocation)
@@ -299,7 +306,7 @@ struct GiftFinderView: View {
                     Image(systemName: "mappin.circle.fill")
                         .font(.system(size: 11))
                     Text(effectiveLocationDisplay)
-                        .font(Font.inter(11, weight: .regular))
+                        .font(Font.bodySans(11, weight: .regular))
                         .lineLimit(1)
                     Image(systemName: "arrow.up.right")
                         .font(.system(size: 9))
@@ -383,7 +390,7 @@ struct GiftFinderView: View {
                     } else {
                         Image(systemName: "sparkles")
                         Text("Find Gift Ideas")
-                            .font(Font.inter(16, weight: .semibold))
+                            .font(Font.bodySans(16, weight: .semibold))
                     }
                 }
                 .frame(maxWidth: .infinity)
@@ -404,7 +411,7 @@ struct GiftFinderView: View {
                     Image(systemName: showMore ? "minus.circle" : "plus.circle")
                         .font(.system(size: 15))
                     Text(showMore ? "Fewer details" : "More details (optional)")
-                        .font(Font.inter(14, weight: .semibold))
+                        .font(Font.bodySans(14, weight: .semibold))
                     Spacer()
                     Image(systemName: "chevron.down")
                         .font(.system(size: 12, weight: .semibold))
@@ -414,7 +421,7 @@ struct GiftFinderView: View {
                 .padding(.horizontal, 18)
                 .padding(.vertical, 14)
                 .frame(maxWidth: .infinity)
-                .background(Color.surfaceElevated)
+                .background(Color.luxeSurfaceTintStrong)
                 .cornerRadius(14)
                 .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.maroonBorderTint, lineWidth: 1))
             }
@@ -491,11 +498,11 @@ struct GiftFinderView: View {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(filteredGifts.isEmpty && giftLoadError != nil ? "Gift ideas" : "\(filteredGifts.count) gift ideas")
-                        .font(Font.displaySerif(20, weight: .semibold))
-                        .foregroundColor(Color.textPrimary)
+                        .font(Font.bodySerif(20, weight: .regular))
+                        .foregroundColor(Color.accentGold)
 
                     Text(effectiveLocation.isEmpty ? "With stores near you" : "With stores near \(effectiveLocationDisplay)")
-                        .font(Font.inter(12, weight: .regular))
+                        .font(Font.bodySans(12, weight: .regular))
                         .foregroundColor(Color.luxuryCreamMuted)
                         .lineLimit(1)
                 }
@@ -516,7 +523,7 @@ struct GiftFinderView: View {
             // Budget filter
             VStack(alignment: .leading, spacing: 10) {
                 Text("Filter by budget")
-                    .font(Font.inter(13, weight: .semibold))
+                    .font(Font.bodySans(13, weight: .semibold))
                     .foregroundColor(Color.luxuryCreamMuted)
                     .padding(.horizontal, 20)
                 ScrollView(.horizontal, showsIndicators: false) {
@@ -564,7 +571,7 @@ struct GiftFinderView: View {
                     } else {
                         Image(systemName: "sparkles")
                         Text("Get More Ideas")
-                            .font(Font.inter(16, weight: .semibold))
+                            .font(Font.bodySans(16, weight: .semibold))
                     }
                 }
                 .frame(maxWidth: .infinity)
@@ -585,7 +592,7 @@ struct GiftFinderView: View {
             }
             .foregroundColor(Color.textPrimary)
             Text("Check your connection and tap Try again for AI-powered suggestions.")
-                .font(Font.inter(12, weight: .regular))
+                .font(Font.bodySans(12, weight: .regular))
                 .foregroundColor(Color.luxuryCreamMuted)
                 .multilineTextAlignment(.center)
             Button {
@@ -594,36 +601,23 @@ struct GiftFinderView: View {
                 HStack(spacing: 6) {
                     Image(systemName: "arrow.clockwise")
                     Text("Try again")
-                        .font(Font.inter(14, weight: .semibold))
+                        .font(Font.bodySans(14, weight: .semibold))
                 }
-                .foregroundColor(Color.textPrimary)
-                .padding(.horizontal, 20)
-                .padding(.vertical, 12)
-                .background(Color.accentMaroon)
-                .cornerRadius(12)
+                .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(LuxuryGoldButtonStyle(isSmall: true))
         }
         .padding(20)
         .frame(maxWidth: .infinity)
-        .background(Color.surfaceElevated)
-        .cornerRadius(16)
-        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.maroonBorderTint, lineWidth: 1))
+        .goldHighlightMaroonAccent(cornerRadius: 16)
         .padding(.horizontal, 20)
     }
 
     // MARK: - Nearby Stores
     private var nearbyStoresSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 6) {
-                Image(systemName: "mappin.and.ellipse")
-                    .font(.system(size: 13))
-                    .foregroundColor(Color.luxuryCreamMuted)
-                Text(effectiveLocation.isEmpty ? "Stores near you" : "Stores near your date")
-                    .font(Font.displaySerif(18, weight: .semibold))
-                    .foregroundColor(Color.textPrimary)
-            }
-            .padding(.horizontal, 20)
+            ExtrasSectionHeader(icon: "mappin.and.ellipse", title: effectiveLocation.isEmpty ? "Stores near you" : "Stores near your date")
+                .padding(.horizontal, 20)
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 12) {
@@ -641,16 +635,16 @@ struct GiftFinderView: View {
                     Image(systemName: "map.fill")
                         .font(.system(size: 13))
                     Text("View all gift shops on map")
-                        .font(Font.inter(14, weight: .semibold))
+                        .font(Font.bodySans(14, weight: .semibold))
                     Image(systemName: "arrow.up.right")
                         .font(.system(size: 11))
                 }
                 .foregroundColor(Color.textPrimary)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 14)
-                .background(Color.surfaceElevated)
+                .background(Color.luxeSurfaceTintStrong)
                 .cornerRadius(12)
-                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.maroonBorderTint, lineWidth: 1))
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.luxeSurfaceBorder, lineWidth: 1))
             }
             .padding(.horizontal, 20)
         }
@@ -711,14 +705,7 @@ struct GiftFinderView: View {
 
     private func sectionContainer<Content: View>(icon: String, title: String, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 6) {
-                Image(systemName: icon)
-                    .font(.system(size: 14))
-                    .foregroundColor(Color.luxuryCreamMuted)
-                Text(title)
-                    .font(Font.displaySerif(20, weight: .semibold))
-                    .foregroundColor(Color.textPrimary)
-            }
+            ExtrasSectionHeader(icon: icon, title: title)
             content()
         }
         .padding(.horizontal, 20)
@@ -743,43 +730,39 @@ struct GiftFinderView: View {
                 Image(systemName: icon)
                     .font(.system(size: 12))
                 Text(title)
-                    .font(Font.inter(13, weight: .medium))
+                    .font(Font.bodySans(13, weight: .medium))
             }
             .foregroundColor(Color.textPrimary)
             .padding(.horizontal, 14)
             .padding(.vertical, 8)
-            .background(Color.surfaceElevated)
+            .background(Color.luxeSurfaceTintStrong)
             .cornerRadius(20)
-            .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.maroonBorderTint, lineWidth: 1))
+            .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.luxeSurfaceBorder, lineWidth: 1))
         }
         .buttonStyle(.plain)
     }
 
     private func giftTextField(placeholder: String, text: Binding<String>) -> some View {
         TextField("", text: text, prompt: Text(placeholder).foregroundColor(Color.luxuryCreamMuted.opacity(0.7)))
-            .font(Font.inter(15, weight: .regular))
+            .font(Font.bodySans(15, weight: .regular))
             .foregroundColor(Color.textPrimary)
             .padding(16)
-            .background(Color.surfaceElevated)
-            .cornerRadius(14)
-            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.maroonBorderTint, lineWidth: 1))
+            .luxeInsetSurface(cornerRadius: 14)
     }
 
     private func giftTextEditor(placeholder: String, text: Binding<String>) -> some View {
         TextEditor(text: text)
-            .font(Font.inter(15, weight: .regular))
+            .font(Font.bodySans(15, weight: .regular))
             .foregroundColor(Color.textPrimary)
             .scrollContentBackground(.hidden)
             .frame(height: 80)
             .padding(14)
-            .background(Color.surfaceElevated)
-            .cornerRadius(14)
-            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.maroonBorderTint, lineWidth: 1))
+            .luxeInsetSurface(cornerRadius: 14)
             .overlay(
                 Group {
                     if text.wrappedValue.isEmpty {
                         Text(placeholder)
-                            .font(Font.inter(15, weight: .regular))
+                            .font(Font.bodySans(15, weight: .regular))
                             .foregroundColor(Color.luxuryCreamMuted.opacity(0.7))
                             .padding(.horizontal, 18)
                             .padding(.vertical, 22)
@@ -1134,25 +1117,25 @@ struct GiftOccasionCard: View {
                 Text(emoji)
                     .font(.system(size: 28))
                 Text(title)
-                    .font(Font.inter(12, weight: .medium))
-                    .foregroundColor(Color.textPrimary)
+                    .font(Font.bodySans(12, weight: .medium))
+                    .foregroundColor(isSelected ? Color.luxuryMaroon : Color.luxuryCream)
                     .multilineTextAlignment(.center)
                     .lineLimit(2)
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 14)
-            .background(isSelected ? Color.accentMaroon : Color.surfaceElevated)
+            .background(isSelected ? AnyShapeStyle(LinearGradient.goldShimmer) : AnyShapeStyle(Color.luxeSurfaceTintStrong))
             .cornerRadius(14)
             .overlay(
                 RoundedRectangle(cornerRadius: 14)
-                    .stroke(isSelected ? Color.accentMaroon : Color.maroonBorderTint, lineWidth: 1)
+                    .stroke(isSelected ? Color.clear : Color.luxeSurfaceBorder, lineWidth: 1)
             )
         }
         .buttonStyle(ScaleButtonStyle())
     }
 }
 
-// MARK: - Selectable chip (maroon = selected)
+// MARK: - Selectable chip (Home questionnaire parity)
 struct GiftChip: View {
     let text: String
     let isSelected: Bool
@@ -1161,15 +1144,15 @@ struct GiftChip: View {
     var body: some View {
         Button(action: action) {
             Text(text)
-                .font(Font.inter(13, weight: isSelected ? .semibold : .regular))
-                .foregroundColor(Color.textPrimary)
+                .font(Font.bodySans(13, weight: isSelected ? .semibold : .regular))
+                .foregroundColor(isSelected ? Color.luxuryMaroon : Color.luxuryCream)
                 .padding(.horizontal, 16)
                 .padding(.vertical, 10)
-                .background(isSelected ? Color.accentMaroon : Color.surfaceElevated)
+                .background(isSelected ? AnyShapeStyle(LinearGradient.goldShimmer) : AnyShapeStyle(Color.luxeSurfaceTintStrong))
                 .cornerRadius(20)
                 .overlay(
                     RoundedRectangle(cornerRadius: 20)
-                        .stroke(isSelected ? Color.accentMaroon : Color.maroonBorderTint, lineWidth: 1)
+                        .stroke(isSelected ? Color.clear : Color.luxeSurfaceBorder, lineWidth: 1)
                 )
         }
         .buttonStyle(.plain)
@@ -1185,15 +1168,15 @@ private struct FilterChip: View {
     var body: some View {
         Button(action: action) {
             Text(title)
-                .font(Font.inter(12, weight: isSelected ? .semibold : .regular))
-                .foregroundColor(isSelected ? Color.textPrimary : Color.luxuryCreamMuted)
+                .font(Font.bodySans(12, weight: isSelected ? .semibold : .regular))
+                .foregroundColor(isSelected ? Color.luxuryMaroon : Color.luxuryCreamMuted)
                 .padding(.horizontal, 14)
                 .padding(.vertical, 8)
-                .background(isSelected ? Color.accentMaroon : Color.surfaceElevated)
+                .background(isSelected ? AnyShapeStyle(LinearGradient.goldShimmer) : AnyShapeStyle(Color.luxeSurfaceTintStrong))
                 .cornerRadius(16)
                 .overlay(
                     RoundedRectangle(cornerRadius: 16)
-                        .stroke(isSelected ? Color.accentMaroon : Color.maroonBorderTint, lineWidth: 1)
+                        .stroke(isSelected ? Color.clear : Color.luxeSurfaceBorder, lineWidth: 1)
                 )
         }
         .buttonStyle(.plain)
@@ -1214,7 +1197,7 @@ struct NearbyStoreCard: View {
                     Text(store.emoji)
                         .font(.system(size: 26))
                         .frame(width: 44, height: 44)
-                        .background(Color.accentMaroon)
+                        .background(Color.accentGold.opacity(0.15))
                         .cornerRadius(10)
 
                     VStack(alignment: .leading, spacing: 2) {
@@ -1222,7 +1205,7 @@ struct NearbyStoreCard: View {
                             .font(Font.bodySerif(14, weight: .semibold))
                             .foregroundColor(Color.textPrimary)
                         Text(store.category)
-                            .font(Font.inter(10, weight: .regular))
+                            .font(Font.bodySans(10, weight: .regular))
                             .foregroundColor(Color.luxuryCreamMuted)
                             .lineLimit(1)
                     }
@@ -1231,11 +1214,11 @@ struct NearbyStoreCard: View {
                 HStack(spacing: 4) {
                     ForEach(store.giftIdeas.prefix(3), id: \.self) { idea in
                         Text(idea)
-                            .font(Font.inter(9, weight: .medium))
+                            .font(Font.bodySans(9, weight: .medium))
                             .foregroundColor(Color.textPrimary)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 3)
-                            .background(Color.accentMaroon.opacity(0.55))
+                            .background(Color.accentGold.opacity(0.2))
                             .cornerRadius(4)
                     }
                 }
@@ -1244,7 +1227,7 @@ struct NearbyStoreCard: View {
                     Image(systemName: "map.fill")
                         .font(.system(size: 10))
                     Text("Open in Maps")
-                        .font(Font.inter(11, weight: .semibold))
+                        .font(Font.bodySans(11, weight: .semibold))
                     Image(systemName: "arrow.up.right")
                         .font(.system(size: 9))
                 }
@@ -1252,9 +1235,7 @@ struct NearbyStoreCard: View {
             }
             .padding(14)
             .frame(width: 180)
-            .background(Color.surfaceElevated)
-            .cornerRadius(14)
-            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.maroonBorderTint, lineWidth: 1))
+            .goldHighlightMaroonAccent(cornerRadius: 14)
         }
         .buttonStyle(ScaleButtonStyle())
     }
@@ -1285,7 +1266,7 @@ struct GiftResultCard: View {
                         Text(gift.emoji)
                             .font(.system(size: 38))
                             .frame(width: 58, height: 58)
-                            .background(Color.accentMaroon.opacity(0.12))
+                            .background(Color.accentGold.opacity(0.12))
                             .cornerRadius(14)
 
                         VStack(alignment: .leading, spacing: 6) {
@@ -1302,7 +1283,7 @@ struct GiftResultCard: View {
                                 }
                             }
                             Text(gift.description)
-                                .font(Font.inter(13, weight: .regular))
+                                .font(Font.bodySans(13, weight: .regular))
                                 .foregroundColor(Color.textMutedOnCard)
                                 .multilineTextAlignment(.leading)
                                 .lineLimit(2)
@@ -1341,22 +1322,21 @@ struct GiftResultCard: View {
 
     private func badge(text: String, filled: Bool) -> some View {
         Text(text)
-            .font(Font.inter(11, weight: .semibold))
-            .foregroundColor(filled ? Color.textPrimary : Color.accentMaroon)
+            .font(Font.bodySans(11, weight: .semibold))
+            .foregroundColor(filled ? Color.luxuryMaroon : Color.accentGold)
             .padding(.horizontal, 10)
             .padding(.vertical, 5)
-            .background(filled ? Color.accentMaroon : Color.accentMaroon.opacity(0.1))
+            .background(filled ? AnyShapeStyle(LinearGradient.goldShimmer) : AnyShapeStyle(Color.accentGold.opacity(0.12)))
             .cornerRadius(8)
     }
 
     private func labeledLine(label: String, value: String) -> some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(label.uppercased())
-                .font(Font.inter(10, weight: .semibold))
-                .tracking(0.5)
-                .foregroundColor(Color.accentMaroon)
+            Text(label)
+                .font(Font.bodySans(11, weight: .semibold))
+                .foregroundColor(Color.textMutedOnCard)
             Text(value)
-                .font(Font.inter(13, weight: .regular))
+                .font(Font.bodySans(13, weight: .regular))
                 .foregroundColor(Color.textOnCard)
                 .multilineTextAlignment(.leading)
         }
@@ -1369,18 +1349,31 @@ struct GiftResultCard: View {
                 Image(systemName: icon)
                     .font(.system(size: 12))
                 Text(title)
-                    .font(Font.inter(13, weight: .semibold))
+                    .font(Font.bodySans(13, weight: .semibold))
                     .lineLimit(1)
                     .minimumScaleFactor(0.85)
             }
-            .foregroundColor(filled ? Color.textPrimary : (disabled ? Color.textMutedOnCard : Color.accentMaroon))
+            .foregroundColor(
+                filled
+                    ? Color.luxuryMaroon
+                    : (disabled ? Color.textMutedOnCard : Color.accentGold)
+            )
             .frame(maxWidth: .infinity)
             .padding(.vertical, 12)
-            .background(filled ? Color.accentMaroon : Color.clear)
+            .background(
+                filled
+                    ? AnyShapeStyle(LinearGradient.goldShimmer)
+                    : AnyShapeStyle(Color.clear)
+            )
             .cornerRadius(10)
             .overlay(
                 RoundedRectangle(cornerRadius: 10)
-                    .stroke(filled ? Color.clear : Color.accentMaroon.opacity(disabled ? 0.2 : 0.5), lineWidth: 1)
+                    .stroke(
+                        filled
+                            ? Color.clear
+                            : Color.accentGold.opacity(disabled ? 0.2 : 0.55),
+                        lineWidth: 1
+                    )
             )
         }
         .buttonStyle(.plain)
@@ -1411,19 +1404,19 @@ struct GiftDetailSheet: View {
                             Text(gift.emoji)
                                 .font(.system(size: 44))
                                 .frame(width: 72, height: 72)
-                                .background(Color.surfaceElevated)
+                                .background(Color.luxeSurfaceTintStrong)
                                 .cornerRadius(16)
                                 .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.maroonBorderTint, lineWidth: 1))
                             VStack(alignment: .leading, spacing: 6) {
                                 Text(gift.name)
-                                    .font(Font.displaySerif(22, weight: .semibold))
-                                    .foregroundColor(Color.textPrimary)
+                                    .font(Font.bodySerif(22, weight: .regular))
+                                    .foregroundColor(Color.accentGold)
                                 Text(gift.priceRange)
-                                    .font(Font.inter(13, weight: .semibold))
-                                    .foregroundColor(Color.textPrimary)
+                                    .font(Font.bodySans(13, weight: .semibold))
+                                    .foregroundColor(Color.accentGold)
                                     .padding(.horizontal, 10)
                                     .padding(.vertical, 4)
-                                    .background(Color.accentMaroon)
+                                    .background(Color.accentGold.opacity(0.15))
                                     .cornerRadius(8)
                             }
                             Spacer()
@@ -1431,7 +1424,7 @@ struct GiftDetailSheet: View {
 
                         if !gift.description.isEmpty {
                             Text(gift.description)
-                                .font(Font.inter(15, weight: .regular))
+                                .font(Font.bodySans(15, weight: .regular))
                                 .foregroundColor(Color.luxuryCreamMuted)
                         }
 
@@ -1449,20 +1442,20 @@ struct GiftDetailSheet: View {
                         Toggle(isOn: $giftWrap) {
                             HStack(spacing: 8) {
                                 Image(systemName: "gift")
-                                    .foregroundColor(Color.luxuryCreamMuted)
+                                    .foregroundColor(Color.accentGold)
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text("Add gift wrap")
-                                        .font(Font.inter(15, weight: .semibold))
+                                        .font(Font.bodySans(15, weight: .semibold))
                                         .foregroundColor(Color.textPrimary)
                                     Text("Most retailers offer wrap at checkout")
-                                        .font(Font.inter(12, weight: .regular))
+                                        .font(Font.bodySans(12, weight: .regular))
                                         .foregroundColor(Color.luxuryCreamMuted)
                                 }
                             }
                         }
-                        .tint(Color.accentMaroon)
+                        .tint(Color.accentGold)
                         .padding(16)
-                        .background(Color.surfaceElevated)
+                        .background(Color.luxeSurfaceTintStrong)
                         .cornerRadius(14)
                         .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.maroonBorderTint, lineWidth: 1))
 
@@ -1472,15 +1465,15 @@ struct GiftDetailSheet: View {
                                 HStack(spacing: 8) {
                                     Image(systemName: isAttached ? "checkmark.circle.fill" : "paperclip")
                                     Text(isAttached ? "Attached to \(plan.title)" : "Attach to \(plan.title)")
-                                        .font(Font.inter(15, weight: .semibold))
+                                        .font(Font.bodySans(15, weight: .semibold))
                                         .lineLimit(1)
                                 }
-                                .foregroundColor(Color.textPrimary)
+                                .foregroundColor(isAttached ? Color.luxuryMaroon : Color.accentGold)
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 15)
-                                .background(isAttached ? Color.accentMaroon : Color.clear)
+                                .background(isAttached ? AnyShapeStyle(LinearGradient.goldShimmer) : AnyShapeStyle(Color.clear))
                                 .cornerRadius(14)
-                                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.accentMaroon, lineWidth: 1.5))
+                                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.accentGold.opacity(isAttached ? 0 : 0.55), lineWidth: 1.5))
                             }
                             .buttonStyle(.plain)
                             .disabled(isAttached)
@@ -1490,7 +1483,7 @@ struct GiftDetailSheet: View {
                             HStack(spacing: 8) {
                                 Image(systemName: "cart.fill")
                                 Text("Shop Now")
-                                    .font(Font.inter(16, weight: .semibold))
+                                    .font(Font.bodySans(16, weight: .semibold))
                             }
                             .frame(maxWidth: .infinity)
                         }
@@ -1503,13 +1496,13 @@ struct GiftDetailSheet: View {
             .toolbar {
                 ToolbarItem(placement: .principal) {
                     Text("Gift Details")
-                        .font(Font.displaySerif(18, weight: .semibold))
-                        .foregroundColor(Color.textPrimary)
+                        .font(Font.bodySerif(18, weight: .regular))
+                        .foregroundColor(Color.accentGold)
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") { dismiss() }
-                        .font(Font.inter(16, weight: .medium))
-                        .foregroundColor(Color.textPrimary)
+                        .font(Font.bodySans(16, weight: .medium))
+                        .foregroundColor(Color.accentGold)
                 }
             }
             .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
@@ -1519,17 +1512,16 @@ struct GiftDetailSheet: View {
 
     private func detailBlock(title: String, body: String) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(title.uppercased())
-                .font(Font.inter(11, weight: .semibold))
-                .tracking(0.5)
-                .foregroundColor(Color.luxuryCreamMuted)
+            Text(title)
+                .font(Font.bodySans(11, weight: .semibold))
+                .foregroundColor(Color.accentGold)
             Text(body)
-                .font(Font.inter(15, weight: .regular))
+                .font(Font.bodySans(15, weight: .regular))
                 .foregroundColor(Color.textPrimary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
-        .background(Color.surfaceElevated)
+        .background(Color.luxeSurfaceTintStrong)
         .cornerRadius(14)
         .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.maroonBorderTint, lineWidth: 1))
     }
@@ -1540,20 +1532,19 @@ struct GiftDetailSheet: View {
         HStack(spacing: 10) {
             Image(systemName: info.systemImage)
                 .font(.system(size: 18))
-                .foregroundColor(Color.luxuryCreamMuted)
+                .foregroundColor(Color.accentGold)
             VStack(alignment: .leading, spacing: 2) {
                 Text("Shipping")
-                    .font(Font.inter(11, weight: .semibold))
-                    .tracking(0.5)
-                    .foregroundColor(Color.luxuryCreamMuted)
+                    .font(Font.bodySans(11, weight: .semibold))
+                    .foregroundColor(Color.accentGold)
                 Text(info.text)
-                    .font(Font.inter(14, weight: .semibold))
+                    .font(Font.bodySans(14, weight: .semibold))
                     .foregroundColor(Color.textPrimary)
             }
             Spacer()
         }
         .padding(16)
-        .background(Color.surfaceElevated)
+        .background(Color.luxeSurfaceTintStrong)
         .cornerRadius(14)
         .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.maroonBorderTint, lineWidth: 1))
     }

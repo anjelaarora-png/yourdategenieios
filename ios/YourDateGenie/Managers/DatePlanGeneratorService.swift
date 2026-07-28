@@ -113,6 +113,52 @@ class DatePlanGeneratorService: ObservableObject {
     
     // MARK: - Edge Function Call
 
+    /// Minimum verified Google Places stops required per plan (must match edge function).
+    private static let minVerifiedStopsPerPlan = 2
+
+    private func isVerifiedGoogleStop(_ stop: DatePlanStop) -> Bool {
+        guard stop.validated == true else { return false }
+        let placeId = stop.placeId?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return !placeId.isEmpty
+    }
+
+    private func parseVerifiedStops(from stopsArray: [[String: Any]]) throws -> [DatePlanStop] {
+        var verified: [DatePlanStop] = []
+        for stopJson in stopsArray {
+            let stop = try parseDatePlanStop(from: stopJson)
+            guard isVerifiedGoogleStop(stop) else { continue }
+            verified.append(stop)
+        }
+        return verified.enumerated().map { index, stop in
+            DatePlanStop(
+                order: index + 1,
+                name: stop.name,
+                venueType: stop.venueType,
+                timeSlot: stop.timeSlot,
+                duration: stop.duration,
+                description: stop.description,
+                whyItFits: stop.whyItFits,
+                romanticTip: stop.romanticTip,
+                emoji: stop.emoji,
+                travelTimeFromPrevious: stop.travelTimeFromPrevious,
+                travelDistanceFromPrevious: stop.travelDistanceFromPrevious,
+                travelMode: stop.travelMode,
+                validated: true,
+                placeId: stop.placeId,
+                address: stop.address,
+                latitude: stop.latitude,
+                longitude: stop.longitude,
+                websiteUrl: stop.websiteUrl,
+                phoneNumber: stop.phoneNumber,
+                openingHours: stop.openingHours,
+                estimatedCostPerPerson: stop.estimatedCostPerPerson,
+                bookingUrl: stop.bookingUrl,
+                imageUrl: stop.imageUrl,
+                reservationPlatforms: stop.reservationPlatforms
+            )
+        }
+    }
+
     /// Calls the generate-date-plan Edge Function and parses the returned datePlans array.
     private func callEdgeFunction(preferences: QuestionnaireData) async throws -> [DatePlan] {
         guard Config.isSupabaseConfigured else {
@@ -124,14 +170,32 @@ class DatePlanGeneratorService: ObservableObject {
                   let plansArray = json["datePlans"] as? [[String: Any]], !plansArray.isEmpty else {
                 throw GenerationError.invalidResponse
             }
-            return try plansArray.map { try parseDatePlan(from: $0) }
+            let plans = try plansArray.map { try parseDatePlan(from: $0) }
+                .filter { $0.stops.count >= Self.minVerifiedStopsPerPlan }
+            guard !plans.isEmpty else {
+                throw GenerationError.apiError(
+                    "We couldn't verify enough real venues on Google Maps for this area. Try again or adjust your starting location."
+                )
+            }
+            return plans
         } catch let supabaseError as SupabaseError {
             switch supabaseError {
-            case .unauthorized: throw GenerationError.unauthorized
+            case .unauthorized, .sessionExpired: throw GenerationError.unauthorized
             case .authFailed(let msg):
                 if msg.lowercased().contains("rate") { throw GenerationError.rateLimited }
                 throw GenerationError.apiError(msg)
+            case .networkError(let err):
+                throw GenerationError.networkError(err.localizedDescription)
             default: throw GenerationError.networkError(supabaseError.localizedDescription)
+            }
+        } catch let urlError as URLError {
+            switch urlError.code {
+            case .timedOut:
+                throw GenerationError.timeout
+            case .notConnectedToInternet, .networkConnectionLost, .cannotConnectToHost:
+                throw GenerationError.networkError(urlError.localizedDescription)
+            default:
+                throw GenerationError.networkError(urlError.localizedDescription)
             }
         }
     }
@@ -487,11 +551,10 @@ class DatePlanGeneratorService: ObservableObject {
         let packingList = json["packingList"] as? [String] ?? []
         let weatherNote = json["weatherNote"] as? String ?? ""
         
-        // Parse stops
-        var stops: [DatePlanStop] = []
-        for stopJson in stopsArray {
-            let stop = try parseDatePlanStop(from: stopJson)
-            stops.append(stop)
+        // Only include stops verified on Google Maps (place_id + validated flag from server).
+        let stops = try parseVerifiedStops(from: stopsArray)
+        guard stops.count >= Self.minVerifiedStopsPerPlan else {
+            throw GenerationError.parsingError("Plan did not include enough verified Google businesses")
         }
         
         // Parse secret touch
@@ -537,6 +600,8 @@ class DatePlanGeneratorService: ObservableObject {
             if conversationStarters?.isEmpty == true { conversationStarters = nil }
         }
         
+        let startingPoint = parseStartingPoint(from: json["startingPoint"])
+
         return DatePlan(
             optionLabel: json["optionLabel"] as? String,
             title: title,
@@ -544,6 +609,7 @@ class DatePlanGeneratorService: ObservableObject {
             totalDuration: totalDuration,
             estimatedCost: estimatedCost,
             stops: stops,
+            startingPoint: startingPoint,
             genieSecretTouch: secretTouch,
             packingList: packingList,
             weatherNote: weatherNote,
@@ -551,9 +617,27 @@ class DatePlanGeneratorService: ObservableObject {
             conversationStarters: conversationStarters
         )
     }
+
+    private func parseStartingPoint(from value: Any?) -> StartingPoint? {
+        guard let json = value as? [String: Any] else { return nil }
+        let address = (json["address"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        guard !address.isEmpty else { return nil }
+        let lat = json["latitude"] as? Double ?? 0
+        let lng = json["longitude"] as? Double ?? 0
+        return StartingPoint(
+            name: json["name"] as? String ?? "Your location",
+            address: address,
+            latitude: lat,
+            longitude: lng
+        )
+    }
     
     private func parseDatePlanStop(from json: [String: Any]) throws -> DatePlanStop {
         let openingHoursArray = json["openingHours"] as? [String]
+        let validated = json["validated"] as? Bool ?? false
+        let placeId = json["placeId"] as? String ?? json["place_id"] as? String
+        let latitude = json["latitude"] as? Double
+        let longitude = json["longitude"] as? Double
         return DatePlanStop(
             order: json["order"] as? Int ?? 1,
             name: json["name"] as? String ?? "",
@@ -567,17 +651,17 @@ class DatePlanGeneratorService: ObservableObject {
             travelTimeFromPrevious: json["travelTimeFromPrevious"] as? String,
             travelDistanceFromPrevious: json["travelDistanceFromPrevious"] as? String,
             travelMode: json["travelMode"] as? String,
-            validated: false,
-            placeId: nil,
+            validated: validated,
+            placeId: placeId,
             address: json["address"] as? String,
-            latitude: nil,
-            longitude: nil,
+            latitude: latitude,
+            longitude: longitude,
             websiteUrl: json["websiteUrl"] as? String,
             phoneNumber: json["phoneNumber"] as? String,
             openingHours: openingHoursArray,
             estimatedCostPerPerson: json["estimatedCostPerPerson"] as? String,
             bookingUrl: json["bookingUrl"] as? String,
-            imageUrl: nil
+            imageUrl: json["imageUrl"] as? String
         )
     }
     

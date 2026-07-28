@@ -37,7 +37,7 @@ struct HelpSupportSheetView: View {
                     VStack(alignment: .leading, spacing: 24) {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("Frequently Asked Questions")
-                                .font(Font.header(18, weight: .bold))
+                                .font(Font.bodySerif(18, weight: .bold))
                                 .foregroundColor(Color.luxuryCream)
                                 .padding(.bottom, 8)
 

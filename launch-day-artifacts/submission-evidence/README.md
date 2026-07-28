@@ -1,10 +1,15 @@
-# Submission Evidence · 2026-05-18
+# Submission Evidence · Rejection recovery (post 2026-07-09)
 
 Folder for screenshots, confirmation emails, and submission artifacts. Fill as you click through App Store Connect.
 
+**Master checklist:** [`../../app-store/REJECTION_RECOVERY_CHECKLIST_2026-07-09.md`](../../app-store/REJECTION_RECOVERY_CHECKLIST_2026-07-09.md)
+
 ## Checklist (tick as you go)
 
-- [ ] **8:45 AM** — Screenshot: ASC → My Apps → Your Date Genie → In-App Purchases tab, all 3 products show "Ready to Submit" → save as `iap-products-ready.png`
+- [ ] Screenshot: ASC → Monetization → Subscriptions → both products show "Ready to Submit" → save as `iap-products-ready.png`
+- [ ] Screenshot: each IAP has an App Review screenshot uploaded
+- [ ] Screenshot: Paid Apps Agreement = Active
+- [ ] **8:45 AM** — Screenshot: ASC → My Apps → Your Date Genie → In-App Purchases tab, monthly + annual show "Ready to Submit" → save as `iap-products-ready.png`
 - [ ] **8:55 AM** — Screenshot: ASC → App Information → Privacy URL, Support URL, EULA URL all populated → save as `app-information-complete.png`
 - [ ] **9:00 AM** — Upload reviewer notes from `../reviewer-notes.md` into App Review Information → Notes field
 - [ ] **9:05 AM** — Upload `apple-review@yourdategenie.com` + password into Sign-In Required section

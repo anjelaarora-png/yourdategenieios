@@ -572,13 +572,13 @@ class NavigationCoordinator: ObservableObject {
             .store(in: &cancellables)
     }
     
-    /// Merge in verified plans from the generator. Match by index so verified B/C (new structs with new ids) replace the originals.
+    /// Merge in verified plans from the generator. Match by index and preserve existing ids so Home hero / pins stay stable.
     private func mergeGeneratedPlans(from newPlans: [DatePlan]) {
         guard !newPlans.isEmpty else { return }
         var updated = generatedPlans
         for (index, genPlan) in newPlans.enumerated() {
             if index < updated.count {
-                updated[index] = genPlan
+                updated[index] = genPlan.preservingIdentity(from: updated[index])
             } else if index == updated.count {
                 updated.append(genPlan)
             }
@@ -664,7 +664,9 @@ class NavigationCoordinator: ObservableObject {
         generatedPlans = resolvedPlans
         generatedPlansSelectedIndex = 0
 
-        let nextSheet: ActiveSheet = resolvedPlans.count >= 3 ? .datePlanOptions : .datePlanResult
+        // Always present the options picker when we have plans — even 1–2 results
+        // should let the user compare, swipe, regenerate, or save (not skip to result).
+        let nextSheet: ActiveSheet = .datePlanOptions
         let replacingQuestionnaireSheet: Bool = {
             if case .questionnaire? = activeSheet { return true }
             return false
@@ -759,12 +761,22 @@ class NavigationCoordinator: ObservableObject {
 
     /// Move a saved plan to Past Dates (date already happened).
     func markPlanAsPast(_ plan: DatePlan) {
+        let wasFirstEver = RoseManager.shared.lifetimeCompletedCount == 0
         savedPlans.removeAll { $0.id == plan.id }
         if !pastPlans.contains(where: { $0.id == plan.id }) {
             pastPlans.append(plan)
         }
         saveState()
+        syncRoseProgress(rewardForNewPlanId: plan.id)
         Task { await uploadPlanToCloud(plan, status: "completed") }
+        if wasFirstEver {
+            NotificationManager.shared.addNotification(AppNotification(
+                type: .dateMilestone,
+                title: "First bud opened 🌹",
+                message: "Your rose is blooming — keep going toward \(RoseManager.shared.monthlyGoal) nights this month.",
+                timestamp: Date()
+            ))
+        }
         NotificationManager.shared.addNotification(AppNotification(
             type: .memoryCapture,
             title: "Capture your memory from \"\(plan.title)\"",
@@ -1132,14 +1144,21 @@ class NavigationCoordinator: ObservableObject {
                 self.pastPlans = past
                 self.experiencesWaiting = experiences
                 self.migratePastDuePlans()
+                self.syncRoseProgress()
             }
         }
+    }
+
+    /// Keeps the rose gamification in sync with completed date history.
+    func syncRoseProgress(rewardForNewPlanId: UUID? = nil) {
+        RoseManager.shared.syncFromCompletedPlans(pastPlans, rewardForNewPlanId: rewardForNewPlanId)
     }
     
     /// Call when home tab appears or app becomes active so "Use & Generate" visibility stays correct after async preference load.
     func refreshPreferencesState() {
         hasCompletedPreferences = UserProfileManager.shared.hasCompletedPreferences || UserDefaults.standard.bool(forKey: "hasCompletedPreferences")
         migratePastDuePlans()
+        syncRoseProgress()
     }
 
     /// Moves any saved plan whose date has already passed into pastPlans automatically.
@@ -1160,6 +1179,7 @@ class NavigationCoordinator: ObservableObject {
         let existingPastIds = Set(pastPlans.map(\.id))
         pastPlans = pastPlans + overdue.filter { !existingPastIds.contains($0.id) }
         saveState()
+        syncRoseProgress()
     }
     
     /// Build a single Date from questionnaire date + start time for display and calendar.
@@ -1249,10 +1269,23 @@ class NavigationCoordinator: ObservableObject {
             let remoteIds = Set(remoteSaved.map(\.id)).union(Set(remotePast.map(\.id)))
             let unsyncedSaved = savedPlans.filter { !remoteIds.contains($0.id) }
             let unsyncedPast = pastPlans.filter { !remoteIds.contains($0.id) }
-            savedPlans = remoteSaved + unsyncedSaved
-            pastPlans = remotePast + unsyncedPast
+            savedPlans = Self.mergeExperiencesWaitingPreservingOrder(
+                local: savedPlans,
+                remote: remoteSaved
+            )
+            for plan in unsyncedSaved where !savedPlans.contains(where: { $0.id == plan.id }) {
+                savedPlans.append(plan)
+            }
+            pastPlans = Self.mergeExperiencesWaitingPreservingOrder(
+                local: pastPlans,
+                remote: remotePast
+            )
+            for plan in unsyncedPast where !pastPlans.contains(where: { $0.id == plan.id }) {
+                pastPlans.append(plan)
+            }
             saveState()
             migratePastDuePlans()
+            syncRoseProgress()
         }
         await uploadAllLocalDatePlansToCloud()
     }
@@ -1303,10 +1336,11 @@ class NavigationCoordinator: ObservableObject {
         do {
             let rows = try await SupabaseService.shared.getExperiencesWaiting(coupleId: coupleId)
             let remote = rows.map(\.plan)
-            let remoteIds = Set(remote.map(\.id))
             await MainActor.run {
-                let unsynced = experiencesWaiting.filter { !remoteIds.contains($0.id) }
-                experiencesWaiting = remote + unsynced
+                experiencesWaiting = Self.mergeExperiencesWaitingPreservingOrder(
+                    local: experiencesWaiting,
+                    remote: remote
+                )
                 saveState()
                 self.experiencesCloudPullCompleted = true
                 self.scheduleSyncAllUnsavedExperiencesToCloud()
@@ -1325,10 +1359,11 @@ class NavigationCoordinator: ObservableObject {
         do {
             let rows = try await SupabaseService.shared.getExperiencesWaiting(userId: userId)
             let remote = rows.map(\.plan)
-            let remoteIds = Set(remote.map(\.id))
             await MainActor.run {
-                let unsynced = experiencesWaiting.filter { !remoteIds.contains($0.id) }
-                experiencesWaiting = remote + unsynced
+                experiencesWaiting = Self.mergeExperiencesWaitingPreservingOrder(
+                    local: experiencesWaiting,
+                    remote: remote
+                )
                 saveState()
                 self.experiencesCloudPullCompleted = true
                 self.scheduleSyncAllUnsavedExperiencesToCloud()
@@ -1339,6 +1374,26 @@ class NavigationCoordinator: ObservableObject {
                 self.scheduleSyncAllUnsavedExperiencesToCloud()
             }
         }
+    }
+
+    /// Keeps local row order; refreshes content from remote; appends genuinely new rows at the end.
+    private static func mergeExperiencesWaitingPreservingOrder(local: [DatePlan], remote: [DatePlan]) -> [DatePlan] {
+        let remoteById = Dictionary(uniqueKeysWithValues: remote.map { ($0.id, $0) })
+        var merged: [DatePlan] = []
+        var seen = Set<UUID>()
+
+        for plan in local {
+            let latest = remoteById[plan.id] ?? plan
+            merged.append(latest)
+            seen.insert(plan.id)
+        }
+
+        for plan in remote where !seen.contains(plan.id) {
+            merged.append(plan)
+            seen.insert(plan.id)
+        }
+
+        return merged
     }
     
     /// Upload or update a single plan on Supabase so history persists across reinstalls.
@@ -1468,29 +1523,28 @@ class NavigationCoordinator: ObservableObject {
         guard !isRegeneratingFromOptions else { return }
         let savedIds = Set(savedPlans.map(\.id))
         let unsaved = generatedPlans.filter { !savedIds.contains($0.id) }
-        if !unsaved.isEmpty {
-            var updated = experiencesWaiting
-            var newlyAdded: [DatePlan] = []
-            for plan in unsaved {
-                if !updated.contains(where: { $0.id == plan.id }) {
-                    updated.append(plan)
-                    newlyAdded.append(plan)
-                }
+        var updatedWaiting = experiencesWaiting
+        var newlyAdded: [DatePlan] = []
+        for plan in unsaved {
+            if !updatedWaiting.contains(where: { $0.id == plan.id }) {
+                updatedWaiting.append(plan)
+                newlyAdded.append(plan)
             }
-            if updated != experiencesWaiting {
-                experiencesWaiting = updated
-                saveState()
-            }
-            if !newlyAdded.isEmpty {
-                let count = newlyAdded.count
-                let label = count == 1 ? "1 unsaved date idea" : "\(count) unsaved date ideas"
-                NotificationManager.shared.addNotification(AppNotification(
-                    type: .unsavedDateWaiting,
-                    title: "\(label) waiting for you",
-                    message: "Save them before they disappear — your perfect date is in there!",
-                    timestamp: Date()
-                ))
-            }
+        }
+        // Single reconcile pass: append to waiting and clear generated together.
+        if !newlyAdded.isEmpty {
+            experiencesWaiting = updatedWaiting
+            saveState()
+        }
+        if !newlyAdded.isEmpty {
+            let count = newlyAdded.count
+            let label = count == 1 ? "1 unsaved date idea" : "\(count) unsaved date ideas"
+            NotificationManager.shared.addNotification(AppNotification(
+                type: .unsavedDateWaiting,
+                title: "\(label) waiting for you",
+                message: "Save them before they disappear — your perfect date is in there!",
+                timestamp: Date()
+            ))
         }
         generatedPlans = []
         generatedPlansSelectedIndex = 0
@@ -1604,6 +1658,13 @@ struct RootNavigationView: View {
         .animation(.easeInOut(duration: 0.4), value: userProfileManager.needsDisplayName)
         .animation(.easeInOut(duration: 0.4), value: socialAuth.isCompletingSocialSignIn)
         .onAppear {
+            #if DEBUG
+            if ScreenshotDemo.isActive {
+                showSplash = false
+                ScreenshotDemo.apply(to: coordinator)
+                return
+            }
+            #endif
             Task {
                 // Record when the splash appeared so we can enforce a minimum display duration.
                 let launchTime = Date()

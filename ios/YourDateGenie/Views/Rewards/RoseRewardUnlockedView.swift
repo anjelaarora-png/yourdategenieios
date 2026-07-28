@@ -35,7 +35,7 @@ struct RoseRewardUnlockedView: View {
                 .opacity(appeared ? 1 : 0)
 
                 Text("Surprise — you earned it")
-                    .font(Font.inter(12))
+                    .font(Font.bodySans(12))
                     .foregroundColor(Color.luxuryMuted)
                     .padding(.top, 18)
 
@@ -46,7 +46,7 @@ struct RoseRewardUnlockedView: View {
                     .padding(.top, 4)
 
                 Text(reward.blurb)
-                    .font(Font.inter(14))
+                    .font(Font.bodySans(14))
                     .foregroundColor(Color.luxuryCreamMuted)
                     .multilineTextAlignment(.center)
                     .lineSpacing(3)

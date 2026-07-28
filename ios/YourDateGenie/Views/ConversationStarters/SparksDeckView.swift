@@ -121,9 +121,9 @@ struct SparksDeckView: View {
                         .symbolRenderingMode(.monochrome)
                         .foregroundColor(Color.luxuryGold)
                         .frame(width: 36, height: 36)
-                        .background(Color.luxuryMaroonLight.opacity(0.9))
+                        .background(Color.luxeSurfaceTintStrong)
                         .clipShape(Circle())
-                        .overlay(Circle().stroke(Color.luxuryGold.opacity(0.35), lineWidth: 1))
+                        .overlay(Circle().stroke(Color.luxeSurfaceBorder, lineWidth: 1))
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Refresh sparks")
@@ -148,12 +148,7 @@ struct SparksDeckView: View {
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 24)
                 .padding(.vertical, 14)
-                .background(Color.luxuryMaroonLight.opacity(0.95))
-                .cornerRadius(12)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color.luxuryGold.opacity(0.5), lineWidth: 1)
-                )
+                .goldHighlightMaroonAccent(cornerRadius: 12)
                 .padding(.horizontal, 32)
                 .padding(.bottom, 200)
             Spacer()
@@ -174,8 +169,7 @@ struct SparksDeckView: View {
                 }
                 .padding(.horizontal, 20)
                 .padding(.vertical, 12)
-                .background(Color.luxuryMaroonLight)
-                .cornerRadius(10)
+                .goldHighlightMaroonAccent(cornerRadius: 10)
                 .padding(.bottom, 120)
             }
             Spacer()
@@ -195,7 +189,7 @@ struct SparksDeckView: View {
                     .multilineTextAlignment(.center)
                 Text("Get a fresh set or head back.")
                     .font(Font.bodySans(16, weight: .regular))
-                    .foregroundColor(Color.luxuryCreamMuted)
+                    .foregroundColor(Color.textMutedOnCard)
                     .multilineTextAlignment(.center)
                 VStack(spacing: 12) {
                     Button {
@@ -227,11 +221,14 @@ struct SparksDeckView: View {
             }
             .padding(28)
             .frame(maxWidth: .infinity)
-            .background(Color.luxuryMaroonLight.opacity(0.98))
+            .background(Color.creamCard)
+            .overlay(alignment: .leading) {
+                Rectangle().fill(Color.accentMaroon).frame(width: 4)
+            }
             .cornerRadius(24)
             .overlay(
                 RoundedRectangle(cornerRadius: 24)
-                    .stroke(Color.luxuryGold.opacity(0.4), lineWidth: 1)
+                    .stroke(Color.maroonBorderTint, lineWidth: 1)
             )
             .padding(.horizontal, 24)
             Spacer()
@@ -291,10 +288,10 @@ struct SparksDeckView: View {
             .padding(.vertical, 6)
             .background(
                 RoundedRectangle(cornerRadius: 8)
-                    .fill(Color.luxuryMaroonLight.opacity(0.92))
+                    .fill(Color.luxeSurfaceTintStrong)
                     .overlay(
                         RoundedRectangle(cornerRadius: 8)
-                            .stroke(Color.luxuryGold.opacity(0.4), lineWidth: 1)
+                            .stroke(Color.luxeSurfaceBorder, lineWidth: 1)
                     )
             )
             .opacity(visible ? min(abs(dragOffset) / swipeThreshold, 1.0) : 0)
@@ -488,52 +485,33 @@ private struct SparkCardView: View {
     var body: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 20)
-                .fill(Color.luxuryMaroonLight.opacity(0.95))
+                .fill(Color.creamCard)
+                .overlay(alignment: .leading) {
+                    Rectangle().fill(Color.accentMaroon).frame(width: 4)
+                }
                 .overlay(
                     RoundedRectangle(cornerRadius: 20)
-                        .stroke(Color.luxuryGold.opacity(0.4), lineWidth: 1)
+                        .stroke(Color.maroonBorderTint, lineWidth: 1)
                 )
-                .overlay(
-                    VStack(spacing: 0) {
-                        RoundedRectangle(cornerRadius: 20)
-                            .fill(
-                                LinearGradient(
-                                    colors: [Color.luxuryGold.opacity(0.35), Color.luxuryGold.opacity(0.08), Color.clear],
-                                    startPoint: .top,
-                                    endPoint: .bottom
-                                )
-                            )
-                            .frame(height: 6)
-                            .frame(maxWidth: .infinity)
-                        Spacer(minLength: 0)
-                    }
-                )
-                .overlay(
-                    LinearGradient(
-                        colors: [Color.luxuryGold.opacity(0.07), Color.clear],
-                        startPoint: .top,
-                        endPoint: .center
-                    )
-                    .clipShape(RoundedRectangle(cornerRadius: 20))
-                )
-                .shadow(color: .black.opacity(0.35), radius: 16, x: 0, y: 6)
+                .shadow(color: .black.opacity(0.15), radius: 16, x: 0, y: 6)
 
             VStack(spacing: 0) {
                 Text("\(index + 1) of \(total)")
                     .font(Font.bodySans(11, weight: .regular))
                     .tracking(2)
-                    .foregroundColor(Color.luxuryMuted)
+                    .foregroundColor(Color.textMutedOnCard)
                     .padding(.bottom, 14)
 
                 Text("• \(spark.tagsLabel.uppercased())")
                     .font(Font.bodySans(11, weight: .semibold))
                     .tracking(2.5)
-                    .foregroundColor(Color.luxuryGold)
+                    .foregroundColor(Color.accentGold)
                     .padding(.bottom, 18)
 
                 Text(spark.openingQuestion)
-                    .font(Font.bodySans(18, weight: .regular))
-                    .foregroundColor(Color.luxuryCream)
+                    .font(Font.bodySerif(18, weight: .regular))
+                    .italic()
+                    .foregroundColor(Color.textOnCard)
                     .multilineTextAlignment(.center)
                     .lineSpacing(5)
                     .frame(maxWidth: .infinity)

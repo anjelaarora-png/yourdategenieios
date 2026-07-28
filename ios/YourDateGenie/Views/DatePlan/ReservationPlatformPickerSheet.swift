@@ -65,7 +65,7 @@ struct ReservationPlatformActionRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(venueName)
-                .font(Font.inter(15, weight: .semibold))
+                .font(Font.bodySans(15, weight: .semibold))
                 .foregroundColor(Color.luxuryCream)
                 .fixedSize(horizontal: false, vertical: true)
             Text("Choose how you\'d like to book:")
@@ -130,7 +130,7 @@ struct ReservationPlatformPickerSheet: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 20) {
                         Text("Book via a reservation platform or call the restaurant directly.")
-                            .font(Font.inter(14, weight: .medium))
+                            .font(Font.bodySans(14, weight: .medium))
                             .foregroundColor(Color.luxuryCreamMuted)
                             .fixedSize(horizontal: false, vertical: true)
                         ReservationPlatformActionRow(

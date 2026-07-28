@@ -17,7 +17,7 @@ struct RosePrimaryButton: View {
     var body: some View {
         Button(action: action) {
             Text(title)
-                .font(Font.inter(16, weight: .semibold))
+                .font(Font.bodySans(16, weight: .semibold))
                 .foregroundColor(Color.backgroundPrimary)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 16)
@@ -48,7 +48,7 @@ struct RoseGhostLink: View {
     var body: some View {
         Button(action: action) {
             Text(title)
-                .font(Font.inter(14, weight: .medium))
+                .font(Font.bodySans(14, weight: .medium))
                 .foregroundColor(Color.luxuryCreamMuted)
                 .underline()
         }
@@ -99,7 +99,7 @@ struct RosePill: View {
     let text: String
     var body: some View {
         Text(text)
-            .font(Font.inter(11, weight: .semibold))
+            .font(Font.bodySans(11, weight: .semibold))
             .foregroundColor(Color.textPrimary)
             .padding(.horizontal, 12)
             .padding(.vertical, 6)
@@ -140,7 +140,7 @@ struct RoseStatCard: View {
                 .font(Font.displaySerif(24, weight: .bold))
                 .foregroundColor(Color.textOnCard)
             Text(label)
-                .font(Font.inter(11, weight: .regular))
+                .font(Font.bodySans(11, weight: .regular))
                 .foregroundColor(Color.textMutedOnCard)
                 .multilineTextAlignment(.center)
         }
@@ -158,8 +158,310 @@ struct RoseLabel: View {
     let text: String
     var body: some View {
         Text(text.uppercased())
-            .font(Font.inter(11, weight: .semibold))
+            .font(Font.bodySans(11, weight: .semibold))
             .tracking(1.5)
             .foregroundColor(Color.luxuryCreamMuted)
+    }
+}
+
+// MARK: Compact bud dots — at-a-glance monthly progress (cream fill, maroon outline)
+
+struct RoseBudDots: View {
+    let open: Int
+    let total: Int
+
+    var body: some View {
+        HStack(spacing: 5) {
+            ForEach(0..<total, id: \.self) { index in
+                Circle()
+                    .fill(index < open ? Color.textPrimary : Color.clear)
+                    .overlay(
+                        Circle().stroke(
+                            index < open
+                                ? Color.textPrimary.opacity(0.45)
+                                : Color.accentMaroon.opacity(0.55),
+                            lineWidth: 1.25
+                        )
+                    )
+                    .frame(width: 7, height: 7)
+            }
+        }
+        .accessibilityHidden(true)
+    }
+}
+
+// MARK: Home pill — subtle rose progress (spec §8: one small pill on Home)
+
+/// Explains the rose mechanic for users who haven't completed a date yet — clearer than the full progress pill.
+struct RoseNewUserIntroCard: View {
+    @ObservedObject var rose: RoseManager
+    var onTap: () -> Void
+
+    @State private var showScienceInfo = false
+
+    var body: some View {
+        HStack(spacing: 0) {
+            Button(action: onTap) {
+                HStack(spacing: 12) {
+                    ZStack {
+                        Circle()
+                            .fill(Color.creamCard.opacity(0.12))
+                        Circle()
+                            .stroke(Color.accentGold.opacity(0.35), lineWidth: 1)
+                        RosePlantView(
+                            mode: .blooming(open: 0, total: rose.monthlyGoal),
+                            size: 40
+                        )
+                    }
+                    .frame(width: 48, height: 48)
+                    .accessibilityHidden(true)
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Your progress")
+                            .font(Font.bodySans(14, weight: .semibold))
+                            .foregroundColor(Color.textPrimary)
+                        Text("0 of \(rose.monthlyGoal) date nights this month · complete one to open your first bud.")
+                            .font(Font.bodySans(11, weight: .regular))
+                            .foregroundColor(Color.luxuryCreamMuted)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .multilineTextAlignment(.leading)
+                    }
+
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(Color.luxuryCreamMuted.opacity(0.75))
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 12)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Your progress. Zero of \(rose.monthlyGoal) date nights this month.")
+            .accessibilityHint("Each completed date opens a bud on your relationship rose.")
+
+            Button {
+                showScienceInfo = true
+            } label: {
+                Image(systemName: "info.circle")
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundColor(Color.accentGold.opacity(0.75))
+                    .frame(width: 36, height: 48)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Why track date nights with a rose")
+            .padding(.trailing, 8)
+        }
+        .background(Color.luxuryMaroonLight.opacity(0.15))
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(Color.accentGold.opacity(0.22), lineWidth: 1)
+        )
+        .sheet(isPresented: $showScienceInfo) {
+            RoseScienceInfoSheet(monthlyGoal: rose.monthlyGoal)
+        }
+    }
+}
+
+struct RoseHomePill: View {
+    @ObservedObject var rose: RoseManager
+    var onTap: () -> Void
+
+    @State private var showScienceInfo = false
+
+    private let roseSize: CGFloat = 64
+    private let roseFrame: CGFloat = 72
+
+    private var progressText: String {
+        if rose.needsRevive {
+            return "Tap for a gentle 15-min revive"
+        }
+        if !rose.hasEverCompletedDate {
+            return "Complete your first date to open bud 1 of \(rose.monthlyGoal)"
+        }
+        if rose.datesThisMonth >= rose.monthlyGoal {
+            return "Goal reached — \(rose.monthlyGoal) date nights this month"
+        }
+        let remaining = rose.budsRemaining
+        let budWord = remaining == 1 ? "bud" : "buds"
+        return "\(rose.datesThisMonth) of \(rose.monthlyGoal) date nights · \(remaining) \(budWord) to full bloom"
+    }
+
+    private var titleText: String {
+        if rose.needsRevive { return "Your progress" }
+        if !rose.hasEverCompletedDate { return "Your progress" }
+        if rose.datesThisMonth >= rose.monthlyGoal { return "Progress: full bloom" }
+        return "Your progress"
+    }
+
+    var body: some View {
+        HStack(spacing: 0) {
+            Button(action: onTap) {
+                HStack(spacing: 14) {
+                    ZStack {
+                        Circle()
+                            .fill(Color.creamCard.opacity(0.14))
+                        Circle()
+                            .stroke(Color.accentGold.opacity(0.35), lineWidth: 1)
+                        RosePlantView(mode: rose.plantDisplayMode, size: roseSize)
+                    }
+                    .frame(width: roseFrame, height: roseFrame)
+                    .accessibilityHidden(true)
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack(alignment: .firstTextBaseline, spacing: 8) {
+                            Text(titleText)
+                                .font(Font.bodySans(14, weight: .semibold))
+                                .foregroundColor(Color.textPrimary)
+                            Spacer(minLength: 0)
+                            if !rose.needsRevive {
+                                Text("\(rose.datesThisMonth)/\(rose.monthlyGoal)")
+                                    .font(Font.displaySerif(17, weight: .bold))
+                                    .foregroundColor(Color.textPrimary)
+                                    .monospacedDigit()
+                            }
+                        }
+
+                        if !rose.needsRevive {
+                            RoseBudDots(
+                                open: min(rose.datesThisMonth, rose.monthlyGoal),
+                                total: rose.monthlyGoal
+                            )
+                            RoseProgressBar(progress: rose.monthProgress, height: 4)
+                                .frame(maxWidth: .infinity)
+                        }
+
+                        Text(progressText)
+                            .font(Font.bodySans(11, weight: .regular))
+                            .foregroundColor(Color.luxuryCreamMuted)
+                            .lineLimit(2)
+                            .multilineTextAlignment(.leading)
+                    }
+
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(Color.luxuryCreamMuted.opacity(0.8))
+                        .padding(.leading, 2)
+                }
+                .padding(.leading, 12)
+                .padding(.trailing, 10)
+                .padding(.vertical, 12)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(homeAccessibilityLabel)
+            .accessibilityHint("Opens your rose progress")
+
+            Button {
+                showScienceInfo = true
+            } label: {
+                Image(systemName: "info.circle")
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundColor(Color.luxuryCreamMuted.opacity(0.65))
+                    .frame(width: 36, height: 52)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Why four dates a month")
+            .padding(.trailing, 8)
+        }
+        .background(Color.luxuryMaroonLight.opacity(0.15))
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(Color.accentGold.opacity(0.22), lineWidth: 1)
+        )
+        .accessibilityElement(children: .contain)
+        .sheet(isPresented: $showScienceInfo) {
+            RoseScienceInfoSheet(monthlyGoal: rose.monthlyGoal)
+        }
+    }
+
+    private var homeAccessibilityLabel: String {
+        if rose.needsRevive { return "Your progress. Tap for a gentle revive." }
+        return "Your progress, \(rose.datesThisMonth) of \(rose.monthlyGoal) date nights this month"
+    }
+}
+
+// MARK: Why 4? — research-backed explainer (discrete info sheet)
+
+struct RoseScienceInfoSheet: View {
+    let monthlyGoal: Int
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    Text("Why \(monthlyGoal) dates a month?")
+                        .font(Font.bodySerif(22, weight: .regular))
+                        .foregroundColor(Color.textPrimary)
+
+                    Text("Your rose blooms as you complete intentional date nights together — one bud for each night, \(monthlyGoal) for full bloom.")
+                        .font(Font.bodySans(14, weight: .regular))
+                        .foregroundColor(Color.luxuryCreamMuted)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    scienceBlock(
+                        title: "The research floor: 2+ nights/month",
+                        body: "In a 2023 survey of 2,000 married couples, those who went on date nights at least once or twice a month reported higher marital happiness, communication satisfaction, and sexual satisfaction than couples who dated less often (National Marriage Project & Wheatley Institute, The Date Night Opportunity)."
+                    )
+
+                    scienceBlock(
+                        title: "The stretch goal: ~1 night/week",
+                        body: "Relationship researcher John Gottman recommends about six hours per week nurturing your relationship — including roughly two hours for a dedicated date night with open-ended conversation and no distractions."
+                    )
+
+                    scienceBlock(
+                        title: "Why we chose \(monthlyGoal)",
+                        body: "\(monthlyGoal) nights per month is about one intentional date a week — ambitious but achievable. Two nights still keeps your rose healthy; \(monthlyGoal) is full bloom."
+                    )
+
+                    Text("These studies show association, not a guarantee. Quality of attention matters as much as frequency.")
+                        .font(Font.bodySans(12, weight: .regular))
+                        .foregroundColor(Color.luxuryMuted)
+                        .italic()
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Sources")
+                            .font(Font.bodySans(11, weight: .semibold))
+                            .foregroundColor(Color.luxuryCreamMuted)
+                            .tracking(0.8)
+                        Text("• Wilcox & Dew, The Date Night Opportunity (2023)")
+                            .font(Font.bodySans(11, weight: .regular))
+                            .foregroundColor(Color.luxuryMuted)
+                        Text("• Gottman Institute, 6 Hours a Week to a Better Relationship")
+                            .font(Font.bodySans(11, weight: .regular))
+                            .foregroundColor(Color.luxuryMuted)
+                    }
+                }
+                .padding(24)
+            }
+            .background(Color.backgroundPrimary)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") { dismiss() }
+                        .foregroundColor(Color.luxuryGold)
+                }
+            }
+            .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+        }
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
+    }
+
+    @ViewBuilder
+    private func scienceBlock(title: String, body: String) -> some View {
+        RoseCard {
+            VStack(alignment: .leading, spacing: 8) {
+                Text(title)
+                    .font(Font.bodySans(14, weight: .semibold))
+                    .foregroundColor(Color.textPrimary)
+                Text(body)
+                    .font(Font.bodySans(13, weight: .regular))
+                    .foregroundColor(Color.luxuryCreamMuted)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
     }
 }

@@ -176,7 +176,7 @@ struct SignUpProgressView: View {
                         
                         if step == currentStep {
                             Text(stepLabels[step - 1])
-                                .font(Font.inter(10, weight: .medium))
+                                .font(Font.bodySans(10, weight: .medium))
                                 .foregroundColor(Color.luxuryGold)
                         }
                     }
@@ -201,7 +201,7 @@ struct SignUpBasicInfoStep: View {
             VStack(alignment: .leading, spacing: 24) {
                 HStack(spacing: 6) {
                     Text("Tell us about")
-                        .font(Font.header(20, weight: .regular))
+                        .font(Font.bodySerif(20, weight: .regular))
                         .foregroundColor(Color.luxuryCream)
                     Text("yourself")
                         .font(Font.bodySerif(32, weight: .bold))
@@ -252,7 +252,7 @@ struct SignUpContactStep: View {
             VStack(alignment: .leading, spacing: 24) {
                 HStack(spacing: 6) {
                     Text("How can we")
-                        .font(Font.header(20, weight: .regular))
+                        .font(Font.bodySerif(20, weight: .regular))
                         .foregroundColor(Color.luxuryCream)
                     Text("reach you?")
                         .font(Font.bodySerif(32, weight: .bold))
@@ -304,7 +304,7 @@ struct SignUpLocationStep: View {
             VStack(alignment: .leading, spacing: 24) {
                 HStack(spacing: 6) {
                     Text("Where are you")
-                        .font(Font.header(20, weight: .regular))
+                        .font(Font.bodySerif(20, weight: .regular))
                         .foregroundColor(Color.luxuryCream)
                     Text("based?")
                         .font(Font.bodySerif(32, weight: .bold))
@@ -341,7 +341,7 @@ struct SignUpLocationStep: View {
                         .lineSpacing(4)
                 }
                 .padding(16)
-                .background(Color.luxuryMaroonLight.opacity(0.5))
+                .background(Color.luxeSurfaceTintStrong)
                 .cornerRadius(12)
                 .overlay(
                     RoundedRectangle(cornerRadius: 12)
@@ -387,7 +387,7 @@ struct LuxuryTextField: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 14)
-            .background(Color.luxuryMaroonLight)
+            .background(Color.luxeSurfaceTintStrong)
             .cornerRadius(12)
             .overlay(
                 RoundedRectangle(cornerRadius: 12)
@@ -449,7 +449,7 @@ struct LuxuryDatePicker: View {
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 14)
-                .background(Color.luxuryMaroonLight)
+                .background(Color.luxeSurfaceTintStrong)
                 .cornerRadius(12)
                 .overlay(
                     RoundedRectangle(cornerRadius: 12)
@@ -492,7 +492,7 @@ struct BirthdayPickerSheet: View {
                     Spacer()
                     
                     Text("Date of Birth")
-                        .font(Font.header(17, weight: .bold))
+                        .font(Font.bodySerif(17, weight: .bold))
                         .foregroundColor(Color.luxuryGold)
                     
                     Spacer()

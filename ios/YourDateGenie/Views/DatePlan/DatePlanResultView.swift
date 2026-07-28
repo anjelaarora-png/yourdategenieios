@@ -17,7 +17,6 @@ struct DatePlanResultView: View {
     @State private var showGiftFinder = false
     @State private var isSaved = false
     @State private var showAddToCalendar = false
-    @State private var calendarDate = Date()
     @State private var calendarMessage: String?
     @State private var showCalendarAlert = false
     @State private var mainPlanCardAppeared = false
@@ -29,6 +28,20 @@ struct DatePlanResultView: View {
     // Screen 23 · paywall appears AFTER the user has seen their first result (spec §10), once, dismissible.
     @State private var showPostResultPaywall = false
     @AppStorage("hasSeenPostResultPaywall") private var hasSeenPostResultPaywall = false
+    @State private var swapContext: SwapStopContext?
+
+    /// Live plan from coordinator after edits (e.g. stop swap); falls back to the passed-in plan.
+    private var displayPlan: DatePlan {
+        if let match = coordinator.generatedPlans.first(where: { $0.id == plan.id }) { return match }
+        if let match = coordinator.savedPlans.first(where: { $0.id == plan.id }) { return match }
+        if let match = coordinator.experiencesWaiting.first(where: { $0.id == plan.id }) { return match }
+        if coordinator.currentDatePlan?.id == plan.id, let current = coordinator.currentDatePlan { return current }
+        return plan
+    }
+
+    private var hasMultipleGeneratedOptions: Bool {
+        coordinator.generatedPlans.count > 1
+    }
     
     var body: some View {
         NavigationStack {
@@ -45,11 +58,9 @@ struct DatePlanResultView: View {
                                 partnerBadgeView(names: names)
                             }
                             mainPlanCard
-                            if coordinator.currentPlanPartnerNames != nil {
-                                bothLoveSection
-                            }
+                            planSecondaryActions
                         }
-                        .padding(.horizontal, 16)
+                        .padding(.horizontal, 20)
                         .padding(.top, 8)
                         .padding(.bottom, 100)
                     }
@@ -66,17 +77,10 @@ struct DatePlanResultView: View {
                             Image(systemName: "xmark")
                                 .font(.system(size: 14, weight: .medium))
                             Text("Close")
-                                .font(Font.inter(14, weight: .medium))
+                                .font(Font.bodySans(14, weight: .medium))
                         }
                         .foregroundColor(Color.luxuryGold)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
-                        .background(Color.luxuryMaroonLight.opacity(0.8))
-                        .cornerRadius(20)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 20)
-                                .stroke(Color.luxuryGold.opacity(0.4), lineWidth: 1)
-                        )
+                        .charcoalToolbarPill()
                     }
                     .buttonStyle(.plain)
                 }
@@ -141,7 +145,10 @@ struct DatePlanResultView: View {
         }
         .sheet(isPresented: $showMap) {
             NavigationStack {
-                RouteMapView(stops: itineraryStops, startingPoint: plan.startingPoint)
+                RouteMapView(
+                    stops: ItineraryPlanFormatting.itineraryStops(for: plan),
+                    startingPoint: plan.startingPoint
+                )
                     .navigationTitle("Route")
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar {
@@ -159,7 +166,26 @@ struct DatePlanResultView: View {
             GiftFinderView(datePlan: plan, dateLocation: plan.stops.first?.address)
         }
         .sheet(isPresented: $showAddToCalendar) {
-            addToCalendarSheet
+            AddToCalendarSheet(
+                plan: plan,
+                onDismiss: { showAddToCalendar = false }
+            ) { result, date in
+                switch result {
+                case .success:
+                    calendarMessage = "Added to your calendar."
+                    showCalendarAlert = true
+                    showAddToCalendar = false
+                    if coordinator.savedPlans.contains(where: { $0.id == plan.id }) {
+                        coordinator.updateScheduledDate(for: plan.id, date: date)
+                    }
+                case .denied:
+                    calendarMessage = "Calendar access was denied. Enable it in Settings to add date plans."
+                    showCalendarAlert = true
+                case .failed(let msg):
+                    calendarMessage = "Could not add: \(msg)"
+                    showCalendarAlert = true
+                }
+            }
         }
         .sheet(isPresented: $showReserveVenuePicker) {
             NavigationStack {
@@ -176,7 +202,7 @@ struct DatePlanResultView: View {
                                 onAction: { showReserveVenuePicker = false }
                             )
                             .padding(.vertical, 4)
-                            .listRowBackground(Color.luxuryMaroonLight.opacity(0.5))
+                            .listRowBackground(Color.luxeSurfaceTintStrong)
                             .listRowSeparatorTint(Color.luxuryGold.opacity(0.28))
                         }
                     }
@@ -245,6 +271,13 @@ struct DatePlanResultView: View {
                 showPostResultPaywall = false
             }
         }
+        .sheet(item: $swapContext) { context in
+            SwapStopSheet(plan: context.plan, stopIndex: context.stopIndex) { alternative in
+                applySwap(alternative, to: context.plan, stopIndex: context.stopIndex)
+            }
+            .presentationDetents([.medium])
+            .presentationDragIndicator(.visible)
+        }
     }
 
     /// Show the paywall once, shortly after the first result renders, for non-subscribers.
@@ -257,433 +290,105 @@ struct DatePlanResultView: View {
         }
     }
     
-    // MARK: - Add to Calendar Sheet
-    private var addToCalendarSheet: some View {
-        NavigationStack {
-            VStack(spacing: 24) {
-                Text("Choose the date for your plan")
-                    .font(Font.bodySans(15, weight: .medium))
-                    .foregroundColor(Color.luxuryCreamMuted)
-                
-                DatePicker("Date", selection: $calendarDate, displayedComponents: .date)
-                    .datePickerStyle(.graphical)
-                    .tint(Color.luxuryGold)
-                    .padding(.horizontal)
-                
-                Button {
-                    Task {
-                        let result = await CalendarSyncManager.shared.addDatePlan(plan, on: calendarDate)
-                        await MainActor.run {
-                            switch result {
-                            case .success:
-                                calendarMessage = "Added to your calendar."
-                                showCalendarAlert = true
-                                showAddToCalendar = false
-                                if coordinator.savedPlans.contains(where: { $0.id == plan.id }) {
-                                    coordinator.updateScheduledDate(for: plan.id, date: calendarDate)
-                                }
-                            case .denied:
-                                calendarMessage = "Calendar access was denied. Enable it in Settings to add date plans."
-                                showCalendarAlert = true
-                            case .failed(let msg):
-                                calendarMessage = "Could not add: \(msg)"
-                                showCalendarAlert = true
-                            }
-                        }
-                    }
-                } label: {
-                    HStack(spacing: 10) {
-                        Image(systemName: "calendar.badge.plus")
-                            .font(.system(size: 16))
-                        Text("Add to Calendar")
-                            .font(Font.inter(16, weight: .semibold))
-                    }
-                    .foregroundColor(Color.luxuryMaroon)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
-                    .background(LinearGradient.goldShimmer)
-                    .cornerRadius(16)
-                }
-                .padding(.horizontal, 20)
-                
-                Spacer()
-            }
-            .padding(.top, 24)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Color.backgroundPrimary)
-            .navigationTitle("Add to Calendar")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") {
-                        showAddToCalendar = false
-                    }
-                    .foregroundColor(Color.luxuryGold)
-                }
-            }
-            .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
-        }
-    }
-    
-    // MARK: - Main Plan Card (love letter paper style)
+    // MARK: - Main Plan Card (matches Home hero cream card)
     private var mainPlanCard: some View {
-        LoveLetterItineraryBackground(cornerRadius: 24) {
-            VStack(spacing: 0) {
-                cardHeader
-                Divider()
-                    .background(Color.luxuryGold.opacity(0.4))
-                    .padding(.horizontal, 20)
-                titleSection
-                if let start = plan.startingPoint {
-                    startingPointSection(firstStop: itineraryStops.first, start: start)
-                }
-                stopsTimeline
-                Divider()
-                    .background(Color.luxuryGold.opacity(0.4))
-                    .padding(.horizontal, 20)
-                statsRow
-                weatherNote
-                conversationStartersSection
-                giftSuggestionsSection
-                packingChips
-                pageDots
-            }
+        ItineraryCreamCardChrome(edgePadding: 0) {
+            ItineraryCreamPlanDetailContent(
+                plan: displayPlan,
+                partnerName: partnerDisplayName,
+                onReserveStop: { stop in
+                    platformPickerPayload = ReservationPlatformPickerPayload(
+                        venueName: stop.name,
+                        phoneNumber: stop.phoneNumber,
+                        address: stop.address,
+                        reservationPlatforms: stop.reservationPlatforms,
+                        bookingUrl: stop.bookingUrl
+                    )
+                },
+                onOpenRoute: {
+                    coordinator.showRouteMap(
+                        stops: ItineraryPlanFormatting.itineraryStops(for: displayPlan),
+                        startingPoint: displayPlan.startingPoint
+                    )
+                },
+                onGetMoreGiftIdeas: {
+                    access.require(.gifting) {
+                        showGiftFinder = true
+                    }
+                },
+                canAccessGiftIdeas: access.canAccess(.gifting)
+            )
         }
         .opacity(mainPlanCardAppeared ? 1 : 0)
         .offset(y: mainPlanCardAppeared ? 0 : 8)
         .animation(.easeOut(duration: 0.4), value: mainPlanCardAppeared)
     }
-    
+
+    private var planSecondaryActions: some View {
+        HStack(spacing: 8) {
+            if SwapStopLogic.dinnerStopIndex(in: displayPlan) != nil {
+                Button {
+                    presentSwapSheet(for: displayPlan)
+                } label: {
+                    Text("Swap stop")
+                        .font(Font.bodySans(13, weight: .medium))
+                        .foregroundColor(Color.luxuryCream)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10)
+                                .stroke(Color.luxuryGold.opacity(0.35), lineWidth: 1)
+                        )
+                }
+                .buttonStyle(.plain)
+            }
+
+            if hasMultipleGeneratedOptions {
+                Button {
+                    if let idx = coordinator.generatedPlans.firstIndex(where: { $0.id == displayPlan.id }) {
+                        coordinator.generatedPlansSelectedIndex = idx
+                    }
+                    coordinator.activeSheet = .datePlanOptions
+                } label: {
+                    Text("Compare options")
+                        .font(Font.bodySans(13, weight: .medium))
+                        .foregroundColor(Color.backgroundPrimary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(Color.accentGold)
+                        .cornerRadius(10)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private func presentSwapSheet(for plan: DatePlan) {
+        guard let stopIndex = SwapStopLogic.dinnerStopIndex(in: plan) else { return }
+        swapContext = SwapStopContext(plan: plan, stopIndex: stopIndex)
+    }
+
+    private func applySwap(_ alternative: SwapStopAlternative, to plan: DatePlan, stopIndex: Int) {
+        guard !alternative.isCurrent else { return }
+        let updated = plan.replacingStop(at: stopIndex, with: alternative)
+        coordinator.persistEditedPlan(updated)
+    }
+
+    private var partnerDisplayName: String? {
+        if let names = coordinator.currentPlanPartnerNames {
+            return names.1
+        }
+        let name = PartnerSessionManager.shared.inviteInfo?.partnerName
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return name.isEmpty ? nil : name
+    }
+
     // MARK: - Partner badge ("Made for A & B")
     private func partnerBadgeView(names: (String, String)) -> some View {
         Text("Made for \(names.0) & \(names.1)")
             .font(Font.bodySans(14, weight: .semibold))
-            .foregroundColor(Color.luxuryGold)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
-            .background(
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(Color.luxuryMaroonLight.opacity(0.8))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 20)
-                    .stroke(Color.luxuryGold, lineWidth: 1.5)
-            )
-    }
-    
-    // MARK: - Both of you will love this because...
-    private var bothLoveSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Both of you will love this because...")
-                .font(Font.bodySans(15, weight: .semibold))
-                .foregroundColor(Color.luxuryCream)
-            Text(plan.tagline)
-                .font(Font.bodySans(14, weight: .regular))
-                .foregroundColor(Color.luxuryCreamMuted)
-            Text(plan.genieSecretTouch.description)
-                .font(Font.bodySans(13, weight: .regular))
-                .foregroundColor(Color.luxuryCreamMuted)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(18)
-        .background(
-            RoundedRectangle(cornerRadius: 20)
-                .fill(Color.luxuryMaroonLight.opacity(0.7))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 20)
-                        .stroke(Color.luxuryGold.opacity(0.25), lineWidth: 1)
-                )
-                .shadow(color: Color.luxuryGold.opacity(0.15), radius: 12, y: 4)
-        )
-    }
-    
-    // MARK: - Card Header (on paper: dark text)
-    private var cardHeader: some View {
-        HStack {
-            HStack(spacing: 8) {
-                Image(systemName: "sparkles")
-                    .font(.system(size: 14))
-                    .foregroundColor(Color.luxuryGoldDark)
-                
-                Text("Your Date Plan")
-                    .font(Font.inter(14, weight: .semibold))
-                    .foregroundColor(Color.accentMaroon)
-            }
-            
-            Spacer()
-            
-            if isSaved {
-                Image(systemName: "checkmark")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(Color.luxuryGold)
-            }
-        }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 16)
-    }
-    
-    // MARK: - Title Section
-    private var titleSection: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(plan.title)
-                .font(Font.header(28, weight: .semibold))
-                .foregroundColor(Color(hex: "3D2C2C"))
-            
-            Text(plan.tagline)
-                .font(Font.playfair(15, weight: .regular))
-                .foregroundColor(Color.luxuryGoldDark)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 20)
-        .padding(.vertical, 16)
-    }
-    
-    /// Itinerary = venues only (step 1, 2, 3...). Starting point is not a step.
-    private var itineraryStops: [DatePlanStop] {
-        plan.stops.filter { $0.venueType != "Starting point" && $0.name != "Your location" }
-    }
-    
-    // MARK: - Starting Point (before timeline)
-    private func startingPointSection(firstStop: DatePlanStop?, start: StartingPoint) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .top, spacing: 8) {
-                Image(systemName: "mappin.circle.fill")
-                    .font(.system(size: 16))
-                    .foregroundColor(Color.luxuryGoldDark)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Starting point")
-                        .font(Font.inter(14, weight: .semibold))
-                        .foregroundColor(Color(hex: "3D2C2C"))
-                    Text(start.address)
-                        .font(Font.inter(12, weight: .regular))
-                        .foregroundColor(Color.luxuryGoldDark)
-                }
-                Spacer(minLength: 0)
-            }
-            if let first = firstStop, let url = MapURLHelper.directionsURL(origin: start, destination: first) {
-                Button {
-                    UIApplication.shared.open(url)
-                } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "arrow.triangle.turn.up.right.diamond.fill")
-                            .font(.system(size: 12))
-                        Text("Get to stop 1: \(first.name)")
-                            .font(Font.inter(13, weight: .medium))
-                    }
-                    .foregroundColor(Color.luxuryGold)
-                }
-            }
-        }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 8)
-    }
-    
-    // MARK: - Stops Timeline (on paper: dark style)
-    private var stopsTimeline: some View {
-        VStack(spacing: 0) {
-            ForEach(Array(itineraryStops.enumerated()), id: \.element.id) { index, stop in
-                if index > 0, let time = stop.travelTimeFromPrevious, !time.isEmpty {
-                    TravelLegRow(
-                        travelMode: stop.travelMode,
-                        timeText: time,
-                        distanceText: stop.travelDistanceFromPrevious,
-                        useDarkStyle: true
-                    )
-                }
-                CompactStopRow(
-                    stop: stop,
-                    isLast: index == itineraryStops.count - 1,
-                    useDarkStyle: true,
-                    onTap: {
-                        if isReservable(stop) {
-                            platformPickerPayload = ReservationPlatformPickerPayload(
-                                venueName: stop.name,
-                                phoneNumber: stop.phoneNumber,
-                                address: stop.address,
-                                reservationPlatforms: stop.reservationPlatforms,
-                                bookingUrl: stop.bookingUrl
-                            )
-                        }
-                    }
-                )
-            }
-        }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 8)
-    }
-    
-    // MARK: - Stats Row (on paper: dark text)
-    private var statsRow: some View {
-        HStack(spacing: 0) {
-            HStack(spacing: 6) {
-                Image(systemName: "clock")
-                    .font(.system(size: 13))
-                    .foregroundColor(Color.luxuryGoldDark)
-                Text(plan.totalDuration)
-                    .font(Font.inter(13, weight: .medium))
-                    .foregroundColor(Color(hex: "3D2C2C"))
-            }
-            if !plan.estimatedCost.isEmpty {
-                Text("·")
-                    .foregroundColor(Color(hex: "6B5344"))
-                    .padding(.horizontal, 12)
-                Text(plan.estimatedCost)
-                    .font(Font.inter(13, weight: .medium))
-                    .foregroundColor(Color(hex: "3D2C2C"))
-            }
-            Spacer()
-        }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 14)
-    }
-    
-    // MARK: - Weather Note (on paper: dark text)
-    private var weatherNote: some View {
-        Group {
-            if !plan.weatherNote.isEmpty {
-                HStack(spacing: 10) {
-                    Image(systemName: "sun.max.fill")
-                        .font(.system(size: 14))
-                        .foregroundColor(Color.luxuryGoldDark)
-                    
-                    Text(plan.weatherNote)
-                        .font(Font.inter(13, weight: .regular))
-                        .foregroundColor(Color(hex: "5C4A3D"))
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .padding(14)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.luxuryGold.opacity(0.12))
-                .cornerRadius(12)
-                .padding(.horizontal, 20)
-                .padding(.vertical, 8)
-            }
-        }
-    }
-    
-    // MARK: - Conversation Starters Section (on paper: all starters when selected)
-    private var conversationStartersSection: some View {
-        Group {
-            if let starters = plan.conversationStarters, !starters.isEmpty {
-                VStack(alignment: .leading, spacing: 10) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "bubble.left.fill")
-                            .font(.system(size: 12))
-                        Text("Conversation Starters")
-                            .font(Font.inter(12, weight: .semibold))
-                    }
-                    .foregroundColor(Color.luxuryGoldDark)
-                    
-                    ForEach(starters) { starter in
-                        Text("\"\(starter.question)\"")
-                            .font(Font.playfairItalic(14))
-                            .foregroundColor(Color(hex: "5C4A3D"))
-                            .fixedSize(horizontal: false, vertical: true)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                }
-                .padding(14)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.luxuryGold.opacity(0.12))
-                .cornerRadius(12)
-                .padding(.horizontal, 20)
-                .padding(.vertical, 8)
-            }
-        }
-    }
-    
-    // MARK: - Gift Suggestions Section (on paper: when selected)
-    private var giftSuggestionsSection: some View {
-        Group {
-            if let gifts = plan.giftSuggestions, !gifts.isEmpty {
-                VStack(alignment: .leading, spacing: 10) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "gift.fill")
-                            .font(.system(size: 12))
-                        Text("Gift Suggestions")
-                            .font(Font.inter(12, weight: .semibold))
-                    }
-                    .foregroundColor(Color.luxuryGoldDark)
-                    
-                    ForEach(gifts) { gift in
-                        VStack(alignment: .leading, spacing: 4) {
-                            HStack(alignment: .top) {
-                                Text(gift.emoji)
-                                    .font(.system(size: 16))
-                                Text(gift.name)
-                                    .font(Font.inter(13, weight: .semibold))
-                                    .foregroundColor(Color(hex: "3D2C2C"))
-                                Spacer(minLength: 8)
-                                Text(gift.priceRange)
-                                    .font(Font.inter(11, weight: .medium))
-                                    .foregroundColor(Color.luxuryGoldDark)
-                            }
-                            Text(gift.description)
-                                .font(Font.inter(12, weight: .regular))
-                                .foregroundColor(Color(hex: "5C4A3D"))
-                                .fixedSize(horizontal: false, vertical: true)
-                            if !gift.whereToBuy.isEmpty {
-                                Text("Where: \(gift.whereToBuy)")
-                                    .font(Font.inter(11, weight: .regular))
-                                    .foregroundColor(Color.luxuryGoldDark)
-                            }
-                        }
-                        .padding(12)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(Color.luxuryGold.opacity(0.08))
-                        .cornerRadius(10)
-                    }
-                }
-                .padding(14)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.luxuryGold.opacity(0.12))
-                .cornerRadius(12)
-                .padding(.horizontal, 20)
-                .padding(.vertical, 8)
-            }
-        }
-    }
-    
-    // MARK: - Packing Chips (on paper: dark text)
-    private var packingChips: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 10) {
-                ForEach(plan.packingList.prefix(4), id: \.self) { item in
-                    HStack(spacing: 6) {
-                        Image(systemName: packingIcon(for: item))
-                            .font(.system(size: 11))
-                        Text(item)
-                            .font(Font.inter(12, weight: .medium))
-                    }
-                    .foregroundColor(Color(hex: "5C4A3D"))
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .background(Color.luxuryGold.opacity(0.15))
-                    .cornerRadius(20)
-                }
-            }
-            .padding(.horizontal, 20)
-        }
-        .padding(.vertical, 12)
-    }
-    
-    // MARK: - Decorative bottom ornament (visual flourish only, not pagination)
-    private var pageDots: some View {
-        HStack(spacing: 6) {
-            Circle()
-                .fill(Color.luxuryGold.opacity(0.3))
-                .frame(width: 6, height: 6)
-            
-            Capsule()
-                .fill(Color.luxuryGoldDark)
-                .frame(width: 20, height: 6)
-            
-            Circle()
-                .fill(Color.luxuryGold.opacity(0.3))
-                .frame(width: 6, height: 6)
-        }
-        .padding(.vertical, 16)
-        .accessibilityHidden(true)
+            .foregroundColor(Color.accentGold)
+            .charcoalToolbarPill()
     }
     
     // MARK: - Bottom Action Bar
@@ -717,7 +422,7 @@ struct DatePlanResultView: View {
                 
                 QuickActionButton(icon: "fork.knife.circle", label: "Reserve", isLocked: !access.canAccess(.datePlan)) {
                     access.require(.datePlan) {
-                        let reservable = plan.stops.filter { isReservable($0) }
+                        let reservable = plan.stops.filter { ItineraryPlanFormatting.isReservable($0) }
                         if reservable.isEmpty {
                             showNoReservableAlert = true
                         } else if reservable.count == 1 {
@@ -758,7 +463,7 @@ struct DatePlanResultView: View {
                         Image(systemName: isSaved ? "checkmark.circle.fill" : "bookmark.fill")
                             .font(.system(size: 14))
                         Text(isSaved ? "Saved" : "Save Date Plan")
-                            .font(Font.inter(14, weight: .semibold))
+                            .font(Font.bodySans(14, weight: .semibold))
                     }
                     .foregroundColor(isSaved ? Color.luxuryCream : Color.luxuryGold)
                     .frame(maxWidth: .infinity)
@@ -766,7 +471,7 @@ struct DatePlanResultView: View {
                     .background(
                         Capsule()
                             .stroke(Color.luxuryGold.opacity(0.5), lineWidth: 1)
-                            .background(Capsule().fill(isSaved ? Color.luxuryGold.opacity(0.4) : Color.luxuryMaroonLight))
+                            .background(Capsule().fill(isSaved ? Color.luxuryGold.opacity(0.4) : Color.luxeSurfaceTintStrong))
                     )
                 }
                 .disabled(isSaved)
@@ -782,7 +487,7 @@ struct DatePlanResultView: View {
                         Image(systemName: "clock.arrow.circlepath")
                             .font(.system(size: 14))
                         Text("We did this date — move to Past Dates")
-                            .font(Font.inter(13, weight: .medium))
+                            .font(Font.bodySans(13, weight: .medium))
                     }
                     .foregroundColor(Color.luxuryGold.opacity(0.9))
                 }
@@ -796,24 +501,6 @@ struct DatePlanResultView: View {
                 .shadow(color: Color.black.opacity(0.3), radius: 20, y: -5)
                 .ignoresSafeArea()
         )
-    }
-    
-    // MARK: - Helpers
-    private func isReservable(_ stop: DatePlanStop) -> Bool {
-        let types = ["restaurant", "bar", "cafe", "lounge", "bistro", "dining"]
-        return types.contains { stop.venueType.lowercased().contains($0) }
-    }
-    
-    private func packingIcon(for item: String) -> String {
-        let lower = item.lowercased()
-        if lower.contains("shoe") || lower.contains("walking") { return "shoeprints.fill" }
-        if lower.contains("jacket") || lower.contains("coat") { return "cloud.fill" }
-        if lower.contains("phone") { return "iphone" }
-        if lower.contains("camera") { return "camera.fill" }
-        if lower.contains("book") || lower.contains("art") { return "book.fill" }
-        if lower.contains("umbrella") { return "umbrella.fill" }
-        if lower.contains("mint") || lower.contains("breath") { return "leaf.fill" }
-        return "bag.fill"
     }
 }
 
@@ -833,13 +520,13 @@ struct TravelLegRow: View {
                 .font(.system(size: 12))
                 .foregroundColor(accentColor)
             Text(timeText)
-                .font(Font.inter(11, weight: .medium))
+                .font(Font.bodySans(11, weight: .medium))
                 .foregroundColor(secondaryText)
             if let dist = distanceText, !dist.isEmpty {
                 Text("·")
                     .foregroundColor(secondaryText)
                 Text(dist)
-                    .font(Font.inter(11, weight: .regular))
+                    .font(Font.bodySans(11, weight: .regular))
                     .foregroundColor(secondaryText)
             }
         }
@@ -902,7 +589,7 @@ struct CompactStopRow: View {
                         Image(systemName: "clock")
                             .font(.system(size: 10))
                         Text(stop.timeSlot)
-                            .font(Font.inter(12, weight: .regular))
+                            .font(Font.bodySans(12, weight: .regular))
                     }
                     .foregroundColor(secondaryText)
                     
@@ -910,7 +597,7 @@ struct CompactStopRow: View {
                         .foregroundColor(secondaryText)
                     
                     Text(stop.formattedAddress)
-                        .font(Font.inter(12, weight: .regular))
+                        .font(Font.bodySans(12, weight: .regular))
                         .foregroundColor(secondaryText)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -923,7 +610,7 @@ struct CompactStopRow: View {
                             Image(systemName: "clock")
                                 .font(.system(size: 9))
                             Text("Hours")
-                                .font(Font.inter(10, weight: .medium))
+                                .font(Font.bodySans(10, weight: .medium))
                             Image(systemName: hoursExpanded ? "chevron.up" : "chevron.down")
                                 .font(.system(size: 9, weight: .semibold))
                         }
@@ -934,7 +621,7 @@ struct CompactStopRow: View {
                         VStack(alignment: .leading, spacing: 1) {
                             ForEach(hours, id: \.self) { line in
                                 Text(line)
-                                    .font(Font.inter(10, weight: .regular))
+                                    .font(Font.bodySans(10, weight: .regular))
                                     .foregroundColor(secondaryText)
                             }
                         }
@@ -948,7 +635,7 @@ struct CompactStopRow: View {
                                 Image(systemName: "phone.fill")
                                     .font(.system(size: 9))
                                 Text(phone)
-                                    .font(Font.inter(10, weight: .regular))
+                                    .font(Font.bodySans(10, weight: .regular))
                             }
                             .foregroundColor(linkColor)
                         }
@@ -958,7 +645,7 @@ struct CompactStopRow: View {
                                     Image(systemName: "globe")
                                         .font(.system(size: 9))
                                     Text("Website")
-                                        .font(Font.inter(10, weight: .regular))
+                                        .font(Font.bodySans(10, weight: .regular))
                                 }
                                 .foregroundColor(linkColor)
                             }
@@ -972,7 +659,7 @@ struct CompactStopRow: View {
                         .font(.system(size: 10))
                         .padding(.top, 1)
                     Text(stop.romanticTip)
-                        .font(Font.inter(11, weight: .medium))
+                        .font(Font.bodySans(11, weight: .medium))
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 .foregroundColor(accentColor)
@@ -1019,7 +706,7 @@ struct VerifiedBadge: View {
                 .foregroundColor(Color(hex: "4CAF50"))
             
             Text("Verified")
-                .font(Font.inter(9, weight: .semibold))
+                .font(Font.bodySans(9, weight: .semibold))
                 .foregroundColor(Color(hex: "4CAF50"))
         }
         .padding(.horizontal, 6)
@@ -1050,32 +737,35 @@ struct QuickActionButton: View {
     
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 6) {
+            VStack(spacing: 8) {
                 ZStack(alignment: .topTrailing) {
-                    Image(systemName: icon)
-                        .font(.system(size: 18))
-                        .foregroundColor(Color.luxuryGold)
-                        .frame(width: 44, height: 44)
-                        .background(Color.luxuryMaroonLight)
-                        .cornerRadius(12)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(Color.luxuryGold.opacity(0.3), lineWidth: 1)
-                        )
+                    ZStack {
+                        Circle()
+                            .fill(Color.accentGold.opacity(0.2))
+                            .frame(width: 48, height: 48)
+                        Image(systemName: icon)
+                            .font(.system(size: 20))
+                            .symbolRenderingMode(.monochrome)
+                            .foregroundColor(Color.accentGold)
+                    }
                     if isLocked {
                         Image(systemName: "lock.fill")
-                            .font(.system(size: 8, weight: .bold))
-                            .foregroundColor(Color.luxuryGold)
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundColor(Color.accentGold)
                             .offset(x: 4, y: -4)
                     }
                 }
                 
                 Text(label)
-                    .font(Font.inter(10, weight: .medium))
-                    .foregroundColor(Color.luxuryMuted)
+                    .font(Font.bodySans(11, weight: .medium))
+                    .foregroundColor(Color.luxuryCream)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.center)
+                    .minimumScaleFactor(0.85)
             }
             .opacity(isLocked ? 0.5 : 1)
         }
+        .buttonStyle(.plain)
         .frame(maxWidth: .infinity)
     }
 }
@@ -1092,10 +782,10 @@ struct LuxuryStatBadge: View {
                 .font(.system(size: 16))
                 .foregroundColor(Color.luxuryGold)
             Text(value)
-                .font(Font.inter(13, weight: .semibold))
+                .font(Font.bodySans(13, weight: .semibold))
                 .foregroundColor(Color.luxuryCream)
             Text(label)
-                .font(Font.inter(9, weight: .medium))
+                .font(Font.bodySans(9, weight: .medium))
                 .foregroundColor(Color.luxuryMuted)
         }
     }
@@ -1114,7 +804,7 @@ struct LuxuryQuickAction: View {
                     .font(.system(size: 20))
                     .foregroundColor(color)
                     .frame(width: 48, height: 48)
-                    .background(Color.luxuryMaroonLight)
+                    .background(Color.luxeSurfaceTintStrong)
                     .cornerRadius(12)
                     .overlay(
                         RoundedRectangle(cornerRadius: 12)
@@ -1122,7 +812,7 @@ struct LuxuryQuickAction: View {
                     )
                 
                 Text(title)
-                    .font(Font.inter(10, weight: .medium))
+                    .font(Font.bodySans(10, weight: .medium))
                     .foregroundColor(Color.luxuryCream)
             }
         }
@@ -1164,7 +854,7 @@ struct LuxuryGiftCard: View {
                     .font(.system(size: 28))
                 Spacer()
                 Text(gift.priceRange)
-                    .font(Font.inter(10, weight: .semibold))
+                    .font(Font.bodySans(10, weight: .semibold))
                     .foregroundColor(Color.luxuryGold)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
@@ -1178,13 +868,13 @@ struct LuxuryGiftCard: View {
                 .lineLimit(1)
             
             Text(gift.description)
-                .font(Font.inter(11, weight: .regular))
+                .font(Font.bodySans(11, weight: .regular))
                 .foregroundColor(Color.luxuryCreamMuted)
                 .lineLimit(2)
         }
         .padding(14)
         .frame(width: 160)
-        .background(Color.luxuryMaroonLight)
+        .background(Color.luxeSurfaceTintStrong)
         .cornerRadius(14)
         .overlay(
             RoundedRectangle(cornerRadius: 14)
@@ -1207,13 +897,13 @@ struct LuxuryConversationCard: View {
                     .foregroundColor(Color.luxuryCream)
                 
                 Text(starter.category)
-                    .font(Font.inter(10, weight: .medium))
+                    .font(Font.bodySans(10, weight: .medium))
                     .foregroundColor(Color.luxuryMuted)
             }
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.luxuryMaroonLight)
+        .background(Color.luxeSurfaceTintStrong)
         .cornerRadius(14)
         .overlay(
             RoundedRectangle(cornerRadius: 14)

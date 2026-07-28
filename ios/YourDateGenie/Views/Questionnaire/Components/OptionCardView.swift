@@ -21,11 +21,40 @@ struct SectionHeader: View {
             
             if let subtitle = subtitle {
                 Text(subtitle)
-                    .font(Font.inter(14, weight: .regular))
+                    .font(Font.bodySans(14, weight: .regular))
                     .foregroundColor(Color.luxuryMuted)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+// MARK: - Shared option surface styling (Home / questionnaire parity)
+private struct QuestionnaireOptionSurface: ViewModifier {
+    let isSelected: Bool
+    var cornerRadius: CGFloat = 16
+
+    func body(content: Content) -> some View {
+        content
+            .background {
+                if isSelected {
+                    LinearGradient.goldShimmer
+                } else {
+                    Color.luxeSurfaceTintStrong
+                }
+            }
+            .cornerRadius(cornerRadius)
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerRadius)
+                    .stroke(isSelected ? Color.clear : Color.luxeSurfaceBorder, lineWidth: 1)
+            )
+            .shadow(color: isSelected ? Color.luxuryGold.opacity(0.25) : Color.clear, radius: 8, y: 4)
+    }
+}
+
+private extension View {
+    func questionnaireOptionSurface(isSelected: Bool, cornerRadius: CGFloat = 16) -> some View {
+        modifier(QuestionnaireOptionSurface(isSelected: isSelected, cornerRadius: cornerRadius))
     }
 }
 
@@ -35,14 +64,12 @@ struct OptionCardView: View {
     let isSelected: Bool
     let onTap: () -> Void
     
-    // Legacy initializer for backward compatibility
     init(option: OptionItem, isSelected: Bool, onSelect: @escaping () -> Void) {
         self.item = option
         self.isSelected = isSelected
         self.onTap = onSelect
     }
     
-    // New initializer matching step views
     init(item: OptionItem, isSelected: Bool, onTap: @escaping () -> Void) {
         self.item = item
         self.isSelected = isSelected
@@ -56,7 +83,7 @@ struct OptionCardView: View {
                     .font(.system(size: 34))
                 
                 Text(item.label)
-                    .font(Font.inter(13, weight: .semibold))
+                    .font(Font.bodySans(13, weight: .semibold))
                     .foregroundColor(isSelected ? Color.luxuryMaroon : Color.luxuryCream)
                     .multilineTextAlignment(.center)
                     .lineLimit(2)
@@ -65,15 +92,7 @@ struct OptionCardView: View {
             .frame(maxWidth: .infinity, minHeight: 100)
             .padding(.vertical, 16)
             .padding(.horizontal, 12)
-            .background(
-                isSelected ? LinearGradient.goldShimmer : LinearGradient(colors: [Color.luxuryMaroonLight], startPoint: .top, endPoint: .bottom)
-            )
-            .cornerRadius(16)
-            .overlay(
-                RoundedRectangle(cornerRadius: 16)
-                    .stroke(isSelected ? Color.clear : Color.luxuryGold.opacity(0.3), lineWidth: 1)
-            )
-            .shadow(color: isSelected ? Color.luxuryGold.opacity(0.3) : Color.clear, radius: 10, y: 4)
+            .questionnaireOptionSurface(isSelected: isSelected)
         }
         .buttonStyle(ScaleButtonStyle())
     }
@@ -92,19 +111,12 @@ struct ChipOptionView: View {
                     .font(.system(size: 16))
                 
                 Text(item.label)
-                    .font(Font.inter(13, weight: isSelected ? .semibold : .medium))
+                    .font(Font.bodySans(13, weight: isSelected ? .semibold : .medium))
                     .foregroundColor(isSelected ? Color.luxuryMaroon : Color.luxuryCream)
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
-            .background(
-                isSelected ? LinearGradient.goldShimmer : LinearGradient(colors: [Color.luxuryMaroonLight], startPoint: .top, endPoint: .bottom)
-            )
-            .cornerRadius(20)
-            .overlay(
-                RoundedRectangle(cornerRadius: 20)
-                    .stroke(isSelected ? Color.clear : Color.luxuryGold.opacity(0.3), lineWidth: 1)
-            )
+            .questionnaireOptionSurface(isSelected: isSelected, cornerRadius: 20)
         }
         .buttonStyle(ScaleButtonStyle())
     }
@@ -116,14 +128,12 @@ struct MultiSelectOptionCard: View {
     let isSelected: Bool
     let onTap: () -> Void
     
-    // Legacy initializer for backward compatibility
     init(option: OptionItem, isSelected: Bool, onToggle: @escaping () -> Void) {
         self.item = option
         self.isSelected = isSelected
         self.onTap = onToggle
     }
     
-    // New initializer matching step views
     init(item: OptionItem, isSelected: Bool, onTap: @escaping () -> Void) {
         self.item = item
         self.isSelected = isSelected
@@ -138,12 +148,12 @@ struct MultiSelectOptionCard: View {
                 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(item.label)
-                        .font(Font.inter(13, weight: .semibold))
+                        .font(Font.bodySans(13, weight: .semibold))
                         .foregroundColor(isSelected ? Color.luxuryMaroon : Color.luxuryCream)
                     
                     if let desc = item.desc {
                         Text(desc)
-                            .font(Font.inter(10, weight: .regular))
+                            .font(Font.bodySans(10, weight: .regular))
                             .foregroundColor(isSelected ? Color.luxuryMaroon.opacity(0.7) : Color.luxuryMuted)
                     }
                 }
@@ -156,15 +166,7 @@ struct MultiSelectOptionCard: View {
             }
             .padding(.horizontal, 18)
             .padding(.vertical, 16)
-            .background(
-                isSelected ? LinearGradient.goldShimmer : LinearGradient(colors: [Color.luxuryMaroonLight], startPoint: .top, endPoint: .bottom)
-            )
-            .cornerRadius(16)
-            .overlay(
-                RoundedRectangle(cornerRadius: 16)
-                    .stroke(isSelected ? Color.clear : Color.luxuryGold.opacity(0.3), lineWidth: 1)
-            )
-            .shadow(color: isSelected ? Color.luxuryGold.opacity(0.2) : Color.clear, radius: 8, y: 4)
+            .questionnaireOptionSurface(isSelected: isSelected)
         }
         .buttonStyle(ScaleButtonStyle())
     }
@@ -185,20 +187,15 @@ struct TextInputCard: View {
                         .foregroundColor(Color.luxuryGold)
                 }
                 Text(title)
-                    .font(Font.subheader(16, weight: .semibold))
+                    .font(Font.bodySerif(16, weight: .regular))
                     .foregroundColor(Color.luxuryCream)
             }
             
             TextField(placeholder, text: $text)
-                .font(Font.inter(15, weight: .regular))
+                .font(Font.bodySans(15, weight: .regular))
                 .foregroundColor(Color.luxuryCream)
                 .padding(16)
-                .background(Color.luxuryMaroonLight)
-                .cornerRadius(14)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 14)
-                        .stroke(Color.luxuryGold.opacity(0.3), lineWidth: 1)
-                )
+                .luxeInsetSurface(cornerRadius: 14)
         }
     }
 }
@@ -220,13 +217,13 @@ struct SliderInputCard: View {
                         .font(.system(size: 20))
                 }
                 Text(title)
-                    .font(Font.subheader(16, weight: .semibold))
+                    .font(Font.bodySerif(16, weight: .regular))
                     .foregroundColor(Color.luxuryCream)
                 
                 Spacer()
                 
                 Text(valueLabel.isEmpty ? "\(Int(value))" : valueLabel)
-                    .font(Font.inter(14, weight: .semibold))
+                    .font(Font.bodySans(14, weight: .semibold))
                     .foregroundColor(Color.luxuryGold)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 6)
@@ -238,12 +235,7 @@ struct SliderInputCard: View {
                 .tint(Color.luxuryGold)
         }
         .padding(18)
-        .background(Color.luxuryMaroonLight)
-        .cornerRadius(16)
-        .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(Color.luxuryGold.opacity(0.3), lineWidth: 1)
-        )
+        .questionnaireInsetSurface(cornerRadius: 16)
     }
 }
 
@@ -263,12 +255,12 @@ struct ToggleOptionCard: View {
             
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
-                    .font(Font.subheader(16, weight: .semibold))
+                    .font(Font.bodySerif(16, weight: .regular))
                     .foregroundColor(Color.luxuryCream)
                 
                 if let subtitle = subtitle {
                     Text(subtitle)
-                        .font(Font.inter(12, weight: .regular))
+                        .font(Font.bodySans(12, weight: .regular))
                         .foregroundColor(Color.luxuryMuted)
                 }
             }
@@ -279,14 +271,7 @@ struct ToggleOptionCard: View {
                 .tint(Color.luxuryGold)
                 .labelsHidden()
         }
-        .padding(.horizontal, 18)
-        .padding(.vertical, 16)
-        .background(Color.luxuryMaroonLight)
-        .cornerRadius(16)
-        .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(Color.luxuryGold.opacity(0.3), lineWidth: 1)
-        )
+        .questionnaireInsetSurface(cornerRadius: 16)
     }
 }
 

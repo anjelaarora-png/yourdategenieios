@@ -56,13 +56,13 @@ So I built one. Memories is the headline premium feature.
 ## The decision
 
 Monthly: $14.99.
-Annual: $99.99 ($8.33/mo equivalent — the streaming-service anchor).
+Annual: $119.99 ($10.00/mo equivalent).
 Free tier: 2 plans per day, no save, no partner.
 7-day free trial.
 
 Three things drove the price:
 1. **$14.99 sits exactly at the demand inflection.** I gave up 23 points of "would pay" by not pricing at $9.99 — but the people who pay at $14.99 use the product 3.2× more (based on a smaller 47-person beta cohort).
-2. **The annual price has to feel like a deal, not a tax.** $99.99/yr signals "you're getting a deal," $119.88 signals "you're paying for 12 of these."
+2. **The annual price has to feel like a deal, not a tax.** $119.99/yr is ~33% off monthly and still cheaper than twelve separate months.
 3. **The free tier has to be useful enough to recommend.** 2 plans/day is enough to actually plan two dates this weekend — which is the moment people text a friend about the app.
 
 ## What I'd tell another founder

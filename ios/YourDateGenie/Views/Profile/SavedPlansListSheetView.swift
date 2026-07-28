@@ -64,7 +64,7 @@ struct SavedPlansListSheetView: View {
             }
 
             Text("No saved plans yet")
-                .font(Font.header(20, weight: .semibold))
+                .font(Font.bodySerif(20, weight: .regular))
                 .foregroundColor(Color.luxuryCream)
 
             Text("When you save a date plan from the result screen, it will show up here.")
@@ -114,25 +114,30 @@ private struct SavedPlanRowCard: View {
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(plan.title)
-                        .font(Font.bodySans(14, weight: .semibold))
-                        .foregroundColor(Color.luxuryCream)
+                        .font(Font.bodySerif(15, weight: .regular))
+                        .foregroundColor(Color.textOnCard)
                         .lineLimit(2)
                     Text("\(plan.stops.count) stops · \(plan.totalDuration)")
                         .font(Font.bodySans(12, weight: .regular))
-                        .foregroundColor(Color.luxuryMuted)
+                        .foregroundColor(Color.textMutedOnCard)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
 
                 Image(systemName: "chevron.right")
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(Color.luxuryGold.opacity(0.8))
+                    .foregroundColor(Color.accentGold.opacity(0.8))
             }
             .padding(16)
-            .background(Color.luxuryMaroonLight.opacity(0.8))
+            .background(Color.creamCard)
+            .overlay(alignment: .leading) {
+                Rectangle()
+                    .fill(Color.accentMaroon)
+                    .frame(width: 3)
+            }
             .cornerRadius(18)
             .overlay(
                 RoundedRectangle(cornerRadius: 18)
-                    .stroke(Color.luxuryGold.opacity(0.2), lineWidth: 1)
+                    .stroke(Color.maroonBorderTint, lineWidth: 1)
             )
         }
         .buttonStyle(.plain)

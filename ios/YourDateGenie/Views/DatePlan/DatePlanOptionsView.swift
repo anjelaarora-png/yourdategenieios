@@ -1,5 +1,10 @@
 import SwiftUI
 
+private struct PendingSavePlan: Identifiable {
+    let plan: DatePlan
+    var id: UUID { plan.id }
+}
+
 struct DatePlanOptionsView: View {
     let plans: [DatePlan]
     var loadingPlanIndices: Set<Int> = []
@@ -15,14 +20,12 @@ struct DatePlanOptionsView: View {
     @State private var showExport = false
     @State private var savedPlanIds: Set<UUID> = []
     @State private var showAddToCalendar = false
-    @State private var calendarDate = Date()
     @State private var calendarMessage: String?
     @State private var showCalendarAlert = false
     @State private var itineraryAppeared = false
     @State private var loadingSpinnerRotation: Double = 0
     @State private var showSavedBanner = false
     @State private var showCloseConfirmation = false
-    @State private var showSaveDatePicker = false
     @State private var pendingPlanForSave: DatePlan? = nil
 
     @State private var inviterFirstChoiceIndex: Int?
@@ -75,17 +78,10 @@ struct DatePlanOptionsView: View {
                             Image(systemName: "xmark")
                                 .font(.system(size: 14, weight: .medium))
                             Text("Close")
-                                .font(Font.inter(14, weight: .medium))
+                                .font(Font.bodySans(14, weight: .medium))
                         }
                         .foregroundColor(Color.luxuryGold)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
-                        .background(Color.luxuryMaroonLight.opacity(0.8))
-                        .cornerRadius(20)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 20)
-                                .stroke(Color.luxuryGold.opacity(0.4), lineWidth: 1)
-                        )
+                        .charcoalToolbarPill()
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Save and exit")
@@ -94,8 +90,8 @@ struct DatePlanOptionsView: View {
                 
                 ToolbarItem(placement: .principal) {
                     Text("Your Date Plans")
-                        .font(Font.header(17, weight: .semibold))
-                        .foregroundColor(Color.luxuryGold)
+                        .font(Font.bodySerif(17, weight: .regular))
+                        .foregroundColor(Color.accentGold)
                 }
                 
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -112,14 +108,7 @@ struct DatePlanOptionsView: View {
                                     .multilineTextAlignment(.center)
                             }
                             .foregroundColor(Color.luxuryGold)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 8)
-                            .background(Color.luxuryMaroonLight)
-                            .cornerRadius(20)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 20)
-                                    .stroke(Color.luxuryGold.opacity(0.3), lineWidth: 1)
-                            )
+                            .charcoalToolbarPill()
                         }
                         
                         Button {
@@ -134,14 +123,7 @@ struct DatePlanOptionsView: View {
                                     .multilineTextAlignment(.center)
                             }
                             .foregroundColor(Color.luxuryGold)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 8)
-                            .background(Color.luxuryMaroonLight)
-                            .cornerRadius(20)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 20)
-                                    .stroke(Color.luxuryGold.opacity(0.3), lineWidth: 1)
-                            )
+                            .charcoalToolbarPill()
                         }
                         
                         Button {
@@ -154,14 +136,7 @@ struct DatePlanOptionsView: View {
                                     .font(Font.bodySans(12, weight: .medium))
                             }
                             .foregroundColor(Color.luxuryGold)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 8)
-                            .background(Color.luxuryMaroonLight)
-                            .cornerRadius(20)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 20)
-                                    .stroke(Color.luxuryGold.opacity(0.3), lineWidth: 1)
-                            )
+                            .charcoalToolbarPill()
                         }
                     }
                 }
@@ -186,20 +161,40 @@ struct DatePlanOptionsView: View {
             PartnerShareView(plan: selectedPlan)
         }
         .sheet(isPresented: $showAddToCalendar) {
-            addToCalendarSheet(plan: selectedPlan)
+            AddToCalendarSheet(
+                plan: selectedPlan,
+                onDismiss: { showAddToCalendar = false }
+            ) { result, date in
+                switch result {
+                case .success:
+                    calendarMessage = "Added to your calendar."
+                    showCalendarAlert = true
+                    showAddToCalendar = false
+                    if coordinator.savedPlans.contains(where: { $0.id == selectedPlan.id }) {
+                        coordinator.updateScheduledDate(for: selectedPlan.id, date: date)
+                    }
+                case .denied:
+                    calendarMessage = "Calendar access was denied. Enable it in Settings to add date plans."
+                    showCalendarAlert = true
+                case .failed(let msg):
+                    calendarMessage = "Could not add: \(msg)"
+                    showCalendarAlert = true
+                }
+            }
         }
-        .sheet(isPresented: $showSaveDatePicker) {
-            if let plan = pendingPlanForSave, let onSave = onSave {
-                DatePickerSheet(planTitle: plan.title) { date in
-                    var updatedPlan = plan
+        .sheet(item: Binding(
+            get: { pendingPlanForSave.map { PendingSavePlan(plan: $0) } },
+            set: { pendingPlanForSave = $0?.plan }
+        )) { wrapper in
+            if let onSave = onSave {
+                DatePickerSheet(planTitle: wrapper.plan.title) { date in
+                    var updatedPlan = wrapper.plan
                     updatedPlan.scheduledDate = date
-                    showSaveDatePicker = false
                     pendingPlanForSave = nil
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                         commitSave(updatedPlan, using: onSave)
                     }
                 } onCancel: {
-                    showSaveDatePicker = false
                     pendingPlanForSave = nil
                 }
             }
@@ -238,74 +233,6 @@ struct DatePlanOptionsView: View {
         }
     }
 
-    // MARK: - Add to Calendar Sheet
-    private func addToCalendarSheet(plan: DatePlan) -> some View {
-        NavigationStack {
-            VStack(spacing: 24) {
-                Text("Choose the date for your plan")
-                    .font(Font.bodySans(15, weight: .medium))
-                    .foregroundColor(Color.luxuryCreamMuted)
-                
-                DatePicker("Date", selection: $calendarDate, displayedComponents: .date)
-                    .datePickerStyle(.graphical)
-                    .tint(Color.luxuryGold)
-                    .padding(.horizontal)
-                
-                Button {
-                    Task {
-                        let result = await CalendarSyncManager.shared.addDatePlan(plan, on: calendarDate)
-                        await MainActor.run {
-                            switch result {
-                            case .success:
-                                calendarMessage = "Added to your calendar."
-                                showCalendarAlert = true
-                                showAddToCalendar = false
-                                if coordinator.savedPlans.contains(where: { $0.id == plan.id }) {
-                                    coordinator.updateScheduledDate(for: plan.id, date: calendarDate)
-                                }
-                            case .denied:
-                                calendarMessage = "Calendar access was denied. Enable it in Settings to add date plans."
-                                showCalendarAlert = true
-                            case .failed(let msg):
-                                calendarMessage = "Could not add: \(msg)"
-                                showCalendarAlert = true
-                            }
-                        }
-                    }
-                } label: {
-                    HStack(spacing: 10) {
-                        Image(systemName: "calendar.badge.plus")
-                            .font(.system(size: 16))
-                        Text("Add to Calendar")
-                            .font(Font.bodySans(16, weight: .semibold))
-                    }
-                    .foregroundColor(Color.luxuryMaroon)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
-                    .background(LinearGradient.goldShimmer)
-                    .cornerRadius(16)
-                }
-                .padding(.horizontal, 20)
-                
-                Spacer()
-            }
-            .padding(.top, 24)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Color.backgroundPrimary)
-            .navigationTitle("Add to Calendar")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") {
-                        showAddToCalendar = false
-                    }
-                    .foregroundColor(Color.luxuryGold)
-                }
-            }
-            .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
-        }
-    }
-    
     // MARK: - Main content (swipeable TabView: one page per plan + Regenerate page)
     private var mainContentArea: some View {
         TabView(selection: $selectedPlanIndex) {
@@ -336,17 +263,26 @@ struct DatePlanOptionsView: View {
                         .transition(.opacity.combined(with: .scale(scale: 0.96)))
                 } else {
                     let plan = plans[index]
-                    LoveLetterItineraryBackground(cornerRadius: 20) {
-                        VStack(spacing: 0) {
-                            planHeaderView(plan: plan)
-                            planItineraryView(plan: plan)
-                            genieSecretTouchView(plan: plan)
-                            giftSuggestionsView(plan: plan)
-                            packingAndWeatherView(plan: plan)
-                            routeSectionView(plan: plan)
-                        }
-                        .padding(.horizontal, 4)
-                        .padding(.vertical, 16)
+                    ItineraryCreamCardChrome(edgePadding: 0) {
+                        ItineraryCreamPlanDetailContent(
+                            plan: plan,
+                            partnerName: coordinator.currentPlanPartnerNames?.1,
+                            onOpenRoute: {
+                                coordinator.showRouteMap(
+                                    stops: ItineraryPlanFormatting.itineraryStops(for: plan),
+                                    startingPoint: plan.startingPoint
+                                )
+                            },
+                            onGetMoreGiftIdeas: {
+                                access.require(.gifting) {
+                                    coordinator.showGiftFinder(
+                                        datePlan: plan,
+                                        dateLocation: plan.stops.first?.address
+                                    )
+                                }
+                            },
+                            canAccessGiftIdeas: access.canAccess(.gifting)
+                        )
                     }
                     .padding(.horizontal, 16)
                     .id(index)
@@ -388,7 +324,7 @@ struct DatePlanOptionsView: View {
             }
             .padding(32)
             .frame(maxWidth: .infinity)
-            .background(Color.luxuryMaroonLight)
+            .background(Color.luxeSurfaceTintStrong)
             .cornerRadius(20)
             .overlay(
                 RoundedRectangle(cornerRadius: 20)
@@ -431,7 +367,7 @@ struct DatePlanOptionsView: View {
         .padding(.vertical, 14)
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(Color.luxuryMaroonLight)
+                .fill(Color.luxeSurfaceTintStrong)
                 .overlay(
                     RoundedRectangle(cornerRadius: 12)
                         .stroke(Color.luxuryGold.opacity(0.5), lineWidth: 1)
@@ -459,7 +395,18 @@ struct DatePlanOptionsView: View {
 
     // MARK: - Option chips (ExperienceCard-style: image, emoji, title — like navigation pane)
     private var optionChipsSection: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
+        VStack(spacing: 0) {
+            if plans.count < 3 {
+                Text(plans.count == 1
+                     ? "We found 1 strong option — swipe for regenerate or save below"
+                     : "We found \(plans.count) options — swipe to compare or regenerate for more")
+                    .font(Font.bodySans(12, weight: .regular))
+                    .foregroundColor(Color.luxuryCreamMuted)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 8)
+            }
+            ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 12) {
                 ForEach(Array(plans.enumerated()), id: \.element.id) { index, plan in
                     let rankBadge: Int? = {
@@ -510,6 +457,7 @@ struct DatePlanOptionsView: View {
                     .animation(.easeOut, value: hasSwipedOptions)
             }
         }
+        }
     }
 
     private func submitInviterRanks() {
@@ -538,7 +486,6 @@ struct DatePlanOptionsView: View {
                     } else {
                         // No date yet — ask the user before saving
                         pendingPlanForSave = plan
-                        showSaveDatePicker = true
                     }
                 } label: {
                     HStack(spacing: 10) {
@@ -702,7 +649,7 @@ struct DatePlanOptionsView: View {
                     HStack(spacing: 6) {
                         Text(plan.genieSecretTouch.emoji)
                         Text("Genie's Secret Touch")
-                            .font(Font.header(17, weight: .bold))
+                            .font(Font.bodySerif(17, weight: .bold))
                             .foregroundColor(Color.luxuryGold)
                     }
                     
@@ -719,7 +666,7 @@ struct DatePlanOptionsView: View {
         }
         .padding(20)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.luxuryMaroonLight)
+        .background(Color.luxeSurfaceTintStrong)
         .cornerRadius(16)
         .overlay(
             RoundedRectangle(cornerRadius: 16)
@@ -742,7 +689,7 @@ struct DatePlanOptionsView: View {
                     HStack(spacing: 8) {
                         Text("🎁")
                         Text("Gift Suggestions")
-                            .font(Font.header(16, weight: .bold))
+                            .font(Font.bodySerif(16, weight: .bold))
                             .foregroundColor(Color.luxuryCream)
                     }
                     
@@ -777,7 +724,7 @@ struct DatePlanOptionsView: View {
                 }
             }
             .padding(20)
-            .background(Color.luxuryMaroonLight.opacity(0.6))
+            .background(Color.luxeSurfaceTintStrong)
             .cornerRadius(16)
             .overlay(
                 RoundedRectangle(cornerRadius: 16)
@@ -801,7 +748,7 @@ struct DatePlanOptionsView: View {
                     Image(systemName: "bag.fill")
                         .foregroundColor(Color.luxuryGold)
                     Text("What to Bring")
-                        .font(Font.header(15, weight: .semibold))
+                        .font(Font.bodySerif(15, weight: .semibold))
                         .foregroundColor(Color.luxuryCream)
                 }
                 
@@ -820,7 +767,7 @@ struct DatePlanOptionsView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(16)
-            .background(Color.luxuryMaroonLight)
+            .background(Color.luxeSurfaceTintStrong)
             .cornerRadius(12)
             
             VStack(alignment: .leading, spacing: 12) {
@@ -828,7 +775,7 @@ struct DatePlanOptionsView: View {
                     Image(systemName: "cloud.sun.fill")
                         .foregroundColor(Color.luxuryGold)
                     Text("Weather Note")
-                        .font(Font.header(15, weight: .semibold))
+                        .font(Font.bodySerif(15, weight: .semibold))
                         .foregroundColor(Color.luxuryCream)
                 }
                 
@@ -839,7 +786,7 @@ struct DatePlanOptionsView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(16)
-            .background(Color.luxuryMaroonLight)
+            .background(Color.luxeSurfaceTintStrong)
             .cornerRadius(12)
         }
         .padding(.top, 24)
@@ -867,7 +814,7 @@ struct DatePlanOptionsView: View {
                 Image(systemName: "location.fill")
                     .foregroundColor(Color.luxuryGold)
                 Text("Your Route")
-                    .font(Font.header(16, weight: .bold))
+                    .font(Font.bodySerif(16, weight: .bold))
                     .foregroundColor(Color.luxuryCream)
             }
             
@@ -902,7 +849,7 @@ struct DatePlanOptionsView: View {
                     .cornerRadius(20)
                 }
                 .padding(16)
-                .background(Color.luxuryMaroonLight)
+                .background(Color.luxeSurfaceTintStrong)
                 .cornerRadius(12)
                 .overlay(
                     RoundedRectangle(cornerRadius: 12)
@@ -939,7 +886,7 @@ private struct OptionChipCard: View {
             VStack(alignment: .leading, spacing: 0) {
                 ZStack(alignment: .bottomLeading) {
                     if isVerifying {
-                        Color.luxuryMaroonLight
+                        Color.luxeSurfaceTintStrong
                             .frame(width: cardWidth, height: imageHeight)
                         ProgressView()
                             .progressViewStyle(CircularProgressViewStyle(tint: Color.luxuryGold))
@@ -952,7 +899,7 @@ private struct OptionChipCard: View {
                                     .resizable()
                                     .aspectRatio(contentMode: .fill)
                             case .empty, .failure:
-                                Color.luxuryMaroonLight
+                                Color.luxeSurfaceTintStrong
                             @unknown default:
                                 EmptyView()
                             }
@@ -995,7 +942,7 @@ private struct OptionChipCard: View {
                 .padding(8)
             }
             .frame(width: cardWidth)
-            .background(Color.luxuryMaroonLight)
+            .background(Color.luxeSurfaceTintStrong)
             .cornerRadius(12)
             .overlay(
                 RoundedRectangle(cornerRadius: 12)
@@ -1025,7 +972,7 @@ struct PlanOptionCard: View {
                             .resizable()
                             .aspectRatio(contentMode: .fill)
                     case .empty, .failure:
-                        Color.luxuryMaroonLight
+                        Color.creamParchmentMid
                     @unknown default:
                         EmptyView()
                     }
@@ -1040,7 +987,7 @@ struct PlanOptionCard: View {
                         .foregroundColor(isSelected ? Color.luxuryMaroon : Color.luxuryMuted)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 4)
-                        .background(isSelected ? Color.luxuryGold : Color.luxuryMaroonLight)
+                        .background(isSelected ? Color.luxuryGold : Color.luxeSurfaceTintStrong)
                         .cornerRadius(8)
                     
                     Spacer()
@@ -1052,19 +999,19 @@ struct PlanOptionCard: View {
                 }
                 
                 Text(plan.title)
-                    .font(Font.bodySans(14, weight: .semibold))
-                    .foregroundColor(Color.luxuryCream)
+                    .font(Font.bodySerif(14, weight: .regular))
+                    .foregroundColor(Color.textOnCard)
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
                 
                 Text(plan.tagline)
                     .font(Font.bodySans(12, weight: .regular))
-                    .foregroundColor(Color.luxuryMuted)
+                    .foregroundColor(Color.textMutedOnCard)
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
                 
                 Divider()
-                    .background(Color.luxuryGold.opacity(0.2))
+                    .background(Color.maroonBorderTint)
                 
                 HStack(spacing: 16) {
                     HStack(spacing: 4) {
@@ -1073,7 +1020,7 @@ struct PlanOptionCard: View {
                         Text(plan.totalDuration)
                             .font(Font.bodySans(11, weight: .medium))
                     }
-                    .foregroundColor(Color.luxuryMuted)
+                    .foregroundColor(Color.textMutedOnCard)
                     
                     HStack(spacing: 4) {
                         Image(systemName: "dollarsign.circle")
@@ -1081,7 +1028,7 @@ struct PlanOptionCard: View {
                         Text(plan.estimatedCost)
                             .font(Font.bodySans(11, weight: .medium))
                     }
-                    .foregroundColor(Color.luxuryMuted)
+                    .foregroundColor(Color.textMutedOnCard)
                 }
                 
                 if isVerifying {
@@ -1106,11 +1053,16 @@ struct PlanOptionCard: View {
             }
             .padding(16)
             .frame(width: 220)
-            .background(Color.luxuryMaroonLight)
+            .background(Color.creamCard)
             .cornerRadius(16)
+            .overlay(alignment: .leading) {
+                Rectangle()
+                    .fill(Color.accentMaroon)
+                    .frame(width: 3)
+            }
             .overlay(
                 RoundedRectangle(cornerRadius: 16)
-                    .stroke(isSelected ? Color.luxuryGold : Color.luxuryGold.opacity(0.2), lineWidth: isSelected ? 2 : 1)
+                    .stroke(isSelected ? Color.accentGold : Color.maroonBorderTint, lineWidth: isSelected ? 2 : 1)
             )
             .scaleEffect(isSelected ? 1.02 : 1.0)
             .shadow(color: isSelected ? Color.luxuryGold.opacity(0.25) : .clear, radius: 12, y: 4)
@@ -1128,7 +1080,7 @@ struct StartingPointCard: View {
         HStack(spacing: 16) {
             ZStack {
                 Circle()
-                    .fill(Color.luxuryMaroonLight)
+                    .fill(Color.luxeSurfaceTintStrong)
                     .frame(width: 40, height: 40)
                 
                 Image(systemName: "location.fill")
@@ -1152,7 +1104,7 @@ struct StartingPointCard: View {
             Spacer()
         }
         .padding(16)
-        .background(Color.luxuryMaroonLight.opacity(0.5))
+        .background(Color.luxeSurfaceTintStrong)
         .cornerRadius(12)
     }
 }
@@ -1192,7 +1144,7 @@ struct ItineraryStopCard: View {
                             HStack(spacing: 6) {
                                 Text(stop.emoji)
                                 Text(stop.name)
-                                    .font(Font.header(17, weight: .bold))
+                                    .font(Font.bodySerif(17, weight: .bold))
                                     .foregroundColor(Color.luxuryCream)
                                 
                                 if stop.validated == true {
@@ -1347,7 +1299,7 @@ struct ItineraryStopCard: View {
                 }
             }
             .padding(16)
-            .background(Color.luxuryMaroonLight)
+            .background(Color.luxeSurfaceTintStrong)
             .cornerRadius(16)
             .overlay(
                 RoundedRectangle(cornerRadius: 16)
@@ -1389,7 +1341,7 @@ struct TravelIndicator: View {
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 6)
-            .background(Color.luxuryMaroonLight.opacity(0.5))
+            .background(Color.luxeSurfaceTintStrong)
             .cornerRadius(16)
         }
         .padding(.leading, 14)
@@ -1410,7 +1362,7 @@ struct GiftSuggestionCard: View {
                         .font(.system(size: 24))
                     
                     Text(gift.name)
-                        .font(Font.header(15, weight: .bold))
+                        .font(Font.bodySerif(15, weight: .bold))
                         .foregroundColor(Color.luxuryCream)
                 }
                 
@@ -1470,7 +1422,7 @@ struct GiftSuggestionCard: View {
             }
         }
         .padding(16)
-        .background(Color.luxuryMaroonLight)
+        .background(Color.luxeSurfaceTintStrong)
         .cornerRadius(12)
         .overlay(
             RoundedRectangle(cornerRadius: 12)
@@ -1553,7 +1505,7 @@ struct RouteSummaryBar: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
-            .background(Color.luxuryMaroonLight)
+            .background(Color.luxeSurfaceTintStrong)
             .cornerRadius(12)
         }
     }
