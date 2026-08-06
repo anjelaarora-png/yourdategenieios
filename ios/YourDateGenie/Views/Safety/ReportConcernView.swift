@@ -65,7 +65,7 @@ struct ReportConcernView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
                 // Context note
-                Text("Your report is confidential. We review all reports within 48 hours and take appropriate action.")
+                Text("Your report is confidential. We review all reports within 24 hours and take appropriate action, including removing content and ejecting abusive users when warranted.")
                     .font(Font.bodySans(13, weight: .regular))
                     .foregroundColor(Color.luxuryCreamMuted)
                     .fixedSize(horizontal: false, vertical: true)
@@ -191,7 +191,7 @@ struct ReportConcernView: View {
             Text("Report submitted")
                 .font(Font.header(22, weight: .semibold))
                 .foregroundColor(Color.luxuryCream)
-            Text("Thank you. We'll review your report within 48 hours and take appropriate action.")
+            Text("Thank you. We'll review your report within 24 hours and take appropriate action.")
                 .font(Font.bodySans(14, weight: .regular))
                 .foregroundColor(Color.luxuryCreamMuted)
                 .multilineTextAlignment(.center)

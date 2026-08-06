@@ -12,6 +12,9 @@ struct AuthenticationView: View {
     @State private var accountMode: AccountMode = .individual
     @State private var showBusinessPortal = false
     @State private var showResetPasswordSheet = false
+    /// Required before register or login (Apple §1.2 EULA).
+    @State private var agreedToTerms = false
+    @State private var showTermsRequiredAlert = false
 
     enum AccountMode { case individual, business }
     @State private var resendCooldownRemaining = 0
@@ -39,9 +42,7 @@ struct AuthenticationView: View {
                 .ignoresSafeArea()
             
             Group {
-                if profileManager.needsDisplayName {
-                    SocialDisplayNameView()
-                } else if profileManager.pendingEmailConfirmation {
+                if profileManager.pendingEmailConfirmation {
                     emailConfirmationWaitScreen
                 } else {
                     ScrollView(showsIndicators: false) {
@@ -55,9 +56,13 @@ struct AuthenticationView: View {
                                 businessPanel
                                     .padding(.top, 24)
                             } else {
+                                // Terms agreement gates every login method (§1.2 EULA).
+                                termsAgreementRow
+                                    .padding(.top, 24)
+
                                 // Sign in with Apple first (§4.8 prominence when Google is also offered).
                                 socialAuthButtons
-                                    .padding(.top, 24)
+                                    .padding(.top, 16)
 
                                 socialDivider
                                     .padding(.top, 28)
@@ -118,8 +123,7 @@ struct AuthenticationView: View {
             }
             
             if let onDismiss = onDismiss,
-               !profileManager.pendingEmailConfirmation,
-               !profileManager.needsDisplayName {
+               !profileManager.pendingEmailConfirmation {
                 VStack {
                     HStack {
                         Spacer()
@@ -163,6 +167,11 @@ struct AuthenticationView: View {
         } message: {
             Text("We sent another confirmation email. Please check your inbox and spam folder.")
         }
+        .alert("Terms Required", isPresented: $showTermsRequiredAlert) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text("Please agree to the Terms of Use and Privacy Policy to continue.")
+        }
         .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { _ in
             if resendCooldownRemaining > 0 {
                 resendCooldownRemaining -= 1
@@ -202,14 +211,45 @@ struct AuthenticationView: View {
                 finishAuthRoutingIfReady()
             }
         }
-        .onChange(of: profileManager.needsDisplayName) { _, needsName in
-            if !needsName && profileManager.isLoggedIn && !socialAuth.isCompletingSocialSignIn {
-                finishAuthRoutingIfReady()
-            }
-        }
     }
 
     // MARK: - Social Auth
+
+    private var termsAgreementRow: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Button {
+                agreedToTerms.toggle()
+            } label: {
+                Image(systemName: agreedToTerms ? "checkmark.square.fill" : "square")
+                    .font(.system(size: 22))
+                    .foregroundColor(agreedToTerms ? Color.luxuryGold : Color.luxuryMuted)
+            }
+            .accessibilityLabel(agreedToTerms ? "Agreed to Terms and Privacy Policy" : "Agree to Terms and Privacy Policy")
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("I agree to the Terms of Use and Privacy Policy. There is no tolerance for objectionable content or abusive users.")
+                    .font(Font.bodySans(13, weight: .regular))
+                    .foregroundColor(Color.luxuryCreamMuted)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                HStack(spacing: 12) {
+                    Link("Terms", destination: URL(string: "https://yourdategenie.com/terms")!)
+                        .font(Font.bodySans(13, weight: .semibold))
+                        .foregroundColor(Color.luxuryGold)
+                    Link("Privacy Policy", destination: URL(string: "https://yourdategenie.com/privacy-policy")!)
+                        .font(Font.bodySans(13, weight: .semibold))
+                        .foregroundColor(Color.luxuryGold)
+                }
+            }
+        }
+        .padding(14)
+        .background(Color.luxeSurfaceTint)
+        .cornerRadius(12)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.luxuryGold.opacity(0.25), lineWidth: 1)
+        )
+    }
 
     private var socialDivider: some View {
         HStack(spacing: 12) {
@@ -239,6 +279,10 @@ struct AuthenticationView: View {
                         request.nonce = socialAuth.generateAndCacheNonce()
                     },
                     onCompletion: { result in
+                        guard agreedToTerms else {
+                            showTermsRequiredAlert = true
+                            return
+                        }
                         // Pass the authorization Apple already collected straight to the service.
                         // Do NOT call signInWithApple() here — that creates a second
                         // ASAuthorizationController and shows the Apple sheet a second time.
@@ -256,7 +300,8 @@ struct AuthenticationView: View {
                 .signInWithAppleButtonStyle(.white)
                 .frame(height: 50)
                 .cornerRadius(12)
-                .disabled(socialAuth.isLoading)
+                .disabled(socialAuth.isLoading || !agreedToTerms)
+                .opacity(agreedToTerms ? 1 : 0.45)
 
                 Text("Use your Apple ID \u{2014} no new password needed")
                     .font(Font.bodySans(12, weight: .regular))
@@ -265,6 +310,10 @@ struct AuthenticationView: View {
 
             // Sign in with Google (Supabase OAuth via ASWebAuthenticationSession)
             Button {
+                guard agreedToTerms else {
+                    showTermsRequiredAlert = true
+                    return
+                }
                 socialAuth.signInWithGoogle()
             } label: {
                 HStack(spacing: 10) {
@@ -283,7 +332,8 @@ struct AuthenticationView: View {
                 )
                 .cornerRadius(12)
             }
-            .disabled(socialAuth.isLoading)
+            .disabled(socialAuth.isLoading || !agreedToTerms)
+            .opacity(agreedToTerms ? 1 : 0.45)
 
         }
         .alert("Sign In Error", isPresented: Binding(
@@ -334,11 +384,11 @@ struct AuthenticationView: View {
         return viewModel.isSignUp ? "Creating your account..." : "Signing in..."
     }
 
-    /// Routes past auth only when social hydrate is done and a real display name exists.
+    /// Routes past auth once social hydrate finishes. Never waits on display-name collection
+    /// (Apple Guideline 4 — SIWA must not require name/email after Authentication Services).
     private func finishAuthRoutingIfReady() {
         guard profileManager.isLoggedIn else { return }
         guard !socialAuth.isCompletingSocialSignIn else { return }
-        guard !profileManager.needsDisplayName else { return }
 
         // `hasEverLoggedIn` is written to keychain on first successful auth and survives
         // sign-out. Use it to distinguish a returning user (→ main app) from a brand-new
@@ -723,6 +773,10 @@ struct AuthenticationView: View {
     private var authButton: some View {
         VStack(spacing: 16) {
             Button {
+                guard agreedToTerms else {
+                    showTermsRequiredAlert = true
+                    return
+                }
                 if viewModel.isSignUp {
                     performSignUp()
                 } else {
@@ -738,8 +792,8 @@ struct AuthenticationView: View {
                 .frame(maxWidth: .infinity)
             }
             .buttonStyle(LuxuryGoldButtonStyle())
-            .disabled(!viewModel.isFormValid)
-            .opacity(viewModel.isFormValid ? 1 : 0.5)
+            .disabled(!viewModel.isFormValid || !agreedToTerms)
+            .opacity((viewModel.isFormValid && agreedToTerms) ? 1 : 0.5)
             
             Button {
                 withAnimation {

@@ -181,9 +181,6 @@ class UserProfileManager: ObservableObject {
         }
     }
     
-    /// True after Apple/Google sign-in when we still need first + last name (no email local-part fallback).
-    @Published var needsDisplayName: Bool = false
-
     @Published var isProfileComplete: Bool = false
     @Published var hasCompletedPreferences: Bool = false
     @Published var isLoggedIn: Bool = false
@@ -377,8 +374,9 @@ class UserProfileManager: ObservableObject {
     /// Throws when profile rows cannot be created — callers should surface the error so the user
     /// is not left stuck on the auth screen with no feedback.
     ///
-    /// When Apple/Google did not provide a real name (or the DB fell back to the email local-part),
-    /// sets `needsDisplayName = true` so the auth UI can collect first + last name before routing on.
+    /// Completes post-SIWA/Google bookkeeping. Apple Guideline 4: never require name/email
+    /// after Sign in with Apple — use provider name when present, otherwise "New Member"
+    /// (editable later in Settings). Does **not** gate the app behind a name form.
     /// - Parameter preferredDisplayName: Name from the provider credential (Apple fullName / Google profile),
     ///   preferred over possibly-stale `user_metadata` right after token exchange.
     func refreshAfterSocialSignIn(preferredDisplayName: String? = nil) async throws {
@@ -411,9 +409,9 @@ class UserProfileManager: ObservableObject {
             }
         }
 
-        let needsName = Self.isPlaceholderDisplayName(resolvedName, email: email)
+        let isPlaceholder = Self.isPlaceholderDisplayName(resolvedName, email: email)
         // Never persist the email local-part as a display name.
-        let nameForRow = needsName ? "New Member" : resolvedName
+        let nameForRow = isPlaceholder ? "New Member" : resolvedName
 
         do {
             try await supabase.ensureUserAndCoupleIfMissing(
@@ -433,8 +431,8 @@ class UserProfileManager: ObservableObject {
             }
         }
 
-        // If the DB trigger already wrote email-local-part, overwrite with placeholder until the user confirms.
-        if needsName, let existing = try? await supabase.getUser(userId: supabaseUser.id),
+        // If the DB trigger already wrote email-local-part, overwrite with a non-PII placeholder.
+        if isPlaceholder, let existing = try? await supabase.getUser(userId: supabaseUser.id),
            Self.isPlaceholderDisplayName(existing.name, email: email) {
             let placeholder = DBUser(
                 userId: existing.userId,
@@ -457,20 +455,16 @@ class UserProfileManager: ObservableObject {
 
         await MainActor.run {
             var profile = UserProfile()
-            if let dbUser = dbUser, !needsName {
+            if let dbUser = dbUser {
                 let nameParts = dbUser.name.components(separatedBy: " ")
                 profile.firstName = nameParts.first ?? ""
                 profile.lastName = nameParts.count > 1 ? nameParts.dropFirst().joined(separator: " ") : ""
                 profile.email = dbUser.email
                 profile.dateOfBirth = dbUser.birthday
                 profile.location = dbUser.homeAddress ?? ""
-            } else if !needsName {
-                profile.firstName = supabaseUser.firstName
-                profile.lastName = supabaseUser.lastName
-                profile.email = email
             } else {
-                profile.firstName = ""
-                profile.lastName = ""
+                profile.firstName = isPlaceholder ? "New" : supabaseUser.firstName
+                profile.lastName = isPlaceholder ? "Member" : supabaseUser.lastName
                 profile.email = email
             }
             if let existing = self.currentUser, !existing.phoneNumber.isEmpty {
@@ -484,7 +478,6 @@ class UserProfileManager: ObservableObject {
             self.currentUser = profile
             self.userId = supabaseUser.id
             self.coupleId = couple?.coupleId
-            self.needsDisplayName = needsName
             self.isLoggedIn = true
             self.pendingEmailConfirmation = false
             self.pendingConfirmationEmail = nil
@@ -493,9 +486,7 @@ class UserProfileManager: ObservableObject {
             self.keychain.setHasEverLoggedIn(true)
         }
 
-        if !needsName {
-            await PostLoginCloudSync.run(coupleId: couple?.coupleId, userId: supabaseUser.id)
-        }
+        await PostLoginCloudSync.run(coupleId: couple?.coupleId, userId: supabaseUser.id)
     }
 
     /// True when `name` is empty, a generic placeholder, or just the email local-part.
@@ -510,63 +501,6 @@ class UserProfileManager: ObservableObject {
         return false
     }
 
-    /// Saves first + last name after social sign-in and clears `needsDisplayName`.
-    @MainActor
-    func completeSocialDisplayName(firstName: String, lastName: String) async throws {
-        let first = firstName.trimmingCharacters(in: .whitespacesAndNewlines)
-        let last = lastName.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !first.isEmpty, !last.isEmpty else {
-            throw NSError(
-                domain: "UserProfileManager",
-                code: -22,
-                userInfo: [NSLocalizedDescriptionKey: "Please enter your first and last name."]
-            )
-        }
-        guard let uid = userId ?? supabase.currentUser?.id else {
-            throw NSError(
-                domain: "UserProfileManager",
-                code: -23,
-                userInfo: [NSLocalizedDescriptionKey: "Your session expired. Please sign in again."]
-            )
-        }
-
-        let fullName = "\(first) \(last)"
-        await supabase.updateAppleUserDisplayName(fullName)
-
-        if let existing = try await supabase.getUser(userId: uid) {
-            let dbUser = DBUser(
-                userId: existing.userId,
-                name: fullName,
-                email: existing.email,
-                passwordHash: existing.passwordHash,
-                gender: existing.gender,
-                birthday: existing.birthday,
-                homeAddress: existing.homeAddress,
-                travelMode: existing.travelMode,
-                phoneNumber: existing.phoneNumber,
-                createdAt: existing.createdAt
-            )
-            try await supabase.updateUser(dbUser)
-        } else {
-            try await supabase.ensureUserAndCoupleIfMissing(
-                userId: uid,
-                email: (currentUser?.email ?? supabase.currentUser?.email ?? "").lowercased(),
-                name: fullName
-            )
-        }
-
-        var profile = currentUser ?? UserProfile()
-        profile.firstName = first
-        profile.lastName = last
-        if profile.email.isEmpty {
-            profile.email = supabase.currentUser?.email ?? ""
-        }
-        currentUser = profile
-        needsDisplayName = false
-
-        await PostLoginCloudSync.run(coupleId: coupleId, userId: uid)
-    }
-
     func signOut() {
         // Flip the observable auth flag first so any view tree dependent on `isLoggedIn`
         // starts transitioning to the login screen immediately — before keychain/network work.
@@ -578,7 +512,6 @@ class UserProfileManager: ObservableObject {
         lastServerPreferencesUpdatedAt = nil
         pendingEmailConfirmation = false
         pendingConfirmationEmail = nil
-        needsDisplayName = false
 
         // Use userInitiated priority so the SDK session clear finishes before iOS can suspend.
         Task(priority: .userInitiated) { try? await supabase.signOut() }
@@ -678,15 +611,11 @@ class UserProfileManager: ObservableObject {
     private func updateUI(with fetched: FetchedRemoteProfile) {
         var profile = UserProfile()
         let email = fetched.dbUser.email
-        let needsName = Self.isPlaceholderDisplayName(fetched.dbUser.name, email: email)
-        if needsName {
-            profile.firstName = ""
-            profile.lastName = ""
-        } else {
-            let nameParts = fetched.dbUser.name.components(separatedBy: " ")
-            profile.firstName = nameParts.first ?? ""
-            profile.lastName = nameParts.count > 1 ? nameParts.dropFirst().joined(separator: " ") : ""
-        }
+        // Keep whatever name is stored (including "New Member" after SIWA when Apple
+        // withheld fullName). Never blank the fields — Settings can edit later.
+        let nameParts = fetched.dbUser.name.components(separatedBy: " ")
+        profile.firstName = nameParts.first ?? ""
+        profile.lastName = nameParts.count > 1 ? nameParts.dropFirst().joined(separator: " ") : ""
         profile.email = email
         profile.dateOfBirth = fetched.dbUser.birthday
         profile.location = fetched.dbUser.homeAddress ?? ""
@@ -717,8 +646,8 @@ class UserProfileManager: ObservableObject {
         
         currentUser = profile
         coupleId = fetched.couple?.coupleId
-        needsDisplayName = needsName
-        isProfileComplete = !needsName && !profile.firstName.isEmpty
+        let isPlaceholder = Self.isPlaceholderDisplayName(fetched.dbUser.name, email: email)
+        isProfileComplete = !isPlaceholder && !profile.firstName.isEmpty
     }
     
     private func performLoadProfileFromDatabase(userId: UUID) async {

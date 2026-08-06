@@ -302,7 +302,7 @@ const Terms = () => {
             <Bullet>Interfere with or disrupt the integrity or performance of the Service or any infrastructure connected thereto.</Bullet>
           </ul>
           <p className="mt-3">
-            Violation of this Section may result in immediate account suspension or permanent termination without notice. We reserve the right to cooperate with law enforcement authorities in connection with any investigation of suspected unlawful activity.
+            <strong>There is no tolerance for objectionable content or abusive users.</strong> Violation of this Section may result in immediate account suspension or permanent termination without notice. We reserve the right to cooperate with law enforcement authorities in connection with any investigation of suspected unlawful activity.
           </p>
         </Section>
 
@@ -335,7 +335,7 @@ const Terms = () => {
           </SubSection>
           <SubSection title="6.4 Reporting & Blocking">
             <p>
-              In accordance with Apple App Store Review Guidelines §1.2, any Member may report a concern or block another Member via <strong>Settings → Report a Concern</strong>. Blocked Members cannot send new Couple Plan invitations to the blocking Member. All reports are reviewed within 48 hours. See our{" "}
+              In accordance with Apple App Store Review Guidelines §1.2, any Member may report a concern or block another Member via <strong>Plan Together → Report a Concern / Block & Unlink Partner</strong>, or via <strong>Settings → Report a Concern</strong>. Blocking removes the session from your view immediately and prevents the blocked Member from sending you future Couple Plan invitations. We also filter objectionable language in partner invite messages and notes before they are shared. <strong>There is no tolerance for objectionable content or abusive users.</strong> All reports are reviewed and acted on within <strong>24 hours</strong> (including removal of offending content and ejection of the offending user when warranted). See our{" "}
               <a href="https://yourdategenie.com/safety" className="text-primary hover:underline">Safety page</a>{" "}for more information.
             </p>
           </SubSection>

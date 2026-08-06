@@ -11,6 +11,7 @@ struct PartnerJoinView: View {
     @StateObject private var userProfileManager = UserProfileManager.shared
 
     @State private var partnerNote = ""
+    @State private var showContentFilterAlert = false
 
     private var displayTitle: String {
         let name = (inviterName ?? "").trimmingCharacters(in: .whitespaces)
@@ -60,6 +61,11 @@ struct PartnerJoinView: View {
         }
         .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
+        .alert("Message not allowed", isPresented: $showContentFilterAlert) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(ObjectionableContentFilter.rejectionMessage)
+        }
     }
 
     private var signInRequiredSection: some View {
@@ -199,6 +205,10 @@ struct PartnerJoinView: View {
     }
 
     private func submitWithSavedPreferences() {
+        if ObjectionableContentFilter.rejectionReason(for: partnerNote) != nil {
+            showContentFilterAlert = true
+            return
+        }
         var data = QuestionnaireData()
         UserProfileManager.shared.prePopulateQuestionnaireData(&data)
         if !partnerNote.trimmingCharacters(in: .whitespaces).isEmpty {

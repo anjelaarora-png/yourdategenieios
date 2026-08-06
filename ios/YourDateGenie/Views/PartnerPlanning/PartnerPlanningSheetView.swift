@@ -32,6 +32,9 @@ struct PartnerPlanningSheetView: View {
     @State private var showingInvitedSuccess = false
     @State private var showingUnlinkConfirmation = false
     @State private var showingReportSheet = false
+    @State private var reportTargetUserId: String?
+    @State private var contentFilterMessage: String?
+    @State private var showContentFilterAlert = false
 
     // Calendar sync (screen 11b)
     @State private var calendarSyncState: CalendarSyncState = .idle
@@ -1309,26 +1312,31 @@ struct PartnerPlanningSheetView: View {
     }
 
     /// Block the partner and cancel the current session (Apple §1.2).
+    /// Resolve the other user ID **before** deleting the session so `blocked_users` is always written.
     private func blockAndUnlinkCurrentPartner() {
         guard let sid = partnerManager.sessionId else { return }
+        let currentUserId = SupabaseService.shared.currentUser?.id
+        // Capture session id for async work, then clear UI immediately.
         partnerManager.clearSession()
         viewingPendingSessionId = nil
         startNewInvite()
         Task {
-            // Delete the session
-            try? await SupabaseService.shared.deletePartnerSession(sessionId: sid)
-            // Fetch the session to get the partner's userId for the block row, then insert
-            if let session = try? await SupabaseService.shared.getPartnerSession(sessionId: sid) {
-                let partnerUUID: UUID? = session.partnerUserId ?? session.inviterUserId
-                // Block whoever is the other party
-                if let otherUserId = partnerUUID,
-                   otherUserId != SupabaseService.shared.currentUser?.id {
-                    try? await SupabaseService.shared.blockUser(
-                        blockedId: otherUserId,
-                        reason: "Unlinked by user via app"
-                    )
-                }
+            let session = try? await SupabaseService.shared.getPartnerSession(sessionId: sid)
+            let candidates = [session?.partnerUserId, session?.inviterUserId].compactMap { $0 }
+            let otherUserId = candidates.first { $0 != currentUserId }
+            if let otherUserId {
+                try? await SupabaseService.shared.blockUser(
+                    blockedId: otherUserId,
+                    reason: "Unlinked by user via app"
+                )
+                // Notify developer (same path as reports) so blocks are visible in hello@ inbox.
+                try? await SupabaseService.shared.submitReport(
+                    reportedUserId: otherUserId.uuidString,
+                    category: "other",
+                    description: "User blocked partner via Block & Unlink. Session: \(sid)."
+                )
             }
+            try? await SupabaseService.shared.deletePartnerSession(sessionId: sid)
             await MainActor.run { refreshPendingPastLists() }
         }
     }
@@ -1410,6 +1418,12 @@ struct PartnerPlanningSheetView: View {
     }
 
     private func sendInviteAndShare() {
+        if let reason = ObjectionableContentFilter.rejectionReason(for: partnerMessage)
+            ?? ObjectionableContentFilter.rejectionReason(for: specialNotes) {
+            contentFilterMessage = reason
+            showContentFilterAlert = true
+            return
+        }
         if partnerManager.sessionId == nil {
             _ = partnerManager.createSession(inviterName: userProfileManager.currentUser?.firstName)
         }
@@ -1566,7 +1580,10 @@ struct PartnerPlanningSheetView: View {
             .buttonStyle(.plain)
 
             Button {
-                showingReportSheet = true
+                Task {
+                    reportTargetUserId = await resolveOtherUserIdForCurrentSession()
+                    await MainActor.run { showingReportSheet = true }
+                }
             } label: {
                 Label("Report a Concern", systemImage: "exclamationmark.bubble")
                     .font(Font.bodySans(13, weight: .medium))
@@ -1590,9 +1607,23 @@ struct PartnerPlanningSheetView: View {
         } message: {
             Text("This will cancel the current session and prevent this partner from sending you future invites.")
         }
-        .sheet(isPresented: $showingReportSheet) {
-            ReportConcernView()
+        .alert("Message not allowed", isPresented: $showContentFilterAlert) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(contentFilterMessage ?? ObjectionableContentFilter.rejectionMessage)
         }
+        .sheet(isPresented: $showingReportSheet) {
+            ReportConcernView(reportedUserId: reportTargetUserId)
+        }
+    }
+
+    /// Other party in the current partner session (for Report / Block).
+    private func resolveOtherUserIdForCurrentSession() async -> String? {
+        guard let sid = partnerManager.sessionId ?? viewingPendingSessionId else { return nil }
+        let currentUserId = SupabaseService.shared.currentUser?.id
+        guard let session = try? await SupabaseService.shared.getPartnerSession(sessionId: sid) else { return nil }
+        let candidates = [session.partnerUserId, session.inviterUserId].compactMap { $0 }
+        return candidates.first { $0 != currentUserId }?.uuidString
     }
     
     private func presentShareSheet(customMessage: String? = nil) {

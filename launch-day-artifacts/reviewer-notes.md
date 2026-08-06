@@ -1,8 +1,8 @@
 # App Review Notes — Your Date Genie v1.0
 
-Thank you for reviewing Your Date Genie. Below is everything you need to test the full app, including premium features, in under five minutes.
+Thank you for reviewing Your Date Genie. Below is everything you need to test the full app, including premium features, safety tools, and subscriptions.
 
-**Please use the email/password demo account below for the core flow.** Sign in with Apple creates a separate account and is available for testing on the welcome screen (it is the first authentication option, above email).
+**Please use the email/password demo account below for the core flow.** Sign in with Apple is available on the welcome screen (first authentication option, above email) and does **not** ask for name or email after Authentication Services completes.
 
 ## Demo account
 
@@ -18,13 +18,13 @@ Use this Sandbox tester to exercise StoreKit purchase / restore on the paywall:
 Sandbox Apple ID: [INSERT SANDBOX EMAIL]
 Sandbox password: [INSERT SANDBOX PASSWORD]
 
-Auto-renewable subscriptions submitted with this build:
+Auto-renewable subscriptions submitted with this build (attached to this version):
 - `com.yourdategenie.premium.monthly` — $14.99/month, 7-day free trial
 - `com.yourdategenie.premium.annual` — $119.99/year, 7-day free trial
 
 ## Happy-path test (60 seconds)
 
-1. Open the app — Sign in with the demo email/password above (not Sign in with Apple for this account).
+1. Open the app — agree to Terms & Privacy on the auth screen, then sign in with the demo email/password above (not Sign in with Apple for this account).
 2. On Home, tap Plan my date. Pick a city (try New York, NY), a vibe (try Romantic), and a date type (try Date Night).
 3. Answer the quick prompts (cuisine preference, budget, vibe, time of day).
 4. Tap Generate. The plan generates in about 30–60 seconds.
@@ -36,7 +36,7 @@ Auto-renewable subscriptions submitted with this build:
 | Feature | Where | What it does |
 |---|---|---|
 | Memories | Bottom tab → Memories | Save and revisit any generated date plan |
-| Partner Planning | Profile → Partner | Link a partner via email; co-plan together |
+| Partner Planning | Profile → Partner (Plan Together) | Link a partner via invite link; co-plan together |
 | Unlimited Generate | Anywhere | Generate as many date plans as needed; free tier is capped |
 
 ## Subscription compliance (Guideline 3.1.2)
@@ -53,19 +53,29 @@ The paywall is reached via Profile → Settings → View plans, or by tapping a 
 
 Auto-renewal disclosure: Payment will be charged to your Apple ID account at confirmation of purchase. Subscription automatically renews unless auto-renew is turned off at least 24 hours before the end of the current period. Manage in Settings → Subscriptions.
 
-## Sign in with Apple (Guideline 4.8)
+## Sign in with Apple (Guideline 4 / HIG)
 
-Sign in with Apple is the first authentication option on the welcome screen (above email/password and Google). It uses the native Sign in with Apple button and creates a complete account without requiring additional data collection. We also support email/password and Google Sign-In.
+Sign in with Apple is the first authentication option on the welcome screen (above email/password and Google). It uses the native Sign in with Apple button. After Authentication Services completes, the app does **not** require the user to enter name or email again — Apple-provided identity is used as-is (name is optional and may be edited later in Settings). Users must check “I agree to the Terms of Use and Privacy Policy” before any login method proceeds (Guideline 1.2 EULA).
 
 **For this review:** please use the demo email/password account for the happy path. Sign in with Apple may be tested separately; it creates a new account (not the seeded demo account).
 
-## Block + Report (Guideline 1.2)
+## Block + Report + EULA (Guideline 1.2)
 
-The Partner Planning feature allows users to block and report partners. Reports route to hello@yourdategenie.com and are reviewed within 24 hours. Blocked users cannot re-link or message. To test:
+Partner Planning is the only user-to-user surface. Precautions in this build:
 
-1. Sign in with the demo account.
-2. Profile → Partner → tap the sandbox partner's name.
-3. Tap the three-dot menu → Report or Block.
+1. **EULA before login** — Auth screen requires agreement to Terms & Privacy (zero tolerance for objectionable content / abusive users). Links: https://yourdategenie.com/terms and https://yourdategenie.com/privacy-policy
+2. **Filtering** — Partner invite messages and notes are filtered for objectionable language before submit.
+3. **Report** — Plan Together waiting screen → **Report a Concern**, or Settings → Support & safety → Report. Reports email hello@yourdategenie.com and are acted on within **24 hours**.
+4. **Block** — Plan Together waiting screen → **Block & Unlink Partner**. Session is removed immediately; blocked users cannot send future invites; developer is notified.
+
+**How to demo on device (also see screen recording in App Review Notes):**
+
+1. Sign in with the demo account (after checking the Terms checkbox).
+2. Open **Plan Together** (Partner Planning) with a pending invite / waiting screen.
+3. Tap **Report a Concern** → choose a category → submit → success (“within 24 hours”).
+4. Tap **Block & Unlink Partner** → confirm → session cleared / unpaired.
+
+There is no three-dot menu for Report/Block — use the labeled buttons on the waiting screen.
 
 ## Disclaimers (in-app)
 

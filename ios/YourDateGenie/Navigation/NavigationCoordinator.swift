@@ -1617,9 +1617,6 @@ struct RootNavigationView: View {
             } else if !coordinator.hasCompletedOnboarding {
                 MobileOnboardingView()
                     .environmentObject(coordinator)
-            } else if userProfileManager.needsDisplayName {
-                SocialDisplayNameView()
-                    .environmentObject(coordinator)
             } else if socialAuth.isCompletingSocialSignIn {
                 // Hold on auth until hydrate finishes so we don't flash Preferences/Main first.
                 AuthenticationView(
@@ -1655,7 +1652,6 @@ struct RootNavigationView: View {
         .animation(.easeInOut(duration: 0.4), value: coordinator.hasSkippedLogin)
         .animation(.easeInOut(duration: 0.4), value: coordinator.hasCompletedPreferences)
         .animation(.easeInOut(duration: 0.4), value: coordinator.hasDeferredInitialPreferences)
-        .animation(.easeInOut(duration: 0.4), value: userProfileManager.needsDisplayName)
         .animation(.easeInOut(duration: 0.4), value: socialAuth.isCompletingSocialSignIn)
         .onAppear {
             #if DEBUG

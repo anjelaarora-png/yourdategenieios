@@ -8,6 +8,7 @@ struct PartnerShareView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var shareMessage = ""
     @State private var copiedToClipboard = false
+    @State private var showContentFilterAlert = false
 
     var body: some View {
         NavigationStack {
@@ -46,6 +47,11 @@ struct PartnerShareView: View {
             }
             .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
+            .alert("Message not allowed", isPresented: $showContentFilterAlert) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(ObjectionableContentFilter.rejectionMessage)
+            }
         }
     }
 
@@ -214,6 +220,10 @@ struct PartnerShareView: View {
     }
 
     private func sharePlan() {
+        guard ObjectionableContentFilter.isAllowed(shareMessage) else {
+            showContentFilterAlert = true
+            return
+        }
         let activityController = UIActivityViewController(activityItems: [shareText], applicationActivities: nil)
 
         guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
@@ -244,6 +254,10 @@ struct PartnerShareView: View {
     }
 
     private func copyToClipboard() {
+        guard ObjectionableContentFilter.isAllowed(shareMessage) else {
+            showContentFilterAlert = true
+            return
+        }
         UIPasteboard.general.string = shareText
         if reduceMotion {
             copiedToClipboard = true
@@ -256,6 +270,10 @@ struct PartnerShareView: View {
     }
 
     private func shareViaMessages() {
+        guard ObjectionableContentFilter.isAllowed(shareMessage) else {
+            showContentFilterAlert = true
+            return
+        }
         if let encoded = shareText.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
            let url = URL(string: "sms:&body=\(encoded)") {
             UIApplication.shared.open(url)
@@ -263,6 +281,10 @@ struct PartnerShareView: View {
     }
 
     private func shareViaEmail() {
+        guard ObjectionableContentFilter.isAllowed(shareMessage) else {
+            showContentFilterAlert = true
+            return
+        }
         let subject = "Our Date Plan: \(plan.title)"
         if let subjectEncoded = subject.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
            let bodyEncoded = shareText.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),

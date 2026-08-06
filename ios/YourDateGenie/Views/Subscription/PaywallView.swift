@@ -282,6 +282,13 @@ struct PaywallView: View {
 
     // MARK: - CTAs
 
+    private var productsReady: Bool {
+        switch selectedPlan {
+        case .annual:  return purchases.premiumAnnualProduct != nil
+        case .monthly: return purchases.premiumMonthlyProduct != nil
+        }
+    }
+
     private var ctaSection: some View {
         VStack(spacing: 12) {
             Button {
@@ -305,7 +312,8 @@ struct PaywallView: View {
                 .frame(maxWidth: .infinity)
             }
             .buttonStyle(LuxuryGoldButtonStyle())
-            .disabled(purchases.isPurchasing)
+            .disabled(purchases.isPurchasing || purchases.isLoadingProducts || !productsReady)
+            .opacity((purchases.isPurchasing || purchases.isLoadingProducts || !productsReady) ? 0.5 : 1)
 
             Button {
                 Task {
