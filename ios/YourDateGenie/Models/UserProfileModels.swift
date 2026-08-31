@@ -33,9 +33,7 @@ struct UserProfile: Codable, Equatable {
     
     var age: Int? {
         guard let dob = dateOfBirth else { return nil }
-        let calendar = Calendar.current
-        let ageComponents = calendar.dateComponents([.year], from: dob, to: Date())
-        return ageComponents.year
+        return AgeEligibility.age(from: dob)
     }
 }
 

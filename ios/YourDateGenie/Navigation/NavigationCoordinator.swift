@@ -1604,6 +1604,8 @@ struct RootNavigationView: View {
     @StateObject private var socialAuth = SocialAuthService.shared
     @EnvironmentObject private var accessManager: AccessManager
     @State private var showSplash = true
+    /// 18+ age gate (persisted). Must pass before onboarding, auth, or explore.
+    @State private var hasConfirmedAge18 = AgeEligibility.hasConfirmedAdult
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
@@ -1614,6 +1616,13 @@ struct RootNavigationView: View {
             if showSplash {
                 LuxurySplashView()
                     .transition(.opacity)
+            } else if !hasConfirmedAge18 {
+                AgeGateView {
+                    withAnimation(.easeInOut(duration: 0.35)) {
+                        hasConfirmedAge18 = true
+                    }
+                }
+                .transition(.opacity)
             } else if !coordinator.hasCompletedOnboarding {
                 MobileOnboardingView()
                     .environmentObject(coordinator)
@@ -1647,6 +1656,7 @@ struct RootNavigationView: View {
             }
         }
         .animation(.easeInOut(duration: 0.6), value: showSplash)
+        .animation(.easeInOut(duration: 0.35), value: hasConfirmedAge18)
         .animation(.easeInOut(duration: 0.4), value: coordinator.hasCompletedOnboarding)
         .animation(.easeInOut(duration: 0.4), value: coordinator.isLoggedIn)
         .animation(.easeInOut(duration: 0.4), value: coordinator.hasSkippedLogin)
@@ -1657,6 +1667,8 @@ struct RootNavigationView: View {
             #if DEBUG
             if ScreenshotDemo.isActive {
                 showSplash = false
+                AgeEligibility.markConfirmedAdult()
+                hasConfirmedAge18 = true
                 ScreenshotDemo.apply(to: coordinator)
                 return
             }

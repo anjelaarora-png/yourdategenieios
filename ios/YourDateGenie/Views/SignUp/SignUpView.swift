@@ -231,6 +231,17 @@ struct SignUpBasicInfoStep: View {
                         date: $viewModel.dateOfBirth,
                         icon: "calendar"
                     )
+
+                    Text("You must be \(AgeEligibility.minimumAge) or older to use Your Date Genie.")
+                        .font(Font.bodySans(12, weight: .regular))
+                        .foregroundColor(Color.luxuryMuted)
+
+                    if let dob = viewModel.dateOfBirth,
+                       !AgeEligibility.isAtLeastMinimumAge(dob) {
+                        Text("Sorry — you must be \(AgeEligibility.minimumAge)+ to create an account.")
+                            .font(Font.bodySans(13, weight: .medium))
+                            .foregroundColor(Color.red.opacity(0.9))
+                    }
                 }
                 
                 Spacer()
@@ -509,7 +520,7 @@ struct BirthdayPickerSheet: View {
                 DatePicker(
                     "",
                     selection: $date,
-                    in: ...Calendar.current.date(byAdding: .year, value: -18, to: Date())!,
+                    in: ...AgeEligibility.maximumEligibleBirthDate,
                     displayedComponents: .date
                 )
                 .datePickerStyle(.wheel)
@@ -540,7 +551,9 @@ class SignUpViewModel: ObservableObject {
     
     var isCurrentStepValid: Bool {
         switch currentStep {
-        case 1: return !firstName.isEmpty
+        case 1:
+            guard !firstName.isEmpty, let dob = dateOfBirth else { return false }
+            return AgeEligibility.isAtLeastMinimumAge(dob)
         case 2: return !email.isEmpty && email.contains("@")
         case 3: return !location.isEmpty
         default: return true

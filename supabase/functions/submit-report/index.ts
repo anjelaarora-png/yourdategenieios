@@ -140,7 +140,7 @@ Deno.serve(async (req) => {
             </div>
 
             <p style="color: #666; font-size: 13px;">
-              Please review within 48 hours per your moderation policy.<br>
+              Please review within <strong>24 hours</strong> per your moderation policy (remove content + eject offending user when warranted).<br>
               View in <a href="https://supabase.com/dashboard" style="color: #8B1A1A;">Supabase Dashboard</a> → Table Editor → user_reports.
             </p>
 

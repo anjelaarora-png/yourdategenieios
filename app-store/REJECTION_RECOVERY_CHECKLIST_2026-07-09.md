@@ -66,16 +66,21 @@ export REVIEWER_PASSWORD="..."   # store in 1Password
 
 ---
 
-## 4. §1.2 screen recording (required for Jul 29 reply)
+## 4. §1.2 screen recording (required — physical device)
 
-Capture on a **physical device** and attach in **App Review Information → Notes** (and/or Resolution Center):
+Capture on a **physical iPhone or iPad** (Control Center → Screen Recording). Upload the file in **App Store Connect → App Review Information → Notes** (and attach / link in Resolution Center reply).
 
-1. Auth screen — Terms & Privacy checkbox before sign-in
-2. Plan Together waiting screen → **Report a Concern** → submit success
-3. **Block & Unlink Partner** → confirm → unpaired
+### Shot list (≈60–90 seconds)
 
-- [ ] Recording captured and uploaded / linked in App Review Notes
+1. **EULA before login** — Log out (or delete & reinstall). On the auth screen, show the Terms & Privacy checkbox with “no tolerance for objectionable content…”, tap **Terms** so the page opens, return, check the box, then Sign In / Sign Up. Do **not** proceed until the checkbox is checked.
+2. **Report** — Sign in with the demo account → open **Plan Together** (Partner Planning). If needed, send a quick invite to a test email so you land on the **waiting** screen → tap **Report a Concern** → pick a category → write a short description → **Submit Report** → show the success alert (“within 24 hours”).
+3. **Block** — On the same waiting screen, tap **Block & Unlink Partner** → confirm → show the session cleared / unpaired state immediately.
 
+Optional (nice to have in the same clip): Settings → Support & safety → **Report a Concern** (second entry point).
+
+- [ ] Recording captured on a physical device
+- [ ] File attached / linked in App Review Information → Notes
+- [ ] Resolution Center reply pasted (template below)
 ---
 
 ## 5. Attach IAPs to the new version + submit
@@ -87,36 +92,42 @@ Capture on a **physical device** and attach in **App Review Information → Note
 - [ ] Submit for Review
 - [ ] Reply in Resolution Center (template below)
 
-### Resolution Center reply (copy/paste)
+### Resolution Center reply — Guideline 1.2 (copy/paste)
 
 ```
-Thank you for the feedback on submission ec3359fb-30bc-496d-8438-456bf8cc0ec6.
+Thank you for the feedback regarding Guideline 1.2 (User-Generated Content).
 
-Guideline 4 (Sign in with Apple):
-We removed the post-SIWA name collection screen. After Sign in with Apple,
-the app no longer requires name or email — Authentication Services identity
-is used as-is. Name may be edited later in Settings if the user chooses.
+Your Date Genie includes Partner Planning (Couple Plan), which is our only
+user-to-user surface. This build implements all required precautions:
 
-Guideline 2.1(b) — IAP:
-Both auto-renewable subscriptions are submitted with this build and attached
-to the version:
-- com.yourdategenie.premium.monthly ($14.99/mo, 7-day free trial)
-- com.yourdategenie.premium.annual ($119.99/yr, 7-day free trial)
-The Paid Apps Agreement is Active. Products were tested in Sandbox on iPad.
+1. Filtering — Partner invite messages and notes are filtered for
+   objectionable language before they can be shared.
+2. Flagging — Users can Report a Concern from Plan Together (waiting
+   screen) or Settings → Support & safety. Reports are stored and emailed
+   to hello@yourdategenie.com.
+3. Blocking — Block & Unlink Partner removes the session from the user’s
+   feed immediately, prevents future invites from that user, and notifies
+   the developer.
+4. EULA — Terms of Use / Privacy Policy agreement is required before
+   register or login, stating there is no tolerance for objectionable
+   content or abusive users. Live Terms: https://yourdategenie.com/terms
+5. 24-hour action — We review and act on reports within 24 hours
+   (remove content and eject the offending user when warranted).
 
-Guideline 1.2 — UGC:
-This build requires Terms & Privacy agreement before register/login (zero
-tolerance for objectionable content/abusive users), filters partner free-text,
-and provides Report + Block & Unlink on the Plan Together waiting screen
-(instant unlink; developer notified; reports acted on within 24 hours).
-A screen recording demonstrating EULA, Report, and Block is attached in
-App Review Information Notes.
+A screen recording on a physical device demonstrating (a) the EULA before
+login, (b) Report a Concern, and (c) Block & Unlink Partner is attached in
+App Review Information → Notes.
 
-Demo account (email/password — core flow):
+How to verify quickly:
+• Auth screen → check Terms checkbox → open Terms link
+• Plan Together waiting screen → Report a Concern → submit
+• Same screen → Block & Unlink Partner → confirm (session clears)
+
+Demo account:
 Email: appstore.review@yourdategenie.com
 Password: [YOUR REVIEWER PASSWORD]
 
-Sandbox Apple ID for IAP testing: [YOUR SANDBOX EMAIL / PASSWORD]
+Support: hello@yourdategenie.com
 ```
 
 ---
