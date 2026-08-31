@@ -55,12 +55,12 @@ const Footer = () => {
               <Link to="/for-business" className="hover:text-foreground transition-colors">
                 For Business
               </Link>
-              <Link to="/privacy" className="hover:text-foreground transition-colors">
+              <a href="https://yourdategenie.com/privacy-policy/" className="hover:text-foreground transition-colors">
                 Privacy Policy
-              </Link>
-              <Link to="/terms" className="hover:text-foreground transition-colors">
+              </a>
+              <a href="https://yourdategenie.com/terms-of-service/" className="hover:text-foreground transition-colors">
                 Terms of Service
-              </Link>
+              </a>
             </nav>
 
             {/* Copyright */}

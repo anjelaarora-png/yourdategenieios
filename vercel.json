@@ -1,3 +1,8 @@
 {
+  "redirects": [
+    { "source": "/terms", "destination": "https://yourdategenie.com/terms-of-service/", "permanent": true },
+    { "source": "/privacy", "destination": "https://yourdategenie.com/privacy-policy/", "permanent": true },
+    { "source": "/privacy-policy", "destination": "https://yourdategenie.com/privacy-policy/", "permanent": true }
+  ],
   "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
 }

@@ -17,8 +17,6 @@ const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Preferences = lazy(() => import("./pages/Preferences"));
 const Admin = lazy(() => import("./pages/Admin"));
 const Mobile = lazy(() => import("./pages/Mobile"));
-const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
-const Terms = lazy(() => import("./pages/Terms"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const Waitlist = lazy(() => import("./pages/Waitlist"));
 const ForBusiness = lazy(() => import("./pages/ForBusiness"));
@@ -75,9 +73,6 @@ const App = () => (
             <Route path="/preferences" element={<Preferences />} />
             <Route path="/admin" element={<Admin />} />
             <Route path="/app" element={<Mobile />} />
-            <Route path="/privacy-policy" element={<PrivacyPolicy />} />
-            <Route path="/privacy" element={<PrivacyPolicy />} />
-            <Route path="/terms" element={<Terms />} />
             <Route path="/waitlist" element={<Waitlist />} />
             <Route path="/for-business" element={<ForBusiness />} />
             <Route path="/for-business/login" element={<BusinessLogin />} />
