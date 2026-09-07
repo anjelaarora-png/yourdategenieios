@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Your Date Genie — App Screen Map</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    :root {
+      --bg: #1a1412;
+      --surface: #2a2220;
+      --surface-2: #322824;
+      --text: #f4efe7;
+      --muted: rgba(244, 239, 231, 0.58);
+      --gold: #c8924a;
+      --gold-dim: rgba(200, 146, 74, 0.25);
+      --maroon: #8b2942;
+      --cream: #efe7da;
+      --green: #6b9e78;
+      --blue: #7a9ec8;
+      --purple: #a87ec8;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'DM Sans', system-ui, sans-serif;
+      background: radial-gradient(ellipse at 50% -10%, #2a1818 0%, var(--bg) 50%);
+      color: var(--text);
+      line-height: 1.5;
+      padding: 32px 20px 80px;
+    }
+    .wrap { max-width: 1200px; margin: 0 auto; }
+    header {
+      text-align: center;
+      margin-bottom: 40px;
+    }
+    header h1 {
+      font-family: 'Cormorant Garamond', Georgia, serif;
+      font-size: clamp(2rem, 5vw, 3rem);
+      font-weight: 600;
+      color: var(--gold);
+      margin-bottom: 8px;
+    }
+    header p { color: var(--muted); font-size: 15px; max-width: 640px; margin: 0 auto; }
+    .meta {
+      display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 16px;
+    }
+    .pill {
+      font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
+      padding: 6px 12px; border-radius: 999px; border: 1px solid var(--gold-dim);
+      color: var(--gold);
+    }
+    nav.toc {
+      display: flex; flex-wrap: wrap; gap: 8px; justify-content: center;
+      margin-bottom: 36px; padding: 16px; background: var(--surface);
+      border-radius: 16px; border: 1px solid var(--gold-dim);
+    }
+    nav.toc a {
+      color: var(--text); text-decoration: none; font-size: 13px; font-weight: 500;
+      padding: 8px 14px; border-radius: 999px; background: var(--surface-2);
+      border: 1px solid transparent; transition: border-color 0.15s;
+    }
+    nav.toc a:hover { border-color: var(--gold); color: var(--gold); }
+    section { margin-bottom: 48px; scroll-margin-top: 24px; }
+    section > h2 {
+      font-family: 'Cormorant Garamond', Georgia, serif;
+      font-size: 1.75rem; color: var(--gold); margin-bottom: 6px;
+    }
+    section > .lead { color: var(--muted); font-size: 14px; margin-bottom: 20px; max-width: 720px; }
+    .diagram {
+      background: var(--surface); border-radius: 16px; border: 1px solid var(--gold-dim);
+      padding: 24px 16px; overflow-x: auto; margin-bottom: 24px;
+    }
+    .mermaid { display: flex; justify-content: center; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 16px;
+    }
+    .card {
+      background: var(--surface); border-radius: 14px; border: 1px solid rgba(255,255,255,0.06);
+      overflow: hidden; transition: border-color 0.15s, transform 0.15s;
+    }
+    .card:hover { border-color: var(--gold-dim); transform: translateY(-2px); }
+    .card-head {
+      padding: 12px 14px 10px; border-bottom: 1px solid rgba(255,255,255,0.05);
+      display: flex; align-items: flex-start; gap: 10px;
+    }
+    .badge {
+      flex-shrink: 0; width: 28px; height: 28px; border-radius: 8px;
+      display: flex; align-items: center; justify-content: center; font-size: 14px;
+    }
+    .badge.entry { background: rgba(107, 158, 120, 0.2); }
+    .badge.tab { background: rgba(122, 158, 200, 0.2); }
+    .badge.sheet { background: rgba(168, 126, 200, 0.2); }
+    .badge.flow { background: rgba(200, 146, 74, 0.2); }
+    .badge.sub { background: rgba(139, 41, 66, 0.35); }
+    .card-head h3 { font-size: 15px; font-weight: 600; line-height: 1.3; }
+    .card-head .file { font-size: 11px; color: var(--muted); font-family: ui-monospace, monospace; margin-top: 2px; word-break: break-all; }
+    .card-body { padding: 12px 14px 14px; font-size: 13px; color: var(--muted); }
+    .card-body ul { margin: 8px 0 0 16px; }
+    .card-body li { margin-bottom: 4px; }
+    .tag-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+    .tag {
+      font-size: 10px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase;
+      padding: 3px 8px; border-radius: 6px; background: var(--surface-2); color: var(--muted);
+    }
+    .tag.gold { color: var(--gold); border: 1px solid var(--gold-dim); }
+    .tag.premium { color: #e8b4b4; border: 1px solid rgba(139,41,66,0.5); }
+    .tabs-visual {
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 24px;
+    }
+    .tab-slot {
+      background: var(--surface); border-radius: 12px; padding: 16px 12px; text-align: center;
+      border: 1px solid rgba(255,255,255,0.06);
+    }
+    .tab-slot.primary { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold-dim); }
+    .tab-slot .icon { font-size: 22px; margin-bottom: 6px; }
+    .tab-slot .label { font-size: 12px; font-weight: 600; color: var(--gold); }
+    .tab-slot .desc { font-size: 11px; color: var(--muted); margin-top: 4px; }
+    .phone-row {
+      display: flex; flex-wrap: wrap; gap: 20px; justify-content: center; margin: 24px 0;
+    }
+    .phone {
+      width: 200px; background: var(--bg); border-radius: 28px;
+      border: 1px solid var(--gold-dim); overflow: hidden; flex-shrink: 0;
+    }
+    .phone-bar { height: 28px; background: var(--surface); }
+    .phone-title {
+      font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+      color: var(--gold); padding: 10px 12px 6px; text-align: center;
+    }
+    .phone-content { padding: 8px 10px 14px; min-height: 180px; }
+    .wire {
+      background: var(--cream); border-radius: 8px; margin-bottom: 6px; padding: 8px;
+      border-left: 3px solid var(--maroon);
+    }
+    .wire.dark { background: var(--surface-2); border-left-color: var(--gold); padding: 10px 8px; }
+    .wire .w-title { font-size: 9px; font-weight: 700; color: var(--maroon); text-transform: uppercase; letter-spacing: 0.05em; }
+    .wire .w-line { height: 6px; background: rgba(44,36,32,0.12); border-radius: 3px; margin-top: 5px; }
+    .wire .w-line.short { width: 65%; }
+    .wire .w-btn {
+      margin-top: 8px; background: var(--gold); color: var(--bg); font-size: 9px;
+      font-weight: 700; text-align: center; padding: 6px; border-radius: 6px;
+    }
+    .phone-label { font-size: 12px; font-weight: 600; text-align: center; padding: 10px; color: var(--text); }
+    .phone-label small { display: block; font-weight: 400; color: var(--muted); font-size: 10px; margin-top: 2px; }
+    .legend {
+      display: flex; flex-wrap: wrap; gap: 16px; font-size: 12px; color: var(--muted);
+      margin-bottom: 20px;
+    }
+    .legend span { display: flex; align-items: center; gap: 6px; }
+    .legend i { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+    footer { text-align: center; color: var(--muted); font-size: 12px; margin-top: 40px; }
+    @media (max-width: 600px) {
+      .tabs-visual { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>Your Date Genie — App Screen Map</h1>
+      <p>Complete navigation layout for the iOS app. Generated from <code>NavigationCoordinator</code>, tab views, and sheet routes in the codebase.</p>
+      <div class="meta">
+        <span class="pill">iOS · SwiftUI</span>
+        <span class="pill">4 main tabs</span>
+        <span class="pill">25+ modal sheets</span>
+        <span class="pill">Jul 2026</span>
+      </div>
+    </header>
+
+    <nav class="toc">
+      <a href="#flow">Launch flow</a>
+      <a href="#tabs">Main tabs</a>
+      <a href="#home">Home sections</a>
+      <a href="#planning">Plan generation</a>
+      <a href="#sheets">Sheets & modals</a>
+      <a href="#partner">Plan Together</a>
+      <a href="#features">Feature screens</a>
+      <a href="#system">System & paywall</a>
+    </nav>
+
+    <!-- LAUNCH FLOW -->
+    <section id="flow">
+      <h2>Launch & entry flow</h2>
+      <p class="lead">Controlled by <code>RootNavigationView</code>. User always sees splash first, then routes based on onboarding / auth / preferences state.</p>
+      <div class="diagram">
+        <pre class="mermaid">
+flowchart TD
+  A[SplashView] --> B{Onboarding done?}
+  B -->|No| C[OnboardingView<br/>6 slides]
+  B -->|Yes| D{Logged in or skipped?}
+  D -->|No| E[AuthenticationView]
+  D -->|Yes| F{Preferences complete?}
+  F -->|No| G[InitialPreferencesGateView<br/>→ Questionnaire]
+  F -->|Yes| H[LuxuryMainAppView<br/>4-tab shell]
+  C --> E
+  E --> H
+  G --> H
+        </pre>
+      </div>
+      <div class="grid">
+        <div class="card">
+          <div class="card-head"><span class="badge entry">1</span><div><h3>Splash</h3><div class="file">Navigation/SplashView.swift</div></div></div>
+          <div class="card-body">Brand splash · min ~1.2s while session restores</div>
+        </div>
+        <div class="card">
+          <div class="card-head"><span class="badge entry">2</span><div><h3>Onboarding (6 slides)</h3><div class="file">Views/Onboarding/OnboardingView.swift</div></div></div>
+          <div class="card-body">
+            <ul>
+              <li>Welcome</li>
+              <li>The Chaos</li>
+              <li>Itinerary preview</li>
+              <li>Home flow</li>
+              <li>Three extras</li>
+              <li>Get started</li>
+            </ul>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-head"><span class="badge entry">3</span><div><h3>Authentication</h3><div class="file">Views/Auth/AuthenticationView.swift</div></div></div>
+          <div class="card-body">Sign in with Apple · Google · Email · Skip to explore (guest)</div>
+        </div>
+        <div class="card">
+          <div class="card-head"><span class="badge entry">4</span><div><h3>Initial preferences gate</h3><div class="file">Views/Onboarding/InitialPreferencesGateView.swift</div></div></div>
+          <div class="card-body">First-run questionnaire before full app access</div>
+        </div>
+        <div class="card">
+          <div class="card-head"><span class="badge entry">5</span><div><h3>Sign up / preferences setup</h3><div class="file">Views/SignUp/SignUpView.swift · PreferencesSetupView.swift</div></div></div>
+          <div class="card-body">Account creation path (alternate entry)</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- MAIN TABS -->
+    <section id="tabs">
+      <h2>Main app shell — 4 tabs</h2>
+      <p class="lead"><code>LuxuryMainAppView</code> + <code>LuxuryTabBar</code>. Center tab bar with gold CTA. All modals attach at this level via <code>activeSheet</code>.</p>
+      <div class="tabs-visual">
+        <div class="tab-slot primary">
+          <div class="icon">🏠</div>
+          <div class="label">Home</div>
+          <div class="desc">Plan hub · hero · shortcuts</div>
+        </div>
+        <div class="tab-slot">
+          <div class="icon">💕</div>
+          <div class="label">Dates</div>
+          <div class="desc">Upcoming · Past · Memories</div>
+        </div>
+        <div class="tab-slot">
+          <div class="icon">💬</div>
+          <div class="label">Convo</div>
+          <div class="desc">Love Notes · Starters</div>
+        </div>
+        <div class="tab-slot">
+          <div class="icon">👤</div>
+          <div class="label">You</div>
+          <div class="desc">Profile · settings · stats</div>
+        </div>
+      </div>
+      <div class="grid">
+        <div class="card">
+          <div class="card-head"><span class="badge tab">Tab</span><div><h3>Home</h3><div class="file">Navigation/HomeTabView.swift</div></div></div>
+          <div class="card-body">Primary planning surface. See <a href="#home" style="color:var(--gold)">Home sections</a> below.</div>
+        </div>
+        <div class="card">
+          <div class="card-head"><span class="badge tab">Tab</span><div><h3>Dates</h3><div class="file">Navigation/DatesTabView.swift</div></div></div>
+          <div class="card-body">
+            Segments: <strong>Upcoming</strong> (saved plans) · <strong>Past</strong> · <strong>Memories</strong> (gallery embed)
+            <div class="tag-row"><span class="tag">→ DatePlanResultView</span></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-head"><span class="badge tab">Tab</span><div><h3>Convo</h3><div class="file">Navigation/ConvoTabView.swift</div></div></div>
+          <div class="card-body">
+            <strong>Love Notes</strong> → LoveNoteGeneratorView<br/>
+            <strong>Conversation Starters</strong> → ConversationStartersView (hub + generator + sparks deck)
+            <div class="tag-row"><span class="tag premium">Premium gated</span></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-head"><span class="badge tab">Tab</span><div><h3>You (Profile)</h3><div class="file">Navigation/ProfileTabView.swift</div></div></div>
+          <div class="card-body">
+            Stats · preferences summary · menu → Saved Plans, Date History, Gift Finder, Rose Journey, Settings, Help
+            <div class="tag-row"><span class="tag">→ many sheets</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- HOME SECTIONS -->
+    <section id="home">
+      <h2>Home tab — scroll sections</h2>
+      <p class="lead">Single scroll on Home. Collapsible sections. Hero plan card is the primary CTA when a plan exists.</p>
+      <div class="phone-row">
+        <div>
+          <div class="phone">
+            <div class="phone-bar"></div>
+            <div class="phone-title">Home — has plan</div>
+            <div class="phone-content">
+              <div class="wire dark"><div class="w-title">Header</div><div class="w-line short"></div></div>
+              <div class="wire"><div class="w-title">Hero itinerary card</div><div class="w-line"></div><div class="w-line"></div><div class="w-btn">Approve · Swap · View</div></div>
+              <div class="wire dark"><div class="w-title">Rose progress</div><div class="w-line short"></div></div>
+              <div class="wire dark"><div class="w-line short"></div></div>
+            </div>
+          </div>
+          <div class="phone-label">ItineraryHeroCard<small>cream card + maroon border</small></div>
+        </div>
+        <div>
+          <div class="phone">
+            <div class="phone-bar"></div>
+            <div class="phone-title">Home — no plan</div>
+            <div class="phone-content">
+              <div class="wire dark"><div class="w-title">Date night CTA copy</div></div>
+              <div class="wire dark"><div class="w-btn" style="background:var(--maroon);color:var(--cream)">Plan My Next Date</div></div>
+              <div class="wire dark"><div class="w-line short"></div></div>
+              <div class="wire dark"><div class="w-title">Shortcuts grid</div></div>
+            </div>
+          </div>
+          <div class="phone-label">Empty hero CTA<small>starts questionnaire</small></div>
+        </div>
+      </div>
+      <div class="grid">
+        <div class="card"><div class="card-head"><span class="badge sub">§</span><div><h3>App header bar</h3></div></div><div class="card-body">Logo · notifications bell → NotificationsSheetView</div></div>
+        <div class="card"><div class="card-head"><span class="badge sub">§</span><div><h3>Greeting header</h3></div></div><div class="card-body">Time-based greeting · mission line (plan vs no plan)</div></div>
+        <div class="card"><div class="card-head"><span class="badge sub">§</span><div><h3>Proactive nudge</h3></div></div><div class="card-body">Birthday / important dates within 45 days</div></div>
+        <div class="card"><div class="card-head"><span class="badge sub">§</span><div><h3>Hero plan card</h3></div></div><div class="card-body">ItineraryHeroCard · Approve · Swap stop · View full plan</div></div>
+        <div class="card"><div class="card-head"><span class="badge sub">§</span><div><h3>Rose progress</h3></div></div><div class="card-body">RoseHomePill or RoseNewUserIntroCard → RoseRewardsView</div></div>
+        <div class="card"><div class="card-head"><span class="badge sub">§</span><div><h3>Low-key tonight link</h3></div></div><div class="card-body">→ LowKeyDateView sheet</div></div>
+        <div class="card"><div class="card-head"><span class="badge sub">§</span><div><h3>Shortcuts (collapsible)</h3></div></div><div class="card-body">Gift Finder · Playlist · Convo · Plan Together · Past Dates · Journey Map · Send to partner · Date Tips</div></div>
+        <div class="card"><div class="card-head"><span class="badge sub">§</span><div><h3>Your upcoming dates</h3></div></div><div class="card-body">Saved plan cards · unsaved plans sheet if &gt;3 waiting</div></div>
+        <div class="card"><div class="card-head"><span class="badge sub">§</span><div><h3>Date experiences</h3></div></div><div class="card-body">DateExperiencesSection · local events carousel → EventImportView</div></div>
+        <div class="card"><div class="card-head"><span class="badge sub">§</span><div><h3>Explore (collapsible)</h3></div></div><div class="card-body">Trending places · → LuxuryExploreTabView sheet</div></div>
+        <div class="card"><div class="card-head"><span class="badge sub">§</span><div><h3>Your story (collapsible)</h3></div></div><div class="card-body">Relationship stats · milestones</div></div>
+      </div>
+      <div class="card" style="margin-top:16px">
+        <div class="card-head"><span class="badge sheet">Overlay</span><div><h3>Home tutorial</h3><div class="file">Views/Onboarding/HomeTutorialOverlayView.swift</div></div></div>
+        <div class="card-body">First-run spotlight: Plan button → Hero → Rose → Tab bar CTA (4 steps)</div>
+      </div>
+    </section>
+
+    <!-- PLAN GENERATION -->
+    <section id="planning">
+      <h2>Date plan generation flow</h2>
+      <p class="lead">Questionnaire → AI generation → 3 options picker → save → Home hero.</p>
+      <div class="diagram">
+        <pre class="mermaid">
+flowchart LR
+  Q[QuestionnaireView<br/>6 steps] --> L[MagicalLoadingView]
+  L --> O[DatePlanOptionsView<br/>3 options + regenerate]
+  O --> S[Save plan]
+  S --> H[Home hero card]
+  O --> R[DatePlanResultView<br/>single plan detail]
+  H --> R
+  H --> PS[PartnerShareView]
+  R --> SW[SwapStopSheet]
+        </pre>
+      </div>
+      <div class="grid">
+        <div class="card">
+          <div class="card-head"><span class="badge flow">Step</span><div><h3>Plan date start chooser</h3><div class="file">Views/Questionnaire/PlanDateStartSheet.swift</div></div></div>
+          <div class="card-body">Fresh plan · Use last answers · Resume draft</div>
+        </div>
+        <div class="card">
+          <div class="card-head"><span class="badge flow">1–6</span><div><h3>Questionnaire steps</h3><div class="file">Views/Questionnaire/Steps/</div></div></div>
+          <div class="card-body">
+            <ul>
+              <li>Step 1 — Location (starting address, city)</li>
+              <li>Step 2 — Transportation & radius</li>
+              <li>Step 3 — Vibe & date type</li>
+              <li>Step 4 — Food, budget, cuisines</li>
+              <li>Step 5 — Deal breakers & allergies</li>
+              <li>Step 6 — Extras (gifts, convo, love languages)</li>
+            </ul>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-head"><span class="badge flow">Load</span><div><h3>Magical loading</h3><div class="file">Views/Generation/MagicalLoadingView.swift</div></div></div>
+          <div class="card-body">Progress + status messages during edge function call</div>
+        </div>
+        <div class="card">
+          <div class="card-head"><span class="badge flow">Pick</span><div><h3>Date plan options</h3><div class="file">Views/DatePlan/DatePlanOptionsView.swift</div></div></div>
+          <div class="card-body">Option chips A/B/C · swipeable TabView · full cream itinerary · save bar · regenerate page · calendar · partner share · export</div>
+        </div>
+        <div class="card">
+          <div class="card-head"><span class="badge flow">Detail</span><div><h3>Date plan result</h3><div class="file">Views/DatePlan/DatePlanResultView.swift</div></div></div>
+          <div class="card-body">Full plan cream card · swap · compare options · route · calendar · playlist · gifts · reserve · save · post-result paywall</div>
+        </div>
+        <div class="card">
+          <div class="card-head"><span class="badge flow">Swap</span><div><h3>Swap stop sheet</h3><div class="file">Navigation/HomeCharcoalComponents.swift</div></div></div>
+          <div class="card-body">Google Places alternatives for dinner stop · persists via persistEditedPlan</div>
+        </div>
+        <div class="card">
+          <div class="card-head"><span class="badge flow">Map</span><div><h3>Route map</h3><div class="file">Views/Map/RouteMapView.swift</div></div></div>
+          <div class="card-body">Stops + starting point · journey map mode (all past stops)</div>
+        </div>
+        <div class="card">
+          <div class="card-head"><span class="badge flow">Share</span><div><h3>Partner share</h3><div class="file">Views/Sharing/PartnerShareView.swift</div></div></div>
+          <div class="card-body">Send plan link · preview card · Messages share</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SHEETS -->
+    <section id="sheets">
+      <h2>All modal sheets</h2>
+      <p class="lead">Presented via <code>NavigationCoordinator.ActiveSheet</code> from MainAppView. Legend:</p>
+      <div class="legend">
+        <span><i style="background:var(--green)"></i> Core planning</span>
+        <span><i style="background:var(--blue)"></i> Features</span>
+        <span><i style="background:var(--purple)"></i> Partner flow</span>
+        <span><i style="background:var(--gold)"></i> Profile / system</span>
+      </div>
+      <div class="grid">
+        <div class="card"><div class="card-head"><span class="badge sheet">Sheet</span><div><h3>questionnaire</h3><div class="file">QuestionnaireView</div></div></div><div class="card-body">6-step plan builder</div></div>
+        <div class="card"><div class="card-head"><span class="badge sheet">Sheet</span><div><h3>datePlanOptions</h3><div class="file">DatePlanOptionsView</div></div></div><div class="card-body">3-plan picker after generation</div></div>
+        <div class="card"><div class="card-head"><span class="badge sheet">Sheet</span><div><h3>datePlanResult</h3><div class="file">DatePlanResultView</div></div></div><div class="card-body">Single saved/selected plan detail</div></div>
+        <div class="card"><div class="card-head"><span class="badge sheet">Sheet</span><div><h3>giftFinder</h3><div class="file">Views/Gifts/GiftFinderView</div></div></div><div class="card-body">Find · Saved · Bought tabs · unwrap intro · results · detail<span class="tag-row"><span class="tag premium">Premium</span></div></div>
+        <div class="card"><div class="card-head"><span class="badge sheet">Sheet</span><div><h3>gifts</h3><div class="file">Navigation/GiftsTabView</div></div></div><div class="card-body">Standalone gift hub from Profile</div></div>
+        <div class="card"><div class="card-head"><span class="badge sheet">Sheet</span><div><h3>playlist</h3><div class="file">Views/Playlist/PlaylistWidgetView</div></div></div><div class="card-body">Generate · save named playlist · SavedPlaylistsView · SongSearchView</div></div>
+        <div class="card"><div class="card-head"><span class="badge sheet">Sheet</span><div><h3>partnerShare</h3><div class="file">PartnerShareView</div></div></div><div class="card-body">Share itinerary with partner</div></div>
+        <div class="card"><div class="card-head"><span class="badge sheet">Sheet</span><div><h3>routeMap</h3><div class="file">RouteMapView</div></div></div><div class="card-body">MapKit route / journey</div></div>
+        <div class="card"><div class="card-head"><span class="badge sheet">Sheet</span><div><h3>memoryGallery</h3><div class="file">Views/Memories/MemoryGalleryView</div></div></div><div class="card-body">Photo memories grid · AddMemorySheet capture</div></div>
+        <div class="card"><div class="card-head"><span class="badge sheet">Sheet</span><div><h3>conversationStarters</h3><div class="file">ConversationStartersView</div></div></div><div class="card-body">Hub · 3-step generator · SparksDeckView · SessionDetailView</div></div>
+        <div class="card"><div class="card-head"><span class="badge sheet">Sheet</span><div><h3>pastMagic</h3><div class="file">Views/PastMagic/PastMagicView</div></div></div><div class="card-body">Completed dates history</div></div>
+        <div class="card"><div class="card-head"><span class="badge sheet">Sheet</span><div><h3>savedPlansList</h3><div class="file">SavedPlansListSheetView</div></div></div><div class="card-body">All saved upcoming plans</div></div>
+        <div class="card"><div class="card-head"><span class="badge sheet">Sheet</span><div><h3>settings</h3><div class="file">SettingsSheetView</div></div></div><div class="card-body">Account · subscription · legal · delete account · EditAccountSheetView</div></div>
+        <div class="card"><div class="card-head"><span class="badge sheet">Sheet</span><div><h3>explore</h3><div class="file">Navigation/ExploreTabView</div></div></div><div class="card-body">Recommended places · categories · radius filter</div></div>
+        <div class="card"><div class="card-head"><span class="badge sheet">Sheet</span><div><h3>playbook</h3><div class="file">Views/Playbook/PlaybookView</div></div></div><div class="card-body">Date tips swipe deck<span class="tag-row"><span class="tag premium">Premium</span></div></div>
+        <div class="card"><div class="card-head"><span class="badge sheet">Sheet</span><div><h3>roseRewards</h3><div class="file">Views/Rewards/RoseRewardsView</div></div></div><div class="card-body">Rose journey · RoseJourneyView · RoseMonthlyRecapView · RoseReviveView · RoseRewardUnlockedView</div></div>
+        <div class="card"><div class="card-head"><span class="badge sheet">Sheet</span><div><h3>lowKey</h3><div class="file">Views/DatePlan/LowKeyDateView</div></div></div><div class="card-body">At-home date ideas when not going out</div></div>
+        <div class="card"><div class="card-head"><span class="badge sheet">Sheet</span><div><h3>reservation → picker</h3><div class="file">ReservationPlatformPickerSheet</div></div></div><div class="card-body">OpenTable / Resy / phone / website · ReservationWidgetView</div></div>
+        <div class="card"><div class="card-head"><span class="badge sheet">Sheet</span><div><h3>authRequired</h3><div class="file">AuthenticationView</div></div></div><div class="card-body">Gate before plan generation when logged out</div></div>
+        <div class="card"><div class="card-head"><span class="badge sheet">Sheet</span><div><h3>planStartChooser</h3><div class="file">PlanDateStartSheet</div></div></div><div class="card-body">Fresh vs reuse vs resume questionnaire</div></div>
+      </div>
+    </section>
+
+    <!-- PARTNER PLANNING -->
+    <section id="partner">
+      <h2>Plan Together (partner flow)</h2>
+      <p class="lead">Couples co-plan via invite link · deep link <code>yourdategenie://partner/join?session=…</code></p>
+      <div class="diagram">
+        <pre class="mermaid">
+flowchart TD
+  I[PartnerPlanningSheetView] -->|invite link| J[PartnerJoinView]
+  J --> Q1[Inviter questionnaire]
+  J --> Q2[Partner questionnaire]
+  Q1 --> G[PlanGeneratingView]
+  Q2 --> G
+  G --> O[DatePlanOptionsView<br/>rank favorites]
+  O --> PR[PartnerRankingView]
+  PR --> FR[FinalDateRevealView]
+  FR --> LI[LockedInView]
+  LI --> PRP[PartnerReceivesPlanView]
+        </pre>
+      </div>
+      <div class="grid">
+        <div class="card"><div class="card-head"><span class="badge sheet">Sheet</span><div><h3>partnerPlanning</h3><div class="file">PartnerPlanningSheetView.swift</div></div></div><div class="card-body">Invite · details · past sessions · questionnaire tabs</div></div>
+        <div class="card"><div class="card-head"><span class="badge sheet">Sheet</span><div><h3>partnerJoin</h3><div class="file">PartnerJoinView.swift</div></div></div><div class="card-body">Partner lands from link · fills preferences</div></div>
+        <div class="card"><div class="card-head"><span class="badge sheet">Sheet</span><div><h3>planGenerating</h3><div class="file">PlanGeneratingView.swift</div></div></div><div class="card-body">Waiting for both + AI generation status</div></div>
+        <div class="card"><div class="card-head"><span class="badge sheet">Sheet</span><div><h3>partnerRanking</h3><div class="file">PartnerRankingView.swift</div></div></div><div class="card-body">Each partner ranks the 3 options</div></div>
+        <div class="card"><div class="card-head"><span class="badge sheet">Sheet</span><div><h3>finalDateReveal</h3><div class="file">FinalDateRevealView.swift</div></div></div><div class="card-body">Matched plan reveal animation</div></div>
+        <div class="card"><div class="card-head"><span class="badge sheet">Sheet</span><div><h3>lockedIn</h3><div class="file">LockedInView.swift</div></div></div><div class="card-body">Confirmation + calendar sync state</div></div>
+        <div class="card"><div class="card-head"><span class="badge sheet">Sheet</span><div><h3>partnerReceivesPlan</h3><div class="file">PartnerReceivesPlanView.swift</div></div></div><div class="card-body">Delight screen on partner device</div></div>
+      </div>
+    </section>
+
+    <!-- FEATURE SCREENS -->
+    <section id="features">
+      <h2>Feature & supporting screens</h2>
+      <p class="lead">Secondary views opened from tabs, sheets, or inline navigation.</p>
+      <div class="grid">
+        <div class="card"><div class="card-head"><span class="badge sub">💌</span><div><h3>Love Note Generator</h3><div class="file">LoveNoteGeneratorView.swift</div></div></div><div class="card-body">Tone · occasion · AI draft · copy · sign-off name</div></div>
+        <div class="card"><div class="card-head"><span class="badge sub">🎁</span><div><h3>Gift unwrap / celebration</h3><div class="file">GiftUnwrapView · BigGiftUnwrapView · GiftBoxOpenCelebrationView</div></div></div><div class="card-body">Intro animations · saved gift rows</div></div>
+        <div class="card"><div class="card-head"><span class="badge sub">🎵</span><div><h3>Playlist library</h3><div class="file">SavedPlaylistsView · MusicRecordAnimationView</div></div></div><div class="card-body">Saved playlists · detail by ID</div></div>
+        <div class="card"><div class="card-head"><span class="badge sub">📸</span><div><h3>Memories</h3><div class="file">MemoryGalleryView · AddMemorySheet</div></div></div><div class="card-body">Capture photo + note after dates</div></div>
+        <div class="card"><div class="card-head"><span class="badge sub">🌹</span><div><h3>Rose system</h3><div class="file">RosePlantView · YourRoseView · RoseHomePill components</div></div></div><div class="card-body">Monthly goal · buds · rewards · revive</div></div>
+        <div class="card"><div class="card-head"><span class="badge sub">📅</span><div><h3>Calendar add</h3><div class="file">AddToCalendarSheet.swift</div></div></div><div class="card-body">Date picker · EventKit integration</div></div>
+        <div class="card"><div class="card-head"><span class="badge sub">🍽</span><div><h3>Reservations</h3><div class="file">ReservationWidgetView.swift</div></div></div><div class="card-body">Venue reservation helper widget</div></div>
+        <div class="card"><div class="card-head"><span class="badge sub">🎪</span><div><h3>Date experiences / events</h3><div class="file">DateExperiencesSection · EventImportView</div></div></div><div class="card-body">Supabase events carousel on Home</div></div>
+        <div class="card"><div class="card-head"><span class="badge sub">🛡</span><div><h3>Safety</h3><div class="file">ReportConcernView.swift</div></div></div><div class="card-body">Block & report user flow (App Store §1.2)</div></div>
+        <div class="card"><div class="card-head"><span class="badge sub">🏢</span><div><h3>Business portal</h3><div class="file">BusinessPortalView · BusinessOnboardingView · BusinessApplicationFormView</div></div></div><div class="card-body">Venue partner onboarding (B2B path)</div></div>
+        <div class="card"><div class="card-head"><span class="badge sub">📄</span><div><h3>Landing (legacy web-style)</h3><div class="file">LandingView.swift · HeroView.swift</div></div></div><div class="card-body">Marketing-style scroll (if used in builds)</div></div>
+      </div>
+    </section>
+
+    <!-- SYSTEM -->
+    <section id="system">
+      <h2>System, paywall & profile sheets</h2>
+      <div class="grid">
+        <div class="card"><div class="card-head"><span class="badge sheet">Global</span><div><h3>PaywallView</h3><div class="file">Views/Subscription/PaywallView.swift</div></div></div><div class="card-body">StoreKit 2 · monthly/annual · restore · triggered by AccessManager</div></div>
+        <div class="card"><div class="card-head"><span class="badge sheet">Global</span><div><h3>PremiumDatePlanPaywallView</h3><div class="file">Views/DatePlan/PremiumDatePlanPaywallView.swift</div></div></div><div class="card-body">Soft upsell after first plan result</div></div>
+        <div class="card"><div class="card-head"><span class="badge sheet">Profile</span><div><h3>SettingsSheetView</h3><div class="file">Views/Profile/SettingsSheetView.swift</div></div></div><div class="card-body">Subscription · notifications · privacy · terms · delete account</div></div>
+        <div class="card"><div class="card-head"><span class="badge sheet">Profile</span><div><h3>HelpSupportSheetView</h3><div class="file">Views/Profile/HelpSupportSheetView.swift</div></div></div><div class="card-body">FAQ · contact hello@yourdategenie.com</div></div>
+        <div class="card"><div class="card-head"><span class="badge sheet">Profile</span><div><h3>EditAccountSheetView</h3><div class="file">Views/Profile/EditAccountSheetView.swift</div></div></div><div class="card-body">Name · email display · profile fields</div></div>
+        <div class="card"><div class="card-head"><span class="badge sheet">Global</span><div><h3>OfflineBannerView</h3><div class="file">Views/Profile/OfflineBannerView.swift</div></div></div><div class="card-body">Top inset when NetworkMonitor offline</div></div>
+        <div class="card"><div class="card-head"><span class="badge sheet">Global</span><div><h3>LockedPremiumTabPlaceholder</h3><div class="file">Used across tabs for gated features</div></div></div><div class="card-body">Shows lock + upgrade CTA per feature flag</div></div>
+        <div class="card"><div class="card-head"><span class="badge sheet">Global</span><div><h3>UndoSnackbarView</h3><div class="file">Views/Profile/UndoSnackbarView.swift</div></div></div><div class="card-body">5s undo after plan delete</div></div>
+      </div>
+    </section>
+
+    <footer>
+      Open this file in any browser · Source: <code>ios/YourDateGenie/</code> · Updated Jul 2026<br/>
+      File: <code>ios/YDG_App_Screen_Map.html</code>
+    </footer>
+  </div>
+
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'dark',
+      themeVariables: {
+        primaryColor: '#2a2220',
+        primaryTextColor: '#f4efe7',
+        primaryBorderColor: '#c8924a',
+        lineColor: '#8b2942',
+        secondaryColor: '#322824',
+        tertiaryColor: '#1a1412',
+        fontFamily: 'DM Sans, system-ui, sans-serif'
+      },
+      flowchart: { curve: 'basis', padding: 16 }
+    });
+  </script>
+</body>
+</html>

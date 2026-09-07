@@ -4,6 +4,8 @@ import Foundation
 enum AgeEligibility {
     static let minimumAge = 18
     static let userDefaultsKey = "dateGenie_confirmedAge18"
+    /// Persists Terms checkbox so remounts / authRequired sheet don't ask again this install.
+    static let termsAcceptedKey = "dateGenie_agreedToTerms"
 
     /// Device has completed the age gate as an adult.
     static var hasConfirmedAdult: Bool {
@@ -12,6 +14,14 @@ enum AgeEligibility {
 
     static func markConfirmedAdult() {
         UserDefaults.standard.set(true, forKey: userDefaultsKey)
+    }
+
+    static var hasAcceptedTerms: Bool {
+        UserDefaults.standard.bool(forKey: termsAcceptedKey)
+    }
+
+    static func markAcceptedTerms(_ value: Bool = true) {
+        UserDefaults.standard.set(value, forKey: termsAcceptedKey)
     }
 
     /// Whole years of age as of `asOf` (defaults to now).

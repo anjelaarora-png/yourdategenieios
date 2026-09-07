@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>YDG — Onboarding typography options</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+      background: #111;
+      color: #fafaf8;
+      padding: 24px 16px 48px;
+      line-height: 1.4;
+    }
+    h1.page-title {
+      font-size: 15px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: #c9a84c;
+      margin-bottom: 8px;
+    }
+    p.page-sub {
+      font-size: 13px;
+      color: rgba(250,250,248,0.55);
+      max-width: 640px;
+      margin-bottom: 28px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+      max-width: 1200px;
+    }
+    .card {
+      background: #1a1a1a;
+      border: 1px solid rgba(201,168,76,0.2);
+      border-radius: 16px;
+      overflow: hidden;
+    }
+    .card-head {
+      padding: 12px 16px;
+      border-bottom: 1px solid rgba(201,168,76,0.12);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    }
+    .card-head strong {
+      font-size: 12px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #c9a84c;
+    }
+    .badge {
+      font-size: 10px;
+      font-weight: 600;
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: rgba(201,168,76,0.15);
+      color: #d4b896;
+      white-space: nowrap;
+    }
+    .badge.current { background: rgba(255,100,100,0.15); color: #ff9a9a; }
+    .badge.rec { background: rgba(100,200,120,0.15); color: #8fdf9f; }
+    .phone {
+      padding: 28px 20px 24px;
+      min-height: 340px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+    }
+    .label {
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: rgba(250,250,248,0.45);
+      margin-bottom: 10px;
+    }
+    .body {
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+      color: rgba(250,250,248,0.65);
+      max-width: 260px;
+      line-height: 1.55;
+    }
+    .pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      justify-content: center;
+      margin-top: 16px;
+    }
+    .pill {
+      font-family: -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+      font-size: 10px;
+      font-weight: 500;
+      padding: 5px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(201,168,76,0.35);
+      color: rgba(250,250,248,0.7);
+    }
+    .spec {
+      padding: 10px 16px 14px;
+      font-size: 11px;
+      color: rgba(250,250,248,0.4);
+      border-top: 1px solid rgba(201,168,76,0.08);
+    }
+    /* Option A — current onboarding */
+    .a-line1 { font-family: "Times New Roman", Times, serif; font-size: 32px; font-weight: 400; color: #fafaf8; }
+    .a-line2 { display: flex; gap: 6px; align-items: baseline; justify-content: center; flex-wrap: wrap; margin-top: 4px; }
+    .a-accent { font-family: Georgia, serif; font-size: 48px; font-weight: 700; font-style: italic;
+      background: linear-gradient(135deg, #d4b896, #c9a84c, #a68b5b); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .a-line3 { font-family: "Times New Roman", Times, serif; font-size: 32px; font-weight: 400; color: #fafaf8; }
+    .a-body { font-size: 15px; margin-top: 14px; }
+
+    /* Option B — in-app match (home + questionnaire) */
+    .b-title { font-family: Georgia, serif; font-size: 22px; font-weight: 400; color: #fafaf8; line-height: 1.25; }
+    .b-gold { color: #c9a84c; }
+    .b-body { font-size: 13px; margin-top: 12px; }
+
+    /* Option C — semantic AppTheme tokens */
+    .c-title { font-family: "Times New Roman", Times, serif; font-size: 24px; font-weight: 700; color: #fafaf8; line-height: 1.25; }
+    .c-body { font-size: 15px; margin-top: 12px; }
+
+    /* Option D — home section pattern */
+    .d-section { font-size: 13px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: #c9a84c; margin-bottom: 6px; }
+    .d-sub { font-size: 11px; color: rgba(250,250,248,0.5); margin-bottom: 14px; }
+    .d-title { font-family: Georgia, serif; font-size: 22px; font-weight: 400; color: #fafaf8; }
+    .d-body { font-size: 13px; margin-top: 10px; }
+
+    /* Option E — compact editorial */
+    .e-title { font-family: Georgia, serif; font-size: 20px; font-weight: 400; color: #c9a84c; line-height: 1.3; }
+    .e-body { font-size: 14px; margin-top: 10px; }
+  </style>
+</head>
+<body>
+  <h1 class="page-title">Onboarding typography — pick a direction</h1>
+  <p class="page-sub">
+    Same sample copy on charcoal (#1A1A1A). Open this file in Safari/Chrome on your Mac or phone.
+    Tell me A, B, C, D, or E (or mix — e.g. “B titles + D section labels”).
+  </p>
+
+  <div class="grid">
+    <!-- A -->
+    <div class="card">
+      <div class="card-head">
+        <strong>Option A</strong>
+        <span class="badge current">Current onboarding</span>
+      </div>
+      <div class="phone">
+        <div class="a-line1">Date nights,</div>
+        <div class="a-line2">
+          <span class="a-accent">planned</span>
+          <span class="a-line3">for you.</span>
+        </div>
+        <p class="body a-body">Tell us what you love once. We build a complete evening — venues, timing, route &amp; every detail handled.</p>
+        <div class="pills">
+          <span class="pill">Real venues</span>
+          <span class="pill">Full itinerary</span>
+        </div>
+      </div>
+      <div class="spec">Times 32 regular + Georgia 48 bold italic + Sans 15 body</div>
+    </div>
+
+    <!-- B -->
+    <div class="card">
+      <div class="card-head">
+        <strong>Option B</strong>
+        <span class="badge rec">Matches home + questionnaire</span>
+      </div>
+      <div class="phone">
+        <p class="b-title">Date nights, <span class="b-gold">planned for you.</span></p>
+        <p class="body b-body">Tell us what you love once. We build a complete evening — venues, timing, route &amp; every detail handled.</p>
+        <div class="pills">
+          <span class="pill">Real venues</span>
+          <span class="pill">Full itinerary</span>
+        </div>
+      </div>
+      <div class="spec">Georgia 22 title (gold accent inline) + Sans 13 body — same as Plan sheet &amp; home greeting</div>
+    </div>
+
+    <!-- C -->
+    <div class="card">
+      <div class="card-head">
+        <strong>Option C</strong>
+        <span class="badge">AppTheme semantic</span>
+      </div>
+      <div class="phone">
+        <p class="label">Welcome</p>
+        <p class="c-title">Date nights, planned for you.</p>
+        <p class="body c-body">Tell us what you love once. We build a complete evening — venues, timing, route &amp; every detail handled.</p>
+        <div class="pills">
+          <span class="pill">Real venues</span>
+          <span class="pill">Full itinerary</span>
+        </div>
+      </div>
+      <div class="spec">Uppercase label 12 + Times sectionTitle 24 bold + bodyText 15</div>
+    </div>
+
+    <!-- D -->
+    <div class="card">
+      <div class="card-head">
+        <strong>Option D</strong>
+        <span class="badge rec">Home section pattern</span>
+      </div>
+      <div class="phone">
+        <p class="d-section">Your evening</p>
+        <p class="d-sub">Personalized from your preferences</p>
+        <p class="d-title">Date nights, planned for you.</p>
+        <p class="body d-body">Tell us what you love once. We build a complete evening — venues, timing, route &amp; every detail handled.</p>
+      </div>
+      <div class="spec">Gold uppercase 13 + subtitle 11 + Georgia 22 + Sans 13 — mirrors Upcoming / Explore sections</div>
+    </div>
+
+    <!-- E -->
+    <div class="card">
+      <div class="card-head">
+        <strong>Option E</strong>
+        <span class="badge">Compact editorial</span>
+      </div>
+      <div class="phone">
+        <p class="e-title">Date nights, planned for you.</p>
+        <p class="body e-body">Tell us what you love once. We build a complete evening — venues, timing, route &amp; every detail handled.</p>
+        <div class="pills">
+          <span class="pill">Real venues</span>
+          <span class="pill">Full itinerary</span>
+        </div>
+      </div>
+      <div class="spec">Georgia 20 gold toolbar-style + Sans 14 body — matches questionnaire nav title scale</div>
+    </div>
+  </div>
+</body>
+</html>

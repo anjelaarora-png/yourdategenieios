@@ -1626,15 +1626,11 @@ struct RootNavigationView: View {
             } else if !coordinator.hasCompletedOnboarding {
                 MobileOnboardingView()
                     .environmentObject(coordinator)
-            } else if socialAuth.isCompletingSocialSignIn {
-                // Hold on auth until hydrate finishes so we don't flash Preferences/Main first.
-                AuthenticationView(
-                    isReinstallFlow: false,
-                    onDismiss: { coordinator.skipLogin() },
-                    allowSkipToExplore: true
-                )
-                    .environmentObject(coordinator)
-            } else if !coordinator.isLoggedIn && !coordinator.hasSkippedLogin {
+            } else if socialAuth.isCompletingSocialSignIn
+                        || (!coordinator.isLoggedIn && !coordinator.hasSkippedLogin) {
+                // Single AuthenticationView identity for both idle + social-hydrate.
+                // Splitting these into two `if` branches remounted the view and cleared the
+                // Terms checkbox mid Sign in with Apple / Google (felt like “agree again”).
                 AuthenticationView(
                     isReinstallFlow: false,
                     onDismiss: { coordinator.skipLogin() },

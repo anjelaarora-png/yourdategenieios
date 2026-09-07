@@ -12,8 +12,9 @@ struct AuthenticationView: View {
     @State private var accountMode: AccountMode = .individual
     @State private var showBusinessPortal = false
     @State private var showResetPasswordSheet = false
-    /// Required before register or login (Apple §1.2 EULA).
-    @State private var agreedToTerms = false
+    /// Required before register or login (Apple §1.2 EULA). Restored from disk so remounts
+    /// (social hydrate / auth-required sheet) don't clear a checkbox the user already checked.
+    @State private var agreedToTerms = AgeEligibility.hasAcceptedTerms
     @State private var showTermsRequiredAlert = false
 
     enum AccountMode { case individual, business }
@@ -170,7 +171,7 @@ struct AuthenticationView: View {
         .alert("Terms Required", isPresented: $showTermsRequiredAlert) {
             Button("OK", role: .cancel) { }
         } message: {
-            Text("Please agree to the Terms of Use and Privacy Policy, and confirm you are \(AgeEligibility.minimumAge) or older, to continue.")
+            Text("Please agree to the Terms of Use and Privacy Policy to continue.")
         }
         .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { _ in
             if resendCooldownRemaining > 0 {
@@ -219,6 +220,7 @@ struct AuthenticationView: View {
         HStack(alignment: .top, spacing: 12) {
             Button {
                 agreedToTerms.toggle()
+                AgeEligibility.markAcceptedTerms(agreedToTerms)
             } label: {
                 Image(systemName: agreedToTerms ? "checkmark.square.fill" : "square")
                     .font(.system(size: 22))
@@ -227,7 +229,8 @@ struct AuthenticationView: View {
             .accessibilityLabel(agreedToTerms ? "Agreed to Terms and Privacy Policy" : "Agree to Terms and Privacy Policy")
 
             VStack(alignment: .leading, spacing: 4) {
-                Text("I agree to the Terms of Use and Privacy Policy, and confirm I am \(AgeEligibility.minimumAge) or older. There is no tolerance for objectionable content or abusive users.")
+                // Age is already verified on AgeGateView; keep this row to Terms / UGC (§1.2 EULA).
+                Text("I agree to the Terms of Use and Privacy Policy. There is no tolerance for objectionable content or abusive users.")
                     .font(Font.bodySans(13, weight: .regular))
                     .foregroundColor(Color.luxuryCreamMuted)
                     .fixedSize(horizontal: false, vertical: true)
