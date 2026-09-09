@@ -26,7 +26,7 @@ Append `?launchMode=launched` to any URL, e.g. `http://localhost:5173/?launchMod
 
 ## Project info
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+**URL**: https://lovable.dev/projects/80522fc9-3812-4243-a63f-4c49f8215273
 
 ## How can I edit this code?
 
@@ -34,7 +34,7 @@ There are several ways of editing your application.
 
 **Use Lovable**
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+Simply visit the [Lovable Project](https://lovable.dev/projects/80522fc9-3812-4243-a63f-4c49f8215273) and start prompting.
 
 Changes made via Lovable will be committed automatically to this repo.
 
@@ -86,7 +86,7 @@ This project is built with:
 
 ## How can I deploy this project?
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+Simply open [Lovable](https://lovable.dev/projects/80522fc9-3812-4243-a63f-4c49f8215273) and click on Share -> Publish.
 
 ## Can I connect a custom domain to my Lovable project?
 
