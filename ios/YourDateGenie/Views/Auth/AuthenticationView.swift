@@ -425,11 +425,7 @@ struct AuthenticationView: View {
         return VStack(spacing: 0) {
             Spacer(minLength: 32)
 
-            Image("Logo")
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-                .frame(width: 96, height: 96)
-                .shadow(color: Color.luxuryGold.opacity(0.35), radius: 18)
+            DateNightMarkView(side: 120)
 
             EmailConfirmationMagicalWaitView()
                 .padding(.top, 40)
@@ -532,11 +528,7 @@ struct AuthenticationView: View {
     
     private var authHeader: some View {
         VStack(spacing: 16) {
-            Image("Logo")
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-                .frame(width: 120, height: 120)
-                .shadow(color: Color.luxuryGold.opacity(0.3), radius: 20)
+            DateNightMarkView(side: 140)
             
             Text(authHeaderTitle)
                 .font(Font.bodySerif(28, weight: .regular))

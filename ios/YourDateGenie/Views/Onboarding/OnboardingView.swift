@@ -11,15 +11,9 @@ struct MobileOnboardingView: View {
     
     var body: some View {
         ZStack {
-            // Luxurious background
-            Color.clear
+            CharcoalMaroonBackground()
                 .ignoresSafeArea()
-            
-            // Subtle gold vignette
-            RadialGradient.goldGlow
-                .opacity(0.15)
-                .ignoresSafeArea()
-            
+
             VStack(spacing: 0) {
                 // Top bar: back chevron (left) · progress dots (centre) · balance spacer (right)
                 HStack(alignment: .center) {
@@ -115,21 +109,15 @@ struct MobileOnboardingView: View {
                             coordinator.completeOnboarding()
                         }
                     } label: {
-                        HStack(spacing: 10) {
-                            Text(currentSlide == totalSlides - 1 ? "Begin Your Journey" : "Next")
-                            
-                            if currentSlide < totalSlides - 1 {
-                                Image(systemName: "arrow.right")
-                                    .font(.system(size: 14, weight: .semibold))
-                            } else {
-                                Image(systemName: "sparkles")
-                                    .font(.system(size: 14))
-                            }
-                        }
-                        .frame(maxWidth: .infinity)
+                        Text(currentSlide == totalSlides - 1 ? "Plan My Next Date" : "Next")
+                            .font(Font.bodySans(16, weight: .semibold))
+                            .foregroundColor(Color.backgroundPrimary)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 16)
+                            .background(Color.accentGold)
+                            .cornerRadius(16)
                     }
-                    .buttonStyle(LuxuryGoldButtonStyle())
-                    .pulseGlow()
+                    .buttonStyle(.plain)
                     
                     if currentSlide < totalSlides - 1 {
                         Button {
@@ -137,13 +125,10 @@ struct MobileOnboardingView: View {
                         } label: {
                             Text("Skip intro")
                                 .font(Font.bodySans(14, weight: .semibold))
-                                .foregroundColor(Color.luxuryGold)
+                                .foregroundColor(Color.accentGold)
+                                .underline()
                                 .frame(maxWidth: .infinity)
                                 .frame(minHeight: 44)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 14)
-                                        .stroke(Color.luxuryGold.opacity(0.6), lineWidth: 1.5)
-                                )
                         }
                         .buttonStyle(.plain)
                     }
@@ -173,102 +158,28 @@ struct MobileOnboardingView: View {
 }
 
 // MARK: - Slide 1: Welcome
+/// Same couple mark and tagline as the charcoal splash.
 struct LuxurySlideWelcome: View {
     let showContent: Bool
-    @State private var glowPulse: Bool = false
-    
+
     var body: some View {
-        VStack(spacing: 0) {
-            // Hero image with luxurious overlay
-            ZStack(alignment: .bottom) {
-                AsyncImage(url: URL(string: "https://images.unsplash.com/photo-1529333166437-7750a6dd5a70?w=800&h=600&fit=crop")) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                            .kenBurns(maxScale: 1.06, duration: 10)
-                    case .empty, .failure:
-                        Rectangle()
-                            .fill(Color.luxuryMaroonLight)
-                    @unknown default:
-                        EmptyView()
-                    }
-                }
-                .frame(height: UIScreen.main.bounds.height * 0.36)
-                .clipped()
-                .overlay(
-                    LinearGradient(
-                        gradient: Gradient(colors: [
-                            Color.luxuryMaroon.opacity(0.2),
-                            Color.luxuryMaroon.opacity(0.6),
-                            Color.luxuryMaroon
-                        ]),
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                )
-                .opacity(showContent ? 1 : 0)
-            }
-            
-            // Content
-            VStack(alignment: .center, spacing: 20) {
-                // Logo with glow effect
-                ZStack {
-                    Image("Logo")
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .frame(width: 140, height: 140)
-                        .blur(radius: glowPulse ? 15 : 10)
-                        .opacity(0.3)
-                    
-                    Image("Logo")
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .frame(width: 120, height: 120)
-                }
-                .opacity(showContent ? 1 : 0)
-                .scaleEffect(showContent ? 1 : 0.5)
-                .animation(.spring(response: 0.6).delay(0.2), value: showContent)
-                
-                OnboardingSectionHeader(
-                    label: "Your evening",
-                    subtitle: "Personalized from your preferences"
-                )
-                .opacity(showContent ? 1 : 0)
-                .animation(.easeOut(duration: 0.5).delay(0.35), value: showContent)
+        VStack(spacing: 28) {
+            Spacer(minLength: 0)
 
-                OnboardingSlideTitle(lead: "Date nights, ", accent: "planned for you.")
-                    .padding(.horizontal, 20)
-                    .opacity(showContent ? 1 : 0)
-                    .offset(y: showContent ? 0 : 12)
-                    .animation(.easeOut(duration: 0.5).delay(0.4), value: showContent)
-
-                OnboardingBodyText(
-                    text: "Tell us what you love once. We build a complete evening — venues, timing, route & every detail handled."
-                )
-                    .padding(.horizontal, 20)
-                    .opacity(showContent ? 1 : 0)
-                    .animation(.easeOut(duration: 0.5).delay(0.5), value: showContent)
-
-                // Reassurance pills
-                HStack(spacing: 8) {
-                    OnboardingPill(text: "Real venues")
-                    OnboardingPill(text: "Full itinerary")
-                    OnboardingPill(text: "Every detail handled")
-                }
+            DateNightMarkView(side: 200)
                 .opacity(showContent ? 1 : 0)
-                .animation(.easeOut(duration: 0.5).delay(0.65), value: showContent)
-            }
-            .padding(.top, -20)
-            
-            Spacer()
+                .scaleEffect(showContent ? 1 : 0.92)
+                .animation(.easeOut(duration: 0.4), value: showContent)
+
+            DateNightsTagline()
+                .opacity(showContent ? 1 : 0)
+                .offset(y: showContent ? 0 : 8)
+                .animation(.easeOut(duration: 0.45).delay(0.1), value: showContent)
+
+            Spacer(minLength: 0)
         }
-        .onAppear {
-            withAnimation(.easeInOut(duration: 2).repeatForever(autoreverses: true)) {
-                glowPulse = true
-            }
-        }
+        .padding(.horizontal, 24)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 

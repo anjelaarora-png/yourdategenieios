@@ -3,76 +3,23 @@ import SwiftUI
 struct HeroView: View {
     @EnvironmentObject var coordinator: NavigationCoordinator
     @EnvironmentObject private var access: AccessManager
-    @State private var glowPulse = false
     /// When set (e.g. post–email-confirm gate), overrides default `startDatePlanning()` CTA.
     var onBeginJourney: (() -> Void)? = nil
 
     var body: some View {
-        ZStack(alignment: .bottom) {
-            // Background image with luxurious overlay
-            AsyncImage(url: URL(string: "https://images.unsplash.com/photo-1529333166437-7750a6dd5a70?w=800&h=600&fit=crop")) { phase in
-                switch phase {
-                case .success(let image):
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                case .empty:
-                    Rectangle()
-                        .fill(Color.luxuryMaroonLight)
-                        .overlay(ProgressView().tint(Color.luxuryGold))
-                case .failure:
-                    Rectangle()
-                        .fill(Color.luxuryMaroonLight)
-                @unknown default:
-                    EmptyView()
-                }
-            }
-            .frame(height: UIScreen.main.bounds.height * 0.65)
-            .clipped()
-            .overlay(
-                LinearGradient(
-                    gradient: Gradient(colors: [
-                        Color.backgroundPrimary.opacity(0.3),
-                        Color.backgroundPrimary.opacity(0.5),
-                        Color.backgroundPrimary.opacity(0.9),
-                        Color.backgroundPrimary
-                    ]),
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-            )
-            
-            // Content
+        ZStack {
+            CharcoalMaroonBackground()
+                .ignoresSafeArea()
+
             VStack(spacing: 28) {
-                // Logo with glow effect
-                ZStack {
-                    Image("Logo")
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .frame(width: 180, height: 180)
-                        .blur(radius: glowPulse ? 15 : 10)
-                        .opacity(0.3)
-                    
-                    Image("Logo")
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .frame(width: 160, height: 160)
-                }
-                
-                OnboardingSectionHeader(
-                    label: "Your evening",
-                    subtitle: "Personalized from your preferences"
-                )
+                Spacer(minLength: 0)
 
-                OnboardingSlideTitle(lead: "Date nights, ", accent: "planned for you.")
-                    .padding(.horizontal, 24)
+                DateNightMarkView(side: 200)
 
-                OnboardingBodyText(
-                    text: "Tell us what you love. We'll create a complete evening — venues, timing, and all the details."
-                )
-                    .padding(.horizontal, 24)
-                
-                // CTA Button
+                DateNightsTagline()
+
+                Spacer(minLength: 24)
+
                 Button {
                     if let onBeginJourney {
                         onBeginJourney()
@@ -82,27 +29,18 @@ struct HeroView: View {
                         }
                     }
                 } label: {
-                    HStack(spacing: 12) {
-                        Text("Begin Your Journey")
-                            .font(Font.bodySans(16, weight: .semibold))
-                        
-                        Image(systemName: "arrow.right")
-                            .font(.system(size: 14, weight: .semibold))
-                    }
+                    Text(onBeginJourney == nil ? "Plan My Next Date" : "Continue")
+                        .font(Font.bodySans(16, weight: .semibold))
+                        .foregroundColor(Color.backgroundPrimary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 16)
+                        .background(Color.accentGold)
+                        .cornerRadius(16)
                 }
-                .buttonStyle(LuxuryGoldButtonStyle())
-                
-                // Trust text
-                HStack(spacing: 4) {
-                    Text("Join 500+ couples planning")
-                        .font(Font.bodySans(12, weight: .regular))
-                        .foregroundColor(Color.luxuryMuted)
-                    Text("memorable dates")
-                        .font(Font.bodySans(12, weight: .regular))
-                        .foregroundColor(Color.luxuryGold)
-                }
+                .buttonStyle(.plain)
+                .padding(.bottom, 28)
             }
-            .padding(.bottom, 60)
+            .padding(.horizontal, 20)
         }
         .overlay(alignment: .topTrailing) {
             if onBeginJourney != nil {
@@ -117,11 +55,6 @@ struct HeroView: View {
                 .padding(.top, 56)
                 .padding(.trailing, 20)
                 .accessibilityLabel("Skip for now")
-            }
-        }
-        .onAppear {
-            withAnimation(.easeInOut(duration: 2.5).repeatForever(autoreverses: true)) {
-                glowPulse = true
             }
         }
     }

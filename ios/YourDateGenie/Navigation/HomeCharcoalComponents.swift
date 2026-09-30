@@ -7,18 +7,7 @@ struct HomeAppHeaderBar: View {
 
     var body: some View {
         HStack(alignment: .center, spacing: 12) {
-            Image("Logo")
-                .resizable()
-                .scaledToFit()
-                .frame(width: 24, height: 24)
-                .padding(4)
-                .background(Color.surfaceElevated)
-                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .stroke(Color.accentMaroon.opacity(0.35), lineWidth: 1)
-                )
-                .accessibilityLabel("Your Date Genie")
+            DateNightMarkView(side: 36)
 
             Spacer(minLength: 0)
 

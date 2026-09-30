@@ -29,11 +29,7 @@ struct AgeGateView: View {
         VStack(spacing: 0) {
             Spacer(minLength: 24)
 
-            Image("Logo")
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-                .frame(width: 96, height: 96)
-                .shadow(color: Color.luxuryGold.opacity(0.35), radius: 16)
+            DateNightMarkView(side: 120)
 
             Text("Age verification")
                 .font(Font.bodySerif(28, weight: .bold))

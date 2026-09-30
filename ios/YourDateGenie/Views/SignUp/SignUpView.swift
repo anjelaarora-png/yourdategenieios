@@ -53,10 +53,7 @@ struct SignUpView: View {
     
     private var signUpHeader: some View {
         VStack(spacing: 12) {
-            Image("Logo")
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-                .frame(width: 100, height: 100)
+            DateNightMarkView(side: 120)
             
             VStack(spacing: 8) {
                 Text("Create Your Account")

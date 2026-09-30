@@ -208,6 +208,42 @@ struct CharcoalMaroonBackground: View {
     }
 }
 
+/// Couple-at-the-table mark. Gold line art with the burgundy field removed so it sits on charcoal.
+struct DateNightMarkView: View {
+    var side: CGFloat
+
+    var body: some View {
+        Image("DateNightMark")
+            .resizable()
+            .scaledToFit()
+            .frame(width: side, height: side)
+            .accessibilityLabel("Your Date Genie")
+    }
+}
+
+/// Opening copy on charcoal. Two short serif lines, then a quiet sans line.
+struct DateNightsTagline: View {
+    var body: some View {
+        VStack(spacing: 14) {
+            VStack(spacing: 0) {
+                Text("Date night.")
+                    .foregroundColor(Color.textPrimary)
+                Text("Done.")
+                    .foregroundColor(Color.accentGold)
+                    .goldShimmer(duration: 2.8)
+            }
+            .font(Font.displaySerif(34, weight: .semibold))
+            .multilineTextAlignment(.center)
+
+            Text("We plan. You love.")
+                .font(Font.bodySans(16, weight: .regular))
+                .foregroundColor(Color.luxuryCreamMuted)
+                .multilineTextAlignment(.center)
+        }
+        .accessibilityElement(children: .combine)
+    }
+}
+
 extension View {
     /// Full-screen charcoal base with subtle maroon edge glow (Charcoal Maroon design system).
     func charcoalMaroonScreenBackground() -> some View {
