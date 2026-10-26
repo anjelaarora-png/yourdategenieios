@@ -537,5 +537,6 @@ IMPORTANT: This is a SOLO DATE for ONE PERSON. All activities should be enjoyabl
    - Creative cuisine use: "Mediterranean Moonlight", "Saffron & Slow Jazz", "Spice, Stars & You"
    
    The tagline is where you can freely describe cuisine, neighborhood, and food details in plain language.
-${scheduledDate ? `10. The date is scheduled for ${scheduledDate}${scheduledTime ? ` starting at ${scheduledTime}` : ""}. Make sure all venues will be OPEN at the specified times and plan the time slots accordingly starting from the scheduled start time.` : ""}`;
+${scheduledDate ? `10. The date is scheduled for ${scheduledDate}${scheduledTime ? ` starting at ${scheduledTime}` : ""}. Make sure all venues will be OPEN at the specified times and plan the time slots accordingly starting from the scheduled start time.` : ""}
+11. Describe only what each venue offers every day. Do NOT invent one-time or scheduled events (film screenings, concerts, trivia nights, tastings, classes) — a screening may only be suggested at an actual cinema. Write timeSlot as "h:mm AM/PM" (e.g. "7:30 PM") and duration as "1.5 hours" or "45 mins". Venues closed at their time slot, or not matching their description, are removed automatically.`;
 };

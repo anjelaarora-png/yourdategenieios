@@ -8,6 +8,7 @@ import { enrichPlanPresentation } from "./planPresentation.ts";
 import { requireAuthenticatedUser } from "../_shared/jwtAuth.ts";
 import { checkRateLimit } from "../_shared/rateLimit.ts";
 import { filterHardNoStops } from "./hardNos.ts";
+import { applySchedule } from "./schedule.ts";
 
 const MIN_VALIDATED_STOPS_PER_PLAN = 2;
 const RATE_LIMIT_MAX = 20;
@@ -214,6 +215,16 @@ serve(async (req) => {
         console.log(`[Validation] Validating ${plan.stops.length} stops for plan: ${plan.title || "Untitled"}`);
         const validatedStops = await validateAllStops(plan.stops, city, GOOGLE_PLACES_API_KEY);
         plan.stops = onlyVerifiedStops(validatedStops);
+        // Drop stops whose venue is closed for its slot, then re-time the rest back-to-back.
+        const { dropped } = applySchedule(plan, {
+          dateScheduled: preferences.dateScheduled,
+          startTime: preferences.startTime,
+        });
+        if (dropped.length > 0) {
+          console.log(
+            `[Hours] Plan "${plan.title || "Untitled"}": removed ${dropped.map((d) => d.name).join(", ")} (closed during slot)`,
+          );
+        }
         console.log(
           `[Validation] Plan "${plan.title || "Untitled"}": ${plan.stops.length} verified Google stops`,
         );
