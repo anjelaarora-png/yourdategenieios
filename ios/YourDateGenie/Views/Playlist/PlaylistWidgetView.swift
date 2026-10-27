@@ -223,16 +223,17 @@ struct PlaylistWidgetView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .principal) {
-                    Text("Smart Playlists")
-                        .font(Font.bodySerif(18, weight: .regular))
-                        .foregroundColor(Color.accentGold)
+                    Text("Smart playlist")
+                        .ydgText(.headline)
                 }
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Close") {
-                        dismiss()
+                    Button { dismiss() } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundColor(Color.ydgTextPrimary)
+                            .frame(width: 44, height: 44)
                     }
-                    .font(Font.bodySans(16, weight: .medium))
-                    .foregroundColor(Color.accentGold)
+                    .accessibilityLabel("Close")
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button {
@@ -246,11 +247,11 @@ struct PlaylistWidgetView: View {
                             }
                         }
                     }
-                    .font(Font.bodySans(14, weight: .medium))
-                    .foregroundColor(Color.accentGold)
+                    .font(.ydg(.body, weight: .semibold))
+                    .foregroundColor(Color.ydgAccent)
                 }
             }
-            .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
+            .toolbarBackground(Color.ydgBase, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .sheet(isPresented: $showSavedPlaylists) {
                 SavedPlaylistsView()
@@ -521,35 +522,34 @@ struct PlaylistWidgetView: View {
     // MARK: - Playlist Content
     private func playlistContent(_ currentPlaylist: DatePlaylist) -> some View {
         ScrollView(showsIndicators: false) {
-            VStack(spacing: 24) {
-                // Header
-                VStack(spacing: 14) {
-                    Text(displayedVibe.emoji)
-                        .font(.system(size: 40))
-
-                    VStack(spacing: 6) {
-                        Text(currentPlaylist.name)
-                            .font(Font.bodySerif(26, weight: .regular))
-                            .foregroundColor(Color.accentGold)
-                            .multilineTextAlignment(.center)
-
-                        Text(selectionSubtitle)
-                            .font(Font.bodySans(13, weight: .regular))
-                            .foregroundColor(Color.luxuryCreamMuted)
-
-                        Text("\(currentPlaylist.songs.count) songs · \(currentPlaylist.totalDuration)")
-                            .font(Font.bodySans(12, weight: .medium))
-                            .foregroundColor(Color.textPrimary.opacity(0.45))
+            VStack(alignment: .leading, spacing: YDGSpace.lg) {
+                // Header: cover tile + title + meta
+                HStack(alignment: .center, spacing: YDGSpace.md) {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: YDGRadius.card, style: .continuous)
+                            .fill(RadialGradient(colors: [Color(hex: "5A2E34"), Color(hex: "2A1A1C")], center: .center, startRadius: 4, endRadius: 70))
+                        Text(displayedVibe.emoji)
+                            .font(.system(size: 36))
                     }
+                    .frame(width: 96, height: 96)
+                    .accessibilityHidden(true)
+
+                    VStack(alignment: .leading, spacing: YDGSpace.xxs) {
+                        Text(currentPlaylist.name)
+                            .ydgText(.title2)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .accessibilityAddTraits(.isHeader)
+                        Text("\(currentPlaylist.songs.count) songs · \(currentPlaylist.totalDuration) · \(selectionSubtitle)")
+                            .ydgText(.footnote, color: .ydgTextSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    Spacer(minLength: 0)
                 }
-                .padding(.top, 12)
-                
-                // Platform buttons - Open All
-                VStack(spacing: 12) {
-                    PlaylistScreenStyle.sectionLabel(title: "Open on", icon: "arrow.up.forward.app")
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, 20)
-                    HStack(spacing: 12) {
+                .padding(.top, YDGSpace.xs)
+
+                // Open on (whole playlist)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: YDGSpace.xs) {
                         ForEach(MusicPlatform.allCases, id: \.self) { platform in
                             PlatformButton(platform: platform) {
                                 openAllOnPlatform(platform, songs: currentPlaylist.songs)
@@ -557,129 +557,49 @@ struct PlaylistWidgetView: View {
                         }
                     }
                 }
-                .padding(.horizontal, 20)
-                
-                // Save & Copy
-                HStack(spacing: 12) {
-                    Button {
-                        pendingSaveName = defaultSavePlaylistName
-                        showSaveNameSheet = true
-                    } label: {
-                        HStack(spacing: 8) {
-                            Image(systemName: savedMessage ? "checkmark.circle.fill" : "square.and.arrow.down")
-                            Text(savedMessage ? "Saved!" : "Save Playlist")
-                        }
-                        .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(LuxuryGoldButtonStyle())
-                    .disabled(savedMessage)
-                    
-                    Button {
-                        copyPlaylistToClipboard(currentPlaylist)
-                    } label: {
-                        HStack(spacing: 8) {
-                            Image(systemName: copiedToClipboard ? "checkmark.circle.fill" : "doc.on.doc")
-                            Text(copiedToClipboard ? "Copied!" : "Copy")
-                        }
-                        .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(LuxuryOutlineButtonStyle(isSmall: true))
-                }
-                .padding(.horizontal, 20)
 
-                if !storage.playlists.isEmpty {
-                    Button {
-                        showSavedPlaylists = true
-                    } label: {
-                        HStack {
-                            Image(systemName: "music.note.list")
-                            Text("View \(storage.playlists.count) saved playlist\(storage.playlists.count == 1 ? "" : "s")")
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .font(.system(size: 12, weight: .semibold))
-                        }
-                        .font(Font.bodySans(14, weight: .medium))
-                        .foregroundColor(Color.textPrimary.opacity(0.85))
-                        .padding(14)
-                        .background(Color.luxeSurfaceTintStrong)
-                        .clipShape(RoundedRectangle(cornerRadius: 14))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 14)
-                                .stroke(Color.luxeSurfaceBorder, lineWidth: 1)
-                        )
-                    }
-                    .buttonStyle(.plain)
-                    .padding(.horizontal, 20)
-                }
-                
-                Button {
-                    showAddSong = true
-                } label: {
-                    HStack(spacing: 8) {
-                        Image(systemName: "plus.circle")
-                        Text("Add Song")
-                    }
-                    .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(LuxuryOutlineButtonStyle(isSmall: true))
-                .padding(.horizontal, 20)
-                
-                // Song list
-                VStack(alignment: .leading, spacing: 10) {
-                    PlaylistScreenStyle.sectionLabel(title: "Tracks", icon: "music.note")
-                        .padding(.horizontal, 20)
-
-                    LoveNoteCreamCard(bannerSubtitle: "\(currentPlaylist.songs.count) songs") {
-                        VStack(spacing: 0) {
-                            ForEach(Array(currentPlaylist.songs.enumerated()), id: \.element.id) { index, song in
-                                SongRow(
-                                    song: song,
-                                    index: index + 1,
-                                    isPlaying: currentlyPlaying == song.id.uuidString,
-                                    onTap: {
-                                        let key = "\(song.title)|\(song.artist)"
-                                        if previewPlayer.currentTrackKey == key, previewPlayer.isPlaying {
-                                            previewPlayer.stop()
-                                            currentlyPlaying = nil
-                                        } else {
-                                            Task {
-                                                if let url = await ITunesSearchService.getPreviewUrl(title: song.title, artist: song.artist) {
-                                                    await MainActor.run {
-                                                        previewPlayer.play(url: url, trackKey: key)
-                                                        withAnimation { currentlyPlaying = song.id.uuidString }
-                                                    }
-                                                }
+                // Tracks
+                VStack(spacing: 0) {
+                    Rectangle().fill(Color.ydgBorder).frame(height: 1)
+                    ForEach(Array(currentPlaylist.songs.enumerated()), id: \.element.id) { index, song in
+                        SongRow(
+                            song: song,
+                            index: index + 1,
+                            isPlaying: currentlyPlaying == song.id.uuidString,
+                            onTap: {
+                                let key = "\(song.title)|\(song.artist)"
+                                if previewPlayer.currentTrackKey == key, previewPlayer.isPlaying {
+                                    previewPlayer.stop()
+                                    currentlyPlaying = nil
+                                } else {
+                                    Task {
+                                        if let url = await ITunesSearchService.getPreviewUrl(title: song.title, artist: song.artist) {
+                                            await MainActor.run {
+                                                previewPlayer.play(url: url, trackKey: key)
+                                                withAnimation { currentlyPlaying = song.id.uuidString }
                                             }
                                         }
-                                    },
-                                    onOpenPlatform: { platform in
-                                        openSongOnPlatform(song, platform: platform)
-                                    },
-                                    onReplace: { replaceSongItem = IdentifiableInt(value: index) },
-                                    onDelete: { removeSong(at: index) }
-                                )
-                                if index < currentPlaylist.songs.count - 1 {
-                                    Divider().background(Color.maroonBorderTint)
+                                    }
                                 }
-                            }
-                        }
+                            },
+                            onOpenPlatform: { platform in
+                                openSongOnPlatform(song, platform: platform)
+                            },
+                            onReplace: { replaceSongItem = IdentifiableInt(value: index) },
+                            onDelete: { removeSong(at: index) }
+                        )
+                        Rectangle().fill(Color.ydgBorder).frame(height: 1)
                     }
-                    .padding(.horizontal, 20)
                 }
-                
-                // Actions
-                HStack(spacing: 12) {
-                    Button {
-                        resetPlaylist()
-                    } label: {
-                        HStack(spacing: 8) {
-                            Image(systemName: "arrow.clockwise")
-                            Text("Regenerate")
-                        }
-                        .frame(maxWidth: .infinity)
+
+                // Secondary actions
+                HStack(spacing: YDGSpace.md) {
+                    Button { showAddSong = true } label: {
+                        Label("Add song", systemImage: "plus")
                     }
-                    .buttonStyle(LuxuryOutlineButtonStyle(isSmall: true))
-                    
+                    Button { copyPlaylistToClipboard(currentPlaylist) } label: {
+                        Label(copiedToClipboard ? "Copied" : "Copy list", systemImage: copiedToClipboard ? "checkmark" : "doc.on.doc")
+                    }
                     Button {
                         playlist = nil
                         generatedVibe = nil
@@ -688,17 +608,32 @@ struct PlaylistWidgetView: View {
                         generatedMood = nil
                         playlistGenerationError = nil
                     } label: {
-                        HStack(spacing: 8) {
-                            Image(systemName: "slider.horizontal.3")
-                            Text("Change Vibe")
-                        }
-                        .frame(maxWidth: .infinity)
+                        Label("Change vibe", systemImage: "slider.horizontal.3")
                     }
-                    .buttonStyle(LuxuryOutlineButtonStyle(isSmall: true))
                 }
-                .padding(.horizontal, 20)
-                .padding(.bottom, 40)
+                .buttonStyle(.ydgTertiary)
+                .labelStyle(.titleOnly)
             }
+            .padding(.horizontal, YDGSpace.margin)
+            .padding(.bottom, YDGSpace.lg)
+        }
+        .safeAreaInset(edge: .bottom) {
+            HStack(spacing: YDGSpace.sm) {
+                Button("Remix") { resetPlaylist() }
+                    .buttonStyle(YDGButtonStyle(kind: .secondary, fullWidth: false))
+                Button {
+                    pendingSaveName = defaultSavePlaylistName
+                    showSaveNameSheet = true
+                } label: {
+                    Text(savedMessage ? "Saved" : "Save playlist")
+                }
+                .buttonStyle(.ydgPrimary)
+                .disabled(savedMessage)
+            }
+            .padding(.horizontal, YDGSpace.margin)
+            .padding(.top, YDGSpace.sm)
+            .padding(.bottom, YDGSpace.xs)
+            .background(Color.ydgBase)
         }
     }
     
@@ -1336,32 +1271,15 @@ struct VibeCard: View {
     }
 }
 
-// MARK: - Platform Button
+// MARK: - Platform Button (open the whole playlist on a service)
 struct PlatformButton: View {
     let platform: PlaylistWidgetView.MusicPlatform
     let action: () -> Void
     
     var body: some View {
-        Button(action: action) {
-            VStack(spacing: 8) {
-                Image(systemName: platform.icon)
-                    .font(.system(size: 20))
-                    .foregroundColor(platform.color)
-                
-                Text(platform.name)
-                    .font(Font.bodySans(10, weight: .medium))
-                    .foregroundColor(Color.textPrimary.opacity(0.85))
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 14)
-            .background(Color.luxeSurfaceTintStrong)
-            .cornerRadius(14)
-            .overlay(
-                RoundedRectangle(cornerRadius: 14)
-                    .stroke(Color.luxeSurfaceBorder, lineWidth: 1)
-            )
-        }
-        .buttonStyle(ScaleButtonStyle())
+        Button(platform.name, action: action)
+            .buttonStyle(YDGButtonStyle(kind: .secondary, fullWidth: false, compact: true))
+            .accessibilityLabel("Open on \(platform.name)")
     }
 }
 
@@ -1385,104 +1303,62 @@ struct SongRow: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 14) {
-                ZStack {
+            HStack(spacing: YDGSpace.sm) {
+                Group {
                     if isPlaying {
-                        RoundedRectangle(cornerRadius: 8)
-                            .fill(Color.accentGold.opacity(0.25))
-                            .frame(width: 40, height: 40)
-                        
                         Image(systemName: "waveform")
-                            .font(.system(size: 14))
-                            .foregroundColor(Color.accentGold)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(Color.ydgHighlight)
                     } else {
-                        RoundedRectangle(cornerRadius: 8)
-                            .fill(Color.creamParchmentMid.opacity(0.5))
-                            .frame(width: 40, height: 40)
-                        
                         Text("\(index)")
-                            .font(Font.bodySans(13, weight: .medium))
-                            .foregroundColor(Color.textMutedOnCard)
+                            .font(.ydg(.subhead))
+                            .foregroundColor(Color.ydgTextTertiary)
+                            .monospacedDigit()
                     }
                 }
+                .frame(width: 22)
                 
-                VStack(alignment: .leading, spacing: 3) {
+                VStack(alignment: .leading, spacing: 1) {
                     Text(song.title)
-                        .font(Font.bodySerif(14, weight: .semibold))
-                        .foregroundColor(isPlaying ? Color.accentGold : Color.textOnCard)
+                        .ydgText(.body, weight: .medium, color: isPlaying ? .ydgHighlight : .ydgTextPrimary)
                         .lineLimit(1)
-                    
                     Text(song.artist)
-                        .font(Font.bodySans(12, weight: .regular))
-                        .foregroundColor(Color.textMutedOnCard)
+                        .ydgText(.footnote, color: .ydgTextSecondary)
                         .lineLimit(1)
                 }
                 
-                Spacer()
+                Spacer(minLength: YDGSpace.xs)
                 
                 Text(song.duration)
-                    .font(Font.bodySans(11, weight: .regular))
-                    .foregroundColor(Color.luxuryMuted)
-                
-                if let onReplace = onReplace {
-                    Button(action: onReplace) {
-                        Image(systemName: "arrow.triangle.2.circlepath")
-                            .font(.system(size: 12))
-                            .foregroundColor(Color.luxuryGold)
-                            .frame(width: 28, height: 28)
+                    .font(.ydg(.footnote))
+                    .foregroundColor(Color.ydgTextTertiary)
+                    .monospacedDigit()
+
+                Menu {
+                    ForEach(PlaylistWidgetView.MusicPlatform.allCases, id: \.self) { platform in
+                        Button("Open on \(platform.name)") { onOpenPlatform(platform) }
                     }
-                }
-                if let onDelete = onDelete {
-                    Button(action: onDelete) {
-                        Image(systemName: "xmark.circle")
-                            .font(.system(size: 12))
-                            .foregroundColor(Color.luxuryError)
-                            .frame(width: 28, height: 28)
+                    if let onReplace {
+                        Button { onReplace() } label: { Label("Replace song", systemImage: "arrow.triangle.2.circlepath") }
                     }
-                }
-                
-                Button {
-                    withAnimation(.spring(response: 0.3)) {
-                        showPlatforms.toggle()
+                    if let onDelete {
+                        Button(role: .destructive) { onDelete() } label: { Label("Remove", systemImage: "trash") }
                     }
                 } label: {
-                    Image(systemName: showPlatforms ? "chevron.up" : "ellipsis")
-                        .font(.system(size: 14))
-                        .foregroundColor(Color.luxuryGold)
-                        .frame(width: 28, height: 28)
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundColor(Color.ydgTextSecondary)
+                        .frame(width: 36, height: 44)
+                        .contentShape(Rectangle())
                 }
+                .accessibilityLabel("More for \(song.title)")
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
-            .background(isPlaying ? Color.accentGold.opacity(0.08) : Color.clear)
+            .frame(minHeight: 56)
             .contentShape(Rectangle())
             .onTapGesture(perform: onTap)
-            
-            // Platform buttons
-            if showPlatforms {
-                HStack(spacing: 10) {
-                    ForEach(PlaylistWidgetView.MusicPlatform.allCases, id: \.self) { platform in
-                        Button {
-                            onOpenPlatform(platform)
-                        } label: {
-                            HStack(spacing: 4) {
-                                Image(systemName: platform.icon)
-                                    .font(.system(size: 12))
-                                Text(platform.name)
-                                    .font(Font.bodySans(10, weight: .medium))
-                            }
-                            .foregroundColor(platform.color)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 6)
-                            .background(platform.color.opacity(0.15))
-                            .cornerRadius(8)
-                        }
-                    }
-                }
-                .padding(.horizontal, 14)
-                .padding(.bottom, 10)
-                .transition(.move(edge: .top).combined(with: .opacity))
-            }
+            .accessibilityElement(children: .combine)
+            .accessibilityAddTraits(.isButton)
+            .accessibilityHint(isPlaying ? "Stops the preview" : "Plays a preview")
         }
     }
 }

@@ -23,483 +23,176 @@ struct SettingsSheetView: View {
         profileManager.currentUser
     }
 
+    private func valueOrNotSet(_ v: String?) -> String {
+        guard let v, !v.isEmpty else { return "Not set" }
+        return v
+    }
+
     var body: some View {
         NavigationStack {
             ZStack {
-                Color.backgroundPrimary
+                Color.ydgBase
                     .ignoresSafeArea()
 
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 24) {
+                    VStack(alignment: .leading, spacing: YDGSpace.lg) {
+                        Text("Settings")
+                            .ydgText(.title1)
+                            .accessibilityAddTraits(.isHeader)
+
                         // MARK: - Account (name, email, phone)
-                        VStack(alignment: .leading, spacing: 16) {
-                            HStack {
-                                Text("Account")
-                                    .font(Font.bodySerif(18, weight: .semibold))
-                                    .foregroundColor(Color.luxuryCream)
-                                Spacer()
-                                Button {
-                                    showEditAccount = true
-                                } label: {
-                                    Text("Edit")
-                                        .font(Font.bodySans(14, weight: .semibold))
-                                        .foregroundColor(Color.luxuryGold)
-                                }
-                                .buttonStyle(.plain)
-                            }
-                            VStack(alignment: .leading, spacing: 14) {
-                                SettingsAccountRow(
-                                    icon: "person.fill",
-                                    label: "Name",
-                                    value: userProfile?.fullName.isEmpty == false ? userProfile!.fullName : "Not set"
-                                )
-                                SettingsAccountRow(
-                                    icon: "envelope.fill",
-                                    label: "Email",
-                                    value: userProfile?.email.isEmpty == false ? userProfile!.email : "Not set"
-                                )
-                                SettingsAccountRow(
-                                    icon: "phone.fill",
-                                    label: "Phone",
-                                    value: userProfile?.phoneNumber.isEmpty == false ? userProfile!.phoneNumber : "Not set"
-                                )
-                            }
+                        SettingsGroup(title: "Account") {
+                            SettingsValueRow(title: "Name", value: valueOrNotSet(userProfile?.fullName)) { showEditAccount = true }
+                            YDGListDivider(leadingInset: YDGSpace.md)
+                            SettingsValueRow(title: "Email", value: valueOrNotSet(userProfile?.email)) { showEditAccount = true }
+                            YDGListDivider(leadingInset: YDGSpace.md)
+                            SettingsValueRow(title: "Phone", value: valueOrNotSet(userProfile?.phoneNumber)) { showEditAccount = true }
                         }
-                        .padding(18)
-                        .luxuryCard()
 
                         // MARK: - Subscription (StoreKit 2)
-                        VStack(alignment: .leading, spacing: 16) {
-                            Text("Subscription")
-                                .font(Font.bodySerif(18, weight: .semibold))
-                                .foregroundColor(Color.luxuryCream)
-
-                            HStack(alignment: .top, spacing: 12) {
-                                Image(systemName: purchases.isSubscribed ? "checkmark.seal.fill" : "crown")
-                                    .font(.system(size: 22))
-                                    .foregroundColor(Color.luxuryGold)
-                                    .frame(width: 28)
-
-                                VStack(alignment: .leading, spacing: 6) {
-                                    Text(purchases.isSubscribed ? "Premium active" : "Premium")
-                                        .font(Font.bodySans(16, weight: .semibold))
-                                        .foregroundColor(Color.luxuryCream)
-                                    Text(
-                                        purchases.isSubscribed
-                                            ? "Thank you for supporting Your Date Genie."
-                                            : "Start free for 7 days, then $14.99/month or $119.99/year."
-                                    )
-                                    .font(Font.bodySans(13, weight: .regular))
-                                    .foregroundColor(Color.luxuryMuted)
-                                    .fixedSize(horizontal: false, vertical: true)
+                        VStack(alignment: .leading, spacing: YDGSpace.xs) {
+                            SettingsGroup(title: "Subscription") {
+                                SettingsValueRow(
+                                    title: "Premium",
+                                    value: purchases.isSubscribed ? "Active" : "7-day free trial"
+                                ) { showSubscriptionOffer = true }
+                                YDGListDivider(leadingInset: YDGSpace.md)
+                                SettingsValueRow(
+                                    title: "Restore purchases",
+                                    value: nil,
+                                    isLoading: purchases.isRestoring,
+                                    showsChevron: false
+                                ) {
+                                    Task { await purchases.restorePurchases() }
+                                }
+                                .disabled(purchases.isRestoring)
+                                if let subscriptionsURL = URL(string: "https://apps.apple.com/account/subscriptions") {
+                                    YDGListDivider(leadingInset: YDGSpace.md)
+                                    SettingsLinkRow(title: "Manage subscriptions", url: subscriptionsURL)
                                 }
                             }
-
-                            Button {
-                                showSubscriptionOffer = true
-                            } label: {
-                                HStack {
-                                    Text("View plans")
-                                        .font(Font.bodySans(15, weight: .semibold))
-                                    Spacer()
-                                    Image(systemName: "chevron.right")
-                                        .font(.system(size: 12, weight: .semibold))
-                                }
-                                .foregroundColor(Color.luxuryMaroon)
-                                .padding(.vertical, 12)
-                                .padding(.horizontal, 16)
-                                .frame(maxWidth: .infinity)
-                                .background(Color.luxuryGold)
-                                .cornerRadius(12)
-                            }
-                            .buttonStyle(.plain)
-
-                            Button {
-                                Task {
-                                    await purchases.restorePurchases()
-                                }
-                            } label: {
-                                HStack {
-                                    if purchases.isRestoring {
-                                        ProgressView()
-                                            .tint(Color.luxuryGold)
-                                    }
-                                    Text("Restore purchases")
-                                        .font(Font.bodySans(15, weight: .medium))
-                                    Spacer()
-                                }
-                                .foregroundColor(Color.luxuryCream)
-                                .padding(.vertical, 8)
-                            }
-                            .buttonStyle(.plain)
-                            .disabled(purchases.isRestoring)
-
+                            Text(purchases.isSubscribed
+                                 ? "Thank you for supporting Your Date Genie."
+                                 : "Start free for 7 days, then $14.99/month or $119.99/year.")
+                                .ydgText(.footnote, color: .ydgTextTertiary)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .padding(.horizontal, YDGSpace.xxs)
                             if let msg = purchases.lastErrorMessage, !msg.isEmpty {
                                 Text(msg)
-                                    .font(Font.bodySans(13, weight: .regular))
-                                    .foregroundColor(Color.orange.opacity(0.95))
+                                    .ydgText(.footnote, color: .ydgWarning)
                                     .fixedSize(horizontal: false, vertical: true)
-                            }
-
-                            if let subscriptionsURL = URL(string: "https://apps.apple.com/account/subscriptions") {
-                                Link(destination: subscriptionsURL) {
-                                    HStack {
-                                        Text("Manage subscriptions")
-                                            .font(Font.bodySans(15, weight: .medium))
-                                        Spacer()
-                                        Image(systemName: "arrow.up.right.square")
-                                            .font(.system(size: 14))
-                                    }
-                                    .foregroundColor(Color.luxuryGold)
-                                    .padding(.vertical, 8)
-                                }
+                                    .padding(.horizontal, YDGSpace.xxs)
                             }
                         }
-                        .padding(18)
-                        .goldHighlightMaroonAccent(cornerRadius: 14)
 
-                        // MARK: - Date preferences (saved from onboarding / profile)
-                        if let prefs = userProfile?.preferences {
-                            PreferencesSummaryCard(preferences: prefs) {
+                        // MARK: - Planning defaults
+                        SettingsGroup(title: "Planning defaults") {
+                            if let prefs = userProfile?.preferences, !prefs.defaultStartingPoint.isEmpty || !prefs.defaultCity.isEmpty {
+                                SettingsValueRow(
+                                    title: "Starting point",
+                                    value: prefs.defaultStartingPoint.isEmpty ? prefs.defaultCity : prefs.defaultStartingPoint
+                                ) {
+                                    dismiss()
+                                    coordinator.startEditPreferencesOnly()
+                                }
+                                YDGListDivider(leadingInset: YDGSpace.md)
+                            }
+                            SettingsValueRow(title: "Your preferences", value: "Edit") {
                                 dismiss()
                                 coordinator.startEditPreferencesOnly()
+                            }
+                            YDGListDivider(leadingInset: YDGSpace.md)
+                            SettingsValueRow(title: "Maps app", value: preferredMapsApp == "google" ? "Google Maps" : "Apple Maps") {
+                                showMapsPicker = true
+                            }
+                            if Config.isGoogleCalendarEnabled {
+                                YDGListDivider(leadingInset: YDGSpace.md)
+                                SettingsValueRow(
+                                    title: "Calendar",
+                                    value: calendarSync.provider.displayName,
+                                    isLoading: isConnectingGoogleCalendar
+                                ) { showCalendarPicker = true }
+                                .disabled(isConnectingGoogleCalendar)
                             }
                         }
 
                         // MARK: - Cloud preferences (Supabase)
                         if profileManager.userId != nil {
-                            VStack(alignment: .leading, spacing: 14) {
-                                HStack {
-                                    Text("Cloud preferences")
-                                        .font(Font.bodySerif(18, weight: .semibold))
-                                        .foregroundColor(Color.luxuryCream)
-                                    Spacer()
-                                    if isLoadingRemotePreferences {
-                                        ProgressView()
-                                            .tint(Color.luxuryGold)
+                            SettingsGroup(title: "Cloud preferences") {
+                                if isLoadingRemotePreferences {
+                                    HStack {
+                                        ProgressView().tint(Color.ydgTextSecondary)
+                                        Spacer()
                                     }
-                                }
-
-                                if let remotePreferencesError {
+                                    .padding(YDGSpace.md)
+                                } else if let remotePreferencesError {
                                     Text(remotePreferencesError)
-                                        .font(Font.bodySans(13, weight: .regular))
-                                        .foregroundColor(Color.orange.opacity(0.95))
+                                        .ydgText(.footnote, color: .ydgWarning)
                                         .fixedSize(horizontal: false, vertical: true)
-                                } else if !isLoadingRemotePreferences {
-                                    List {
-                                        if let row = remotePreferences {
-                                            ForEach(Self.remotePreferenceRows(for: row), id: \.label) { item in
-                                                HStack(alignment: .top) {
-                                                    Text(item.label)
-                                                        .font(Font.bodySans(12, weight: .medium))
-                                                        .foregroundColor(Color.luxuryMuted)
-                                                        .frame(width: 120, alignment: .leading)
-                                                    Text(item.value)
-                                                        .font(Font.bodySans(14, weight: .regular))
-                                                        .foregroundColor(Color.luxuryCream)
-                                                        .frame(maxWidth: .infinity, alignment: .leading)
-                                                }
-                                                .listRowBackground(Color.clear)
-                                                .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
-                                            }
-                                        } else {
-                                            Text("No preferences row found in Supabase for this account yet.")
-                                                .font(Font.bodySans(13, weight: .regular))
-                                                .foregroundColor(Color.luxuryMuted)
-                                                .listRowBackground(Color.clear)
+                                        .padding(YDGSpace.md)
+                                } else if let row = remotePreferences {
+                                    let items = Self.remotePreferenceRows(for: row)
+                                    ForEach(Array(items.enumerated()), id: \.element.label) { index, item in
+                                        if index > 0 { YDGListDivider(leadingInset: YDGSpace.md) }
+                                        HStack(alignment: .top, spacing: YDGSpace.sm) {
+                                            Text(item.label)
+                                                .ydgText(.subhead, weight: .regular, color: .ydgTextSecondary)
+                                                .frame(width: 110, alignment: .leading)
+                                            Text(item.value)
+                                                .ydgText(.subhead, weight: .regular)
+                                                .frame(maxWidth: .infinity, alignment: .trailing)
+                                                .multilineTextAlignment(.trailing)
                                         }
+                                        .padding(.horizontal, YDGSpace.md)
+                                        .padding(.vertical, YDGSpace.sm)
                                     }
-                                    .listStyle(.plain)
-                                    .scrollContentBackground(.hidden)
-                                    .frame(minHeight: cloudPreferencesListMinHeight)
+                                } else {
+                                    Text("No saved preferences in the cloud for this account yet.")
+                                        .ydgText(.footnote, color: .ydgTextSecondary)
+                                        .padding(YDGSpace.md)
                                 }
                             }
-                            .padding(18)
-                            .luxuryCard()
                         }
 
-                        Text("App settings")
-                            .font(Font.bodySans(14, weight: .medium))
-                            .foregroundColor(Color.luxuryCreamMuted)
-                            .padding(.horizontal, 4)
-
-                        VStack(spacing: 12) {
-                            Button {
-                                showMapsPicker = true
-                            } label: {
-                                HStack(spacing: 14) {
-                                    Image(systemName: "map.fill")
-                                        .font(.system(size: 18))
-                                        .foregroundColor(Color.luxuryGold)
-                                        .frame(width: 28)
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text("Maps app")
-                                            .font(Font.bodySans(15, weight: .medium))
-                                            .foregroundColor(Color.luxuryCream)
-                                        Text(preferredMapsApp == "google" ? "Google Maps" : "Apple Maps")
-                                            .font(Font.bodySans(12, weight: .regular))
-                                            .foregroundColor(Color.luxuryMuted)
-                                    }
-                                    Spacer()
-                                    Image(systemName: "chevron.right")
-                                        .font(.system(size: 12))
-                                        .foregroundColor(Color.luxuryMuted)
-                                }
-                                .padding(.vertical, 4)
+                        // MARK: - Support & Safety (Apple §1.2) + Legal (Apple §3.1.2 + §5.1.1)
+                        SettingsGroup(title: "Support & safety") {
+                            if let contactURL = URL(string: "mailto:hello@yourdategenie.com") {
+                                SettingsLinkRow(title: "Contact support", url: contactURL)
+                                YDGListDivider(leadingInset: YDGSpace.md)
                             }
-                            .buttonStyle(.plain)
-
-                            if Config.isGoogleCalendarEnabled {
-                                Button {
-                                    showCalendarPicker = true
-                                } label: {
-                                    HStack(spacing: 14) {
-                                        Image(systemName: "calendar")
-                                            .font(.system(size: 18))
-                                            .foregroundColor(Color.luxuryGold)
-                                            .frame(width: 28)
-                                        VStack(alignment: .leading, spacing: 2) {
-                                            Text("Calendar for date nights")
-                                                .font(Font.bodySans(15, weight: .medium))
-                                                .foregroundColor(Color.luxuryCream)
-                                            Text(calendarSync.provider.displayName)
-                                                .font(Font.bodySans(12, weight: .regular))
-                                                .foregroundColor(Color.luxuryMuted)
-                                        }
-                                        Spacer()
-                                        if isConnectingGoogleCalendar {
-                                            ProgressView()
-                                                .tint(Color.luxuryGold)
-                                        } else {
-                                            Image(systemName: "chevron.right")
-                                                .font(.system(size: 12))
-                                                .foregroundColor(Color.luxuryMuted)
-                                        }
-                                    }
-                                    .padding(.vertical, 4)
-                                }
-                                .buttonStyle(.plain)
-                                .disabled(isConnectingGoogleCalendar)
-                            }
-                            
-                            SettingsRow(
-                                icon: "bell.fill",
-                                title: "Notifications",
-                                subtitle: "Reminders and alerts"
-                            )
-                            SettingsRow(
-                                icon: "moon.fill",
-                                title: "Appearance",
-                                subtitle: "Theme and display"
-                            )
-                            SettingsRow(
-                                icon: "lock.fill",
-                                title: "Privacy",
-                                subtitle: "Data and security"
-                            )
-
-                            #if DEBUG
-                            Button {
-                                coordinator.replayIntroOnboarding()
-                                dismiss()
-                            } label: {
-                                HStack(spacing: 14) {
-                                    Image(systemName: "arrow.counterclockwise")
-                                        .font(.system(size: 18))
-                                        .foregroundColor(Color.luxuryGold)
-                                        .frame(width: 28)
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text("Reset onboarding flags")
-                                            .font(Font.bodySans(15, weight: .medium))
-                                            .foregroundColor(Color.luxuryCream)
-                                        Text("Debug only")
-                                            .font(Font.bodySans(12, weight: .regular))
-                                            .foregroundColor(Color.luxuryMuted)
-                                    }
-                                    Spacer()
-                                }
-                                .padding(.vertical, 4)
-                            }
-                            .buttonStyle(.plain)
-                            #endif
-                        }
-                        .padding(18)
-                        .luxuryCard()
-
-                        // MARK: - Legal (Apple §3.1.2 + §5.1.1)
-                        Text("Legal")
-                            .font(Font.bodySans(14, weight: .medium))
-                            .foregroundColor(Color.luxuryCreamMuted)
-                            .padding(.horizontal, 4)
-
-                        VStack(spacing: 12) {
+                            SettingsValueRow(title: "Report a concern", value: nil) { showingReportSheet = true }
                             if let privacyURL = URL(string: "https://yourdategenie.com/privacy-policy") {
-                                Link(destination: privacyURL) {
-                                    HStack(spacing: 14) {
-                                        Image(systemName: "hand.raised.fill")
-                                            .font(.system(size: 18))
-                                            .foregroundColor(Color.luxuryGold)
-                                            .frame(width: 28)
-                                        VStack(alignment: .leading, spacing: 2) {
-                                            Text("Privacy Policy")
-                                                .font(Font.bodySans(15, weight: .medium))
-                                                .foregroundColor(Color.luxuryCream)
-                                            Text("How we handle your data")
-                                                .font(Font.bodySans(12, weight: .regular))
-                                                .foregroundColor(Color.luxuryMuted)
-                                        }
-                                        Spacer()
-                                        Image(systemName: "arrow.up.right.square")
-                                            .font(.system(size: 13))
-                                            .foregroundColor(Color.luxuryMuted)
-                                    }
-                                    .padding(.vertical, 4)
-                                }
+                                YDGListDivider(leadingInset: YDGSpace.md)
+                                SettingsLinkRow(title: "Privacy policy", url: privacyURL)
                             }
                             if let termsURL = URL(string: "https://yourdategenie.com/terms") {
-                                Link(destination: termsURL) {
-                                    HStack(spacing: 14) {
-                                        Image(systemName: "doc.text.fill")
-                                            .font(.system(size: 18))
-                                            .foregroundColor(Color.luxuryGold)
-                                            .frame(width: 28)
-                                        VStack(alignment: .leading, spacing: 2) {
-                                            Text("Terms of Use")
-                                                .font(Font.bodySans(15, weight: .medium))
-                                                .foregroundColor(Color.luxuryCream)
-                                            Text("Your agreement with Your Date Genie LLC")
-                                                .font(Font.bodySans(12, weight: .regular))
-                                                .foregroundColor(Color.luxuryMuted)
-                                        }
-                                        Spacer()
-                                        Image(systemName: "arrow.up.right.square")
-                                            .font(.system(size: 13))
-                                            .foregroundColor(Color.luxuryMuted)
-                                    }
-                                    .padding(.vertical, 4)
-                                }
+                                YDGListDivider(leadingInset: YDGSpace.md)
+                                SettingsLinkRow(title: "Terms of use", url: termsURL)
                             }
                         }
-                        .padding(18)
-                        .luxuryCard()
-
-                        // MARK: - Support & Safety (Apple §1.2)
-                        Text("Support & safety")
-                            .font(Font.bodySans(14, weight: .medium))
-                            .foregroundColor(Color.luxuryCreamMuted)
-                            .padding(.horizontal, 4)
-
-                        VStack(spacing: 12) {
-                            if let contactURL = URL(string: "mailto:hello@yourdategenie.com") {
-                                Link(destination: contactURL) {
-                                    HStack(spacing: 14) {
-                                        Image(systemName: "envelope.fill")
-                                            .font(.system(size: 18))
-                                            .foregroundColor(Color.luxuryGold)
-                                            .frame(width: 28)
-                                        VStack(alignment: .leading, spacing: 2) {
-                                            Text("Contact Support")
-                                                .font(Font.bodySans(15, weight: .medium))
-                                                .foregroundColor(Color.luxuryCream)
-                                            Text("hello@yourdategenie.com")
-                                                .font(Font.bodySans(12, weight: .regular))
-                                                .foregroundColor(Color.luxuryMuted)
-                                        }
-                                        Spacer()
-                                        Image(systemName: "arrow.up.right.square")
-                                            .font(.system(size: 13))
-                                            .foregroundColor(Color.luxuryMuted)
-                                    }
-                                    .padding(.vertical, 4)
-                                }
-                            }
-
-                            Button {
-                                showingReportSheet = true
-                            } label: {
-                                HStack(spacing: 14) {
-                                    Image(systemName: "exclamationmark.bubble.fill")
-                                        .font(.system(size: 18))
-                                        .foregroundColor(Color.luxuryGold)
-                                        .frame(width: 28)
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text("Report a Concern")
-                                            .font(Font.bodySans(15, weight: .medium))
-                                            .foregroundColor(Color.luxuryCream)
-                                        Text("Report safety or content issues")
-                                            .font(Font.bodySans(12, weight: .regular))
-                                            .foregroundColor(Color.luxuryMuted)
-                                    }
-                                    Spacer()
-                                    Image(systemName: "chevron.right")
-                                        .font(.system(size: 12))
-                                        .foregroundColor(Color.luxuryMuted)
-                                }
-                                .padding(.vertical, 4)
-                            }
-                            .buttonStyle(.plain)
-                        }
-                        .padding(18)
-                        .luxuryCard()
 
                         // MARK: - App tour & intro
-                        VStack(spacing: 12) {
-                            Button {
+                        SettingsGroup(title: "Help") {
+                            SettingsValueRow(title: "Show home tour again", value: nil) {
                                 coordinator.replayHomeTutorial()
                                 dismiss()
-                            } label: {
-                                HStack(spacing: 14) {
-                                    Image(systemName: "questionmark.circle.fill")
-                                        .font(.system(size: 18))
-                                        .foregroundColor(Color.luxuryGold)
-                                        .frame(width: 28)
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text("Show home tutorial again")
-                                            .font(Font.bodySans(15, weight: .medium))
-                                            .foregroundColor(Color.luxuryCream)
-                                        Text("Quick walkthrough of the home screen")
-                                            .font(Font.bodySans(12, weight: .regular))
-                                            .foregroundColor(Color.luxuryMuted)
-                                    }
-                                    Spacer()
-                                    Image(systemName: "chevron.right")
-                                        .font(.system(size: 12))
-                                        .foregroundColor(Color.luxuryMuted)
-                                }
-                                .padding(.vertical, 4)
                             }
-                            .buttonStyle(.plain)
-
-                            Button {
+                            YDGListDivider(leadingInset: YDGSpace.md)
+                            SettingsValueRow(title: "Replay intro slides", value: nil) {
                                 coordinator.replayIntroOnboarding()
                                 dismiss()
-                            } label: {
-                                HStack(spacing: 14) {
-                                    Image(systemName: "sparkles")
-                                        .font(.system(size: 18))
-                                        .foregroundColor(Color.luxuryGold)
-                                        .frame(width: 28)
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text("Replay intro slides")
-                                            .font(Font.bodySans(15, weight: .medium))
-                                            .foregroundColor(Color.luxuryCream)
-                                        Text("Watch the welcome tour again")
-                                            .font(Font.bodySans(12, weight: .regular))
-                                            .foregroundColor(Color.luxuryMuted)
-                                    }
-                                    Spacer()
-                                    Image(systemName: "chevron.right")
-                                        .font(.system(size: 12))
-                                        .foregroundColor(Color.luxuryMuted)
-                                }
-                                .padding(.vertical, 4)
                             }
-                            .buttonStyle(.plain)
+                            #if DEBUG
+                            YDGListDivider(leadingInset: YDGSpace.md)
+                            SettingsValueRow(title: "Reset onboarding flags", value: "Debug") {
+                                coordinator.replayIntroOnboarding()
+                                dismiss()
+                            }
+                            #endif
                         }
-                        .padding(18)
-                        .luxuryCard()
                     }
-                    .padding(20)
+                    .padding(.horizontal, YDGSpace.margin)
+                    .padding(.bottom, YDGSpace.xxl)
                 }
             }
             .sheet(isPresented: $showEditAccount) {
@@ -543,9 +236,8 @@ struct SettingsSheetView: View {
             } message: {
                 Text("Free-evening detection and adding plans to your calendar use this choice. Google Calendar asks for permission the first time.")
             }
-            .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
+            .toolbarBackground(Color.ydgBase, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar {
@@ -554,8 +246,8 @@ struct SettingsSheetView: View {
                         dismiss()
                     } label: {
                         Text("Done")
-                            .font(Font.bodySans(15, weight: .semibold))
-                            .foregroundColor(Color.luxuryGold)
+                            .font(.ydg(.body, weight: .semibold))
+                            .foregroundColor(Color.ydgAccent)
                     }
                 }
             }
@@ -563,11 +255,6 @@ struct SettingsSheetView: View {
                 await loadRemotePreferences()
             }
         }
-    }
-
-    private var cloudPreferencesListMinHeight: CGFloat {
-        guard let p = remotePreferences else { return 56 }
-        return CGFloat(max(120, Self.remotePreferenceRows(for: p).count * 40))
     }
 
     private func loadRemotePreferences() async {
@@ -610,61 +297,82 @@ struct SettingsSheetView: View {
     }
 }
 
-// MARK: - Settings Account Row (read-only label + value)
-private struct SettingsAccountRow: View {
-    let icon: String
-    let label: String
-    let value: String
+// MARK: - Settings group (caption + raised card of rows)
+private struct SettingsGroup<Content: View>: View {
+    let title: String
+    @ViewBuilder var content: Content
 
     var body: some View {
-        HStack(spacing: 14) {
-            Image(systemName: icon)
-                .font(.system(size: 16))
-                .foregroundColor(Color.luxuryGold)
-                .frame(width: 28)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(label)
-                    .font(Font.bodySans(12, weight: .medium))
-                    .foregroundColor(Color.luxuryMuted)
-                Text(value)
-                    .font(Font.bodySans(15, weight: .regular))
-                    .foregroundColor(Color.luxuryCream)
-            }
-            Spacer()
+        VStack(alignment: .leading, spacing: YDGSpace.xs) {
+            Text(title)
+                .ydgText(.caption)
+                .padding(.horizontal, YDGSpace.xxs)
+            VStack(spacing: 0) { content }
+                .background(Color.ydgRaised, in: RoundedRectangle(cornerRadius: YDGRadius.card, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: YDGRadius.card, style: .continuous)
+                        .stroke(Color.ydgBorder, lineWidth: 1)
+                )
         }
-        .padding(.vertical, 4)
     }
 }
 
-// MARK: - Settings Row
-private struct SettingsRow: View {
-    let icon: String
+// MARK: - Settings row (title · trailing value · chevron)
+private struct SettingsValueRow: View {
     let title: String
-    let subtitle: String
+    let value: String?
+    var isLoading: Bool = false
+    var showsChevron: Bool = true
+    let action: () -> Void
 
     var body: some View {
-        HStack(spacing: 14) {
-            Image(systemName: icon)
-                .font(.system(size: 18))
-                .foregroundColor(Color.luxuryGold)
-                .frame(width: 28)
-
-            VStack(alignment: .leading, spacing: 2) {
+        Button(action: action) {
+            HStack(spacing: YDGSpace.sm) {
                 Text(title)
-                    .font(Font.bodySans(15, weight: .medium))
-                    .foregroundColor(Color.luxuryCream)
-                Text(subtitle)
-                    .font(Font.bodySans(12, weight: .regular))
-                    .foregroundColor(Color.luxuryMuted)
+                    .ydgText(.body, weight: .regular)
+                Spacer(minLength: YDGSpace.sm)
+                if let value {
+                    Text(value)
+                        .ydgText(.body, weight: .regular, color: .ydgTextSecondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+                if isLoading {
+                    ProgressView().tint(Color.ydgTextSecondary)
+                } else if showsChevron {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(Color.ydgTextTertiary)
+                }
             }
-
-            Spacer()
-
-            Image(systemName: "chevron.right")
-                .font(.system(size: 12))
-                .foregroundColor(Color.luxuryMuted)
+            .padding(.horizontal, YDGSpace.md)
+            .frame(minHeight: 52)
+            .contentShape(Rectangle())
         }
-        .padding(.vertical, 4)
+        .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Settings external link row
+private struct SettingsLinkRow: View {
+    let title: String
+    let url: URL
+
+    var body: some View {
+        Link(destination: url) {
+            HStack(spacing: YDGSpace.sm) {
+                Text(title)
+                    .ydgText(.body, weight: .regular)
+                Spacer(minLength: YDGSpace.sm)
+                Image(systemName: "arrow.up.right")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(Color.ydgTextTertiary)
+            }
+            .padding(.horizontal, YDGSpace.md)
+            .frame(minHeight: 52)
+            .contentShape(Rectangle())
+        }
+        .accessibilityHint("Opens outside the app")
     }
 }
 

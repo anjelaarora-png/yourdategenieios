@@ -130,7 +130,7 @@ struct GiftFinderView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color.backgroundPrimary
+                Color.ydgBase
                     .ignoresSafeArea()
 
                 if showUnwrapAnimation {
@@ -140,11 +140,10 @@ struct GiftFinderView: View {
                 } else {
                     ScrollView(showsIndicators: false) {
                         VStack(spacing: 0) {
-                            headerSection
-                                .padding(.bottom, 20)
-
-                            giftFinderTabBar
-                                .padding(.bottom, 24)
+                            if !(selectedTab == .find && showResults) {
+                                headerSection
+                                    .padding(.bottom, YDGSpace.lg)
+                            }
 
                             switch selectedTab {
                             case .find:
@@ -174,17 +173,21 @@ struct GiftFinderView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .principal) {
-                    Text("Gift Finder")
-                        .font(Font.bodySerif(18, weight: .regular))
-                        .foregroundColor(Color.accentGold)
+                    if !showUnwrapAnimation {
+                        giftFinderTabBar
+                    }
                 }
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Close") { dismiss() }
-                        .font(Font.bodySans(16, weight: .medium))
-                        .foregroundColor(Color.accentGold)
+                    Button { dismiss() } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundColor(Color.ydgTextPrimary)
+                            .frame(width: 44, height: 44)
+                    }
+                    .accessibilityLabel("Close")
                 }
             }
-            .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
+            .toolbarBackground(Color.ydgBase, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .onAppear {
                 if reduceMotion { showUnwrapAnimation = false }
@@ -214,106 +217,74 @@ struct GiftFinderView: View {
         }
     }
 
-    // MARK: - Tab Bar (charcoal, maroon underline — gold reserved for the one CTA per screen)
+    // MARK: - Tab switcher (lives in the nav bar)
     private var giftFinderTabBar: some View {
-        HStack(spacing: 0) {
-            ForEach(GiftFinderTab.allCases, id: \.self) { tab in
-                Button {
-                    animate { selectedTab = tab }
-                } label: {
-                    VStack(spacing: 8) {
-                        Text(tab.rawValue)
-                            .font(Font.bodySans(14, weight: selectedTab == tab ? .semibold : .regular))
-                            .foregroundColor(selectedTab == tab ? Color.textPrimary : Color.luxuryCreamMuted)
-
-                        Rectangle()
-                            .fill(selectedTab == tab ? Color.accentGold : Color.clear)
-                            .frame(height: 2)
-                    }
-                }
-                .frame(maxWidth: .infinity)
-                .buttonStyle(.plain)
-            }
-        }
-        .padding(.horizontal, 20)
-        .overlay(
-            Rectangle()
-                .fill(Color.maroonBorderTint)
-                .frame(height: 1),
-            alignment: .bottom
+        YDGSegmentedControl(
+            options: GiftFinderTab.allCases,
+            selection: Binding(get: { selectedTab }, set: { tab in animate { selectedTab = tab } }),
+            title: { $0 == .find ? "Ideas" : $0.rawValue }
         )
+        .frame(width: 230)
     }
 
     // MARK: - Header
     private var headerSection: some View {
-        VStack(spacing: 12) {
-            ZStack {
-                Circle()
-                    .fill(Color.luxeSurfaceTintStrong)
-                    .overlay(Circle().stroke(Color.luxeSurfaceBorder, lineWidth: 1))
-                    .frame(width: 80, height: 80)
+        VStack(alignment: .leading, spacing: YDGSpace.xs) {
+            Text(selectedTab == .find ? "Find the perfect gift" : (selectedTab == .saved ? "Saved gifts" : "Gifts you bought"))
+                .ydgText(.title1)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityAddTraits(.isHeader)
 
-                Image(systemName: "gift.fill")
-                    .font(.system(size: 34))
-                    .foregroundColor(Color.accentGold)
+            if selectedTab == .find {
+                Text("Thoughtful picks for your person, tuned to the occasion.")
+                    .ydgText(.body, color: .ydgTextSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-
-            Text("Find the Perfect Gift")
-                .font(Font.bodySerif(28, weight: .regular))
-                .foregroundColor(Color.accentGold)
-
-            Text("Thoughtful picks for your person, tuned to the occasion")
-                .font(Font.bodySans(15, weight: .regular))
-                .foregroundColor(Color.luxuryCreamMuted)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 24)
 
             if prefilledFromPartner && selectedTab == .find && !showResults {
-                Text("✨ Pre-filled from \(prefillPartnerName.isEmpty ? "your profile" : prefillPartnerName)")
-                    .font(Font.bodySans(12, weight: .semibold))
-                    .foregroundColor(Color.textPrimary)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 7)
-                    .goldHighlightMaroonAccent(cornerRadius: 20)
+                Label("Pre-filled from \(prefillPartnerName.isEmpty ? "your profile" : prefillPartnerName)", systemImage: "sparkles")
+                    .font(.ydg(.footnote, weight: .semibold))
+                    .foregroundColor(Color.ydgHighlight)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(Capsule().fill(Color.ydgHighlightSubtle))
+                    .padding(.top, YDGSpace.xxs)
             }
 
-            if let plan = datePlan {
+            if let plan = datePlan, selectedTab == .find {
                 dateContextBadge(plan: plan)
+                    .padding(.top, YDGSpace.xs)
             }
         }
-        .padding(.top, 20)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, YDGSpace.margin)
+        .padding(.top, YDGSpace.xs)
     }
 
     private func dateContextBadge(plan: DatePlan) -> some View {
-        VStack(spacing: 8) {
-            HStack(spacing: 8) {
-                Image(systemName: "calendar")
-                    .font(.system(size: 12))
-                    .foregroundColor(Color.luxuryCreamMuted)
-                Text("Your date: \(plan.title)")
-                    .font(Font.bodySerif(15, weight: .regular))
-                    .foregroundColor(Color.textPrimary)
+        HStack(spacing: YDGSpace.sm) {
+            YDGIconTile(systemName: "calendar", size: 36)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("For your date")
+                    .ydgText(.caption)
+                Text(plan.title)
+                    .ydgText(.subhead, weight: .semibold)
                     .lineLimit(1)
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
-            .goldHighlightMaroonAccent(cornerRadius: 20)
-
+            Spacer(minLength: 0)
             Button {
                 openInAppleMaps(query: "gift shop", near: mapSearchLocation)
             } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "mappin.circle.fill")
-                        .font(.system(size: 11))
-                    Text(effectiveLocationDisplay)
-                        .font(Font.bodySans(11, weight: .regular))
-                        .lineLimit(1)
-                    Image(systemName: "arrow.up.right")
-                        .font(.system(size: 9))
-                }
-                .foregroundColor(Color.luxuryCreamMuted)
+                Label(effectiveLocationDisplay, systemImage: "mappin")
+                    .font(.ydg(.footnote, weight: .medium))
+                    .foregroundColor(Color.ydgTextSecondary)
+                    .lineLimit(1)
+                    .frame(minHeight: 44)
             }
+            .buttonStyle(.plain)
+            .accessibilityHint("Opens gift shops near you in Maps")
         }
+        .ydgCard(padding: YDGSpace.sm)
     }
 
     // MARK: - Input Form (24) — core picks + the two open boxes up top, advanced behind "+ More"
@@ -384,21 +355,11 @@ struct GiftFinderView: View {
             Button {
                 generateGifts()
             } label: {
-                HStack(spacing: 10) {
-                    if isLoading {
-                        ProgressView().tint(Color.backgroundPrimary)
-                    } else {
-                        Image(systemName: "sparkles")
-                        Text("Find Gift Ideas")
-                            .font(Font.bodySans(16, weight: .semibold))
-                    }
-                }
-                .frame(maxWidth: .infinity)
+                Label(selectedOccasion.isEmpty ? "Pick an occasion to start" : "Find gift ideas", systemImage: "sparkles")
             }
-            .buttonStyle(LuxuryGoldButtonStyle())
+            .buttonStyle(YDGButtonStyle(kind: .primary, isLoading: isLoading))
             .disabled(isLoading || selectedOccasion.isEmpty)
-            .opacity(selectedOccasion.isEmpty ? 0.55 : 1)
-            .padding(.horizontal, 20)
+            .padding(.horizontal, YDGSpace.margin)
         }
     }
 
@@ -421,9 +382,9 @@ struct GiftFinderView: View {
                 .padding(.horizontal, 18)
                 .padding(.vertical, 14)
                 .frame(maxWidth: .infinity)
-                .background(Color.luxeSurfaceTintStrong)
+                .background(Color.ydgRaised)
                 .cornerRadius(14)
-                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.maroonBorderTint, lineWidth: 1))
+                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.ydgBorder, lineWidth: 1))
             }
             .buttonStyle(.plain)
             .padding(.horizontal, 20)
@@ -495,37 +456,27 @@ struct GiftFinderView: View {
             }
 
             // Header with Refine + New Search
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(filteredGifts.isEmpty && giftLoadError != nil ? "Gift ideas" : "\(filteredGifts.count) gift ideas")
-                        .font(Font.bodySerif(20, weight: .regular))
-                        .foregroundColor(Color.accentGold)
+            VStack(alignment: .leading, spacing: YDGSpace.xxs) {
+                Text(filteredGifts.isEmpty && giftLoadError != nil ? "Gift ideas" : "\(filteredGifts.count) gift ideas")
+                    .ydgText(.title1)
+                    .accessibilityAddTraits(.isHeader)
 
-                    Text(effectiveLocation.isEmpty ? "With stores near you" : "With stores near \(effectiveLocationDisplay)")
-                        .font(Font.bodySans(12, weight: .regular))
-                        .foregroundColor(Color.luxuryCreamMuted)
+                HStack(spacing: YDGSpace.sm) {
+                    Text(resultsMetaLine)
+                        .ydgText(.subhead, weight: .regular, color: .ydgTextSecondary)
                         .lineLimit(1)
-                }
-
-                Spacer()
-
-                HStack(spacing: 10) {
-                    ghostPill(icon: "slider.horizontal.3", title: "Refine") {
-                        animate { showResults = false }
-                    }
-                    ghostPill(icon: "magnifyingglass", title: "New") {
-                        resetSearch()
-                    }
+                    Spacer(minLength: 0)
+                    Button("Refine") { animate { showResults = false } }
+                        .buttonStyle(.ydgTertiary)
+                    Button("New") { resetSearch() }
+                        .buttonStyle(.ydgTertiary)
                 }
             }
-            .padding(.horizontal, 20)
+            .padding(.horizontal, YDGSpace.margin)
+            .padding(.top, YDGSpace.xs)
 
             // Budget filter
-            VStack(alignment: .leading, spacing: 10) {
-                Text("Filter by budget")
-                    .font(Font.bodySans(13, weight: .semibold))
-                    .foregroundColor(Color.luxuryCreamMuted)
-                    .padding(.horizontal, 20)
+            VStack(alignment: .leading, spacing: YDGSpace.xs) {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
                         FilterChip(title: "All", isSelected: resultBudgetFilter.isEmpty) {
@@ -546,7 +497,7 @@ struct GiftFinderView: View {
             }
 
             // Gift cards
-            VStack(spacing: 14) {
+            VStack(spacing: YDGSpace.sm) {
                 ForEach(filteredGifts) { gift in
                     GiftResultCard(
                         gift: gift,
@@ -565,21 +516,21 @@ struct GiftFinderView: View {
             Button {
                 generateGifts()
             } label: {
-                HStack(spacing: 8) {
-                    if isLoading {
-                        ProgressView().tint(Color.backgroundPrimary)
-                    } else {
-                        Image(systemName: "sparkles")
-                        Text("Get More Ideas")
-                            .font(Font.bodySans(16, weight: .semibold))
-                    }
-                }
-                .frame(maxWidth: .infinity)
+                Label("Get more ideas", systemImage: "sparkles")
             }
-            .buttonStyle(LuxuryGoldButtonStyle())
+            .buttonStyle(YDGButtonStyle(kind: .primary, isLoading: isLoading))
             .disabled(isLoading)
-            .padding(.horizontal, 20)
+            .padding(.horizontal, YDGSpace.margin)
         }
+    }
+
+    /// "Anniversary · $50–$100 · Italian food" — what these ideas were tuned for.
+    private var resultsMetaLine: String {
+        let parts = [selectedOccasion, selectedBudget].filter { !$0.isEmpty }
+        if parts.isEmpty {
+            return effectiveLocation.isEmpty ? "With stores near you" : "With stores near \(effectiveLocationDisplay)"
+        }
+        return parts.joined(separator: " · ")
     }
 
     private func errorCard(_ error: String) -> some View {
@@ -588,7 +539,7 @@ struct GiftFinderView: View {
                 Image(systemName: "wifi.exclamationmark")
                     .font(.system(size: 18))
                 Text("Couldn't load gift ideas")
-                    .font(Font.bodySerif(16, weight: .regular))
+                    .font(Font.ydgDisplay(16))
             }
             .foregroundColor(Color.textPrimary)
             Text("Check your connection and tap Try again for AI-powered suggestions.")
@@ -598,14 +549,9 @@ struct GiftFinderView: View {
             Button {
                 generateGifts()
             } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "arrow.clockwise")
-                    Text("Try again")
-                        .font(Font.bodySans(14, weight: .semibold))
-                }
-                .frame(maxWidth: .infinity)
+                Label("Try again", systemImage: "arrow.clockwise")
             }
-            .buttonStyle(LuxuryGoldButtonStyle(isSmall: true))
+            .buttonStyle(YDGButtonStyle(kind: .secondary, compact: true))
         }
         .padding(20)
         .frame(maxWidth: .infinity)
@@ -642,7 +588,7 @@ struct GiftFinderView: View {
                 .foregroundColor(Color.textPrimary)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 14)
-                .background(Color.luxeSurfaceTintStrong)
+                .background(Color.ydgRaised)
                 .cornerRadius(12)
                 .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.luxeSurfaceBorder, lineWidth: 1))
             }
@@ -726,34 +672,23 @@ struct GiftFinderView: View {
 
     private func ghostPill(icon: String, title: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            HStack(spacing: 6) {
-                Image(systemName: icon)
-                    .font(.system(size: 12))
-                Text(title)
-                    .font(Font.bodySans(13, weight: .medium))
-            }
-            .foregroundColor(Color.textPrimary)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 8)
-            .background(Color.luxeSurfaceTintStrong)
-            .cornerRadius(20)
-            .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.luxeSurfaceBorder, lineWidth: 1))
+            Label(title, systemImage: icon)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(YDGButtonStyle(kind: .secondary, fullWidth: false, compact: true))
     }
 
     private func giftTextField(placeholder: String, text: Binding<String>) -> some View {
-        TextField("", text: text, prompt: Text(placeholder).foregroundColor(Color.luxuryCreamMuted.opacity(0.7)))
-            .font(Font.bodySans(15, weight: .regular))
-            .foregroundColor(Color.textPrimary)
+        TextField("", text: text, prompt: Text(placeholder).foregroundColor(Color.ydgTextTertiary))
+            .font(.ydg(.body))
+            .foregroundColor(Color.ydgTextPrimary)
             .padding(16)
             .luxeInsetSurface(cornerRadius: 14)
     }
 
     private func giftTextEditor(placeholder: String, text: Binding<String>) -> some View {
         TextEditor(text: text)
-            .font(Font.bodySans(15, weight: .regular))
-            .foregroundColor(Color.textPrimary)
+            .font(.ydg(.body))
+            .foregroundColor(Color.ydgTextPrimary)
             .scrollContentBackground(.hidden)
             .frame(height: 80)
             .padding(14)
@@ -762,8 +697,8 @@ struct GiftFinderView: View {
                 Group {
                     if text.wrappedValue.isEmpty {
                         Text(placeholder)
-                            .font(Font.bodySans(15, weight: .regular))
-                            .foregroundColor(Color.luxuryCreamMuted.opacity(0.7))
+                            .font(.ydg(.body))
+                            .foregroundColor(Color.ydgTextTertiary)
                             .padding(.horizontal, 18)
                             .padding(.vertical, 22)
                             .allowsHitTesting(false)
@@ -1113,25 +1048,28 @@ struct GiftOccasionCard: View {
 
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 8) {
+            VStack(spacing: YDGSpace.xs) {
                 Text(emoji)
-                    .font(.system(size: 28))
+                    .font(.system(size: 26))
+                    .accessibilityHidden(true)
                 Text(title)
-                    .font(Font.bodySans(12, weight: .medium))
-                    .foregroundColor(isSelected ? Color.luxuryMaroon : Color.luxuryCream)
+                    .font(.ydg(.footnote, weight: isSelected ? .semibold : .medium))
+                    .foregroundColor(isSelected ? Color.ydgAccent : Color.ydgTextPrimary)
                     .multilineTextAlignment(.center)
                     .lineLimit(2)
+                    .minimumScaleFactor(0.85)
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 14)
-            .background(isSelected ? AnyShapeStyle(LinearGradient.goldShimmer) : AnyShapeStyle(Color.luxeSurfaceTintStrong))
-            .cornerRadius(14)
+            .padding(.vertical, YDGSpace.sm)
+            .background(isSelected ? Color.ydgAccentSubtle : Color.ydgRaised,
+                        in: RoundedRectangle(cornerRadius: YDGRadius.card, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 14)
-                    .stroke(isSelected ? Color.clear : Color.luxeSurfaceBorder, lineWidth: 1)
+                RoundedRectangle(cornerRadius: YDGRadius.card, style: .continuous)
+                    .stroke(isSelected ? Color.ydgAccent : Color.ydgBorder, lineWidth: isSelected ? 1.5 : 1)
             )
         }
-        .buttonStyle(ScaleButtonStyle())
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }
 
@@ -1142,20 +1080,7 @@ struct GiftChip: View {
     let action: () -> Void
 
     var body: some View {
-        Button(action: action) {
-            Text(text)
-                .font(Font.bodySans(13, weight: isSelected ? .semibold : .regular))
-                .foregroundColor(isSelected ? Color.luxuryMaroon : Color.luxuryCream)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
-                .background(isSelected ? AnyShapeStyle(LinearGradient.goldShimmer) : AnyShapeStyle(Color.luxeSurfaceTintStrong))
-                .cornerRadius(20)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 20)
-                        .stroke(isSelected ? Color.clear : Color.luxeSurfaceBorder, lineWidth: 1)
-                )
-        }
-        .buttonStyle(.plain)
+        YDGChip(title: text, isSelected: isSelected, showsCheckmark: false, action: action)
     }
 }
 
@@ -1166,20 +1091,7 @@ private struct FilterChip: View {
     let action: () -> Void
 
     var body: some View {
-        Button(action: action) {
-            Text(title)
-                .font(Font.bodySans(12, weight: isSelected ? .semibold : .regular))
-                .foregroundColor(isSelected ? Color.luxuryMaroon : Color.luxuryCreamMuted)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 8)
-                .background(isSelected ? AnyShapeStyle(LinearGradient.goldShimmer) : AnyShapeStyle(Color.luxeSurfaceTintStrong))
-                .cornerRadius(16)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16)
-                        .stroke(isSelected ? Color.clear : Color.luxeSurfaceBorder, lineWidth: 1)
-                )
-        }
-        .buttonStyle(.plain)
+        YDGChip(title: title, isSelected: isSelected, showsCheckmark: false, action: action)
     }
 }
 
@@ -1197,16 +1109,13 @@ struct NearbyStoreCard: View {
                     Text(store.emoji)
                         .font(.system(size: 26))
                         .frame(width: 44, height: 44)
-                        .background(Color.accentGold.opacity(0.15))
-                        .cornerRadius(10)
+                        .background(Color.ydgOverlay, in: RoundedRectangle(cornerRadius: YDGRadius.chip, style: .continuous))
 
                     VStack(alignment: .leading, spacing: 2) {
                         Text(store.name)
-                            .font(Font.bodySerif(14, weight: .semibold))
-                            .foregroundColor(Color.textPrimary)
+                            .ydgText(.subhead, weight: .semibold)
                         Text(store.category)
-                            .font(Font.bodySans(10, weight: .regular))
-                            .foregroundColor(Color.luxuryCreamMuted)
+                            .ydgText(.footnote, color: .ydgTextSecondary)
                             .lineLimit(1)
                     }
                 }
@@ -1214,12 +1123,11 @@ struct NearbyStoreCard: View {
                 HStack(spacing: 4) {
                     ForEach(store.giftIdeas.prefix(3), id: \.self) { idea in
                         Text(idea)
-                            .font(Font.bodySans(9, weight: .medium))
-                            .foregroundColor(Color.textPrimary)
+                            .font(.ydg(.caption))
+                            .foregroundColor(Color.ydgTextPrimary)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 3)
-                            .background(Color.accentGold.opacity(0.2))
-                            .cornerRadius(4)
+                            .background(Color.ydgOverlay, in: RoundedRectangle(cornerRadius: 4))
                     }
                 }
 
@@ -1227,15 +1135,14 @@ struct NearbyStoreCard: View {
                     Image(systemName: "map.fill")
                         .font(.system(size: 10))
                     Text("Open in Maps")
-                        .font(Font.bodySans(11, weight: .semibold))
+                        .font(.ydg(.footnote, weight: .semibold))
                     Image(systemName: "arrow.up.right")
                         .font(.system(size: 9))
                 }
-                .foregroundColor(Color.luxuryCreamMuted)
+                .foregroundColor(Color.ydgTextSecondary)
             }
-            .padding(14)
-            .frame(width: 180)
-            .goldHighlightMaroonAccent(cornerRadius: 14)
+            .frame(width: 180, alignment: .leading)
+            .ydgCard(padding: YDGSpace.sm)
         }
         .buttonStyle(ScaleButtonStyle())
     }
@@ -1248,7 +1155,7 @@ struct NearbyStoreCard: View {
     }
 }
 
-// MARK: - Gift Result Card (24b) — cream itinerary-style card with maroon left border
+// MARK: - Gift Result Card (24b)
 struct GiftResultCard: View {
     let gift: GiftSuggestion
     var isSaved: Bool = false
@@ -1259,125 +1166,57 @@ struct GiftResultCard: View {
     var onFindNearby: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: YDGSpace.sm) {
             Button(action: onOpenDetail) {
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack(alignment: .top, spacing: 14) {
+                VStack(alignment: .leading, spacing: YDGSpace.sm) {
+                    HStack(alignment: .top, spacing: YDGSpace.sm) {
                         Text(gift.emoji)
-                            .font(.system(size: 38))
-                            .frame(width: 58, height: 58)
-                            .background(Color.accentGold.opacity(0.12))
-                            .cornerRadius(14)
+                            .font(.system(size: 32))
+                            .frame(width: 72, height: 72)
+                            .background(Color.ydgOverlay, in: RoundedRectangle(cornerRadius: YDGRadius.chip, style: .continuous))
+                            .accessibilityHidden(true)
 
-                        VStack(alignment: .leading, spacing: 6) {
-                            HStack {
-                                Text(gift.name)
-                                    .font(Font.bodySerif(17, weight: .semibold))
-                                    .foregroundColor(Color.textOnCard)
-                                    .multilineTextAlignment(.leading)
-                                Spacer()
-                                if isBought {
-                                    badge(text: "Bought", filled: true)
-                                } else {
-                                    badge(text: gift.priceRange, filled: false)
-                                }
-                            }
-                            Text(gift.description)
-                                .font(Font.bodySans(13, weight: .regular))
-                                .foregroundColor(Color.textMutedOnCard)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(gift.name)
+                                .ydgText(.headline)
                                 .multilineTextAlignment(.leading)
-                                .lineLimit(2)
+                                .fixedSize(horizontal: false, vertical: true)
+                            Text(isBought ? "Bought" : gift.priceRange)
+                                .ydgText(.subhead, weight: .semibold, color: isBought ? .ydgSuccess : .ydgTextPrimary)
+                            if !gift.whereToBuy.isEmpty {
+                                Text(gift.whereToBuy)
+                                    .ydgText(.footnote, color: .ydgTextSecondary)
+                                    .lineLimit(1)
+                            }
                         }
+                        Spacer(minLength: 0)
                     }
 
-                    if !gift.whyItFits.isEmpty {
-                        labeledLine(label: "Why it fits", value: gift.whyItFits)
-                    }
-                    if !gift.whereToBuy.isEmpty {
-                        labeledLine(label: "Where to buy", value: gift.whereToBuy)
-                    }
+                    Text(gift.whyItFits.isEmpty ? gift.description : gift.whyItFits)
+                        .ydgText(.subhead, weight: .regular, color: .ydgTextSecondary)
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .accessibilityHint("Shows details")
 
-            // Card actions — maroon accents; gold is reserved for the screen CTA
-            HStack(spacing: 10) {
-                cardButton(icon: "heart.fill", title: isSaved ? "Saved" : "Save", filled: false, disabled: isSaved, action: onSave)
-                cardButton(icon: "mappin.circle.fill", title: "Nearby", filled: false, disabled: false, action: onFindNearby)
-                cardButton(icon: "cart.fill", title: "Shop Now", filled: true, disabled: false, action: onShop)
+            HStack(spacing: YDGSpace.xs) {
+                Button(isSaved ? "Saved" : "Save", action: onSave)
+                    .buttonStyle(YDGButtonStyle(kind: .secondary, fullWidth: false, compact: true))
+                    .disabled(isSaved)
+                Button(action: onFindNearby) {
+                    Image(systemName: "mappin")
+                }
+                .buttonStyle(YDGButtonStyle(kind: .secondary, fullWidth: false, compact: true))
+                .accessibilityLabel("Find nearby")
+                Button("Shop now", action: onShop)
+                    .buttonStyle(YDGButtonStyle(kind: .accentOutline, compact: true))
             }
+            .padding(.top, YDGSpace.xxs)
         }
-        .padding(18)
-        .background(Color.creamCard)
-        .clipShape(RoundedRectangle(cornerRadius: 18))
-        .overlay(
-            Rectangle()
-                .fill(Color.accentMaroon)
-                .frame(width: 4)
-                .clipShape(RoundedRectangle(cornerRadius: 2)),
-            alignment: .leading
-        )
-        .shadow(color: Color.black.opacity(0.25), radius: 10, y: 5)
-    }
-
-    private func badge(text: String, filled: Bool) -> some View {
-        Text(text)
-            .font(Font.bodySans(11, weight: .semibold))
-            .foregroundColor(filled ? Color.luxuryMaroon : Color.accentGold)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 5)
-            .background(filled ? AnyShapeStyle(LinearGradient.goldShimmer) : AnyShapeStyle(Color.accentGold.opacity(0.12)))
-            .cornerRadius(8)
-    }
-
-    private func labeledLine(label: String, value: String) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(label)
-                .font(Font.bodySans(11, weight: .semibold))
-                .foregroundColor(Color.textMutedOnCard)
-            Text(value)
-                .font(Font.bodySans(13, weight: .regular))
-                .foregroundColor(Color.textOnCard)
-                .multilineTextAlignment(.leading)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private func cardButton(icon: String, title: String, filled: Bool, disabled: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack(spacing: 6) {
-                Image(systemName: icon)
-                    .font(.system(size: 12))
-                Text(title)
-                    .font(Font.bodySans(13, weight: .semibold))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.85)
-            }
-            .foregroundColor(
-                filled
-                    ? Color.luxuryMaroon
-                    : (disabled ? Color.textMutedOnCard : Color.accentGold)
-            )
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 12)
-            .background(
-                filled
-                    ? AnyShapeStyle(LinearGradient.goldShimmer)
-                    : AnyShapeStyle(Color.clear)
-            )
-            .cornerRadius(10)
-            .overlay(
-                RoundedRectangle(cornerRadius: 10)
-                    .stroke(
-                        filled
-                            ? Color.clear
-                            : Color.accentGold.opacity(disabled ? 0.2 : 0.55),
-                        lineWidth: 1
-                    )
-            )
-        }
-        .buttonStyle(.plain)
-        .disabled(disabled)
+        .ydgCard()
     }
 }
 
@@ -1404,20 +1243,15 @@ struct GiftDetailSheet: View {
                             Text(gift.emoji)
                                 .font(.system(size: 44))
                                 .frame(width: 72, height: 72)
-                                .background(Color.luxeSurfaceTintStrong)
+                                .background(Color.ydgRaised)
                                 .cornerRadius(16)
-                                .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.maroonBorderTint, lineWidth: 1))
+                                .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.ydgBorder, lineWidth: 1))
                             VStack(alignment: .leading, spacing: 6) {
                                 Text(gift.name)
-                                    .font(Font.bodySerif(22, weight: .regular))
-                                    .foregroundColor(Color.accentGold)
+                                    .ydgText(.title2)
+                                    .fixedSize(horizontal: false, vertical: true)
                                 Text(gift.priceRange)
-                                    .font(Font.bodySans(13, weight: .semibold))
-                                    .foregroundColor(Color.accentGold)
-                                    .padding(.horizontal, 10)
-                                    .padding(.vertical, 4)
-                                    .background(Color.accentGold.opacity(0.15))
-                                    .cornerRadius(8)
+                                    .ydgText(.subhead, weight: .semibold)
                             }
                             Spacer()
                         }
@@ -1442,7 +1276,7 @@ struct GiftDetailSheet: View {
                         Toggle(isOn: $giftWrap) {
                             HStack(spacing: 8) {
                                 Image(systemName: "gift")
-                                    .foregroundColor(Color.accentGold)
+                                    .foregroundColor(Color.ydgTextSecondary)
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text("Add gift wrap")
                                         .font(Font.bodySans(15, weight: .semibold))
@@ -1453,41 +1287,24 @@ struct GiftDetailSheet: View {
                                 }
                             }
                         }
-                        .tint(Color.accentGold)
+                        .tint(Color.ydgAccent)
                         .padding(16)
-                        .background(Color.luxeSurfaceTintStrong)
+                        .background(Color.ydgRaised)
                         .cornerRadius(14)
-                        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.maroonBorderTint, lineWidth: 1))
+                        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.ydgBorder, lineWidth: 1))
 
                         // Attach to date (maroon outline) + Shop Now (the one gold CTA)
                         if let plan = datePlan {
                             Button(action: onAttach) {
-                                HStack(spacing: 8) {
-                                    Image(systemName: isAttached ? "checkmark.circle.fill" : "paperclip")
-                                    Text(isAttached ? "Attached to \(plan.title)" : "Attach to \(plan.title)")
-                                        .font(Font.bodySans(15, weight: .semibold))
-                                        .lineLimit(1)
-                                }
-                                .foregroundColor(isAttached ? Color.luxuryMaroon : Color.accentGold)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 15)
-                                .background(isAttached ? AnyShapeStyle(LinearGradient.goldShimmer) : AnyShapeStyle(Color.clear))
-                                .cornerRadius(14)
-                                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.accentGold.opacity(isAttached ? 0 : 0.55), lineWidth: 1.5))
+                                Label(isAttached ? "Attached to \(plan.title)" : "Attach to \(plan.title)",
+                                      systemImage: isAttached ? "checkmark" : "paperclip")
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(.ydgSecondary)
                             .disabled(isAttached)
                         }
 
-                        Button(action: onShop) {
-                            HStack(spacing: 8) {
-                                Image(systemName: "cart.fill")
-                                Text("Shop Now")
-                                    .font(Font.bodySans(16, weight: .semibold))
-                            }
-                            .frame(maxWidth: .infinity)
-                        }
-                        .buttonStyle(LuxuryGoldButtonStyle())
+                        Button("Shop now", action: onShop)
+                            .buttonStyle(.ydgPrimary)
                     }
                     .padding(20)
                 }
@@ -1495,17 +1312,16 @@ struct GiftDetailSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .principal) {
-                    Text("Gift Details")
-                        .font(Font.bodySerif(18, weight: .regular))
-                        .foregroundColor(Color.accentGold)
+                    Text("Gift details")
+                        .ydgText(.headline)
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") { dismiss() }
-                        .font(Font.bodySans(16, weight: .medium))
-                        .foregroundColor(Color.accentGold)
+                        .font(.ydg(.body, weight: .semibold))
+                        .foregroundColor(Color.ydgAccent)
                 }
             }
-            .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
+            .toolbarBackground(Color.ydgBase, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
         }
     }
@@ -1513,17 +1329,16 @@ struct GiftDetailSheet: View {
     private func detailBlock(title: String, body: String) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title)
-                .font(Font.bodySans(11, weight: .semibold))
-                .foregroundColor(Color.accentGold)
+                .ydgText(.caption)
             Text(body)
                 .font(Font.bodySans(15, weight: .regular))
                 .foregroundColor(Color.textPrimary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
-        .background(Color.luxeSurfaceTintStrong)
+        .background(Color.ydgRaised)
         .cornerRadius(14)
-        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.maroonBorderTint, lineWidth: 1))
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.ydgBorder, lineWidth: 1))
     }
 
     @ViewBuilder
@@ -1532,11 +1347,10 @@ struct GiftDetailSheet: View {
         HStack(spacing: 10) {
             Image(systemName: info.systemImage)
                 .font(.system(size: 18))
-                .foregroundColor(Color.accentGold)
+                .foregroundColor(Color.ydgTextSecondary)
             VStack(alignment: .leading, spacing: 2) {
                 Text("Shipping")
-                    .font(Font.bodySans(11, weight: .semibold))
-                    .foregroundColor(Color.accentGold)
+                    .ydgText(.caption)
                 Text(info.text)
                     .font(Font.bodySans(14, weight: .semibold))
                     .foregroundColor(Color.textPrimary)
@@ -1544,9 +1358,9 @@ struct GiftDetailSheet: View {
             Spacer()
         }
         .padding(16)
-        .background(Color.luxeSurfaceTintStrong)
+        .background(Color.ydgRaised)
         .cornerRadius(14)
-        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.maroonBorderTint, lineWidth: 1))
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.ydgBorder, lineWidth: 1))
     }
 
     /// Estimate delivery relative to the planned date (standard shipping ≈ 5 days).

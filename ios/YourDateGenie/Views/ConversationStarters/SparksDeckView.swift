@@ -9,7 +9,6 @@ struct SparksDeckView: View {
     @StateObject private var storage = ConversationStarterStorageManager.shared
 
     @State private var dragOffset: CGFloat = 0
-    @State private var showWelcomePrompt = true
     @State private var saveConfirmation: String? = nil
     @State private var showEndOfDeck = false
 
@@ -50,7 +49,7 @@ struct SparksDeckView: View {
 
     var body: some View {
         ZStack {
-            Color.backgroundPrimary
+            Color.ydgBase
                 .ignoresSafeArea()
 
             VStack(spacing: 0) {
@@ -59,18 +58,12 @@ struct SparksDeckView: View {
                 if sparks.isEmpty {
                     emptyState
                 } else if let spark = currentSpark {
-                    dotIndicators
                     cardStackSection
-                    swipeHintSection
-                    saveButtonSection(spark: spark)
-                    bottomButtons
+                    Spacer(minLength: YDGSpace.md)
+                    bottomButtons(spark: spark)
                 } else {
                     emptyState
                 }
-            }
-
-            if showWelcomePrompt && !sparks.isEmpty {
-                welcomeOverlay
             }
 
             if saveConfirmation != nil {
@@ -83,12 +76,6 @@ struct SparksDeckView: View {
         }
         .onAppear {
             clampIndex()
-            // Hide welcome after 3 seconds
-            DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
-                withAnimation(.easeOut(duration: 0.3)) {
-                    showWelcomePrompt = false
-                }
-            }
         }
         .onChange(of: currentIndex) { _, _ in
             clampIndex()
@@ -96,170 +83,113 @@ struct SparksDeckView: View {
         .onChange(of: session.id) { _, _ in
             dragOffset = 0
             showEndOfDeck = false
-            showWelcomePrompt = false
         }
     }
 
     // MARK: - Header
     private var headerSection: some View {
-        VStack(spacing: 4) {
-            HStack(alignment: .center) {
-                Spacer(minLength: 0)
-                Text("Your Sparks")
-                    .font(Font.bodySerif(32, weight: .regular))
-                    .foregroundColor(Color.accentGold)
-                Spacer(minLength: 0)
-                Button {
-                    showEndOfDeck = false
-                    dragOffset = 0
-                    onRegenerate()
-                    let generator = UIImpactFeedbackGenerator(style: .medium)
-                    generator.impactOccurred()
-                } label: {
-                    Image(systemName: "arrow.clockwise")
-                        .font(Font.bodySans(16, weight: .semibold))
-                        .symbolRenderingMode(.monochrome)
-                        .foregroundColor(Color.luxuryGold)
-                        .frame(width: 36, height: 36)
-                        .background(Color.luxeSurfaceTintStrong)
-                        .clipShape(Circle())
-                        .overlay(Circle().stroke(Color.luxeSurfaceBorder, lineWidth: 1))
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Refresh sparks")
+        HStack(alignment: .center) {
+            Button {
+                onDone()
+            } label: {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundColor(Color.ydgTextPrimary)
+                    .frame(width: 44, height: 44)
             }
-            Text("\(relationshipLabel) · \(vibeLabel)")
-                .font(Font.bodySans(16, weight: .semibold))
-                .foregroundColor(Color.luxuryCream)
-                .frame(maxWidth: .infinity)
-        }
-        .padding(.horizontal, 20)
-        .padding(.top, 16)
-        .padding(.bottom, 8)
-    }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Back")
 
-    // MARK: - Welcome prompt (swipe hint)
-    private var welcomeOverlay: some View {
-        VStack {
-            Spacer()
-            Text("Swipe left for next · Swipe right to skip")
-                .font(Font.bodySans(14, weight: .semibold))
-                .foregroundColor(Color.luxuryCream)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 24)
-                .padding(.vertical, 14)
-                .goldHighlightMaroonAccent(cornerRadius: 12)
-                .padding(.horizontal, 32)
-                .padding(.bottom, 200)
-            Spacer()
+            Spacer(minLength: 0)
+
+            VStack(spacing: 2) {
+                Text("Your sparks")
+                    .ydgText(.headline)
+                    .accessibilityAddTraits(.isHeader)
+                Text("\(relationshipLabel) · \(vibeLabel)")
+                    .ydgText(.footnote, color: .ydgTextSecondary)
+                    .lineLimit(1)
+            }
+
+            Spacer(minLength: 0)
+
+            Button {
+                showEndOfDeck = false
+                dragOffset = 0
+                onRegenerate()
+                let generator = UIImpactFeedbackGenerator(style: .medium)
+                generator.impactOccurred()
+            } label: {
+                Image(systemName: "arrow.clockwise")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(Color.ydgTextPrimary)
+                    .frame(width: 44, height: 44)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Refresh sparks")
         }
-        .allowsHitTesting(false)
+        .padding(.horizontal, YDGSpace.xs)
+        .padding(.top, YDGSpace.xs)
     }
 
     private var saveToast: some View {
         VStack {
             Spacer()
             if let msg = saveConfirmation {
-                HStack(spacing: 8) {
-                    Image(systemName: "bookmark.fill")
-                        .foregroundColor(Color.luxuryGold)
-                    Text(msg)
-                        .font(Font.bodySans(14, weight: .semibold))
-                        .foregroundColor(Color.luxuryCream)
-                }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 12)
-                .goldHighlightMaroonAccent(cornerRadius: 10)
-                .padding(.bottom, 120)
+                Label(msg, systemImage: "heart.fill")
+                    .font(.ydg(.subhead, weight: .semibold))
+                    .foregroundColor(Color.ydgTextPrimary)
+                    .padding(.horizontal, YDGSpace.md)
+                    .padding(.vertical, YDGSpace.sm)
+                    .background(Capsule().fill(Color.ydgOverlay))
+                    .overlay(Capsule().stroke(Color.ydgBorder, lineWidth: 1))
+                    .padding(.bottom, 120)
             }
-            Spacer()
         }
         .allowsHitTesting(false)
     }
 
     // MARK: - End of deck overlay (Regenerate vs Back)
     private var endOfDeckOverlay: some View {
-        VStack(spacing: 0) {
-            Color.backgroundPrimary.opacity(0.85)
+        ZStack {
+            Color.ydgBase.opacity(0.9)
                 .ignoresSafeArea()
-            VStack(spacing: 24) {
-                Text("You've seen all your sparks")
-                    .font(Font.bodySerif(26, weight: .regular))
-                    .foregroundColor(Color.accentGold)
-                    .multilineTextAlignment(.center)
+            VStack(alignment: .leading, spacing: YDGSpace.md) {
+                Text("That's every spark")
+                    .ydgText(.title2)
+                    .accessibilityAddTraits(.isHeader)
                 Text("Get a fresh set or head back.")
-                    .font(Font.bodySans(16, weight: .regular))
-                    .foregroundColor(Color.textMutedOnCard)
-                    .multilineTextAlignment(.center)
-                VStack(spacing: 12) {
+                    .ydgText(.body, color: .ydgTextSecondary)
+                VStack(spacing: YDGSpace.sm) {
                     Button {
                         showEndOfDeck = false
                         onRegenerate()
                     } label: {
-                        HStack(spacing: 8) {
-                            Image(systemName: "sparkles")
-                            Text("Get more sparks")
-                                .font(Font.bodySans(16, weight: .semibold))
-                        }
-                        .frame(maxWidth: .infinity)
+                        Label("Get more sparks", systemImage: "sparkles")
                     }
-                    .buttonStyle(LuxuryGoldButtonStyle(isSmall: false))
-                    Button {
+                    .buttonStyle(.ydgPrimary)
+                    Button("Back to talk sparks") {
                         showEndOfDeck = false
                         onDone()
-                    } label: {
-                        HStack(spacing: 8) {
-                            Image(systemName: "chevron.left")
-                            Text("Back to Conversation Starters")
-                                .font(Font.bodySans(16, weight: .semibold))
-                        }
-                        .frame(maxWidth: .infinity)
                     }
-                    .buttonStyle(LuxuryOutlineButtonStyle(isSmall: false))
+                    .buttonStyle(.ydgSecondary)
                 }
-                .padding(.horizontal, 32)
+                .padding(.top, YDGSpace.xs)
             }
-            .padding(28)
-            .frame(maxWidth: .infinity)
-            .background(Color.creamCard)
-            .overlay(alignment: .leading) {
-                Rectangle().fill(Color.accentMaroon).frame(width: 4)
-            }
-            .cornerRadius(24)
+            .padding(YDGSpace.lg)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.ydgOverlay, in: RoundedRectangle(cornerRadius: YDGRadius.sheet, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 24)
-                    .stroke(Color.maroonBorderTint, lineWidth: 1)
+                RoundedRectangle(cornerRadius: YDGRadius.sheet, style: .continuous)
+                    .stroke(Color.ydgBorder, lineWidth: 1)
             )
-            .padding(.horizontal, 24)
-            Spacer()
+            .padding(.horizontal, YDGSpace.margin)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    // MARK: - Dot indicators
-    private var dotIndicators: some View {
-        HStack(spacing: 8) {
-            ForEach(0..<sparks.count, id: \.self) { i in
-                Capsule()
-                    .fill(i == currentIndex ? Color.luxuryGold : Color.luxuryGold.opacity(0.25))
-                    .frame(width: i == currentIndex ? 22 : 6, height: 6)
-                    .animation(.spring(response: 0.35, dampingFraction: 0.7), value: currentIndex)
-            }
-        }
-        .padding(.top, 12)
-    }
-
-    // MARK: - Card stack (reference-style: multiple cards with stack transform + seamless swipe)
+    // MARK: - Card stack
     private var cardStackSection: some View {
         ZStack {
-            HStack {
-                hintLabel(text: "← Back", visible: dragOffset > 40)
-                Spacer()
-                hintLabel(text: "Next →", visible: dragOffset < -40)
-            }
-            .padding(.horizontal, 28)
-            .zIndex(20)
-
             ForEach(cardIndices, id: \.self) { i in
                 let relPos = i - currentIndex
                 SparkCardView(
@@ -274,28 +204,12 @@ struct SparksDeckView: View {
             }
         }
         .frame(maxWidth: .infinity)
-        .frame(height: 280)
-        .padding(.top, 16)
-        .padding(.horizontal, 24)
-    }
-
-    private func hintLabel(text: String, visible: Bool) -> some View {
-        Text(text)
-            .font(Font.bodySans(12, weight: .medium))
-            .tracking(1.5)
-            .foregroundColor(Color.luxuryGoldLight)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 6)
-            .background(
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(Color.luxeSurfaceTintStrong)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(Color.luxeSurfaceBorder, lineWidth: 1)
-                    )
-            )
-            .opacity(visible ? min(abs(dragOffset) / swipeThreshold, 1.0) : 0)
-            .animation(.easeInOut(duration: 0.15), value: visible)
+        .frame(height: 470)
+        .padding(.top, YDGSpace.md)
+        .padding(.horizontal, YDGSpace.lg)
+        .accessibilityElement(children: .contain)
+        .accessibilityAction(named: "Next spark") { if !isOnLastCard { navigateTo(currentIndex + 1) } }
+        .accessibilityAction(named: "Previous spark") { navigateTo(currentIndex - 1) }
     }
 
     private var dragGesture: some Gesture {
@@ -352,95 +266,45 @@ struct SparksDeckView: View {
             }
     }
 
-    private var swipeHintSection: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "arrow.left")
-                .font(Font.bodySans(12, weight: .regular))
-            Text("swipe to explore")
-                .font(Font.bodySans(11, weight: .regular))
-                .tracking(2)
-            Image(systemName: "arrow.right")
-                .font(Font.bodySans(12, weight: .regular))
-        }
-        .foregroundColor(Color.luxuryGoldLight.opacity(0.35))
-        .padding(.top, 14)
-    }
-
     // MARK: - Empty state
     private var emptyState: some View {
-        VStack(spacing: 16) {
-            Text("No sparks in this session")
-                .font(Font.bodySans(16, weight: .medium))
-                .foregroundColor(Color.luxuryMuted)
-            Button("Done") {
-                onDone()
-            }
-            .buttonStyle(LuxuryGoldButtonStyle(isSmall: false))
-            .padding(.horizontal, 40)
-        }
+        YDGEmptyState(
+            systemName: "bubble.left.and.bubble.right",
+            title: "No sparks in this session",
+            message: "Head back and start a new one.",
+            actionTitle: "Done",
+            action: onDone
+        )
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    // MARK: - Save button (below card)
-    private func saveButtonSection(spark: SparkItem) -> some View {
-        Button {
-            performSave(spark: spark)
-        } label: {
-            HStack(spacing: 8) {
-                Image(systemName: "bookmark")
-                    .font(Font.bodySans(18, weight: .medium))
-                Text("Save to favorites")
-                    .font(Font.bodySans(16, weight: .semibold))
-            }
-            .foregroundColor(Color.luxuryGold)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 14)
-        }
-        .buttonStyle(LuxuryOutlineButtonStyle(isSmall: false))
-        .padding(.horizontal, 24)
-        .padding(.top, 16)
-    }
-
-    // MARK: - Bottom buttons
-    private var bottomButtons: some View {
-        HStack(spacing: 12) {
+    // MARK: - Bottom buttons (save + next)
+    private func bottomButtons(spark: SparkItem) -> some View {
+        HStack(spacing: YDGSpace.sm) {
             Button {
-                if currentIndex > 0 {
-                    navigateTo(currentIndex - 1)
-                } else {
-                    onDone()
-                }
+                performSave(spark: spark)
             } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: "chevron.left")
-                    Text("Back")
-                        .font(Font.bodySans(16, weight: .semibold))
-                }
-                .frame(maxWidth: .infinity)
+                Image(systemName: saveConfirmation == nil ? "heart" : "heart.fill")
+                    .font(.system(size: 19, weight: .semibold))
+                    .foregroundColor(saveConfirmation == nil ? Color.ydgTextPrimary : Color.ydgHighlight)
+                    .frame(width: 52, height: 52)
+                    .overlay(Circle().stroke(Color.ydgBorderStrong, lineWidth: 1))
+                    .contentShape(Circle())
             }
-            .buttonStyle(LuxuryOutlineButtonStyle(isSmall: false))
+            .buttonStyle(.plain)
+            .accessibilityLabel("Save to favorites")
 
-            Button {
+            Button(isOnLastCard ? "Done" : "Next spark") {
                 if isOnLastCard {
                     showEndOfDeck = true
                 } else {
                     navigateTo(currentIndex + 1)
                 }
-            } label: {
-                HStack(spacing: 8) {
-                    Text(isOnLastCard ? "Done" : "Next spark")
-                        .font(Font.bodySans(16, weight: .semibold))
-                    if !isOnLastCard {
-                        Image(systemName: "arrow.right")
-                    }
-                }
-                .frame(maxWidth: .infinity)
             }
-            .buttonStyle(LuxuryGoldButtonStyle(isSmall: false))
+            .buttonStyle(.ydgPrimary)
         }
-        .padding(.horizontal, 20)
-        .padding(.top, 20)
-        .padding(.bottom, 32)
+        .padding(.horizontal, YDGSpace.margin)
+        .padding(.bottom, YDGSpace.md)
     }
 
     // MARK: - Helpers
@@ -482,61 +346,86 @@ private struct SparkCardView: View {
     let relativePosition: Int
     let dragOffset: CGFloat
 
+    private var isFront: Bool { relativePosition == 0 }
+
     var body: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 20)
-                .fill(Color.creamCard)
-                .overlay(alignment: .leading) {
-                    Rectangle().fill(Color.accentMaroon).frame(width: 4)
-                }
+        ZStack(alignment: .topLeading) {
+            RoundedRectangle(cornerRadius: YDGRadius.sheet, style: .continuous)
+                .fill(isFront ? Color.ydgTextPrimary : Color.ydgRaised)
                 .overlay(
-                    RoundedRectangle(cornerRadius: 20)
-                        .stroke(Color.maroonBorderTint, lineWidth: 1)
+                    RoundedRectangle(cornerRadius: YDGRadius.sheet, style: .continuous)
+                        .stroke(isFront ? Color.clear : Color.ydgBorder, lineWidth: 1)
                 )
-                .shadow(color: .black.opacity(0.15), radius: 16, x: 0, y: 6)
+                .shadow(color: .black.opacity(isFront ? 0.3 : 0), radius: 18, x: 0, y: 8)
 
-            VStack(spacing: 0) {
-                Text("\(index + 1) of \(total)")
-                    .font(Font.bodySans(11, weight: .regular))
-                    .tracking(2)
-                    .foregroundColor(Color.textMutedOnCard)
-                    .padding(.bottom, 14)
+            if isFront {
+                VStack(alignment: .leading, spacing: 0) {
+                    HStack {
+                        Text(spark.tagsLabel.uppercased())
+                            .font(.ydg(.caption, weight: .semibold))
+                            .tracking(1)
+                            .foregroundColor(Color(hex: "9A4A4C"))
+                            .lineLimit(1)
+                        Spacer()
+                        Text("\(index + 1) of \(total)")
+                            .font(.ydg(.footnote))
+                            .foregroundColor(Color(hex: "6B635A"))
+                    }
 
-                Text("• \(spark.tagsLabel.uppercased())")
-                    .font(Font.bodySans(11, weight: .semibold))
-                    .tracking(2.5)
-                    .foregroundColor(Color.accentGold)
-                    .padding(.bottom, 18)
+                    Spacer(minLength: YDGSpace.md)
 
-                Text(spark.openingQuestion)
-                    .font(Font.bodySerif(18, weight: .regular))
-                    .italic()
-                    .foregroundColor(Color.textOnCard)
-                    .multilineTextAlignment(.center)
-                    .lineSpacing(5)
-                    .frame(maxWidth: .infinity)
-                    .padding(.horizontal, 4)
+                    Text(spark.openingQuestion)
+                        .font(.ydgDisplay(30))
+                        .foregroundColor(Color.ydgBase)
+                        .lineSpacing(2)
+                        .minimumScaleFactor(0.7)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    Spacer(minLength: YDGSpace.md)
+
+                    Text("Swipe for the next one")
+                        .font(.ydg(.footnote))
+                        .foregroundColor(Color(hex: "6B635A"))
+                }
+                .padding(YDGSpace.lg)
             }
-            .padding(26)
         }
         .frame(maxWidth: .infinity)
-        .frame(height: 260)
+        .frame(height: 470)
         .scaleEffect(stackScale)
-        .offset(y: stackOffsetY)
-        .opacity(stackOpacity)
-        .offset(x: relativePosition == 0 ? dragOffset : 0)
-        .rotationEffect(.degrees(relativePosition == 0 ? Double(dragOffset) * 0.06 : 0))
+        .rotationEffect(.degrees(stackRotation))
+        .offset(x: stackOffsetX, y: stackOffsetY)
+        .offset(x: isFront ? dragOffset : 0)
+        .rotationEffect(.degrees(isFront ? Double(dragOffset) * 0.06 : 0))
         .animation(
-            relativePosition == 0 ? nil : .spring(response: 0.4, dampingFraction: 0.75),
+            isFront ? nil : .spring(response: 0.4, dampingFraction: 0.75),
             value: relativePosition
         )
+        .accessibilityElement(children: .combine)
+        .accessibilityHidden(!isFront)
+    }
+
+    private var stackRotation: Double {
+        switch relativePosition {
+        case 0: return 0
+        case 1: return -4
+        default: return 3
+        }
+    }
+
+    private var stackOffsetX: CGFloat {
+        switch relativePosition {
+        case 0: return 0
+        case 1: return -8
+        default: return 8
+        }
     }
 
     private var stackScale: CGFloat {
         switch relativePosition {
         case 0: return 1.0
-        case 1: return 0.95
-        default: return 0.90
+        case 1: return 0.96
+        default: return 0.92
         }
     }
 
@@ -551,8 +440,8 @@ private struct SparkCardView: View {
     private var stackOpacity: Double {
         switch relativePosition {
         case 0: return 1.0
-        case 1: return 0.6
-        default: return 0.3
+        case 1: return 1.0
+        default: return 0.6
         }
     }
 }

@@ -27,7 +27,7 @@ struct RoseRewardUnlockedView: View {
                     Circle()
                         .fill(Color.surfaceElevated)
                         .frame(width: 88, height: 88)
-                        .overlay(Circle().stroke(Color.accentMaroon.opacity(0.5), lineWidth: 1))
+                        .overlay(Circle().stroke(Color.ydgBorder, lineWidth: 1))
                     Text(reward.emoji)
                         .font(.system(size: 34))
                 }
@@ -40,7 +40,7 @@ struct RoseRewardUnlockedView: View {
                     .padding(.top, 18)
 
                 Text(reward.title)
-                    .font(Font.displaySerif(22, weight: .bold))
+                    .font(Font.ydgDisplay(22))
                     .foregroundColor(Color.textPrimary)
                     .multilineTextAlignment(.center)
                     .padding(.top, 4)

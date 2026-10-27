@@ -27,6 +27,10 @@ enum AppScreenshotScene: String {
     case signIn
     case hero
     case tutorial
+    case lowKey
+    case sparks
+    case rose
+    case settings
 }
 
 enum ScreenshotDemo {
@@ -156,6 +160,14 @@ enum ScreenshotDemo {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
                 coordinator.homeTutorialReplayToken &+= 1
             }
+        case .lowKey:
+            coordinator.activeSheet = .lowKey
+        case .sparks:
+            coordinator.activeSheet = .conversationStarters
+        case .rose:
+            coordinator.activeSheet = .roseRewards
+        case .settings:
+            coordinator.activeSheet = .settings
         case .splash, .ageGate, .onboarding, .signIn, .hero:
             break
         }

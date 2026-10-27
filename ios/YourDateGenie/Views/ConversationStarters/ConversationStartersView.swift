@@ -112,7 +112,8 @@ struct ConversationStartersView: View {
                     }
                 }
             }
-            .toolbar(isEmbeddedInTab && !showingGeneratorFlow ? .hidden : .visible, for: .navigationBar)
+            // The deck draws its own header (back · title · refresh).
+            .toolbar((isEmbeddedInTab && !showingGeneratorFlow) || (showingSparksDeck && currentSession != nil) ? .hidden : .visible, for: .navigationBar)
         }
         .onChange(of: step) { _, newStep in
             if newStep == 3 {

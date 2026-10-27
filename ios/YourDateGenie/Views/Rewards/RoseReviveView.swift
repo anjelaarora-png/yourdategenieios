@@ -26,7 +26,7 @@ struct RoseReviveView: View {
                 RosePlantView(mode: .drooping)
 
                 Text("Your rose misses you")
-                    .font(Font.displaySerif(22, weight: .bold))
+                    .font(Font.ydgDisplay(22))
                     .foregroundColor(Color.textPrimary)
                     .padding(.top, 6)
 

@@ -17,75 +17,125 @@ struct YourRoseView: View {
 
     @State private var showScienceInfo = false
 
+    @Environment(\.dismiss) private var dismiss
+
     var body: some View {
         ZStack {
-            Color.backgroundPrimary.ignoresSafeArea()
+            Color.ydgBase.ignoresSafeArea()
 
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 0) {
                     RosePlantView(mode: rose.plantDisplayMode)
-                        .padding(.top, 8)
+                        .padding(.top, YDGSpace.xs)
 
                     Text(roseHeadline)
-                        .font(Font.displaySerif(22, weight: .bold))
-                        .foregroundColor(Color.textPrimary)
-                        .padding(.top, 4)
+                        .ydgText(.title2)
+                        .multilineTextAlignment(.center)
+                        .accessibilityAddTraits(.isHeader)
+                        .padding(.top, YDGSpace.xxs)
 
                     Text(progressLine)
-                        .font(Font.bodySans(13))
-                        .foregroundColor(Color.luxuryCreamMuted)
+                        .ydgText(.subhead, weight: .regular, color: .ydgTextSecondary)
                         .multilineTextAlignment(.center)
-                        .padding(.top, 6)
+                        .padding(.top, YDGSpace.xxs)
 
-                    RoseProgressBar(progress: rose.monthProgress)
-                        .padding(.top, 14)
-                        .padding(.horizontal, 4)
+                    budSegments
+                        .padding(.top, YDGSpace.sm)
 
-                    Button {
-                        showScienceInfo = true
-                    } label: {
-                        HStack(spacing: 5) {
-                            Image(systemName: "info.circle")
-                                .font(.system(size: 12))
-                            Text("Why \(rose.monthlyGoal) nights a month?")
-                                .font(Font.bodySans(12, weight: .medium))
-                        }
-                        .foregroundColor(Color.luxuryMuted)
-                    }
-                    .buttonStyle(.plain)
-                    .padding(.top, 10)
-
-                    streakCard
-                        .padding(.top, 18)
-
-                    Button(action: onShowJourney) {
-                        journeyRow
-                    }
-                    .buttonStyle(.plain)
-                    .padding(.top, 10)
-
-                    Button(action: onShowRecap) {
-                        recapRow
-                    }
-                    .buttonStyle(.plain)
-                    .padding(.top, 10)
-
-                    Spacer(minLength: 28)
-
-                    RosePrimaryButton(title: ctaTitle, action: onOpenNextBud)
-                        .padding(.top, 8)
+                    rowsCard
+                        .padding(.top, YDGSpace.lg)
                 }
-                .padding(.horizontal, 24)
-                .padding(.bottom, 28)
+                .padding(.horizontal, YDGSpace.margin)
+                .padding(.bottom, YDGSpace.lg)
             }
+        }
+        .safeAreaInset(edge: .bottom) {
+            RosePrimaryButton(title: ctaTitle, action: onOpenNextBud)
+                .padding(.horizontal, YDGSpace.margin)
+                .padding(.top, YDGSpace.sm)
+                .padding(.bottom, YDGSpace.xs)
+                .background(Color.ydgBase)
         }
         .navigationTitle("Your rose")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
+        .toolbarBackground(Color.ydgBase, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button { dismiss() } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundColor(Color.ydgTextPrimary)
+                        .frame(width: 44, height: 44)
+                }
+                .accessibilityLabel("Close")
+            }
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button { showScienceInfo = true } label: {
+                    Image(systemName: "info.circle")
+                        .font(.system(size: 17))
+                        .foregroundColor(Color.ydgTextSecondary)
+                        .frame(width: 44, height: 44)
+                }
+                .accessibilityLabel("Why \(rose.monthlyGoal) nights a month?")
+            }
+        }
         .sheet(isPresented: $showScienceInfo) {
             RoseScienceInfoSheet(monthlyGoal: rose.monthlyGoal)
         }
+    }
+
+    /// One segment per bud in the monthly goal; opened buds fill rose.
+    private var budSegments: some View {
+        HStack(spacing: 6) {
+            ForEach(0..<max(rose.monthlyGoal, 1), id: \.self) { i in
+                Capsule()
+                    .fill(i < rose.datesThisMonth ? Color.ydgHighlight : Color.ydgOverlay)
+                    .frame(width: 40, height: 6)
+            }
+        }
+        .accessibilityElement()
+        .accessibilityLabel("\(rose.datesThisMonth) of \(rose.monthlyGoal) buds open")
+    }
+
+    private var rowsCard: some View {
+        VStack(spacing: 0) {
+            roseRow(title: streakText, subtitle: rose.partnerName == nil ? "Tend your rose with a night out each week" : "You both tend this rose", trailing: rose.earnedBadgeCount > 0 ? "\(rose.earnedBadgeCount) badges" : nil, action: onShowJourney)
+            YDGListDivider(leadingInset: YDGSpace.md)
+            roseRow(title: "Your journey", subtitle: "Level \(rose.level) · \(rose.levelName)", trailing: nil, action: onShowJourney)
+            YDGListDivider(leadingInset: YDGSpace.md)
+            roseRow(title: "Your month together", subtitle: "A little proof you showed up", trailing: nil, action: onShowRecap)
+        }
+        .background(Color.ydgRaised, in: RoundedRectangle(cornerRadius: YDGRadius.card, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: YDGRadius.card, style: .continuous)
+                .stroke(Color.ydgBorder, lineWidth: 1)
+        )
+    }
+
+    private func roseRow(title: String, subtitle: String, trailing: String?, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: YDGSpace.sm) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .ydgText(.subhead, weight: .semibold)
+                    Text(subtitle)
+                        .ydgText(.footnote, color: .ydgTextSecondary)
+                }
+                Spacer(minLength: 0)
+                if let trailing {
+                    Text(trailing)
+                        .ydgText(.footnote, color: .ydgTextSecondary)
+                }
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(Color.ydgTextTertiary)
+            }
+            .padding(.horizontal, YDGSpace.md)
+            .frame(minHeight: 60)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 
     private var roseHeadline: String {
@@ -103,83 +153,29 @@ struct YourRoseView: View {
 
     private var progressLine: String {
         if !rose.hasEverCompletedDate {
-            return "0 of \(rose.monthlyGoal) nights · \(rose.monthlyGoal) buds waiting to open"
+            return "0 of \(rose.monthlyGoal) nights · \(rose.monthlyGoal) buds waiting"
         }
         let buds = rose.budsRemaining
-        let budText = buds == 1 ? "1 bud left to open" : "\(buds) buds left to open"
+        let budText = buds == 1 ? "1 bud to go" : "\(buds) buds to go"
         return "\(rose.datesThisMonth) of \(rose.monthlyGoal) nights this month · \(budText)"
     }
 
     private var ctaTitle: String {
         if !rose.hasEverCompletedDate {
-            return "Plan your first date → open bud 1"
+            return "Plan your first night"
         }
         return rose.budsRemaining == 0
-            ? "Full bloom — plan a bonus night"
-            : "Open the next bud → plan night \(rose.datesThisMonth + 1)"
-    }
-
-    private var streakCard: some View {
-        RoseCard {
-            HStack {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(streakText)
-                        .font(Font.bodySans(13, weight: .medium))
-                        .foregroundColor(Color.textPrimary)
-                    Text(rose.partnerName == nil ? "tend your rose nightly" : "you both tend this rose")
-                        .font(Font.bodySans(11))
-                        .foregroundColor(Color.luxuryMuted)
-                }
-                Spacer()
-                RosePill(text: "🏅 ×\(rose.earnedBadgeCount)")
-            }
-        }
+            ? "Plan a bonus night"
+            : "Plan night \(rose.datesThisMonth + 1)"
     }
 
     private var streakText: String {
         if let partner = rose.partnerName {
-            return "🔥 \(rose.streakWeeks)-week streak · with \(partner)"
+            return rose.streakWeeks == 0 ? "Start a streak with \(partner)" : "\(rose.streakWeeks)-week streak with \(partner)"
         }
-        return "🔥 \(rose.streakWeeks)-week streak"
+        return rose.streakWeeks == 0 ? "Start your streak" : "\(rose.streakWeeks)-week streak"
     }
 
-    private var journeyRow: some View {
-        RoseCard {
-            HStack {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("⭐ Your journey")
-                        .font(Font.bodySans(13, weight: .medium))
-                        .foregroundColor(Color.textPrimary)
-                    Text("Lvl \(rose.level) · 🔥 \(rose.streakWeeks)-week streak")
-                        .font(Font.bodySans(11))
-                        .foregroundColor(Color.luxuryMuted)
-                }
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(Color.luxuryMuted)
-            }
-        }
-    }
-
-    private var recapRow: some View {
-        RoseCard {
-            HStack {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("📅 Your month together")
-                        .font(Font.bodySans(13, weight: .medium))
-                        .foregroundColor(Color.textPrimary)
-                    Text("A little proof you showed up")
-                        .font(Font.bodySans(11))
-                        .foregroundColor(Color.luxuryMuted)
-                }
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(Color.luxuryMuted)
-            }
-        }
-    }
 }
 
 #if DEBUG

@@ -51,8 +51,7 @@ struct RoseJourneyView: View {
             VStack(alignment: .leading, spacing: 8) {
                 HStack(alignment: .firstTextBaseline) {
                     Text("Level \(rose.level) · \(rose.levelName)")
-                        .font(Font.displaySerif(15, weight: .bold))
-                        .foregroundColor(Color.textPrimary)
+                        .ydgText(.headline)
                     Spacer()
                     Text("\(rose.xpIntoLevel) / \(rose.xpForLevel)")
                         .font(Font.bodySans(11))

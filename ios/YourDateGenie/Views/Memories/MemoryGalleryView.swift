@@ -15,29 +15,39 @@ struct MemoryGalleryView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                luxuryBackground
+                Color.ydgBase
+                    .ignoresSafeArea()
                 
                 if memoryManager.memories.isEmpty {
                     emptyStateView
                 } else {
-                    timelineView
+                    galleryView
                 }
-                
-                floatingAddButton
             }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 if showCloseButton {
                     ToolbarItem(placement: .navigationBarLeading) {
-                        Button("Close") {
-                            dismiss()
+                        Button { dismiss() } label: {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundColor(Color.ydgTextPrimary)
+                                .frame(width: 44, height: 44)
                         }
-                        .font(Font.bodySans(16, weight: .medium))
-                        .foregroundColor(Color.luxuryGold)
+                        .accessibilityLabel("Close")
                     }
                 }
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button { showAddMemory = true } label: {
+                        Image(systemName: "plus")
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundColor(Color.ydgAccent)
+                            .frame(width: 44, height: 44)
+                    }
+                    .accessibilityLabel("Add a memory")
+                }
             }
-            .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
+            .toolbarBackground(Color.ydgBase, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .sheet(isPresented: $showAddMemory) {
                 AddMemorySheet()
@@ -53,348 +63,102 @@ struct MemoryGalleryView: View {
         }
     }
     
-    // MARK: - Luxury Background
-    private var luxuryBackground: some View {
-        ZStack {
-            Color.backgroundPrimary
-                .ignoresSafeArea()
-            
-            FloatingSparklesView()
-                .ignoresSafeArea()
-        }
-    }
-    
-    // MARK: - Floating Add Button
-    private var floatingAddButton: some View {
-        VStack {
-            Spacer()
-            HStack {
-                Spacer()
-                Button {
-                    showAddMemory = true
-                } label: {
-                    ZStack {
-                        Circle()
-                            .fill(LinearGradient.goldShimmer)
-                            .frame(width: 60, height: 60)
-                            .shadow(color: Color.luxuryGold.opacity(0.5), radius: 12, y: 4)
-                        
-                        Image(systemName: "plus")
-                            .font(.system(size: 24, weight: .bold))
-                            .foregroundColor(Color.luxuryMaroon)
-                    }
-                }
-                .padding(.trailing, 24)
-                .padding(.bottom, 24)
-            }
-        }
-    }
-    
     // MARK: - Empty State View
     private var emptyStateView: some View {
-        VStack(spacing: 32) {
+        VStack(alignment: .leading, spacing: 0) {
+            headerSection
             Spacer()
-            
-            ZStack {
-                Circle()
-                    .fill(Color.luxuryGold.opacity(0.1))
-                    .frame(width: 160, height: 160)
-                
-                Circle()
-                    .fill(Color.luxuryGold.opacity(0.05))
-                    .frame(width: 200, height: 200)
-                
-                Image(systemName: "sparkles")
-                    .font(.system(size: 60))
-                    .foregroundStyle(LinearGradient.goldShimmer)
-                    .symbolEffect(.pulse)
-            }
-            
-            VStack(spacing: 16) {
-                HStack(spacing: 6) {
-                    Text("Your")
-                        .font(Font.displaySerif(24, weight: .regular))
-                        .foregroundColor(Color.luxuryCream)
-                    Text("love story")
-                        .font(Font.bodySerif(26, weight: .regular))
-                        .foregroundColor(Color.accentGold)
-                    Text("begins here")
-                        .font(Font.displaySerif(24, weight: .regular))
-                        .foregroundColor(Color.luxuryCream)
-                }
-                .multilineTextAlignment(.center)
-                
-                Text("Capture memories from your magical dates together")
-                    .font(Font.bodySans(15, weight: .regular))
-                    .foregroundColor(Color.luxuryCreamMuted)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 40)
-            }
-            
-            Button {
-                showAddMemory = true
-            } label: {
-                Text("Add Your First Memory")
-                    .font(Font.bodySans(16, weight: .semibold))
-            }
-            .buttonStyle(LuxuryOutlineButtonStyle())
-            
+            YDGEmptyState(
+                systemName: "photo.on.rectangle.angled",
+                title: "Your story starts here",
+                message: "Add a photo and a line from your next date. They'll collect here, one polaroid at a time.",
+                actionTitle: "Add your first memory",
+                action: { showAddMemory = true }
+            )
             Spacer()
         }
+        .padding(.horizontal, YDGSpace.margin)
     }
     
-    // MARK: - Timeline View
-    private var timelineView: some View {
+    // MARK: - Gallery (two-column polaroids)
+    private var galleryView: some View {
         ScrollView(showsIndicators: false) {
-            VStack(spacing: 0) {
+            VStack(alignment: .leading, spacing: YDGSpace.lg) {
                 headerSection
-                    .padding(.bottom, 32)
                 
-                PolaroidTimelineView(
-                    memories: memoryManager.memoriesSortedByDate,
-                    onSelect: { memory in
-                        selectedMemory = memory
+                LazyVGrid(columns: [GridItem(.flexible(), spacing: YDGSpace.sm), GridItem(.flexible(), spacing: YDGSpace.sm)], spacing: YDGSpace.md) {
+                    ForEach(Array(memoryManager.memoriesSortedByDate.enumerated()), id: \.element.id) { index, memory in
+                        Button { selectedMemory = memory } label: {
+                            GalleryPolaroidCard(memory: memory, rotation: Self.tilt(for: index))
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("\(memory.title), \(memory.shortFormattedDate)")
                     }
-                )
-                .padding(.bottom, 100)
+                }
             }
+            .padding(.horizontal, YDGSpace.margin)
+            .padding(.bottom, YDGSpace.xxl)
         }
+    }
+
+    /// Small, stable tilt so the grid feels hand-placed but doesn't reshuffle on redraw.
+    private static func tilt(for index: Int) -> Double {
+        [-1.5, 1.2, 0.8, -1.0, 1.4, -0.6][index % 6]
     }
     
     // MARK: - Header Section
     private var headerSection: some View {
-        VStack(spacing: 16) {
-            Spacer().frame(height: 16)
-            
-            HStack(spacing: 6) {
-                Text("Our")
-                    .font(Font.displaySerif(30, weight: .regular))
-                    .foregroundColor(Color.luxuryCream)
-                Text("Memories")
-                    .font(Font.bodySerif(32, weight: .regular))
-                    .foregroundColor(Color.accentGold)
-            }
-            
-            Text("Every date, beautifully remembered")
-                .font(Font.bodySans(16, weight: .regular))
-                .foregroundColor(Color.luxuryCreamMuted)
-            
-            HStack(spacing: 8) {
-                Image(systemName: "heart.fill")
-                    .font(.system(size: 12))
-                Text("\(memoryManager.totalMemoriesCount) dates together")
-                    .font(Font.bodySans(14, weight: .medium))
-            }
-            .foregroundColor(Color.luxuryMaroon)
-            .padding(.horizontal, 20)
-            .padding(.vertical, 10)
-            .background(
-                Capsule()
-                    .fill(Color.luxuryGold.opacity(0.9))
-            )
-            .padding(.top, 8)
+        VStack(alignment: .leading, spacing: YDGSpace.xxs) {
+            Text("Our memories")
+                .ydgText(.title1)
+                .accessibilityAddTraits(.isHeader)
+            Text(headerSubtitle)
+                .ydgText(.body, color: .ydgTextSecondary)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.top, YDGSpace.xs)
+    }
+
+    private var headerSubtitle: String {
+        let count = memoryManager.totalMemoriesCount
+        guard count > 0, let first = memoryManager.memories.map(\.date).min() else {
+            return "Every date, beautifully remembered."
+        }
+        let month = first.formatted(.dateTime.month(.wide))
+        return "\(count) \(count == 1 ? "date" : "dates") together since \(month)"
     }
 }
 
-// MARK: - Polaroid Timeline View
-
-struct PolaroidTimelineView: View {
-    let memories: [DateMemory]
-    let onSelect: (DateMemory) -> Void
-    
-    var body: some View {
-        ZStack(alignment: .leading) {
-            timelineLine
-                .padding(.leading, 40)
-            
-            VStack(spacing: 40) {
-                ForEach(Array(memories.enumerated()), id: \.element.id) { index, memory in
-                    PolaroidTimelineItem(
-                        memory: memory,
-                        isLeft: index % 2 == 0,
-                        rotation: Double.random(in: -3...3),
-                        delay: Double(index) * 0.1
-                    )
-                    .onTapGesture {
-                        onSelect(memory)
-                    }
-                }
-            }
-            .padding(.horizontal, 20)
-        }
-    }
-    
-    private var timelineLine: some View {
-        GeometryReader { geometry in
-            Rectangle()
-                .fill(LinearGradient.timelineGold)
-                .frame(width: 3)
-                .shadow(color: Color.luxuryGold.opacity(0.6), radius: 8)
-                .shadow(color: Color.luxuryGold.opacity(0.3), radius: 16)
-        }
-    }
-}
-
-// MARK: - Polaroid Timeline Item
-
-struct PolaroidTimelineItem: View {
+// MARK: - Gallery polaroid
+private struct GalleryPolaroidCard: View {
     let memory: DateMemory
-    let isLeft: Bool
     let rotation: Double
-    let delay: Double
-    
-    @State private var isVisible = false
-    
+
     var body: some View {
-        HStack(spacing: 16) {
-            if !isLeft {
-                Spacer()
+        VStack(alignment: .leading, spacing: 0) {
+            Color.polaroidCream
+                .aspectRatio(1, contentMode: .fit)
+                .overlay { MemoryPhotoView(memory: memory) }
+                .clipped()
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(memory.title)
+                    .font(.ydgDisplay(16).italic())
+                    .foregroundColor(Color.polaroidCaption)
+                    .lineLimit(1)
+                Text([memory.location, memory.date.formatted(.dateTime.month(.abbreviated).day())].filter { !$0.isEmpty }.joined(separator: " · "))
+                    .font(.ydg(.caption))
+                    .foregroundColor(Color.polaroidCaption.opacity(0.65))
+                    .lineLimit(1)
             }
-            
-            timelineDot
-            
-            polaroidCard
-            
-            if isLeft {
-                Spacer()
-            }
+            .padding(.top, YDGSpace.xs)
+            .padding(.bottom, YDGSpace.xxs)
         }
-        .opacity(isVisible ? 1 : 0)
-        .offset(x: isVisible ? 0 : (isLeft ? -50 : 50))
-        .onAppear {
-            withAnimation(.spring(response: 0.6, dampingFraction: 0.8).delay(delay)) {
-                isVisible = true
-            }
-        }
-    }
-    
-    private var timelineDot: some View {
-        ZStack {
-            Circle()
-                .fill(Color.luxuryGold)
-                .frame(width: 16, height: 16)
-                .shadow(color: Color.luxuryGold.opacity(0.6), radius: 6)
-            
-            Circle()
-                .fill(Color.luxuryMaroon)
-                .frame(width: 6, height: 6)
-        }
-    }
-    
-    private var polaroidCard: some View {
-        VStack(spacing: 0) {
-            photoArea
-            
-            captionArea
-        }
-        .frame(width: 200)
-        .background(Color.creamCard)
-        .cornerRadius(4)
-        .shadow(color: Color.polaroidShadow.opacity(0.25), radius: 8, x: 2, y: 4)
-        .shadow(color: Color.black.opacity(0.12), radius: 20, x: 4, y: 8)
+        .padding(YDGSpace.xs)
+        .background(Color.creamCard, in: RoundedRectangle(cornerRadius: 3))
+        .shadow(color: Color.black.opacity(0.35), radius: 10, x: 0, y: 6)
         .rotationEffect(.degrees(rotation))
     }
-    
-    private var photoArea: some View {
-        ZStack {
-            Rectangle()
-                .fill(Color.polaroidCream)
-            
-            MemoryPhotoView(memory: memory)
-        }
-        .frame(width: 180, height: 180)
-        .clipped()
-        .padding(.top, 10)
-        .padding(.horizontal, 10)
-    }
-    
-    private var placeholderPhoto: some View {
-        ZStack {
-            LinearGradient(
-                colors: [Color.luxeSurfaceTintStrong.opacity(0.3), Color.luxuryMaroonMedium.opacity(0.2)],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            
-            Image(systemName: "sparkle")
-                .font(.system(size: 40))
-                .foregroundStyle(LinearGradient.goldShimmer)
-                .opacity(0.6)
-        }
-    }
-    
-    private var captionArea: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(memory.caption ?? memory.title)
-                .font(Font.bodySerif(16, weight: .regular))
-                .foregroundColor(Color.polaroidCaption)
-                .lineLimit(2)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            
-            HStack(spacing: 4) {
-                Image(systemName: "mappin")
-                    .font(.system(size: 10))
-                Text(memory.shortFormattedDate)
-                if !memory.location.isEmpty {
-                    Text("•")
-                    Text(memory.location)
-                        .lineLimit(1)
-                }
-            }
-            .font(Font.bodySans(10, weight: .regular))
-            .foregroundColor(Color.polaroidCaption.opacity(0.6))
-        }
-        .padding(.horizontal, 12)
-        .padding(.top, 8)
-        .padding(.bottom, 16)
-    }
-}
-
-// MARK: - Floating Sparkles View
-
-struct FloatingSparklesView: View {
-    @State private var sparkles: [SparkleData] = []
-    
-    var body: some View {
-        GeometryReader { geometry in
-            ForEach(sparkles) { sparkle in
-                Image(systemName: "sparkle")
-                    .font(.system(size: sparkle.size))
-                    .foregroundColor(Color.luxuryGold.opacity(sparkle.opacity))
-                    .position(x: sparkle.x, y: sparkle.y)
-                    .animation(
-                        .easeInOut(duration: sparkle.animationDuration)
-                        .repeatForever(autoreverses: true),
-                        value: sparkle.opacity
-                    )
-            }
-            .onAppear {
-                createSparkles(in: geometry.size)
-            }
-        }
-    }
-    
-    private func createSparkles(in size: CGSize) {
-        sparkles = (0..<15).map { _ in
-            SparkleData(
-                x: CGFloat.random(in: 0...size.width),
-                y: CGFloat.random(in: 0...size.height),
-                size: CGFloat.random(in: 6...14),
-                opacity: Double.random(in: 0.1...0.4),
-                animationDuration: Double.random(in: 2...4)
-            )
-        }
-    }
-}
-
-struct SparkleData: Identifiable {
-    let id = UUID()
-    let x: CGFloat
-    let y: CGFloat
-    let size: CGFloat
-    var opacity: Double
-    let animationDuration: Double
 }
 
 // MARK: - Add Memory Sheet
@@ -415,7 +179,7 @@ struct AddMemorySheet: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color.backgroundPrimary
+                Color.ydgBase
                     .ignoresSafeArea()
                 
                 ScrollView(showsIndicators: false) {
@@ -440,11 +204,11 @@ struct AddMemorySheet: View {
                     Button("Cancel") {
                         dismiss()
                     }
-                    .font(Font.bodySans(16, weight: .medium))
-                    .foregroundColor(Color.luxuryGold)
+                    .font(.ydg(.body))
+                    .foregroundColor(Color.ydgTextPrimary)
                 }
             }
-            .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
+            .toolbarBackground(Color.ydgBase, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .onChange(of: selectedItem) { _, newValue in
                 Task {
@@ -457,15 +221,14 @@ struct AddMemorySheet: View {
     }
     
     private var headerSection: some View {
-        VStack(spacing: 8) {
-            Text("Add Memory")
-                .font(Font.bodySerif(28, weight: .bold))
-                .foregroundColor(Color.luxuryGold)
-            
-            Text("Capture this beautiful moment")
-                .font(Font.headerItalic(16))
-                .foregroundColor(Color.luxuryCreamMuted)
+        VStack(alignment: .leading, spacing: YDGSpace.xxs) {
+            Text("Add a memory")
+                .ydgText(.title1)
+                .accessibilityAddTraits(.isHeader)
+            Text("A photo and a line, so you remember how it felt.")
+                .ydgText(.body, color: .ydgTextSecondary)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
     
     private var photoPickerSection: some View {
@@ -477,8 +240,8 @@ struct AddMemorySheet: View {
                     .overlay(
                         RoundedRectangle(cornerRadius: 16)
                             .stroke(
-                                LinearGradient.goldShimmer,
-                                style: StrokeStyle(lineWidth: 2, dash: [8, 4])
+                                Color.ydgBorderStrong,
+                                style: StrokeStyle(lineWidth: 1.5, dash: [6, 4])
                             )
                     )
                 
@@ -491,12 +254,11 @@ struct AddMemorySheet: View {
                 } else {
                     VStack(spacing: 12) {
                         Image(systemName: "photo.badge.plus")
-                            .font(.system(size: 40))
-                            .foregroundStyle(LinearGradient.goldShimmer)
+                            .font(.system(size: 32))
+                            .foregroundStyle(Color.ydgIconCream)
                         
-                        Text("Tap to add photo")
-                            .font(Font.bodySans(14, weight: .medium))
-                            .foregroundColor(Color.luxuryGold)
+                        Text("Add a photo")
+                            .ydgText(.subhead, weight: .semibold)
                     }
                 }
             }
@@ -504,65 +266,44 @@ struct AddMemorySheet: View {
     }
     
     private var formFieldsSection: some View {
-        VStack(spacing: 20) {
-            formField(title: "Memory Title", placeholder: "e.g., Dinner at La Belle", text: $title)
+        VStack(spacing: YDGSpace.md) {
+            LuxuryTextField(title: "Title", placeholder: "e.g. Dinner at La Belle", text: $title)
             
-            VStack(alignment: .leading, spacing: 8) {
+            HStack {
                 Text("Date")
-                    .font(Font.bodySans(13, weight: .medium))
-                    .foregroundColor(Color.luxuryGold)
-                
-                DatePicker("", selection: $date, displayedComponents: .date)
+                    .ydgText(.body, weight: .regular)
+                Spacer()
+                DatePicker("Date", selection: $date, displayedComponents: .date)
                     .datePickerStyle(.compact)
                     .labelsHidden()
-                    .tint(Color.luxuryGold)
-                    .padding(14)
-                    .background(Color.luxeSurfaceTintStrong)
-                    .cornerRadius(12)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(Color.luxuryGold.opacity(0.3), lineWidth: 1)
-                    )
+                    .tint(Color.ydgAccent)
+                    .colorScheme(.dark)
             }
+            .padding(.horizontal, YDGSpace.md)
+            .frame(minHeight: 52)
+            .background(Color.ydgRaised, in: RoundedRectangle(cornerRadius: YDGRadius.card, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: YDGRadius.card, style: .continuous)
+                    .stroke(Color.ydgBorder, lineWidth: 1)
+            )
             
-            formField(title: "Location", placeholder: "e.g., San Francisco, CA", text: $location)
+            LuxuryTextField(title: "Location", placeholder: "e.g. West Village, NYC", text: $location)
             
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: YDGSpace.xs) {
                 Text("Caption")
-                    .font(Font.bodySans(13, weight: .medium))
-                    .foregroundColor(Color.luxuryGold)
+                    .ydgText(.subhead, weight: .medium)
                 
-                TextField("Write something memorable...", text: $caption, axis: .vertical)
-                    .font(Font.bodySans(15, weight: .regular))
-                    .foregroundColor(Color.luxuryCream)
+                TextField("", text: $caption, prompt: Text("Write something you'll want to remember…").foregroundColor(Color.ydgTextTertiary), axis: .vertical)
+                    .font(.ydg(.body))
+                    .foregroundColor(Color.ydgTextPrimary)
                     .lineLimit(3...6)
-                    .padding(14)
-                    .background(Color.luxeSurfaceTintStrong)
-                    .cornerRadius(12)
+                    .padding(YDGSpace.md)
+                    .background(Color.ydgRaised, in: RoundedRectangle(cornerRadius: YDGRadius.card, style: .continuous))
                     .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(Color.luxuryGold.opacity(0.3), lineWidth: 1)
+                        RoundedRectangle(cornerRadius: YDGRadius.card, style: .continuous)
+                            .stroke(Color.ydgBorder, lineWidth: 1)
                     )
             }
-        }
-    }
-    
-    private func formField(title: String, placeholder: String, text: Binding<String>) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title)
-                .font(Font.bodySans(13, weight: .medium))
-                .foregroundColor(Color.luxuryGold)
-            
-            TextField(placeholder, text: text)
-                .font(Font.bodySans(15, weight: .regular))
-                .foregroundColor(Color.luxuryCream)
-                .padding(14)
-                .background(Color.luxeSurfaceTintStrong)
-                .cornerRadius(12)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color.luxuryGold.opacity(0.3), lineWidth: 1)
-                )
         }
     }
     
@@ -573,10 +314,10 @@ struct AddMemorySheet: View {
                     HStack(spacing: 6) {
                         Image(systemName: "checkmark.circle.fill")
                             .font(.system(size: 14))
-                            .foregroundColor(Color.luxuryGold)
+                            .foregroundColor(Color.ydgTextSecondary)
                         Text("Link to date plan")
                             .font(Font.bodySans(13, weight: .medium))
-                            .foregroundColor(Color.luxuryGold)
+                            .foregroundColor(Color.ydgTextSecondary)
                         Text("(Booked or approved)")
                             .font(Font.bodySans(12, weight: .regular))
                             .foregroundColor(Color.luxuryCreamMuted)
@@ -613,14 +354,14 @@ struct AddMemorySheet: View {
                             Spacer()
                             Image(systemName: "chevron.down")
                                 .font(.system(size: 13, weight: .semibold))
-                                .foregroundColor(Color.luxuryGold)
+                                .foregroundColor(Color.ydgTextSecondary)
                         }
                         .padding(14)
                         .background(Color.luxeSurfaceTintStrong)
                         .cornerRadius(12)
                         .overlay(
                             RoundedRectangle(cornerRadius: 12)
-                                .stroke(Color.luxuryGold.opacity(0.3), lineWidth: 1)
+                                .stroke(Color.ydgBorder, lineWidth: 1)
                         )
                     }
                 }
@@ -640,17 +381,10 @@ struct AddMemorySheet: View {
         Button {
             saveMemory()
         } label: {
-            Text("Save Memory")
-                .font(Font.bodySerif(18, weight: .bold))
-                .foregroundColor(Color.luxuryMaroon)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 16)
-                .background(LinearGradient.goldShimmer)
-                .cornerRadius(14)
-                .shadow(color: Color.luxuryGold.opacity(0.4), radius: 12, y: 4)
+            Text("Save memory")
         }
+        .buttonStyle(.ydgPrimary)
         .disabled(title.isEmpty)
-        .opacity(title.isEmpty ? 0.6 : 1)
         .padding(.top, 8)
     }
     
@@ -680,7 +414,7 @@ struct MemoryDetailView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color.backgroundPrimary
+                Color.ydgBase
                     .ignoresSafeArea()
                 
                 ScrollView(showsIndicators: false) {
@@ -702,10 +436,10 @@ struct MemoryDetailView: View {
                         dismiss()
                     }
                     .font(Font.bodySans(16, weight: .medium))
-                    .foregroundColor(Color.luxuryGold)
+                    .foregroundColor(Color.ydgTextSecondary)
                 }
             }
-            .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
+            .toolbarBackground(Color.ydgBase, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .alert("Delete Memory?", isPresented: $showDeleteConfirmation) {
                 Button("Cancel", role: .cancel) { }
@@ -734,7 +468,7 @@ struct MemoryDetailView: View {
             
             VStack(alignment: .leading, spacing: 8) {
                 Text(memory.caption ?? memory.title)
-                    .font(Font.bodySerif(22, weight: .regular))
+                    .font(Font.ydgDisplay(22))
                     .foregroundColor(Color.polaroidCaption)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
@@ -777,7 +511,7 @@ struct MemoryDetailView: View {
         HStack(spacing: 12) {
             Image(systemName: icon)
                 .font(.system(size: 18))
-                .foregroundColor(Color.luxuryGold)
+                .foregroundColor(Color.ydgTextSecondary)
                 .frame(width: 24)
             
             VStack(alignment: .leading, spacing: 4) {
@@ -876,14 +610,13 @@ private struct MemoryPhotoView: View {
     private var placeholder: some View {
         ZStack {
             LinearGradient(
-                colors: [Color.luxeSurfaceTintStrong.opacity(0.3), Color.luxuryMaroonMedium.opacity(0.2)],
+                colors: [Color(hex: "5A2E34"), Color(hex: "2A1A1C")],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
-            Image(systemName: "sparkle")
-                .font(.system(size: 40))
-                .foregroundStyle(LinearGradient.goldShimmer)
-                .opacity(0.6)
+            Image(systemName: "photo")
+                .font(.system(size: 28))
+                .foregroundStyle(Color.ydgIconCream.opacity(0.7))
         }
     }
 }

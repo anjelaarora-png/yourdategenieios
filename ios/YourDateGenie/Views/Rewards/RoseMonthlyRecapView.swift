@@ -19,7 +19,7 @@ struct RoseMonthlyRecapView: View {
             ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 0) {
                     Text("Your \(recap.monthName)\ntogether 💛")
-                        .font(Font.displaySerif(24, weight: .bold))
+                        .font(Font.ydgDisplay(24))
                         .foregroundColor(Color.textPrimary)
                         .fixedSize(horizontal: false, vertical: true)
                         .padding(.top, 8)

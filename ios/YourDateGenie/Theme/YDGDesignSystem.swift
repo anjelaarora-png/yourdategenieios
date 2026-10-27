@@ -198,11 +198,14 @@ extension View {
 // MARK: - YDGButton (one component, every state)
 
 struct YDGButtonStyle: ButtonStyle {
-    enum Kind { case primary, secondary, tertiary, destructive }
+    /// `accentOutline`: gold label + gold hairline, for an in-card action that isn't the screen's primary.
+    enum Kind { case primary, secondary, tertiary, destructive, accentOutline }
 
     var kind: Kind = .primary
     var isLoading: Bool = false
     var fullWidth: Bool = true
+    /// 44pt height and subhead label, for actions inside cards.
+    var compact: Bool = false
     @Environment(\.isEnabled) private var isEnabled
 
     func makeBody(configuration: Configuration) -> some View {
@@ -217,11 +220,11 @@ struct YDGButtonStyle: ButtonStyle {
                 .lineLimit(1)
                 .minimumScaleFactor(0.85)
         }
-        .font(.ydg(.headline))
+        .font(compact ? .ydg(.subhead, weight: .semibold) : .ydg(.headline))
         .foregroundStyle(labelColor)
-        .padding(.horizontal, kind == .tertiary ? YDGSpace.xs : YDGSpace.lg)
+        .padding(.horizontal, kind == .tertiary ? YDGSpace.xs : (compact ? YDGSpace.md : YDGSpace.lg))
         .frame(maxWidth: fullWidth && kind != .tertiary ? .infinity : nil)
-        .frame(minHeight: kind == .tertiary ? 44 : 54)
+        .frame(minHeight: kind == .tertiary || compact ? 44 : 54)
         .background(background(pressed: pressed))
         .overlay(border)
         .contentShape(Capsule())
@@ -237,6 +240,7 @@ struct YDGButtonStyle: ButtonStyle {
         case .secondary: return .ydgTextPrimary
         case .tertiary: return .ydgAccent
         case .destructive: return .ydgDanger
+        case .accentOutline: return .ydgAccent
         }
     }
 
@@ -245,7 +249,7 @@ struct YDGButtonStyle: ButtonStyle {
         switch kind {
         case .primary:
             Capsule().fill(isEnabled ? (pressed ? Color.ydgAccentPressed : Color.ydgAccent) : Color.ydgDisabledFill)
-        case .secondary, .destructive:
+        case .secondary, .destructive, .accentOutline:
             Capsule().fill(pressed ? Color.ydgRaised : Color.clear)
         case .tertiary:
             Color.clear
@@ -259,6 +263,8 @@ struct YDGButtonStyle: ButtonStyle {
             Capsule().stroke(Color.ydgBorderStrong, lineWidth: 1)
         case .destructive:
             Capsule().stroke(Color.ydgDanger.opacity(0.7), lineWidth: 1)
+        case .accentOutline:
+            Capsule().stroke(isEnabled ? Color.ydgAccent : Color.ydgBorder, lineWidth: 1)
         default:
             EmptyView()
         }

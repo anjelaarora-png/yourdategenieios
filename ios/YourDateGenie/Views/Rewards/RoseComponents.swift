@@ -15,16 +15,8 @@ struct RosePrimaryButton: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        Button(action: action) {
-            Text(title)
-                .font(Font.bodySans(16, weight: .semibold))
-                .foregroundColor(Color.backgroundPrimary)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 16)
-                .background(Color.accentGold)
-                .clipShape(RoundedRectangle(cornerRadius: 14))
-        }
-        .buttonStyle(RosePressStyle(reduceMotion: reduceMotion))
+        Button(title, action: action)
+            .buttonStyle(.ydgPrimary)
     }
 }
 
@@ -48,11 +40,8 @@ struct RoseGhostLink: View {
     var body: some View {
         Button(action: action) {
             Text(title)
-                .font(Font.bodySans(14, weight: .medium))
-                .foregroundColor(Color.luxuryCreamMuted)
-                .underline()
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.ydgTertiary)
     }
 }
 
@@ -61,8 +50,8 @@ struct RoseGhostLink: View {
 struct RoseProgressBar: View {
     /// 0…1
     let progress: Double
-    var height: CGFloat = 7
-    var fill: Color = .textPrimary
+    var height: CGFloat = 6
+    var fill: Color = .ydgHighlight
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var animated: Double = 0
@@ -99,32 +88,24 @@ struct RosePill: View {
     let text: String
     var body: some View {
         Text(text)
-            .font(Font.bodySans(11, weight: .semibold))
-            .foregroundColor(Color.textPrimary)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-            .background(Color.accentMaroon.opacity(0.25))
-            .clipShape(Capsule())
-            .overlay(Capsule().stroke(Color.accentMaroon.opacity(0.55), lineWidth: 1))
+            .font(.ydg(.footnote, weight: .semibold))
+            .foregroundColor(Color.ydgTextPrimary)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background(Capsule().fill(Color.ydgHighlightSubtle))
     }
 }
 
 // MARK: Elevated surface card
 
 struct RoseCard<Content: View>: View {
-    var padding: CGFloat = 14
+    var padding: CGFloat = YDGSpace.md
     @ViewBuilder var content: Content
 
     var body: some View {
         content
-            .padding(padding)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.surfaceElevated)
-            .clipShape(RoundedRectangle(cornerRadius: 14))
-            .overlay(
-                RoundedRectangle(cornerRadius: 14)
-                    .stroke(Color.maroonBorderTint, lineWidth: 1)
-            )
+            .ydgCard(padding: padding)
     }
 }
 
@@ -137,18 +118,20 @@ struct RoseStatCard: View {
     var body: some View {
         VStack(spacing: 4) {
             Text(value)
-                .font(Font.displaySerif(24, weight: .bold))
-                .foregroundColor(Color.textOnCard)
+                .font(.ydgDisplay(28))
+                .foregroundColor(Color.ydgTextPrimary)
             Text(label)
-                .font(Font.bodySans(11, weight: .regular))
-                .foregroundColor(Color.textMutedOnCard)
+                .ydgText(.footnote, color: .ydgTextSecondary)
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 16)
-        .padding(.horizontal, 8)
-        .background(Color.creamCard)
-        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .padding(.vertical, YDGSpace.md)
+        .padding(.horizontal, YDGSpace.xs)
+        .background(Color.ydgRaised, in: RoundedRectangle(cornerRadius: YDGRadius.card, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: YDGRadius.card, style: .continuous)
+                .stroke(Color.ydgBorder, lineWidth: 1)
+        )
     }
 }
 
@@ -157,10 +140,8 @@ struct RoseStatCard: View {
 struct RoseLabel: View {
     let text: String
     var body: some View {
-        Text(text.uppercased())
-            .font(Font.bodySans(11, weight: .semibold))
-            .tracking(1.5)
-            .foregroundColor(Color.luxuryCreamMuted)
+        Text(text)
+            .ydgText(.caption)
     }
 }
 
@@ -179,7 +160,7 @@ struct RoseBudDots: View {
                         Circle().stroke(
                             index < open
                                 ? Color.textPrimary.opacity(0.45)
-                                : Color.accentMaroon.opacity(0.55),
+                                : Color.ydgBorderStrong,
                             lineWidth: 1.25
                         )
                     )
@@ -310,7 +291,7 @@ struct RoseHomePill: View {
                             Spacer(minLength: 0)
                             if !rose.needsRevive {
                                 Text("\(rose.datesThisMonth)/\(rose.monthlyGoal)")
-                                    .font(Font.displaySerif(17, weight: .bold))
+                                    .font(Font.ydgDisplay(17))
                                     .foregroundColor(Color.textPrimary)
                                     .monospacedDigit()
                             }
@@ -357,7 +338,7 @@ struct RoseHomePill: View {
             .accessibilityLabel("Why four dates a month")
             .padding(.trailing, 8)
         }
-        .background(Color.luxuryMaroonLight.opacity(0.15))
+        .background(Color.ydgHighlightSubtle)
         .clipShape(RoundedRectangle(cornerRadius: 14))
         .overlay(
             RoundedRectangle(cornerRadius: 14)

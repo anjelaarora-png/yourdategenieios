@@ -38,139 +38,110 @@ struct LowKeyDateView: View {
 
     var body: some View {
         ZStack {
-            Color.backgroundPrimary.ignoresSafeArea()
+            Color.ydgBase.ignoresSafeArea()
 
-            VStack(spacing: 0) {
+            VStack(alignment: .leading, spacing: 0) {
                 header
 
-                Spacer(minLength: 8)
-
                 ideaCard
-                    .padding(.horizontal, 24)
+                    .padding(.top, YDGSpace.lg)
                     .scaleEffect(cardBump ? 1.0 : 0.98)
                     .opacity(cardBump ? 1 : 0.92)
 
-                Spacer(minLength: 8)
+                Spacer(minLength: YDGSpace.lg)
 
                 footer
             }
-            .padding(.top, 12)
-            .padding(.bottom, 24)
+            .padding(.horizontal, YDGSpace.margin)
+            .padding(.top, YDGSpace.xs)
+            .padding(.bottom, YDGSpace.md)
         }
         .onAppear { animateIn() }
     }
 
     // MARK: Header
     private var header: some View {
-        VStack(spacing: 8) {
+        VStack(alignment: .leading, spacing: YDGSpace.xs) {
             HStack {
+                Spacer()
                 Button {
                     onClose?(); dismiss()
                 } label: {
                     Image(systemName: "xmark")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundColor(Color.textPrimary.opacity(0.6))
-                        .frame(width: 36, height: 36)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(Color.ydgTextPrimary)
+                        .frame(width: 32, height: 32)
+                        .background(Circle().fill(Color.ydgOverlay))
+                        .frame(width: 44, height: 44)
                 }
                 .buttonStyle(.plain)
-                Spacer()
+                .accessibilityLabel("Close")
             }
-            .padding(.horizontal, 16)
+            .padding(.trailing, -YDGSpace.xs)
 
-            Text("Tonight, keep it low-key")
-                .font(Font.bodySerif(24, weight: .regular))
-                .foregroundColor(Color.textPrimary)
-                .multilineTextAlignment(.center)
+            Text("A low-key night in")
+                .ydgText(.title1)
+                .accessibilityAddTraits(.isHeader)
 
-            Text("No reservations. No travel. Just the two of you.")
-                .font(Font.bodySans(13, weight: .regular))
-                .foregroundColor(Color.luxuryCreamMuted)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 32)
+            Text("No reservations, no travel. Just you two.")
+                .ydgText(.body, color: .ydgTextSecondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
-    // MARK: Idea card (cream, maroon left border — matches itinerary card language)
+    // MARK: Idea card
     private var ideaCard: some View {
-        HStack(spacing: 0) {
-            Rectangle()
-                .fill(Color.luxuryMaroon)
-                .frame(width: 4)
+        VStack(alignment: .leading, spacing: YDGSpace.sm) {
+            Text(current.emoji)
+                .font(.system(size: 24))
+                .frame(width: 48, height: 48)
+                .background(Circle().fill(Color.ydgHighlightSubtle))
+                .accessibilityHidden(true)
 
-            VStack(alignment: .leading, spacing: 14) {
-                HStack(spacing: 12) {
-                    Text(current.emoji)
-                        .font(.system(size: 38))
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("1 OF DOZENS")
-                            .font(Font.bodySans(10, weight: .bold))
-                            .tracking(1.4)
-                            .foregroundColor(Color.luxuryMaroon.opacity(0.7))
-                        Text(current.title)
-                            .font(Font.bodySerif(21, weight: .regular))
-                            .foregroundColor(Color.luxuryMaroon)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
+            Text("Tonight's idea")
+                .ydgText(.caption)
+                .padding(.top, YDGSpace.xs)
+
+            Text(current.title)
+                .ydgText(.title2)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Text(current.blurb)
+                .ydgText(.body, color: .ydgTextSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            HStack(spacing: YDGSpace.xs) {
+                ForEach(current.meta.components(separatedBy: " · "), id: \.self) { tag in
+                    Text(tag)
+                        .font(.ydg(.footnote, weight: .medium))
+                        .foregroundColor(Color.ydgTextPrimary)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(Color.ydgOverlay, in: RoundedRectangle(cornerRadius: YDGRadius.chip, style: .continuous))
                 }
-
-                Text(current.blurb)
-                    .font(Font.bodySans(15, weight: .regular))
-                    .foregroundColor(Color.luxuryMaroon.opacity(0.85))
-                    .fixedSize(horizontal: false, vertical: true)
-
-                HStack(spacing: 8) {
-                    Image(systemName: "leaf.fill")
-                        .font(.system(size: 11))
-                    Text(current.meta)
-                        .font(Font.bodySans(12, weight: .semibold))
-                }
-                .foregroundColor(Color.luxuryMaroon.opacity(0.6))
             }
-            .padding(20)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.top, YDGSpace.xxs)
         }
-        .background(Color.luxuryCream)
-        .clipShape(RoundedRectangle(cornerRadius: 18))
-        .shadow(color: Color.black.opacity(0.25), radius: 16, y: 8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .ydgCard(padding: YDGSpace.lg)
     }
 
-    // MARK: Footer — one gold CTA + ghost shuffle
+    // MARK: Footer — one gold CTA + outline shuffle
     private var footer: some View {
-        VStack(spacing: 14) {
-            Button {
+        VStack(spacing: YDGSpace.sm) {
+            Button("Plan this tonight") {
                 onChoose?(current)
                 onClose?(); dismiss()
-            } label: {
-                Text("Plan this tonight")
-                    .font(Font.bodySans(16, weight: .semibold))
-                    .foregroundColor(Color.backgroundPrimary)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
-                    .background(Color.accentGold)
-                    .cornerRadius(16)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.ydgPrimary)
 
             Button {
                 shuffle()
             } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: "shuffle")
-                        .font(.system(size: 13, weight: .semibold))
-                    Text("Show me another")
-                        .font(Font.bodySans(14, weight: .semibold))
-                }
-                .foregroundColor(Color.textPrimary.opacity(0.85))
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 14)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 14)
-                        .stroke(Color.luxuryMaroon.opacity(0.55), lineWidth: 1)
-                )
+                Label("Show me another", systemImage: "shuffle")
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.ydgSecondary)
         }
-        .padding(.horizontal, 24)
     }
 
     // MARK: Logic

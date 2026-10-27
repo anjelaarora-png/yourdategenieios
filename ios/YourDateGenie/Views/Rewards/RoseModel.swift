@@ -414,5 +414,5 @@ extension Color {
     static let roseDroopPetal = Color(hex: "7A2C3A")
     static let roseDroopCore = Color(hex: "8A5F48")
     /// Dark progress-track behind cream fills (matches mockup #3a0a0d).
-    static let roseTrack = Color(hex: "2A0A0A")
+    static let roseTrack = Color.ydgOverlay
 }
