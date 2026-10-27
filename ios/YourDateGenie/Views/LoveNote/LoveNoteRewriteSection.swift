@@ -38,8 +38,15 @@ struct LoveNoteRewriteSection: View {
                 }
                 .padding(.horizontal, 1)
             }
+            .scrollClipDisabled()
 
             rewriteButton
+
+            if skin == .charcoal && !canRewrite && !isRewriting {
+                Text("Write a few words first")
+                    .ydgText(.footnote, color: .ydgTextSecondary)
+                    .frame(maxWidth: .infinity)
+            }
 
             if let appliedStyle, preRewriteSnapshot != nil {
                 rewriteStatusRow(style: appliedStyle)
@@ -66,10 +73,8 @@ struct LoveNoteRewriteSection: View {
     private var stylePickerLabel: some View {
         switch skin {
         case .charcoal:
-            Text("REWRITE STYLE")
-                .font(Font.bodySans(11, weight: .bold))
-                .tracking(1.4)
-                .foregroundColor(Color.textPrimary.opacity(0.45))
+            Text("Rewrite as")
+                .ydgText(.subhead, color: .ydgTextSecondary)
         case .luxury:
             HStack(spacing: 6) {
                 Text("Rewrite")
@@ -84,10 +89,16 @@ struct LoveNoteRewriteSection: View {
         }
     }
 
+    @ViewBuilder
     private func styleChip(_ style: LoveNoteRewriteStyle) -> some View {
         let isSelected = selectedStyle == style
 
-        return Button {
+        if skin == .charcoal {
+            YDGChip(title: style.displayName, isSelected: isSelected, showsCheckmark: false) {
+                selectedStyle = style
+            }
+        } else {
+        Button {
             selectedStyle = style
         } label: {
             HStack(spacing: 5) {
@@ -107,9 +118,23 @@ struct LoveNoteRewriteSection: View {
             )
         }
         .buttonStyle(.plain)
+        }
     }
 
+    @ViewBuilder
     private var rewriteButton: some View {
+        if skin == .charcoal {
+            Button(action: performRewrite) {
+                Label(appliedStyle == nil ? "Rewrite with AI" : "Try another style", systemImage: "wand.and.stars")
+            }
+            .buttonStyle(YDGButtonStyle(kind: .primary, isLoading: isRewriting))
+            .disabled(!canRewrite || isRewriting)
+        } else {
+            legacyRewriteButton
+        }
+    }
+
+    private var legacyRewriteButton: some View {
         Button(action: performRewrite) {
             HStack(spacing: 8) {
                 if isRewriting {
@@ -144,10 +169,9 @@ struct LoveNoteRewriteSection: View {
         HStack(spacing: 8) {
             Image(systemName: style.icon)
                 .font(.system(size: 11, weight: .semibold))
-                .foregroundColor(Color.accentGold)
+                .foregroundColor(Color.ydgTextSecondary)
             Text("Rewritten as \(style.displayName)")
-                .font(Font.bodySans(12, weight: .medium))
-                .foregroundColor(Color.textPrimary.opacity(0.55))
+                .ydgText(.footnote, color: .ydgTextSecondary)
 
             Spacer()
 
@@ -160,8 +184,7 @@ struct LoveNoteRewriteSection: View {
                 preRewriteSnapshot = nil
                 appliedStyle = nil
             }
-            .font(Font.bodySans(12, weight: .semibold))
-            .foregroundColor(Color.accentGold)
+            .buttonStyle(.ydgTertiary)
         }
     }
 

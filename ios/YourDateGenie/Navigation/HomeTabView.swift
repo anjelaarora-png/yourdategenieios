@@ -350,23 +350,23 @@ struct LuxuryHomeTabView: View {
     }
     
     private var headerSection: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: YDGSpace.xs) {
             Text(greetingLine1)
-                .font(Font.displaySerif(24, weight: .semibold))
-                .foregroundColor(Color.textPrimary)
+                .ydgText(.title1)
                 .multilineTextAlignment(.leading)
                 .frame(maxWidth: .infinity, alignment: .leading)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityAddTraits(.isHeader)
 
             Text(greetingLine2)
-                .font(Font.bodySans(14, weight: .regular))
-                .foregroundColor(Color.luxuryCreamMuted)
+                .ydgText(.body, color: .ydgTextSecondary)
                 .multilineTextAlignment(.leading)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity)
-        .padding(.horizontal, 20)
-        .padding(.top, 4)
+        .padding(.horizontal, YDGSpace.margin)
+        .padding(.top, YDGSpace.xs)
     }
     
     private var greetingLine1: String {
@@ -387,24 +387,18 @@ struct LuxuryHomeTabView: View {
     
     private var greetingLine2: String {
         if displayHeroPlan != nil {
-            return "Tonight's ready — review your itinerary or share it in one tap."
+            return "Tonight's ready. Review the plan or share it in one tap."
         }
-        return "Tell us the vibe — we build the plan."
+        return "Tell us the vibe. We build the plan."
     }
 
     /// Rose progress — below hero so planning stays the primary focus for new users.
     @ViewBuilder
     private var roseProgressSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 8) {
-                Image(systemName: "chart.line.uptrend.xyaxis")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(Color.accentMaroon.opacity(0.85))
-                Text("YOUR PROGRESS")
-                    .font(Font.bodySans(11, weight: .bold))
-                    .tracking(1.4)
-                    .foregroundColor(Color.textPrimary.opacity(0.55))
-            }
+        VStack(alignment: .leading, spacing: YDGSpace.sm) {
+            Text("This month")
+                .ydgText(.caption)
+                .accessibilityAddTraits(.isHeader)
 
             Group {
                 if rose.hasEverCompletedDate {
@@ -466,22 +460,30 @@ struct LuxuryHomeTabView: View {
         Button {
             coordinator.activeSheet = .lowKey
         } label: {
-            HStack(spacing: 7) {
-                Image(systemName: "leaf.fill")
-                    .font(.system(size: 12, weight: .medium))
-                Text("Not up for going out? Keep it low-key tonight")
-                    .font(Font.bodySans(13, weight: .semibold))
+            HStack(spacing: 14) {
+                Image(systemName: "leaf")
+                    .font(.system(size: 17, weight: .regular))
+                    .foregroundColor(Color.ydgTextSecondary)
+                    .frame(width: 22)
+                Text("Staying in? Keep it low-key tonight")
+                    .font(Font.ydgSans(15, weight: .medium))
+                    .foregroundColor(Color.ydgTextPrimary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(Color.ydgTextTertiary)
             }
-            .foregroundColor(Color.luxuryCreamMuted)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 12)
+            .padding(.horizontal, YDGSpace.md)
+            .frame(minHeight: 52)
+            .background(Color.ydgRaised, in: RoundedRectangle(cornerRadius: YDGRadius.card, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(Color.luxuryGold.opacity(0.18), lineWidth: 1)
+                RoundedRectangle(cornerRadius: YDGRadius.card, style: .continuous)
+                    .stroke(Color.ydgBorder, lineWidth: 1)
             )
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .padding(.horizontal, 20)
+        .padding(.horizontal, YDGSpace.margin)
     }
 
     // MARK: - Screen 18 · Proactive nudge (uses important dates; dormant when none are near)
@@ -566,49 +568,34 @@ struct LuxuryHomeTabView: View {
         let showUseLast = LastQuestionnaireStore.hasLastData || coordinator.hasCompletedPreferences
         let showResume = QuestionnaireProgressStore.hasValidProgress
 
-        return VStack(spacing: 16) {
-            Button {
+        return VStack(spacing: YDGSpace.sm) {
+            Button("Plan my next date") {
                 coordinator.startDatePlanning(mode: .fresh)
-            } label: {
-                Text("Plan My Next Date")
-                    .font(Font.bodySans(16, weight: .semibold))
-                    .foregroundColor(Color.backgroundPrimary)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
-                    .background(Color.accentGold)
-                    .cornerRadius(16)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.ydgPrimary)
             .homeTutorialAnchor(.planButton)
             .id(HomeTutorialAnchor.planButton.rawValue)
 
             if !coordinator.isLoggedIn {
-                Text("Sign in to generate your date plan")
-                    .font(Font.bodySans(12, weight: .regular))
-                    .foregroundColor(Color.textPrimary.opacity(0.55))
+                Text("Sign in to save and share your plans")
+                    .ydgText(.footnote, color: .ydgTextSecondary)
                     .multilineTextAlignment(.center)
             } else if !access.isSubscribed && access.freePlansRemaining > 0 {
                 Text(access.freePlansRemaining == AccessManager.freePlanLimit
-                     ? "\(access.freePlansRemaining) free date plans included — no card needed"
-                     : "\(access.freePlansRemaining) free plan remaining · subscribe for unlimited")
-                    .font(Font.bodySans(12, weight: .regular))
-                    .foregroundColor(Color.luxuryCreamMuted)
+                     ? "\(access.freePlansRemaining) free date plans included. No card needed."
+                     : "\(access.freePlansRemaining) free plan left. Subscribe for unlimited.")
+                    .ydgText(.footnote, color: .ydgTextSecondary)
                     .multilineTextAlignment(.center)
             }
 
             if showUseLast || showResume {
-                Button {
+                Button(showResume ? "Continue where I left off" : "Reuse my last setup") {
                     coordinator.startDatePlanning(mode: showResume ? .resume : .useLast)
-                } label: {
-                    Text("or reuse your last plan")
-                        .font(Font.bodySans(13, weight: .semibold))
-                        .foregroundColor(Color.textPrimary.opacity(0.72))
-                        .underline()
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.ydgTertiary)
             }
         }
-        .padding(.horizontal, 20)
+        .padding(.horizontal, YDGSpace.margin)
     }
 
     private func openHeroPlan(_ plan: DatePlan) {
@@ -848,7 +835,7 @@ struct LuxuryHomeTabView: View {
     // MARK: - Date Experiences collapsible wrapper (events only)
     private var dateExperiencesCollapsibleSection: some View {
         CollapsibleHomeSection(
-            title: "Happening Near You",
+            title: "Happening near you",
             subtitle: "Live events within 60 miles",
             isExpanded: $dateExperiencesExpanded
         ) {
@@ -992,48 +979,40 @@ struct LuxuryHomeTabView: View {
         let badgeCount = savedCount + unsavedToMerge.count
 
         return VStack(alignment: .leading, spacing: 0) {
-            // Gold section divider
-            Rectangle()
-                .fill(Color.luxuryGold.opacity(0.12))
-                .frame(height: 1)
-                .padding(.horizontal, 20)
-                .padding(.bottom, 18)
-
-            // Collapsible header
+            // Collapsible header (same treatment as CollapsibleHomeSection)
             Button {
                 withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
                     upcomingExpanded.toggle()
                 }
             } label: {
-                HStack(spacing: 8) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack(spacing: 8) {
-                            Text("UPCOMING")
-                                .font(Font.bodySans(13, weight: .semibold))
-                                .tracking(1.2)
-                                .foregroundColor(Color.accentGold)
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack(alignment: .firstTextBaseline, spacing: 8) {
+                            Text("Upcoming")
+                                .ydgText(.title2)
                             if badgeCount > 0 {
                                 Text("\(badgeCount)")
-                                    .font(Font.bodySans(11, weight: .bold))
-                                    .foregroundColor(Color.backgroundPrimary)
-                                    .padding(.horizontal, 7)
-                                    .padding(.vertical, 3)
-                                    .background(Color.accentGold)
-                                    .clipShape(Capsule())
+                                    .font(Font.ydgSans(12, weight: .semibold))
+                                    .foregroundColor(Color.ydgTextPrimary)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 2)
+                                    .background(Capsule().fill(Color.ydgOverlay))
+                                    .accessibilityLabel("\(badgeCount) plans")
                             }
                         }
                         Text("Tap any plan to view details and extras")
-                            .font(Font.bodySans(11, weight: .regular))
-                            .foregroundColor(Color.textPrimary.opacity(0.5))
+                            .ydgText(.footnote, color: .ydgTextSecondary)
                     }
                     Spacer()
                     Image(systemName: upcomingExpanded ? "chevron.up" : "chevron.down")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(Color.accentGold.opacity(0.7))
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(Color.ydgTextTertiary)
+                        .frame(width: 44, height: 44, alignment: .trailing)
                 }
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .padding(.horizontal, 20)
+            .padding(.horizontal, YDGSpace.margin)
 
             if upcomingExpanded {
                 upcomingDatesExpandedContent(

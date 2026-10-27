@@ -7,6 +7,9 @@ struct ConversationStartersView: View {
     @StateObject private var storage = ConversationStarterStorageManager.shared
     @StateObject private var sessionStorage = SparkSessionStorageManager.shared
 
+    /// True inside the Convo tab, which supplies its own title; hides the sheet chrome.
+    var isEmbeddedInTab = false
+
     private let totalSteps = 3
     @State private var showingGeneratorFlow = false
     @State private var showingSparksDeck = false
@@ -32,7 +35,7 @@ struct ConversationStartersView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color.backgroundPrimary
+                Color.ydgBase
                     .ignoresSafeArea()
 
                 if let session = showingSessionDetail {
@@ -51,31 +54,16 @@ struct ConversationStartersView: View {
                     .id(session.id)
                 } else if showingGeneratorFlow {
                     VStack(spacing: 0) {
-                        Text("CONVERSATION STARTERS")
-                            .font(Font.bodySans(12, weight: .semibold))
-                            .tracking(2)
-                            .foregroundColor(Color.luxuryGold)
+                        Text("Find the spark made for you")
+                            .ydgText(.title2)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.horizontal, 20)
-                            .padding(.top, 6)
-                            .padding(.bottom, 2)
-                        HStack(alignment: .firstTextBaseline, spacing: 4) {
-                            Text("Find the spark made for ")
-                                .font(Font.bodySerif(22, weight: .regular))
-                                .foregroundColor(Color.luxuryCream)
-                            Text("you")
-                                .font(Font.bodySerif(24, weight: .regular))
-                                .foregroundColor(Color.accentGold)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, 20)
-                        .padding(.bottom, 2)
-                        Text("2 taps. Personalized instantly.")
-                            .font(Font.bodySans(14, weight: .regular))
-                            .foregroundColor(Color.luxuryCreamMuted)
+                            .padding(.horizontal, YDGSpace.margin)
+                            .padding(.top, YDGSpace.xs)
+                        Text("Two taps, made for the two of you.")
+                            .ydgText(.subhead, weight: .regular, color: .ydgTextSecondary)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.horizontal, 20)
-                            .padding(.bottom, 6)
+                            .padding(.horizontal, YDGSpace.margin)
+                            .padding(.bottom, YDGSpace.xs)
                         stepProgressHeader
                             .padding(.horizontal, 20)
                         TabView(selection: $step) {
@@ -91,7 +79,7 @@ struct ConversationStartersView: View {
                     hubContent
                 }
             }
-            .navigationTitle("Conversation Starters")
+            .navigationTitle(isEmbeddedInTab ? "" : "Talk sparks")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
@@ -106,22 +94,25 @@ struct ConversationStartersView: View {
                             mood = nil
                             topic = nil
                         } label: {
-                            Text("Back")
-                                .font(Font.bodySans(16, weight: .semibold))
-                                .foregroundColor(Color.luxuryGold)
+                            Label("Back", systemImage: "chevron.left")
+                                .font(Font.ydgSans(16, weight: .semibold))
+                                .foregroundColor(Color.ydgTextPrimary)
                         }
                     }
                 }
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button {
-                        dismiss()
-                    } label: {
-                        Text("Done")
-                            .font(Font.bodySans(16, weight: .semibold))
-                            .foregroundColor(Color.luxuryGold)
+                if !isEmbeddedInTab {
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Button {
+                            dismiss()
+                        } label: {
+                            Text("Done")
+                                .font(Font.ydgSans(16, weight: .semibold))
+                                .foregroundColor(Color.ydgAccent)
+                        }
                     }
                 }
             }
+            .toolbar(isEmbeddedInTab && !showingGeneratorFlow ? .hidden : .visible, for: .navigationBar)
         }
         .onChange(of: step) { _, newStep in
             if newStep == 3 {
@@ -133,28 +124,13 @@ struct ConversationStartersView: View {
     // MARK: - Hub (Conversation Starters)
     private var hubContent: some View {
         ScrollView(showsIndicators: false) {
-            VStack(alignment: .leading, spacing: 24) {
-                Text("CONVERSATION STARTERS")
-                    .font(Font.bodySans(12, weight: .semibold))
-                    .tracking(2)
-                    .foregroundColor(Color.luxuryGold)
-                    .padding(.horizontal, 4)
-
-                HStack(alignment: .firstTextBaseline, spacing: 4) {
-                    Text("Find the spark made for ")
-                        .font(Font.bodySerif(26, weight: .regular))
-                        .foregroundColor(Color.luxuryCream)
-                    Text("you")
-                        .font(Font.bodySerif(28, weight: .regular))
-                        .foregroundColor(Color.accentGold)
+            VStack(alignment: .leading, spacing: YDGSpace.md) {
+                VStack(alignment: .leading, spacing: YDGSpace.xxs) {
+                    Text("Find the spark made for you")
+                        .ydgText(.title2)
+                    Text("Two taps, made for the two of you.")
+                        .ydgText(.subhead, weight: .regular, color: .ydgTextSecondary)
                 }
-                .padding(.horizontal, 4)
-
-                Text("2 taps. Personalized instantly.")
-                    .font(Font.bodySans(15, weight: .regular))
-                    .foregroundColor(Color.luxuryCreamMuted)
-                    .padding(.horizontal, 4)
-                    .padding(.top, -4)
 
                 Button {
                     showingGeneratorFlow = true
@@ -164,51 +140,31 @@ struct ConversationStartersView: View {
                     topic = nil
                     currentOpener = nil
                 } label: {
-                    HStack(spacing: 16) {
-                        ZStack {
-                            Circle()
-                                .stroke(Color.luxuryGold.opacity(0.5), lineWidth: 1.5)
-                                .frame(width: 48, height: 48)
-                            Image(systemName: "plus")
-                                .font(Font.bodySans(20, weight: .semibold))
-                                .symbolRenderingMode(.monochrome)
-                                .foregroundColor(Color.luxuryGold)
-                        }
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("New session")
-                                .font(Font.bodySans(18, weight: .semibold))
-                                .foregroundColor(Color.luxuryCream)
+                    HStack(spacing: YDGSpace.md) {
+                        YDGIconTile(systemName: "plus", size: 48)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("New session").ydgText(.headline)
                             Text("Pick your vibe, get your sparks.")
-                                .font(Font.bodySans(14, weight: .regular))
-                                .foregroundColor(Color.luxuryCreamMuted)
+                                .ydgText(.subhead, weight: .regular, color: .ydgTextSecondary)
                         }
                         Spacer()
                         Image(systemName: "chevron.right")
-                            .font(Font.bodySans(14, weight: .semibold))
-                            .symbolRenderingMode(.monochrome)
-                            .foregroundColor(Color.luxuryGold)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(Color.ydgTextTertiary)
                     }
-                    .padding(18)
-                    .background(Color.luxeSurfaceTintStrong)
-                    .cornerRadius(20)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 20)
-                            .stroke(Color.luxuryGold.opacity(0.4), lineWidth: 1)
-                    )
+                    .ydgCard()
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(ScaleButtonStyle())
 
                 Text("Your favorites")
-                    .font(Font.bodySerif(20, weight: .regular))
-                    .foregroundColor(Color.accentGold)
-                    .padding(.top, 8)
+                    .ydgText(.title3)
+                    .padding(.top, YDGSpace.md)
+                    .accessibilityAddTraits(.isHeader)
 
                 if storage.savedStarters.isEmpty {
-                    Text("Save sparks you love — they'll show up here.")
-                        .font(Font.bodySans(14, weight: .regular))
-                        .foregroundColor(Color.luxuryMuted)
-                        .padding(.horizontal, 4)
-                        .padding(.bottom, 8)
+                    Text("Save sparks you love and they'll show up here.")
+                        .ydgText(.subhead, weight: .regular, color: .ydgTextSecondary)
                 } else {
                     ForEach(storage.savedStarters) { saved in
                         SavedStarterCard(
@@ -220,16 +176,13 @@ struct ConversationStartersView: View {
                 }
 
                 Text("Past sessions")
-                    .font(Font.bodySerif(20, weight: .regular))
-                    .foregroundColor(Color.accentGold)
-                    .padding(.top, 16)
+                    .ydgText(.title3)
+                    .padding(.top, YDGSpace.md)
+                    .accessibilityAddTraits(.isHeader)
 
                 if sessionStorage.sessions.isEmpty {
-                    Text("Your past sessions will appear here.")
-                        .font(Font.bodySans(14, weight: .regular))
-                        .foregroundColor(Color.luxuryMuted)
-                        .padding(.horizontal, 4)
-                        .padding(.bottom, 8)
+                    Text("Your past sessions will show up here.")
+                        .ydgText(.subhead, weight: .regular, color: .ydgTextSecondary)
                 } else {
                     ForEach(sessionStorage.sessions) { session in
                         PastSessionCard(
@@ -240,7 +193,9 @@ struct ConversationStartersView: View {
                     }
                 }
             }
-            .padding(20)
+            .padding(.horizontal, YDGSpace.margin)
+            .padding(.top, YDGSpace.xs)
+            .padding(.bottom, YDGSpace.lg)
         }
         .mainTabBarScrollInset()
     }
@@ -284,17 +239,13 @@ struct ConversationStartersView: View {
     private var step1Content: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 20) {
-                Text("WHERE ARE YOU?")
-                    .font(Font.bodySans(12, weight: .semibold))
-                    .tracking(2)
-                    .foregroundColor(Color.luxuryMuted)
-                    .padding(.horizontal, 4)
-
-                Text("Choose what best describes your connection")
-                    .font(Font.bodySans(14, weight: .regular))
-                    .foregroundColor(Color.luxuryCreamMuted)
-                    .padding(.horizontal, 4)
-                    .padding(.bottom, 4)
+                VStack(alignment: .leading, spacing: YDGSpace.xxs) {
+                    Text("Where are you two?")
+                        .ydgText(.title3)
+                        .accessibilityAddTraits(.isHeader)
+                    Text("Pick what best describes your connection.")
+                        .ydgText(.subhead, weight: .regular, color: .ydgTextSecondary)
+                }
 
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
                     ForEach(ConversationOpenerContent.relationshipStages, id: \.value) { stage in
@@ -318,17 +269,13 @@ struct ConversationStartersView: View {
     private var step2Content: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 24) {
-                Text("WHAT DO YOU NEED?")
-                    .font(Font.bodySans(12, weight: .semibold))
-                    .tracking(2)
-                    .foregroundColor(Color.luxuryMuted)
-                    .padding(.horizontal, 4)
-
-                Text("We'll match your starters to the mood.")
-                    .font(Font.bodySans(14, weight: .regular))
-                    .foregroundColor(Color.luxuryCreamMuted)
-                    .padding(.horizontal, 4)
-                    .padding(.bottom, 4)
+                VStack(alignment: .leading, spacing: YDGSpace.xxs) {
+                    Text("What do you need?")
+                        .ydgText(.title3)
+                        .accessibilityAddTraits(.isHeader)
+                    Text("We'll match your sparks to the mood.")
+                        .ydgText(.subhead, weight: .regular, color: .ydgTextSecondary)
+                }
 
                 ForEach(ConversationOpenerContent.vibeOptions, id: \.value) { vibe in
                     VibeRowCard(
@@ -384,17 +331,13 @@ struct ConversationStartersView: View {
     private var step3Content: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 24) {
-                Text("OPTIONAL")
-                    .font(Font.bodySans(12, weight: .semibold))
-                    .tracking(2)
-                    .foregroundColor(Color.luxuryMuted)
-                    .padding(.horizontal, 4)
-
-                Text("Tap any topics that feel right — or skip ahead.")
-                    .font(Font.bodySans(14, weight: .regular))
-                    .foregroundColor(Color.luxuryCreamMuted)
-                    .padding(.horizontal, 4)
-                    .padding(.bottom, 4)
+                VStack(alignment: .leading, spacing: YDGSpace.xxs) {
+                    Text("Any topics?")
+                        .ydgText(.title3)
+                        .accessibilityAddTraits(.isHeader)
+                    Text("Optional. Tap any that feel right, or skip ahead.")
+                        .ydgText(.subhead, weight: .regular, color: .ydgTextSecondary)
+                }
 
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
                     ForEach(ConversationOpenerContent.topics, id: \.value) { t in
@@ -475,8 +418,8 @@ struct ConversationStartersView: View {
                     }
                     .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(LuxuryGoldButtonStyle(isSmall: false))
-                .padding(.horizontal, 20)
+                .buttonStyle(.ydgPrimary)
+                .padding(.horizontal, YDGSpace.margin)
             } else {
                 Button {
                     withAnimation {
@@ -496,17 +439,13 @@ struct ConversationStartersView: View {
                     }
                     .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(LuxuryGoldButtonStyle(isSmall: false))
+                .buttonStyle(.ydgPrimary)
                 .disabled(!canContinue)
-                .opacity(canContinue ? 1 : 0.5)
-                .padding(.horizontal, 20)
+                .padding(.horizontal, YDGSpace.margin)
             }
         }
-        .padding(.vertical, 16)
-        .background(
-            Color.backgroundPrimary
-                .shadow(color: Color.black.opacity(0.3), radius: 10, y: -5)
-        )
+        .padding(.vertical, YDGSpace.md)
+        .background(Color.ydgBase)
     }
 }
 
@@ -522,36 +461,31 @@ private struct VibeRowCard: View {
         Button(action: onTap) {
             HStack(spacing: 14) {
                 Image(systemName: icon)
-                    .font(Font.bodySans(20, weight: .medium))
-                    .symbolRenderingMode(.monochrome)
-                    .foregroundColor(Color.accentGold)
+                    .font(.system(size: 20, weight: .regular))
+                    .foregroundColor(isSelected ? Color.ydgAccent : Color.ydgTextSecondary)
                     .frame(width: 28, alignment: .center)
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: 2) {
                     Text(title)
-                        .font(Font.bodySans(16, weight: .semibold))
-                        .foregroundColor(isSelected ? Color.luxuryMaroon : Color.luxuryCream)
+                        .ydgText(.headline, color: isSelected ? .ydgAccent : .ydgTextPrimary)
                     Text(subtitle)
-                        .font(Font.bodySans(13, weight: .regular))
-                        .foregroundColor(isSelected ? Color.luxuryMaroon.opacity(0.8) : Color.luxuryMuted)
+                        .ydgText(.footnote, color: .ydgTextSecondary)
                 }
                 Spacer()
                 Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                    .font(Font.bodySans(18, weight: .regular))
-                    .symbolRenderingMode(.monochrome)
-                    .foregroundColor(Color.luxuryGold)
+                    .font(.system(size: 20, weight: .regular))
+                    .foregroundColor(isSelected ? Color.ydgAccent : Color.ydgTextTertiary)
             }
-            .padding(16)
+            .padding(YDGSpace.md)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                isSelected ? LinearGradient.goldShimmer : LinearGradient(colors: [Color.luxeSurfaceTintStrong], startPoint: .top, endPoint: .bottom)
-            )
-            .cornerRadius(16)
+            .background(isSelected ? Color.ydgAccentSubtle : Color.ydgRaised,
+                        in: RoundedRectangle(cornerRadius: YDGRadius.card, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 16)
-                    .stroke(isSelected ? Color.clear : Color.luxuryGold.opacity(0.3), lineWidth: 1)
+                RoundedRectangle(cornerRadius: YDGRadius.card, style: .continuous)
+                    .stroke(isSelected ? Color.ydgAccent : Color.ydgBorder, lineWidth: isSelected ? 1.5 : 1)
             )
         }
         .buttonStyle(ScaleButtonStyle())
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }
 
@@ -705,32 +639,29 @@ private struct RelationshipStageCard: View {
             VStack(alignment: .leading, spacing: 6) {
                 HStack {
                     Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                        .font(Font.bodySans(16, weight: .regular))
-                        .symbolRenderingMode(.monochrome)
-                        .foregroundColor(Color.luxuryGold)
+                        .font(.system(size: 18, weight: .regular))
+                        .foregroundColor(isSelected ? Color.ydgAccent : Color.ydgTextTertiary)
                     Spacer()
                 }
                 Text(title)
-                    .font(Font.bodySans(16, weight: .semibold))
-                    .foregroundColor(isSelected ? Color.luxuryMaroon : Color.luxuryCream)
+                    .ydgText(.headline, color: isSelected ? .ydgAccent : .ydgTextPrimary)
                     .multilineTextAlignment(.leading)
                 Text(subtitle)
-                    .font(Font.bodySans(12, weight: .regular))
-                    .foregroundColor(isSelected ? Color.luxuryMaroon.opacity(0.8) : Color.luxuryMuted)
+                    .ydgText(.footnote, color: .ydgTextSecondary)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            .padding(16)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                isSelected ? LinearGradient.goldShimmer : LinearGradient(colors: [Color.luxeSurfaceTintStrong], startPoint: .top, endPoint: .bottom)
-            )
-            .cornerRadius(16)
+            .padding(YDGSpace.md)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .background(isSelected ? Color.ydgAccentSubtle : Color.ydgRaised,
+                        in: RoundedRectangle(cornerRadius: YDGRadius.card, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 16)
-                    .stroke(isSelected ? Color.clear : Color.luxuryGold.opacity(0.3), lineWidth: 1)
+                RoundedRectangle(cornerRadius: YDGRadius.card, style: .continuous)
+                    .stroke(isSelected ? Color.ydgAccent : Color.ydgBorder, lineWidth: isSelected ? 1.5 : 1)
             )
-            .shadow(color: isSelected ? Color.luxuryGold.opacity(0.3) : Color.clear, radius: 10, y: 4)
         }
         .buttonStyle(ScaleButtonStyle())
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }
 

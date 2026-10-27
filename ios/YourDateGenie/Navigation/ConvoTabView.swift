@@ -7,21 +7,22 @@ struct ConvoTabView: View {
     @State private var segment: Segment = .notes
 
     enum Segment: String, CaseIterable, Identifiable {
-        case notes = "Love Notes"
-        case sparks = "Conversation Starters"
+        case notes = "Love notes"
+        case sparks = "Talk sparks"
         var id: String { rawValue }
     }
 
     var body: some View {
         ZStack {
-            CharcoalMaroonBackground()
+            Color.ydgBase
                 .ignoresSafeArea()
 
             VStack(spacing: 0) {
+                YDGLargeTitle(title: "Convo")
+                    .padding(.bottom, YDGSpace.md)
                 segmentPicker
-                    .padding(.horizontal, 20)
-                    .padding(.top, 12)
-                    .padding(.bottom, 8)
+                    .padding(.horizontal, YDGSpace.margin)
+                    .padding(.bottom, YDGSpace.xs)
 
                 Group {
                     switch segment {
@@ -36,7 +37,7 @@ struct ConvoTabView: View {
                             )
                         }
                     case .sparks:
-                        ConversationStartersView()
+                        ConversationStartersView(isEmbeddedInTab: true)
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -45,40 +46,6 @@ struct ConvoTabView: View {
     }
 
     private var segmentPicker: some View {
-        HStack(spacing: 6) {
-            ForEach(Segment.allCases) { item in
-                let isSelected = segment == item
-                Button {
-                    withAnimation(.easeInOut(duration: 0.18)) { segment = item }
-                } label: {
-                    Text(item.rawValue)
-                        .font(Font.bodySans(13, weight: isSelected ? .semibold : .regular))
-                        .foregroundColor(isSelected ? Color.textPrimary : Color.luxuryCreamMuted)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 9)
-                        .background(
-                            isSelected
-                                ? AnyShapeStyle(Color.accentMaroon.opacity(0.35))
-                                : AnyShapeStyle(Color.clear)
-                        )
-                        .overlay(alignment: .bottom) {
-                            if isSelected {
-                                Rectangle()
-                                    .fill(Color.accentMaroon)
-                                    .frame(height: 2)
-                                    .padding(.horizontal, 8)
-                            }
-                        }
-                        .clipShape(Capsule())
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .padding(4)
-        .background(Color.surfaceElevated)
-        .clipShape(Capsule())
-        .overlay(
-            Capsule().stroke(Color.accentGold.opacity(0.2), lineWidth: 1)
-        )
+        YDGSegmentedControl(options: Segment.allCases, selection: $segment) { $0.rawValue }
     }
 }

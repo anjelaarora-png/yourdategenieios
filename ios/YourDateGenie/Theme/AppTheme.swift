@@ -5,8 +5,9 @@ import SwiftUI
 
 extension Color {
     // Semantic tokens — Charcoal Maroon redesign
-    static let backgroundPrimary = Color(hex: "1A1A1A")
-    static let surfaceElevated = Color(hex: "242424")
+    // Legacy names now resolve to the Final design tokens in YDGDesignSystem.swift.
+    static let backgroundPrimary = ydgBase
+    static let surfaceElevated = ydgRaised
     static let creamCard = Color(hex: "F5F0E8")
     static let creamParchmentLight = Color(hex: "FDF8F0")
     static let creamParchmentMid = Color(hex: "F5EDE0")
@@ -14,10 +15,10 @@ extension Color {
     /// Warm cream tint on charcoal surfaces — never stark white overlays.
     static let luxeSurfaceTint = Color(hex: "F5F0E8").opacity(0.08)
     static let luxeSurfaceTintStrong = Color(hex: "F5F0E8").opacity(0.12)
-    static let luxeSurfaceBorder = Color(hex: "F5F0E8").opacity(0.16)
-    static let accentGold = Color(hex: "C9A84C")
+    static let luxeSurfaceBorder = ydgBorder
+    static let accentGold = ydgAccent
     static let accentMaroon = Color(hex: "4A0E0E")
-    static let textPrimary = Color(hex: "FAFAF8")
+    static let textPrimary = ydgTextPrimary
     static let textOnCard = Color(hex: "1A1A1A")
     static let textMutedOnCard = Color(hex: "888888")
     static let maroonBorderTint = Color(hex: "4A0E0E").opacity(0.15)
@@ -25,18 +26,19 @@ extension Color {
     // Legacy aliases (mapped to Charcoal Maroon tokens)
     static let luxuryMaroon = accentMaroon
     static let luxuryMaroonLight = surfaceElevated
-    static let luxuryMaroonMedium = Color(hex: "2E2E2E")
+    static let luxuryMaroonMedium = ydgOverlay
     static let luxuryGold = accentGold
     static let luxuryGoldLight = Color(hex: "D4B896")
     static let luxuryGoldDark = Color(hex: "A68B5B")
     static let luxuryCream = textPrimary
-    static let luxuryCreamMuted = Color(hex: "FAFAF8").opacity(0.65)
-    static let luxuryMuted = Color(hex: "888888")
-    
+    /// Solid secondary text (was 65% cream, which dropped below AA on raised surfaces).
+    static let luxuryCreamMuted = ydgTextSecondary
+    static let luxuryMuted = ydgTextTertiary
+
     // Functional Colors
-    static let luxurySuccess = Color(hex: "7CB87C")          // Muted green
-    static let luxuryError = Color(hex: "C75050")            // Muted red
-    static let luxuryWarning = Color(hex: "D4A84B")          // Warm yellow
+    static let luxurySuccess = ydgSuccess
+    static let luxuryError = ydgDanger
+    static let luxuryWarning = ydgWarning
     
     // Polaroid/Memory Colors
     static let polaroidWhite = Color(hex: "FFFDF7")          // Warm white for polaroid frame
@@ -176,35 +178,11 @@ extension RadialGradient {
 
 // MARK: - Charcoal Maroon screen backdrop (subtle maroon glow at edges — accent only)
 
+/// Flat charcoal screen base. The maroon edge glows were removed in the Final design:
+/// depth comes from lighter surfaces, and the one gradient is saved for the plan reveal.
 struct CharcoalMaroonBackground: View {
     var body: some View {
-        ZStack {
-            Color.backgroundPrimary
-
-            LinearGradient(
-                colors: [
-                    Color.accentMaroon.opacity(0.24),
-                    Color.backgroundPrimary,
-                    Color(hex: "141010"),
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-
-            RadialGradient(
-                colors: [Color.accentMaroon.opacity(0.16), Color.clear],
-                center: UnitPoint(x: 0.88, y: 0.06),
-                startRadius: 0,
-                endRadius: 300
-            )
-
-            RadialGradient(
-                colors: [Color.accentMaroon.opacity(0.12), Color.clear],
-                center: UnitPoint(x: 0.1, y: 0.94),
-                startRadius: 0,
-                endRadius: 280
-            )
-        }
+        Color.ydgBase
     }
 }
 
@@ -229,8 +207,7 @@ struct DateNightsTagline: View {
                 Text("Date night.")
                     .foregroundColor(Color.textPrimary)
                 Text("Done.")
-                    .foregroundColor(Color.accentGold)
-                    .goldShimmer(duration: 2.8)
+                    .foregroundColor(Color.textPrimary)
             }
             .font(Font.displaySerif(34, weight: .semibold))
             .multilineTextAlignment(.center)
@@ -256,66 +233,53 @@ extension View {
 
 // MARK: - Luxurious Button Styles
 
-/// Gold outline button with gold text on dark background
+/// Secondary pill: cream label, hairline outline. (Legacy name; new code uses `.ydgSecondary`.)
 struct LuxuryOutlineButtonStyle: ButtonStyle {
     var isSmall: Bool = false
-    
+
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(Font.inter(isSmall ? 14 : 16, weight: .semibold))
-            .foregroundColor(Color.luxuryGold)
-            .padding(.horizontal, isSmall ? 20 : 28)
-            .padding(.vertical, isSmall ? 12 : 16)
-            .background(Color.clear)
-            .overlay(
-                RoundedRectangle(cornerRadius: isSmall ? 10 : 14)
-                    .stroke(Color.luxuryGold, lineWidth: 1.5)
-            )
-            .scaleEffect(configuration.isPressed ? 0.97 : 1)
-            .opacity(configuration.isPressed ? 0.8 : 1)
-            .animation(.easeInOut(duration: 0.15), value: configuration.isPressed)
+            .font(Font.ydgSans(isSmall ? 15 : 17, weight: .semibold))
+            .foregroundColor(Color.ydgTextPrimary)
+            .padding(.horizontal, isSmall ? 18 : 24)
+            .frame(minHeight: isSmall ? 44 : 54)
+            .background(Capsule().fill(configuration.isPressed ? Color.ydgRaised : Color.clear))
+            .overlay(Capsule().stroke(Color.ydgBorderStrong, lineWidth: 1))
+            .contentShape(Capsule())
+            .scaleEffect(configuration.isPressed ? 0.98 : 1)
+            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
     }
 }
 
-/// Solid gold button with dark or light label (e.g. onboarding: white text)
+/// Primary pill: flat gold, charcoal label, no glow. (Legacy name; new code uses `.ydgPrimary`.)
 struct LuxuryGoldButtonStyle: ButtonStyle {
     var isSmall: Bool = false
-    /// Use .textPrimary or .white for onboarding; default charcoal on gold CTA.
+    /// Kept for call-site compatibility; the label is always charcoal on gold for contrast.
     var labelColor: Color = Color.backgroundPrimary
+    @Environment(\.isEnabled) private var isEnabled
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(Font.inter(isSmall ? 14 : 16, weight: .semibold))
-            .foregroundColor(labelColor)
-            .padding(.horizontal, isSmall ? 20 : 28)
-            .padding(.vertical, isSmall ? 12 : 16)
+            .font(Font.ydgSans(isSmall ? 15 : 17, weight: .semibold))
+            .foregroundColor(isEnabled ? Color.ydgTextOnAccent : Color.ydgDisabledLabel)
+            .padding(.horizontal, isSmall ? 18 : 24)
+            .frame(minHeight: isSmall ? 44 : 54)
             .background(
-                LinearGradient.goldShimmer
-                    .opacity(configuration.isPressed ? 0.8 : 1)
+                Capsule().fill(
+                    !isEnabled ? Color.ydgDisabledFill
+                        : configuration.isPressed ? Color.ydgAccentPressed : Color.ydgAccent
+                )
             )
-            .cornerRadius(isSmall ? 10 : 14)
-            .shadow(color: Color.luxuryGold.opacity(0.3), radius: configuration.isPressed ? 4 : 12, y: configuration.isPressed ? 2 : 6)
-            .scaleEffect(configuration.isPressed ? 0.97 : 1)
-            .animation(.easeInOut(duration: 0.15), value: configuration.isPressed)
+            .contentShape(Capsule())
+            .scaleEffect(configuration.isPressed ? 0.98 : 1)
+            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
     }
 }
 
-/// Maroon button with gold text (secondary)
+/// Former maroon button; now the same secondary pill as `LuxuryOutlineButtonStyle`.
 struct LuxuryMaroonButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(Font.inter(16, weight: .semibold))
-            .foregroundColor(Color.luxuryGold)
-            .padding(.horizontal, 28)
-            .padding(.vertical, 16)
-            .background(Color.luxuryMaroonLight)
-            .cornerRadius(14)
-            .overlay(
-                RoundedRectangle(cornerRadius: 14)
-                    .stroke(Color.luxuryGold.opacity(0.3), lineWidth: 1)
-            )
-            .scaleEffect(configuration.isPressed ? 0.97 : 1)
-            .animation(.easeInOut(duration: 0.15), value: configuration.isPressed)
+        LuxuryOutlineButtonStyle().makeBody(configuration: configuration)
     }
 }
 
@@ -348,33 +312,13 @@ struct LuxuryReservationPlatformButtonStyle: ButtonStyle {
 // Legacy button styles
 struct GoldButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(Font.inter(17, weight: .semibold))
-            .foregroundColor(Color.luxuryMaroon)
-            .padding(.horizontal, 32)
-            .padding(.vertical, 16)
-            .background(LinearGradient.goldShimmer)
-            .cornerRadius(12)
-            .shadow(color: Color.luxuryGold.opacity(0.4), radius: 12, x: 0, y: 6)
-            .scaleEffect(configuration.isPressed ? 0.97 : 1)
-            .animation(.easeInOut(duration: 0.2), value: configuration.isPressed)
+        LuxuryGoldButtonStyle().makeBody(configuration: configuration)
     }
 }
 
 struct OutlineButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(Font.inter(17, weight: .semibold))
-            .foregroundColor(Color.luxuryGold)
-            .padding(.horizontal, 32)
-            .padding(.vertical, 16)
-            .background(Color.clear)
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(Color.luxuryGold, lineWidth: 1.5)
-            )
-            .scaleEffect(configuration.isPressed ? 0.97 : 1)
-            .animation(.easeInOut(duration: 0.2), value: configuration.isPressed)
+        LuxuryOutlineButtonStyle().makeBody(configuration: configuration)
     }
 }
 
@@ -383,27 +327,14 @@ struct OutlineButtonStyle: ButtonStyle {
 struct LuxuryCardModifier: ViewModifier {
     var hasBorder: Bool = true
     
+    /// Raised surface + hairline, no gold border or shadow (Final design depth rule).
     func body(content: Content) -> some View {
         content
-            .background(
-                ZStack {
-                    Color.luxuryMaroonLight.opacity(0.7)
-                    LinearGradient.magicalOverlay
-                }
-            )
-            .cornerRadius(20)
+            .background(Color.ydgRaised, in: RoundedRectangle(cornerRadius: YDGRadius.card, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 20)
-                    .stroke(
-                        LinearGradient(
-                            colors: [Color.luxuryGold.opacity(0.4), Color.luxuryGold.opacity(0.1)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        lineWidth: hasBorder ? 1 : 0
-                    )
+                RoundedRectangle(cornerRadius: YDGRadius.card, style: .continuous)
+                    .stroke(Color.ydgBorder, lineWidth: hasBorder ? 1 : 0)
             )
-            .shadow(color: Color.black.opacity(0.3), radius: 15, y: 8)
     }
 }
 
@@ -419,33 +350,27 @@ extension View {
 
 // MARK: - Charcoal Maroon highlight boxes (website parity: gold boxes + maroon pops)
 
-/// Subtle gold fill + gold border — use on charcoal for callouts, nudges, and grouped content.
+/// Grouped content on charcoal: raised surface + hairline (Final design; was gold fill + gold border).
 struct GoldHighlightBoxModifier: ViewModifier {
     var cornerRadius: CGFloat = 14
 
     func body(content: Content) -> some View {
         content
-            .background(Color.accentGold.opacity(0.1))
-            .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
+            .background(Color.ydgRaised, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: cornerRadius)
-                    .stroke(Color.accentGold.opacity(0.35), lineWidth: 1)
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .stroke(Color.ydgBorder, lineWidth: 1)
             )
     }
 }
 
-/// 3pt maroon rail on the leading edge — accent pop only, never a full maroon fill.
+/// Former 3pt maroon rail. Maroon on charcoal measured 1.1:1, so the rail is retired;
+/// the modifier is kept as a no-op so existing call sites compile.
 struct MaroonLeadingAccentModifier: ViewModifier {
     var width: CGFloat = 3
 
     func body(content: Content) -> some View {
         content
-            .overlay(alignment: .leading) {
-                RoundedRectangle(cornerRadius: 1.5)
-                    .fill(Color.accentMaroon)
-                    .frame(width: width)
-                    .padding(.vertical, 6)
-            }
     }
 }
 
@@ -504,15 +429,13 @@ extension View {
             .maroonLeadingAccent()
     }
 
-    /// Charcoal inset with cream border tint — form fields on dark screens.
+    /// Form-field surface on dark screens: raised fill + hairline.
     func luxeInsetSurface(cornerRadius: CGFloat = 14) -> some View {
-        background(LinearGradient.charcoalMaroonInset)
-            .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
+        background(Color.ydgRaised, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: cornerRadius)
-                    .stroke(Color.luxeSurfaceBorder, lineWidth: 1)
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .stroke(Color.ydgBorder, lineWidth: 1)
             )
-            .maroonLeadingAccent(width: 2)
     }
 
     /// Questionnaire toggles / inset panels — flat charcoal tint (matches Home section insets).
@@ -571,43 +494,28 @@ struct ExtrasSectionHeader: View {
 /// - Body: Inter (sans-serif) - For all body text app-wide. Same font as questionnaire "What time works best?" buttons.
 
 extension Font {
-    // MARK: - Header Font (Times New Roman / Serif)
-    /// Primary header font - Times New Roman or system serif
+    // MARK: - Header Font (Playfair Display)
+    /// Primary header font - Playfair Display; regular maps to semibold to match the type scale
     static func header(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
-        let weightName: String
-        switch weight {
-        case .regular: weightName = "TimesNewRomanPSMT"
-        case .bold: weightName = "TimesNewRomanPS-BoldMT"
-        case .semibold: weightName = "TimesNewRomanPS-BoldMT"
-        default: weightName = "TimesNewRomanPSMT"
-        }
-        return .custom(weightName, size: size)
+        Font.ydgDisplay(size, weight: weight == .regular ? .semibold : weight)
     }
     
     static func headerItalic(_ size: CGFloat) -> Font {
-        .custom("TimesNewRomanPS-ItalicMT", size: size)
+        Font.ydgDisplay(size, weight: .regular).italic()
     }
     
-    // MARK: - Subheader Font (Times New Roman)
-    /// Subheader font - Times New Roman for subheadings (consistent with app)
+    // MARK: - Subheader Font (Playfair Display)
+    /// Subheader font - Playfair Display medium for subheadings
     static func subheader(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
-        let weightName: String
-        switch weight {
-        case .regular: weightName = "TimesNewRomanPSMT"
-        case .medium: weightName = "TimesNewRomanPSMT"
-        case .semibold: weightName = "TimesNewRomanPS-BoldMT"
-        case .bold: weightName = "TimesNewRomanPS-BoldMT"
-        default: weightName = "TimesNewRomanPSMT"
-        }
-        return .custom(weightName, size: size)
+        Font.ydgDisplay(size, weight: weight == .regular ? .medium : weight)
     }
     
     static func subheaderItalic(_ size: CGFloat) -> Font {
-        .custom("TimesNewRomanPS-ItalicMT", size: size)
+        Font.ydgDisplay(size, weight: .regular).italic()
     }
     
     // MARK: - Display Serif (functional headers)
-    /// Georgia serif for display titles on charcoal screens (replaces Tangerine in-app).
+    /// Playfair Display for display titles on charcoal screens.
     static func displaySerif(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
         bodySerif(size, weight: weight)
     }
@@ -617,26 +525,20 @@ extension Font {
         displaySerif(size, weight: weight)
     }
     
-    // MARK: - Body Font (Serif - Georgia)
-    /// Body serif font - Georgia for elegant readable text
+    // MARK: - Serif accent (Playfair Display)
+    /// Serif accent text - Playfair Display (was Georgia)
     static func bodySerif(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
-        let weightName: String
-        switch weight {
-        case .bold: weightName = "Georgia-Bold"
-        case .semibold: weightName = "Georgia-Bold"
-        default: weightName = "Georgia"
-        }
-        return .custom(weightName, size: size)
+        Font.ydgDisplay(size, weight: weight)
     }
     
     static func bodySerifItalic(_ size: CGFloat) -> Font {
-        .custom("Georgia-Italic", size: size)
+        Font.ydgDisplay(size, weight: .regular).italic()
     }
     
-    // MARK: - Body Font (Sans-Serif - System / Inter when bundled)
-    /// Body sans-serif - system font (SF Pro) when Inter not in bundle; add Inter .ttf + UIAppFonts to use Inter
+    // MARK: - Body Font (Inter)
+    /// Body sans-serif - Inter (bundled variable font), scales with Dynamic Type
     static func bodySans(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
-        .system(size: size, weight: weight)
+        Font.ydgSans(size, weight: weight)
     }
     
     // MARK: - Legacy Support (Keeping old names for compatibility)

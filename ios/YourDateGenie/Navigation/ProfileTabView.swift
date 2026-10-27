@@ -23,43 +23,19 @@ struct LuxuryProfileTabView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                CharcoalMaroonBackground()
+                Color.ydgBase
                     .ignoresSafeArea()
                 
                 ScrollView(.vertical, showsIndicators: false) {
-                    VStack(spacing: 24) {
-                        VStack(spacing: 16) {
-                            ZStack {
-                                Circle()
-                                    .fill(Color.surfaceElevated)
-                                    .frame(width: 72, height: 72)
-                                    .overlay(
-                                        Circle()
-                                            .stroke(Color.accentGold, lineWidth: 2)
-                                    )
-                                
-                                Text(userInitials)
-                                    .font(Font.bodySerif(28, weight: .regular))
-                                    .foregroundColor(Color.accentGold)
-                            }
-                            
-                            VStack(spacing: 4) {
-                                Text(userProfile?.displayName ?? "Date Enthusiast")
-                                    .font(Font.bodySerif(20, weight: .regular))
-                                    .foregroundColor(Color.textPrimary)
-                                
-                                if let email = userProfile?.email, !email.isEmpty {
-                                    Text(memberLine(email: email))
-                                        .font(Font.bodySans(12, weight: .regular))
-                                        .foregroundColor(Color.luxuryMuted)
-                                }
-                            }
-                        }
-                        .padding(.top, 16)
+                    VStack(alignment: .leading, spacing: YDGSpace.lg) {
+                        YDGLargeTitle(title: "You")
+
+                        profileRow
+                            .padding(.horizontal, YDGSpace.margin)
 
                         if let partnerName = linkedPartnerName {
                             partnerStrip(name: partnerName)
-                                .padding(.horizontal, 20)
+                                .padding(.horizontal, YDGSpace.margin)
                         }
                         
                         HStack(spacing: 10) {
@@ -67,142 +43,105 @@ struct LuxuryProfileTabView: View {
                             ProfileStatBox(value: "\(coordinator.pastPlans.count)", label: "Completed")
                             ProfileStatBox(value: "\(memoryManager.totalMemoriesCount)", label: "Memories")
                         }
-                        .padding(.horizontal, 20)
+                        .padding(.horizontal, YDGSpace.margin)
                         
                         if let prefs = userProfile?.preferences {
                             PreferencesSummaryCard(preferences: prefs, onEdit: {
                                 coordinator.startEditPreferencesOnly()
                             })
-                                .padding(.horizontal, 20)
+                                .padding(.horizontal, YDGSpace.margin)
                         }
                         
                         VStack(spacing: 0) {
-                            LuxuryProfileMenuItem(icon: "bookmark.fill", title: "Saved Plans", isLocked: !access.canAccess(.datePlan)) {
+                            LuxuryProfileMenuItem(icon: "bookmark", title: "Saved plans", isLocked: !access.canAccess(.datePlan)) {
                                 access.require(.datePlan) {
                                     coordinator.activeSheet = .savedPlansList
                                 }
                             }
-                            Divider().background(Color.luxeSurfaceTint)
-                            LuxuryProfileMenuItem(icon: "clock.fill", title: "Date History", isLocked: !access.canAccess(.datePlan)) {
+                            YDGListDivider()
+                            LuxuryProfileMenuItem(icon: "clock", title: "Date history", isLocked: !access.canAccess(.datePlan)) {
                                 access.require(.datePlan) {
                                     coordinator.activeSheet = .pastMagic
                                 }
                             }
-                            Divider().background(Color.luxeSurfaceTint)
-                            LuxuryProfileMenuItem(icon: "gift.fill", title: "Gift Finder", isLocked: !access.canAccess(.gifting)) {
+                            YDGListDivider()
+                            LuxuryProfileMenuItem(icon: "gift", title: "Gift finder", isLocked: !access.canAccess(.gifting)) {
                                 access.require(.gifting) {
                                     coordinator.activeSheet = .gifts
                                 }
                             }
-                            Divider().background(Color.luxeSurfaceTint)
-                            LuxuryProfileMenuItem(icon: "leaf.fill", title: "Your Journey") {
+                            YDGListDivider()
+                            LuxuryProfileMenuItem(icon: "camera.macro", title: "Your rose garden") {
                                 coordinator.activeSheet = .roseRewards
                             }
-                            Divider().background(Color.luxeSurfaceTint)
-                            LuxuryProfileMenuItem(icon: "heart.fill", title: "Preferences") {
+                            YDGListDivider()
+                            LuxuryProfileMenuItem(icon: "slider.horizontal.3", title: "Preferences") {
                                 coordinator.startEditPreferencesOnly()
                             }
-                            Divider().background(Color.luxeSurfaceTint)
-                            LuxuryProfileMenuItem(icon: "bell.fill", title: "Notifications") {
+                            YDGListDivider()
+                            LuxuryProfileMenuItem(icon: "bell", title: "Notifications") {
                                 notificationManager.showNotificationsSheet = true
                             }
-                            Divider().background(Color.luxeSurfaceTint)
-                            LuxuryProfileMenuItem(icon: "gearshape.fill", title: "Settings") {
+                            YDGListDivider()
+                            LuxuryProfileMenuItem(icon: "gearshape", title: "Settings") {
                                 coordinator.activeSheet = .settings
                             }
-                            Divider().background(Color.luxeSurfaceTint)
-                            LuxuryProfileMenuItem(icon: "questionmark.circle.fill", title: "Help & Support") {
+                            YDGListDivider()
+                            LuxuryProfileMenuItem(icon: "questionmark.circle", title: "Help & support") {
                                 showHelpSupport = true
                             }
                         }
-                        .goldHighlightMaroonAccent(cornerRadius: 14)
-                        .padding(.horizontal, 20)
+                        .ydgGroupedList()
+                        .padding(.horizontal, YDGSpace.margin)
                         
-                        // Restore Purchases
-                        Button {
-                            Task {
-                                do {
-                                    try await PurchaseManager.shared.restorePurchases()
-                                    restoreMessage = "Purchases restored successfully."
-                                } catch {
-                                    restoreMessage = "No purchases found to restore."
+                        // Account actions: quiet text buttons, destructive ones last.
+                        VStack(spacing: YDGSpace.xxs) {
+                            Button("Restore purchases") {
+                                Task {
+                                    do {
+                                        try await PurchaseManager.shared.restorePurchases()
+                                        restoreMessage = "Purchases restored successfully."
+                                    } catch {
+                                        restoreMessage = "No purchases found to restore."
+                                    }
+                                    showRestoreAlert = true
                                 }
-                                showRestoreAlert = true
                             }
-                        } label: {
-                            HStack(spacing: 10) {
-                                Image(systemName: "arrow.clockwise.circle.fill")
-                                    .font(.system(size: 20))
-                                    .foregroundColor(Color.luxuryGold)
-                                    .frame(width: 24, height: 24)
-                                Text("Restore Purchases")
-                            }
-                            .font(Font.bodySans(14, weight: .medium))
-                            .foregroundColor(Color.accentGold)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 14)
-                            .background(Color.clear)
-                            .cornerRadius(10)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 10)
-                                    .stroke(Color.luxeSurfaceBorder, lineWidth: 1)
-                            )
-                        }
-                        .padding(.horizontal, 20)
+                            .buttonStyle(.ydgTertiary)
 
-                        // Sign Out
-                        Button {
-                            showSignOutAlert = true
-                        } label: {
-                            HStack(spacing: 10) {
-                                Image(systemName: "arrow.left.square.fill")
-                                    .font(.system(size: 20))
-                                    .foregroundColor(Color.luxuryError.opacity(0.85))
-                                    .frame(width: 24, height: 24)
+                            if coordinator.isLoggedIn {
+                                Button {
+                                    showSignOutAlert = true
+                                } label: {
+                                    Text("Sign out")
+                                        .ydgText(.callout, weight: .semibold, color: .ydgDanger)
+                                        .frame(minHeight: 44)
+                                }
+                                .buttonStyle(.plain)
 
-                                Text("Sign Out")
-                            }
-                            .font(Font.bodySans(14, weight: .medium))
-                            .foregroundColor(Color.luxuryError.opacity(0.85))
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 14)
-                            .background(Color.clear)
-                            .cornerRadius(10)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 10)
-                                    .stroke(Color.luxuryError.opacity(0.3), lineWidth: 1)
-                            )
-                        }
-                        .padding(.horizontal, 20)
-
-                        // Delete Account (required by App Store / GDPR)
-                        Button {
-                            showDeleteAccountAlert = true
-                        } label: {
-                            if isDeletingAccount {
-                                ProgressView()
-                                    .tint(Color.luxuryError.opacity(0.7))
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 14)
-                            } else {
-                                Text("Delete Account")
-                                    .font(Font.bodySans(13, weight: .medium))
-                                    .foregroundColor(Color.luxuryError.opacity(0.7))
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 14)
+                                Button {
+                                    showDeleteAccountAlert = true
+                                } label: {
+                                    if isDeletingAccount {
+                                        ProgressView().tint(Color.ydgTextTertiary)
+                                    } else {
+                                        Text("Delete account")
+                                            .ydgText(.footnote, color: .ydgTextTertiary)
+                                    }
+                                }
+                                .buttonStyle(.plain)
+                                .frame(minHeight: 44)
+                                .disabled(isDeletingAccount)
                             }
                         }
-                        .disabled(isDeletingAccount)
-                        .padding(.horizontal, 20)
+                        .frame(maxWidth: .infinity)
+                        .padding(.bottom, YDGSpace.md)
                     }
                 }
                 .mainTabBarScrollInset()
                 .scrollBounceBehavior(.basedOnSize)
             }
-            .navigationTitle("You")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
-            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbar(.hidden, for: .navigationBar)
             .sheet(isPresented: $notificationManager.showNotificationsSheet) {
                 NotificationsSheetView(notificationManager: notificationManager)
             }
@@ -270,26 +209,69 @@ struct LuxuryProfileTabView: View {
         return email
     }
 
+    /// Avatar tile, name and email; a guest sees a sign-in prompt instead.
+    private var profileRow: some View {
+        HStack(spacing: 14) {
+            ZStack {
+                Circle().fill(Color.ydgIconTile)
+                if coordinator.isLoggedIn {
+                    Text(userInitials)
+                        .font(.ydgSans(18, weight: .semibold))
+                        .foregroundColor(Color.ydgIconCream)
+                } else {
+                    Image(systemName: "person")
+                        .font(.system(size: 20, weight: .regular))
+                        .foregroundColor(Color.ydgIconCream)
+                }
+            }
+            .frame(width: 52, height: 52)
+            .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 2) {
+                if coordinator.isLoggedIn {
+                    Text(userProfile?.displayName ?? "Your profile")
+                        .ydgText(.headline)
+                    if let email = userProfile?.email, !email.isEmpty {
+                        Text(memberLine(email: email))
+                            .ydgText(.footnote, color: .ydgTextSecondary)
+                            .lineLimit(1)
+                    }
+                } else {
+                    Text("Guest").ydgText(.headline)
+                    Text("Sign in to keep plans and memories")
+                        .ydgText(.footnote, color: .ydgTextSecondary)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            if !coordinator.isLoggedIn {
+                Button("Sign in") {
+                    coordinator.activeSheet = .authRequired(.fresh)
+                }
+                .buttonStyle(.ydgTertiary)
+            }
+        }
+    }
+
     private func partnerStrip(name: String) -> some View {
         Button {
             coordinator.showPartnerPlanning()
         } label: {
-            HStack(spacing: 8) {
-                Image(systemName: "person.2.fill")
-                    .font(.system(size: 13, weight: .semibold))
+            HStack(spacing: 12) {
+                Image(systemName: "person.2")
+                    .font(.system(size: 17, weight: .regular))
+                    .foregroundColor(Color.ydgHighlight)
                 Text("Planning with \(name)")
-                    .font(Font.bodySans(11, weight: .semibold))
-                    .tracking(0.4)
-                    .textCase(.uppercase)
+                    .ydgText(.callout, weight: .medium)
                 Spacer(minLength: 8)
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 11, weight: .semibold))
-                    .opacity(0.6)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(Color.ydgTextTertiary)
             }
-            .foregroundColor(Color.textPrimary)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-            .goldHighlightMaroonAccent(cornerRadius: 12)
+            .padding(.horizontal, YDGSpace.md)
+            .frame(minHeight: 52)
+            .background(Color.ydgHighlightSubtle, in: RoundedRectangle(cornerRadius: YDGRadius.card, style: .continuous))
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }
@@ -302,30 +284,17 @@ struct PreferencesSummaryCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            HStack {
-                HStack(spacing: 6) {
-                    Text("Your")
-                        .font(Font.bodySerif(16, weight: .regular))
-                        .foregroundColor(Color.luxuryCream)
-                    Text("Preferences")
-                        .font(Font.bodySerif(20, weight: .regular))
-                        .foregroundColor(Color.accentGold)
-                }
+            HStack(alignment: .firstTextBaseline) {
+                Text("Your preferences")
+                    .ydgText(.title3)
+                    .accessibilityAddTraits(.isHeader)
                 
                 Spacer()
                 
-                Button {
+                Button("Edit") {
                     onEdit?()
-                } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "pencil")
-                            .font(.system(size: 13))
-                            .foregroundColor(Color.luxuryGold)
-                        Text("Edit")
-                    }
-                    .font(Font.bodySans(13, weight: .medium))
-                    .foregroundColor(Color.luxuryGold)
                 }
+                .buttonStyle(.ydgTertiary)
             }
             
             VStack(alignment: .leading, spacing: 14) {
@@ -400,8 +369,8 @@ struct PreferencesSummaryCard: View {
                 )
             }
         }
-        .padding(18)
-        .goldHighlightMaroonAccent(cornerRadius: 14)
+        .padding(YDGSpace.md)
+        .goldHighlightMaroonAccent(cornerRadius: YDGRadius.card)
     }
 }
 
@@ -420,24 +389,23 @@ private struct PreferenceStartingPointSection: View {
                 HStack(spacing: 8) {
                     Image(systemName: "mappin.and.ellipse")
                         .font(.system(size: 14))
-                        .foregroundColor(Color.luxuryGold.opacity(0.9))
+                        .foregroundColor(Color.ydgTextSecondary)
                     Text("Starting point")
-                        .font(Font.bodySans(13, weight: .semibold))
-                        .foregroundColor(Color.luxuryCream)
+                        .ydgText(.subhead, weight: .semibold)
                 }
                 Spacer()
                 Button {
                     onEdit?()
                 } label: {
                     Text("Change")
-                        .font(Font.bodySans(12, weight: .semibold))
-                        .foregroundColor(Color.luxuryGold)
+                        .font(.ydg(.subhead, weight: .semibold))
+                        .foregroundColor(Color.ydgAccent)
+                        .frame(minHeight: 44)
                 }
                 .buttonStyle(.plain)
             }
-            Text(trimmed.isEmpty ? "Not set — add an address for routes and nearby picks." : trimmed)
-                .font(Font.bodySans(13, weight: .regular))
-                .foregroundColor(trimmed.isEmpty ? Color.luxuryMuted : Color.luxuryCream)
+            Text(trimmed.isEmpty ? "Not set. Add an address for routes and nearby picks." : trimmed)
+                .ydgText(.subhead, weight: .regular, color: trimmed.isEmpty ? .ydgTextTertiary : .ydgTextPrimary)
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -455,16 +423,14 @@ struct PreferenceChipsSection: View {
             HStack(spacing: 8) {
                 Image(systemName: icon)
                     .font(.system(size: 14))
-                    .foregroundColor(Color.luxuryGold.opacity(0.9))
+                    .foregroundColor(Color.ydgTextSecondary)
                 Text(title)
-                    .font(Font.bodySans(13, weight: .semibold))
-                    .foregroundColor(Color.luxuryCream)
+                    .ydgText(.subhead, weight: .semibold)
             }
             
             if chips.isEmpty {
                 Text("None selected")
-                    .font(Font.bodySans(12, weight: .regular))
-                    .foregroundColor(Color.luxuryMuted)
+                    .ydgText(.footnote, color: .ydgTextTertiary)
             } else {
                 FlowLayout(spacing: 8) {
                     ForEach(Array(chips.enumerated()), id: \.offset) { _, chip in
@@ -486,40 +452,36 @@ struct PreferenceChip: View {
             Text(emoji)
                 .font(.system(size: 16))
             Text(label)
-                .font(Font.bodySans(12, weight: .medium))
-                .foregroundColor(Color.luxuryCream)
+                .font(.ydg(.footnote, weight: .medium))
+                .foregroundColor(Color.ydgTextPrimary)
         }
         .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(Color.backgroundPrimary.opacity(0.5))
-        .cornerRadius(20)
-        .overlay(
-            RoundedRectangle(cornerRadius: 20)
-                .stroke(Color.accentGold.opacity(0.25), lineWidth: 1)
-        )
+        .padding(.vertical, 7)
+        .background(Capsule().fill(Color.ydgOverlay))
     }
 }
 
-// MARK: - Profile stat box (cream card)
+// MARK: - Profile stat box
 struct ProfileStatBox: View {
     let value: String
     let label: String
 
     var body: some View {
-        VStack(spacing: 4) {
+        VStack(alignment: .leading, spacing: 2) {
             Text(value)
-                .font(Font.bodySerif(24, weight: .regular))
-                .foregroundColor(Color.accentGold)
-            Text(label.lowercased())
-                .font(Font.bodySans(10, weight: .regular))
-                .foregroundColor(Color.textMutedOnCard)
-                .lineLimit(2)
-                .multilineTextAlignment(.center)
+                .font(.ydgSans(24, weight: .semibold))
+                .foregroundColor(Color.ydgTextPrimary)
+                .monospacedDigit()
+            Text(label)
+                .ydgText(.footnote, color: .ydgTextSecondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
         }
-        .frame(maxWidth: .infinity)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.vertical, 14)
-        .padding(.horizontal, 8)
-        .creamCardMaroonAccent(cornerRadius: 14)
+        .padding(.horizontal, 14)
+        .background(Color.ydgRaised, in: RoundedRectangle(cornerRadius: YDGRadius.card, style: .continuous))
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -580,31 +542,32 @@ struct LuxuryProfileMenuItem: View {
         Button {
             action?()
         } label: {
-            HStack(spacing: 16) {
+            HStack(spacing: 14) {
                 Image(systemName: icon)
-                    .font(.system(size: 16))
-                    .foregroundColor(Color.accentGold)
+                    .font(.system(size: 18, weight: .regular))
+                    .foregroundColor(Color.ydgTextSecondary)
                     .frame(width: 24, alignment: .center)
                 
                 Text(title)
-                    .font(Font.bodySans(14, weight: .regular))
-                    .foregroundColor(Color.textPrimary)
+                    .ydgText(.body)
                 
                 Spacer()
 
                 if isLocked {
                     Image(systemName: "lock.fill")
                         .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(Color.luxuryGold.opacity(0.85))
+                        .foregroundColor(Color.ydgTextTertiary)
+                        .accessibilityLabel("Premium")
                 }
                 
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 14))
-                    .foregroundColor(Color.luxuryMuted)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(Color.ydgTextTertiary)
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 14)
-            .opacity(isLocked ? 0.5 : 1)
+            .padding(.horizontal, YDGSpace.md)
+            .frame(minHeight: 52)
+            .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
     }
 }

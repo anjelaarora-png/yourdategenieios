@@ -15,28 +15,28 @@ struct DatesTabView: View {
 
     var body: some View {
         ZStack {
-            CharcoalMaroonBackground()
+            Color.ydgBase
                 .ignoresSafeArea()
 
             VStack(spacing: 0) {
                 header
                 segmentPicker
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 12)
+                    .padding(.horizontal, YDGSpace.margin)
+                    .padding(.bottom, YDGSpace.md)
 
                 Group {
                     switch segment {
                     case .upcoming:
                         planList(
                             coordinator.savedPlans,
-                            emptyTitle: "No upcoming dates yet",
-                            emptySubtitle: "Plan a date and save it — it’ll show up here, ready to revisit."
+                            emptyTitle: "No dates planned yet",
+                            emptySubtitle: "Plan one and save it. It’ll show up here with the route, reservations and extras."
                         )
                     case .past:
                         planList(
                             coordinator.pastPlans,
                             emptyTitle: "No past dates yet",
-                            emptySubtitle: "Once you’ve enjoyed a date, it lands here so you can relive it."
+                            emptySubtitle: "Once you’ve been on a date, it lands here so you can look back on it."
                         )
                     case .memories:
                         memoriesContent
@@ -50,51 +50,12 @@ struct DatesTabView: View {
     // MARK: - Header
 
     private var header: some View {
-        Text("Your Dates")
-            .font(Font.bodySerif(28, weight: .regular))
-            .foregroundColor(Color.accentGold)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 20)
-            .padding(.top, 12)
-            .padding(.bottom, 14)
+        YDGLargeTitle(title: "Your dates")
+            .padding(.bottom, YDGSpace.md)
     }
 
     private var segmentPicker: some View {
-        HStack(spacing: 6) {
-            ForEach(Segment.allCases) { item in
-                let isSelected = segment == item
-                Button {
-                    withAnimation(.easeInOut(duration: 0.18)) { segment = item }
-                } label: {
-                    Text(item.rawValue)
-                        .font(Font.bodySans(13, weight: isSelected ? .semibold : .regular))
-                        .foregroundColor(isSelected ? Color.textPrimary : Color.luxuryCreamMuted)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 9)
-                        .background(
-                            isSelected
-                                ? AnyShapeStyle(Color.accentMaroon.opacity(0.35))
-                                : AnyShapeStyle(Color.clear)
-                        )
-                        .overlay(alignment: .bottom) {
-                            if isSelected {
-                                Rectangle()
-                                    .fill(Color.accentMaroon)
-                                    .frame(height: 2)
-                                    .padding(.horizontal, 8)
-                            }
-                        }
-                        .clipShape(Capsule())
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .padding(4)
-        .background(Color.surfaceElevated)
-        .clipShape(Capsule())
-        .overlay(
-            Capsule().stroke(Color.accentGold.opacity(0.2), lineWidth: 1)
-        )
+        YDGSegmentedControl(options: Segment.allCases, selection: $segment) { $0.rawValue }
     }
 
     // MARK: - Plan list (Upcoming / Past)
@@ -105,7 +66,7 @@ struct DatesTabView: View {
             emptyState(title: emptyTitle, subtitle: emptySubtitle)
         } else {
             ScrollView(showsIndicators: false) {
-                VStack(spacing: 14) {
+                VStack(spacing: YDGSpace.sm) {
                     ForEach(plans) { plan in
                         DateListRow(plan: plan) {
                             coordinator.currentDatePlan = plan
@@ -114,8 +75,8 @@ struct DatesTabView: View {
                         }
                     }
                 }
-                .padding(.horizontal, 20)
-                .padding(.top, 4)
+                .padding(.horizontal, YDGSpace.margin)
+                .padding(.top, YDGSpace.xxs)
             }
             .mainTabBarScrollInset()
         }
@@ -135,37 +96,15 @@ struct DatesTabView: View {
     }
 
     private func emptyState(title: String, subtitle: String) -> some View {
-        VStack(spacing: 16) {
-            Spacer()
-            ZStack {
-                Circle()
-                    .fill(Color.luxuryGold.opacity(0.12))
-                    .frame(width: 80, height: 80)
-                Image(systemName: "heart.text.square")
-                    .font(.system(size: 32))
-                    .foregroundColor(Color.luxuryGold.opacity(0.8))
-            }
-            Text(title)
-                .font(Font.bodySans(17, weight: .semibold))
-                .foregroundColor(Color.luxuryCream)
-            Text(subtitle)
-                .font(Font.bodySans(14, weight: .regular))
-                .foregroundColor(Color.luxuryMuted)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 40)
-            Button {
-                coordinator.startDatePlanning()
-            } label: {
-                Text("Plan My Next Date")
-                    .font(Font.bodySans(15, weight: .semibold))
-                    .foregroundColor(Color.luxuryMaroon)
-                    .padding(.horizontal, 28)
-                    .padding(.vertical, 12)
-                    .background(LinearGradient.goldShimmer)
-                    .clipShape(Capsule())
-            }
-            .buttonStyle(.plain)
-            .padding(.top, 4)
+        VStack {
+            Spacer(minLength: YDGSpace.xl)
+            YDGEmptyState(
+                systemName: "calendar",
+                title: title,
+                message: subtitle,
+                actionTitle: "Plan my next date",
+                action: { coordinator.startDatePlanning() }
+            )
             Spacer()
             Spacer()
         }
@@ -175,65 +114,80 @@ struct DatesTabView: View {
 
 // MARK: - Date list row
 
+/// Raised card: date block (or stop emojis when unscheduled), title, stops and duration.
 private struct DateListRow: View {
     let plan: DatePlan
     let onTap: () -> Void
 
+    private static let weekday: DateFormatter = {
+        let f = DateFormatter(); f.dateFormat = "EEE"; return f
+    }()
+    private static let day: DateFormatter = {
+        let f = DateFormatter(); f.dateFormat = "d"; return f
+    }()
+    private static let time: DateFormatter = {
+        let f = DateFormatter(); f.dateFormat = "h:mm a"; return f
+    }()
+
+    private var metaLine: String {
+        var parts: [String] = []
+        if let date = plan.scheduledDate { parts.append(Self.time.string(from: date)) }
+        parts.append("\(plan.stops.count) stop\(plan.stops.count == 1 ? "" : "s")")
+        if !plan.totalDuration.isEmpty { parts.append(plan.totalDuration) }
+        return parts.joined(separator: " · ")
+    }
+
     var body: some View {
         Button(action: onTap) {
-            HStack(spacing: 14) {
-                AsyncImage(url: URL(string: plan.displayImageUrl)) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image.resizable().aspectRatio(contentMode: .fill)
-                    case .empty, .failure:
-                        ZStack {
-                            Color.luxuryMaroonLight
-                            HStack(spacing: 2) {
-                                ForEach(plan.stops.prefix(3)) { stop in
-                                    Text(stop.emoji).font(.system(size: 18))
-                                }
-                            }
-                        }
-                    @unknown default:
-                        Color.luxuryMaroonLight
-                    }
-                }
-                .frame(width: 56, height: 56)
-                .clipShape(RoundedRectangle(cornerRadius: 14))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 14)
-                        .stroke(Color.luxuryGold.opacity(0.3), lineWidth: 1)
-                )
+            HStack(spacing: YDGSpace.md) {
+                dateBlock
 
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: YDGSpace.xxs) {
                     Text(plan.title)
-                        .font(Font.bodySerif(15, weight: .regular))
-                        .foregroundColor(Color.textOnCard)
+                        .ydgText(.headline)
                         .lineLimit(2)
-                    Text("\(plan.stops.count) stops · \(plan.totalDuration)")
-                        .font(Font.bodySans(12, weight: .regular))
-                        .foregroundColor(Color.textMutedOnCard)
+                        .multilineTextAlignment(.leading)
+                    Text(metaLine)
+                        .ydgText(.footnote, color: .ydgTextSecondary)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
 
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(Color.accentGold.opacity(0.8))
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(Color.ydgTextTertiary)
             }
-            .padding(16)
-            .background(Color.creamCard)
-            .overlay(alignment: .leading) {
-                Rectangle()
-                    .fill(Color.accentMaroon)
-                    .frame(width: 3)
-            }
-            .cornerRadius(18)
-            .overlay(
-                RoundedRectangle(cornerRadius: 18)
-                    .stroke(Color.maroonBorderTint, lineWidth: 1)
-            )
+            .ydgCard()
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityElement(children: .combine)
+    }
+
+    @ViewBuilder
+    private var dateBlock: some View {
+        Group {
+            if let date = plan.scheduledDate {
+                VStack(spacing: 0) {
+                    Text(Self.weekday.string(from: date).uppercased())
+                        .font(.ydgSans(12, weight: .semibold))
+                        .tracking(0.9)
+                        .foregroundColor(Color.ydgHighlight)
+                    Text(Self.day.string(from: date))
+                        .font(.ydgSans(24, weight: .semibold))
+                        .foregroundColor(Color.ydgTextPrimary)
+                        .monospacedDigit()
+                }
+            } else {
+                HStack(spacing: 1) {
+                    ForEach(plan.stops.prefix(2)) { stop in
+                        Text(stop.emoji).font(.system(size: 18))
+                    }
+                }
+            }
+        }
+        .frame(width: 56, height: 64)
+        .background(plan.scheduledDate == nil ? Color.ydgOverlay : Color.ydgHighlightSubtle)
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .accessibilityHidden(true)
     }
 }

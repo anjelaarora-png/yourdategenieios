@@ -205,9 +205,7 @@ struct RoseNewUserIntroCard: View {
                 HStack(spacing: 12) {
                     ZStack {
                         Circle()
-                            .fill(Color.creamCard.opacity(0.12))
-                        Circle()
-                            .stroke(Color.accentGold.opacity(0.35), lineWidth: 1)
+                            .fill(Color.ydgHighlightSubtle)
                         RosePlantView(
                             mode: .blooming(open: 0, total: rose.monthlyGoal),
                             size: 40
@@ -217,22 +215,20 @@ struct RoseNewUserIntroCard: View {
                     .accessibilityHidden(true)
 
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Your progress")
-                            .font(Font.bodySans(14, weight: .semibold))
-                            .foregroundColor(Color.textPrimary)
-                        Text("0 of \(rose.monthlyGoal) date nights this month · complete one to open your first bud.")
-                            .font(Font.bodySans(11, weight: .regular))
-                            .foregroundColor(Color.luxuryCreamMuted)
+                        Text("0 of \(rose.monthlyGoal) date nights")
+                            .ydgText(.headline)
+                        Text("Complete a date to grow your first rose")
+                            .ydgText(.subhead, weight: .regular, color: .ydgTextSecondary)
                             .fixedSize(horizontal: false, vertical: true)
                             .multilineTextAlignment(.leading)
                     }
 
                     Image(systemName: "chevron.right")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(Color.luxuryCreamMuted.opacity(0.75))
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(Color.ydgTextTertiary)
                 }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 12)
+                .padding(.leading, YDGSpace.md)
+                .padding(.vertical, YDGSpace.md)
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Your progress. Zero of \(rose.monthlyGoal) date nights this month.")
@@ -243,18 +239,17 @@ struct RoseNewUserIntroCard: View {
             } label: {
                 Image(systemName: "info.circle")
                     .font(.system(size: 15, weight: .medium))
-                    .foregroundColor(Color.accentGold.opacity(0.75))
-                    .frame(width: 36, height: 48)
+                    .foregroundColor(Color.ydgTextTertiary)
+                    .frame(width: 44, height: 48)
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Why track date nights with a rose")
             .padding(.trailing, 8)
         }
-        .background(Color.luxuryMaroonLight.opacity(0.15))
-        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .background(Color.ydgRaised, in: RoundedRectangle(cornerRadius: YDGRadius.card, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 14)
-                .stroke(Color.accentGold.opacity(0.22), lineWidth: 1)
+            RoundedRectangle(cornerRadius: YDGRadius.card, style: .continuous)
+                .stroke(Color.ydgBorder, lineWidth: 1)
         )
         .sheet(isPresented: $showScienceInfo) {
             RoseScienceInfoSheet(monthlyGoal: rose.monthlyGoal)

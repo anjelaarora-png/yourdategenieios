@@ -1,46 +1,43 @@
 import SwiftUI
 
 // MARK: - Luxury Quick Tile (icon + label; use .frame(maxWidth: .infinity) for even distribution in a row)
+/// Cream glyph on a warm circle (`YDGIconTile`). `color` is kept for call-site compatibility;
+/// every tile uses the same cream so the row reads as one set.
 struct LuxuryQuickTile: View {
     let icon: String
     let title: String
     let color: Color
     var isLocked: Bool = false
     let action: () -> Void
-    
+
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 8) {
-                ZStack {
-                    Circle()
-                        .fill(color.opacity(0.2))
-                        .frame(width: 48, height: 48)
-                    Image(systemName: icon)
-                        .font(.system(size: 22))
-                        .symbolRenderingMode(.monochrome)
-                        .foregroundColor(color)
-                }
+            VStack(spacing: YDGSpace.xs) {
+                YDGIconTile(systemName: icon)
+                    .overlay(alignment: .topTrailing) {
+                        if isLocked {
+                            Image(systemName: "lock.fill")
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundColor(Color.ydgTextOnAccent)
+                                .frame(width: 18, height: 18)
+                                .background(Circle().fill(Color.ydgIconCream))
+                                .offset(x: 2, y: -2)
+                        }
+                    }
                 Text(title)
-                    .font(Font.bodySans(11, weight: .medium))
-                    .foregroundColor(Color.luxuryCream)
+                    .font(Font.ydgSans(13, weight: .medium))
+                    .foregroundColor(Color.ydgTextPrimary)
                     .lineLimit(2)
                     .multilineTextAlignment(.center)
                     .truncationMode(.tail)
                     .minimumScaleFactor(0.85)
-                    .frame(minHeight: 28)
+                    .frame(minHeight: 32, alignment: .top)
             }
             .frame(maxWidth: .infinity)
-            .opacity(isLocked ? 0.5 : 1)
-            .overlay(alignment: .topTrailing) {
-                if isLocked {
-                    Image(systemName: "lock.fill")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(Color.luxuryGold.opacity(0.9))
-                        .padding(4)
-                }
-            }
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(isLocked ? "\(title), Premium" : title)
     }
 }
 

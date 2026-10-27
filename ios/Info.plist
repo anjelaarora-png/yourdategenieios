@@ -78,6 +78,8 @@
 	<array>
 		<string>Tangerine-Regular.ttf</string>
 		<string>Tangerine-Bold.ttf</string>
+		<string>PlayfairDisplay-Variable.ttf</string>
+		<string>Inter-Variable.ttf</string>
 	</array>
 	<key>UIApplicationSceneManifest</key>
 	<dict>

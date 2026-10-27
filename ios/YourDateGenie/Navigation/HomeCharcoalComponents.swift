@@ -44,38 +44,32 @@ struct CollapsibleHomeSection<Content: View, Trailing: View>: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Rectangle()
-                .fill(Color.accentGold.opacity(0.12))
-                .frame(height: 1)
-                .padding(.horizontal, 20)
-                .padding(.bottom, 18)
-
             Button {
                 withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
                     isExpanded.toggle()
                 }
             } label: {
-                HStack(spacing: 8) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(title.uppercased())
-                            .font(Font.bodySans(13, weight: .semibold))
-                            .tracking(1.2)
-                            .foregroundColor(Color.accentGold)
+                        Text(title)
+                            .ydgText(.title2)
                         if let subtitle, !subtitle.isEmpty {
                             Text(subtitle)
-                                .font(Font.bodySans(11, weight: .regular))
-                                .foregroundColor(Color.textPrimary.opacity(0.5))
+                                .ydgText(.footnote, color: .ydgTextSecondary)
                         }
                     }
                     Spacer(minLength: 8)
                     headerTrailing()
                     Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(Color.accentGold.opacity(0.7))
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(Color.ydgTextTertiary)
+                        .frame(width: 44, height: 44, alignment: .trailing)
                 }
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .padding(.horizontal, 20)
+            .accessibilityHint(isExpanded ? "Collapse section" : "Expand section")
+            .padding(.horizontal, YDGSpace.margin)
 
             content()
                 .padding(.top, isExpanded ? 14 : 0)

@@ -54,10 +54,13 @@ struct LuxuryTabBar: View {
         }
         .frame(height: LuxuryTabBarMetrics.barShellHeight, alignment: .bottom)
         .frame(maxWidth: .infinity)
-        .background(
-            tabBarBackground
+        .background(alignment: .bottom) {
+            // Fill only the bar row and the home-indicator area; the plan button's
+            // protrusion floats over content.
+            Color.ydgRaised
+                .padding(.top, LuxuryTabBarMetrics.planButtonProtrusion)
                 .ignoresSafeArea(edges: .bottom)
-        )
+        }
         .homeTutorialAnchor(.tabBar)
     }
 
@@ -70,22 +73,13 @@ struct LuxuryTabBar: View {
         } label: {
             VStack(spacing: 4) {
                 Image(systemName: isSelected ? tab.selectedIcon : tab.icon)
-                    .font(.system(size: 20, weight: isSelected ? .semibold : .regular))
-                    .frame(height: 22)
+                    .font(.system(size: 21, weight: isSelected ? .semibold : .regular))
+                    .frame(height: 24)
                 Text(tab.tabBarTitle)
-                    .font(Font.bodySans(10, weight: isSelected ? .semibold : .regular))
+                    .font(Font.ydgSans(11, weight: isSelected ? .semibold : .medium))
             }
-            .foregroundColor(isSelected ? Color.accentGold : Color.luxuryMuted)
-            .frame(maxWidth: .infinity)
-            .overlay(alignment: .bottom) {
-                if isSelected {
-                    Rectangle()
-                        .fill(Color.accentMaroon)
-                        .frame(height: 2)
-                        .padding(.horizontal, 14)
-                        .offset(y: 6)
-                }
-            }
+            .foregroundColor(isSelected ? Color.ydgAccent : Color.ydgTextSecondary)
+            .frame(maxWidth: .infinity, minHeight: 48)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -95,26 +89,17 @@ struct LuxuryTabBar: View {
 
     private var planButton: some View {
         Button(action: onPlanTapped) {
-            VStack(spacing: 5) {
-                ZStack {
-                    Circle()
-                        .fill(Color.accentGold)
-                        .frame(width: 58, height: 58)
-                        .shadow(color: Color.accentGold.opacity(0.4), radius: 12, y: 4)
-                        .overlay(
-                            Circle()
-                                .stroke(Color.backgroundPrimary, lineWidth: 3)
-                        )
+            VStack(spacing: 4) {
+                Image(systemName: "wand.and.stars")
+                    .font(.system(size: 22, weight: .semibold))
+                    .foregroundColor(Color.ydgTextOnAccent)
+                    .frame(width: 60, height: 60)
+                    .background(Circle().fill(Color.ydgAccent))
+                    .overlay(Circle().stroke(Color.ydgBase, lineWidth: 4))
 
-                    Image(systemName: "wand.and.stars")
-                        .font(.system(size: 22, weight: .semibold))
-                        .foregroundColor(Color.backgroundPrimary)
-                }
-
-                Text("Plan Date")
-                    .font(Font.bodySans(10, weight: .bold))
-                    .tracking(0.2)
-                    .foregroundColor(Color.accentGold)
+                Text("Plan")
+                    .font(Font.ydgSans(11, weight: .semibold))
+                    .foregroundColor(Color.ydgTextPrimary)
             }
         }
         .buttonStyle(.plain)
@@ -123,16 +108,14 @@ struct LuxuryTabBar: View {
         .homeTutorialAnchor(.planDateButton)
     }
 
+    /// Raised surface with a top hairline (no maroon glow, no shadow).
     private var tabBarBackground: some View {
-        ZStack {
-            CharcoalMaroonBackground()
-            Color.black.opacity(0.15)
-        }
-        .overlay(
-            Rectangle()
-                .fill(Color.luxeSurfaceBorder)
-                .frame(height: 1),
-            alignment: .top
-        )
+        Color.ydgRaised
+            .overlay(
+                Rectangle()
+                    .fill(Color.ydgBorder)
+                    .frame(height: 1),
+                alignment: .top
+            )
     }
 }

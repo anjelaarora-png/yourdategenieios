@@ -159,25 +159,20 @@ struct NotificationBellButton: View {
         } label: {
             ZStack(alignment: .topTrailing) {
                 Image(systemName: "bell")
-                    .font(.system(size: 17, weight: .medium))
-                    .foregroundColor(Color.luxuryGold)
-                    .frame(width: 36, height: 36)
-                    .background(Color.luxeSurfaceTint)
-                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .stroke(Color.luxeSurfaceTintStrong, lineWidth: 1)
-                    )
+                    .font(.system(size: 20, weight: .regular))
+                    .foregroundColor(Color.ydgTextSecondary)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
 
                 if notificationManager.unreadCount > 0 {
                     Text(badgeLabel)
-                        .font(Font.bodySans(9, weight: .bold))
-                        .foregroundColor(Color.luxuryMaroon)
+                        .font(Font.ydgSans(10, weight: .bold))
+                        .foregroundColor(Color.ydgTextOnAccent)
                         .frame(minWidth: 16, minHeight: 16)
                         .padding(.horizontal, 2)
-                        .background(Circle().fill(LinearGradient.goldShimmer))
-                        .overlay(Circle().stroke(Color.backgroundPrimary, lineWidth: 1.5))
-                        .offset(x: 6, y: -4)
+                        .background(Capsule().fill(Color.ydgHighlight))
+                        .overlay(Capsule().stroke(Color.ydgBase, lineWidth: 1.5))
+                        .offset(x: -4, y: 6)
                 }
             }
         }

@@ -30,12 +30,11 @@ struct LoveNoteGeneratorView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color.backgroundPrimary
+                Color.ydgBase
                     .ignoresSafeArea()
 
                 ScrollView(.vertical, showsIndicators: false) {
-                    VStack(spacing: 24) {
-                        headerSection
+                    VStack(spacing: YDGSpace.lg) {
                         savedLoveNotesSection
                         draftIndicatorSection
                         promptsSection
@@ -45,31 +44,13 @@ struct LoveNoteGeneratorView: View {
                         previewSection
                         saveButton
                     }
-                    .padding(.horizontal, 20)
-                    .padding(.top, 16)
+                    .padding(.horizontal, YDGSpace.margin)
+                    .padding(.top, YDGSpace.xs)
                 }
                 .mainTabBarScrollInset()
             }
-            .navigationTitle("")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .principal) {
-                    Text("Love Notes")
-                        .font(Font.bodySerif(18, weight: .regular))
-                        .foregroundColor(Color.accentGold)
-                }
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
-                        storage.clearDraft()
-                        noteText = ""
-                        signOffName = UserProfileManager.shared.currentUser?.displayName ?? ""
-                        coordinator.currentTab = .home
-                    }
-                    .foregroundColor(Color.accentGold)
-                }
-            }
-            .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
-            .toolbarBackground(.visible, for: .navigationBar)
+            // The Convo tab supplies the title; this view has no bar of its own.
+            .toolbar(.hidden, for: .navigationBar)
             .onAppear {
                 if signOffName.isEmpty {
                     signOffName = UserProfileManager.shared.currentUser?.displayName ?? ""
@@ -101,21 +82,19 @@ struct LoveNoteGeneratorView: View {
         Group {
             if hasDraftContent {
                 HStack(spacing: 6) {
-                    Image(systemName: "heart.text.square.fill")
-                        .font(.system(size: 12))
-                        .foregroundColor(Color.luxuryGold.opacity(0.9))
-                    Text(draftSavedAt != nil ? "Love Note draft saved" : "Love Note draft")
-                        .font(Font.bodySans(13, weight: .medium))
-                        .foregroundColor(Color.luxuryCreamMuted)
+                    Image(systemName: draftSavedAt != nil ? "checkmark" : "pencil")
+                        .font(.system(size: 12, weight: .semibold))
+                    Text(draftSavedAt != nil ? "Draft saved" : "Draft")
+                        .font(Font.ydgSans(13, weight: .medium))
+                    Spacer(minLength: 0)
+                    Button("Start over") {
+                        storage.clearDraft()
+                        noteText = ""
+                        signOffName = UserProfileManager.shared.currentUser?.displayName ?? ""
+                    }
+                    .buttonStyle(.ydgTertiary)
                 }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(Color.luxeSurfaceTintStrong)
-                .cornerRadius(10)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 10)
-                        .stroke(Color.luxeSurfaceBorder, lineWidth: 1)
-                )
+                .foregroundColor(Color.ydgTextSecondary)
             }
         }
     }
@@ -160,9 +139,8 @@ struct LoveNoteGeneratorView: View {
             if !storage.savedNotes.isEmpty {
                 VStack(alignment: .leading, spacing: 12) {
                     sectionLabel(title: "Saved love notes", icon: "heart.text.square")
-                    Text("Tap to view or save to photos again.")
-                        .font(Font.bodySans(12, weight: .regular))
-                        .foregroundColor(Color.luxuryCreamMuted)
+                    Text("Tap one to view it or save it to Photos again.")
+                        .ydgText(.footnote, color: .ydgTextSecondary)
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 12) {
                             ForEach(storage.savedNotes) { note in
@@ -178,88 +156,53 @@ struct LoveNoteGeneratorView: View {
         }
     }
 
-    private var headerSection: some View {
-        VStack(spacing: 10) {
-            Text("Write a Love Note")
-                .font(Font.bodySerif(28, weight: .regular))
-                .foregroundColor(Color.accentGold)
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: .infinity)
-
-            Text("Pour your heart out, rewrite with AI, then save or send.")
-                .font(Font.bodySans(13, weight: .regular))
-                .foregroundColor(Color.luxuryCreamMuted)
-                .multilineTextAlignment(.center)
-        }
-        .padding(.top, 8)
-    }
-
     private var promptsSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            sectionLabel(title: "Need inspiration?", icon: "lightbulb")
+        VStack(alignment: .leading, spacing: YDGSpace.sm) {
+            sectionLabel(title: "Need a starting point?", icon: "lightbulb")
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 10) {
+                HStack(spacing: YDGSpace.xs) {
                     ForEach(Array(prompts.enumerated()), id: \.offset) { index, prompt in
-                        Button {
+                        YDGChip(title: prompt.title, isSelected: selectedPromptIndex == index, showsCheckmark: false) {
                             selectedPromptIndex = index
-                        } label: {
-                            Text(prompt.title)
-                                .font(Font.bodySans(12, weight: .semibold))
-                                .foregroundColor(selectedPromptIndex == index ? Color.backgroundPrimary : Color.textPrimary.opacity(0.82))
-                                .padding(.horizontal, 14)
-                                .padding(.vertical, 10)
-                                .background(
-                                    selectedPromptIndex == index
-                                        ? Color.accentGold
-                                        : Color.luxeSurfaceTintStrong
-                                )
-                                .cornerRadius(20)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 20)
-                                        .stroke(selectedPromptIndex == index ? Color.clear : Color.maroonBorderTint, lineWidth: 1)
-                                )
                         }
-                        .buttonStyle(.plain)
                     }
                 }
                 .padding(.horizontal, 2)
             }
+            .scrollClipDisabled()
         }
     }
 
     private var writerSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            sectionLabel(title: "Your words", icon: "pencil.line")
-            LoveNoteCreamCard(bannerSubtitle: "Your words") {
-                ZStack(alignment: .topLeading) {
-                    if noteText.isEmpty {
-                        Text(prompts[selectedPromptIndex].placeholder)
-                            .font(Font.bodySerif(15, weight: .regular))
-                            .foregroundColor(Color.textMutedOnCard.opacity(0.55))
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 14)
-                    }
-                    TextEditor(text: $noteText)
-                        .font(Font.bodySerif(15, weight: .regular))
-                        .foregroundColor(Color.textOnCard)
-                        .scrollContentBackground(.hidden)
-                        .padding(12)
-                        .frame(minHeight: 140)
-                }
+        ZStack(alignment: .topLeading) {
+            if noteText.isEmpty {
+                Text(prompts[selectedPromptIndex].placeholder)
+                    .ydgText(.body, color: .ydgTextTertiary)
+                    .padding(.horizontal, YDGSpace.md)
+                    .padding(.vertical, YDGSpace.md + 2)
+                    .accessibilityHidden(true)
             }
+            TextEditor(text: $noteText)
+                .font(.ydg(.body))
+                .foregroundColor(Color.ydgTextPrimary)
+                .scrollContentBackground(.hidden)
+                .padding(YDGSpace.sm)
+                .frame(minHeight: 170)
+                .accessibilityLabel("Your love note")
         }
+        .luxeInsetSurface()
     }
 
     private var signOffSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: YDGSpace.xs) {
             sectionLabel(title: "Sign as", icon: "signature")
-            LoveNoteCreamCard(bannerSubtitle: "Sign as") {
-                TextField("Your name", text: $signOffName)
-                    .font(Font.bodySerif(15, weight: .regular))
-                    .foregroundColor(Color.textOnCard)
-                    .padding(14)
-                    .autocapitalization(.words)
-            }
+            TextField("", text: $signOffName, prompt: Text("Your name").foregroundColor(Color.ydgTextTertiary))
+                .font(.ydg(.body))
+                .foregroundColor(Color.ydgTextPrimary)
+                .padding(.horizontal, YDGSpace.md)
+                .frame(minHeight: 52)
+                .autocapitalization(.words)
+                .luxeInsetSurface()
         }
     }
 
@@ -282,49 +225,25 @@ struct LoveNoteGeneratorView: View {
     }
 
     private func sectionLabel(title: String, icon: String) -> some View {
-        ExtrasSectionHeader(icon: icon, title: title)
+        Text(title)
+            .ydgText(.subhead, color: .ydgTextSecondary)
+            .accessibilityAddTraits(.isHeader)
     }
 
     private func goldPrimaryButton(title: String, icon: String, disabled: Bool = false, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            HStack(spacing: 10) {
-                Image(systemName: icon)
-                    .font(.system(size: 16, weight: .semibold))
-                Text(title)
-                    .font(Font.bodySans(15, weight: .semibold))
-                Spacer(minLength: 0)
-            }
-            .foregroundColor(Color.backgroundPrimary)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 14)
-            .background(Color.accentGold)
-            .cornerRadius(14)
+            Label(title, systemImage: icon)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.ydgPrimary)
         .disabled(disabled)
-        .opacity(disabled ? 0.5 : 1)
     }
 
     private func goldOutlineButton(title: String, icon: String, disabled: Bool = false, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            HStack(spacing: 10) {
-                Image(systemName: icon)
-                    .font(.system(size: 15, weight: .medium))
-                Text(title)
-                    .font(Font.bodySans(15, weight: .semibold))
-                Spacer(minLength: 0)
-            }
-            .foregroundColor(Color.accentGold)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 14)
-            .overlay(
-                RoundedRectangle(cornerRadius: 14)
-                    .stroke(Color.accentGold.opacity(0.55), lineWidth: 1.5)
-            )
+            Label(title, systemImage: icon)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.ydgSecondary)
         .disabled(disabled)
-        .opacity(disabled ? 0.5 : 1)
     }
 
     private var hasContentToSave: Bool {
@@ -333,31 +252,19 @@ struct LoveNoteGeneratorView: View {
     }
 
     private var saveButton: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            sectionLabel(title: "Save or send", icon: "square.and.arrow.up")
-            VStack(spacing: 10) {
+        VStack(alignment: .leading, spacing: YDGSpace.sm) {
+            VStack(spacing: YDGSpace.sm) {
                 goldPrimaryButton(
-                    title: "Save Love Note",
+                    title: "Save love note",
                     icon: "heart.text.square.fill",
                     disabled: !hasContentToSave,
                     action: saveLoveNoteInApp
                 )
 
                 if isSaving {
-                    HStack(spacing: 10) {
-                        ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle(tint: Color.accentGold))
-                        Text("Saving…")
-                            .font(Font.bodySans(15, weight: .semibold))
-                        Spacer(minLength: 0)
-                    }
-                    .foregroundColor(Color.accentGold)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 14)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 14)
-                            .stroke(Color.accentGold.opacity(0.55), lineWidth: 1.5)
-                    )
+                    Button("Saving…") {}
+                        .buttonStyle(YDGButtonStyle(kind: .secondary, isLoading: true))
+                        .disabled(true)
                 } else {
                     goldOutlineButton(
                         title: "Save as photo",
