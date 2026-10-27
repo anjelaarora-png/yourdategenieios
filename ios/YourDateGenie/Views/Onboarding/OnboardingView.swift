@@ -11,7 +11,7 @@ struct MobileOnboardingView: View {
     
     var body: some View {
         ZStack {
-            CharcoalMaroonBackground()
+            Color.ydgBase
                 .ignoresSafeArea()
 
             VStack(spacing: 0) {
@@ -25,24 +25,27 @@ struct MobileOnboardingView: View {
                     } label: {
                         Image(systemName: "chevron.left")
                             .font(.system(size: 17, weight: .semibold))
-                            .foregroundColor(Color.luxuryGold)
+                            .foregroundColor(Color.ydgTextPrimary)
                             .frame(width: 44, height: 44)
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel("Back")
                     .opacity(currentSlide > 0 ? 1 : 0)
                     .disabled(currentSlide == 0)
                     .animation(.easeInOut(duration: 0.2), value: currentSlide)
 
                     Spacer()
 
-                    HStack(spacing: 12) {
+                    HStack(spacing: 6) {
                         ForEach(0..<totalSlides, id: \.self) { index in
                             Capsule()
-                                .fill(index == currentSlide ? Color.luxuryGold : Color.luxuryMuted.opacity(0.4))
-                                .frame(width: index == currentSlide ? 28 : 10, height: 10)
+                                .fill(index == currentSlide ? Color.ydgAccent : Color.ydgBorderStrong)
+                                .frame(width: index == currentSlide ? 20 : 6, height: 6)
                                 .animation(.spring(response: 0.4), value: currentSlide)
                         }
                     }
+                    .accessibilityElement()
+                    .accessibilityLabel("Page \(currentSlide + 1) of \(totalSlides)")
 
                     Spacer()
 
@@ -50,20 +53,19 @@ struct MobileOnboardingView: View {
                     Color.clear
                         .frame(width: 44, height: 44)
                 }
-                .padding(.top, 56)
-                .padding(.horizontal, 16)
-                .padding(.bottom, 0)
+                .padding(.top, YDGSpace.xs)
+                .padding(.horizontal, YDGSpace.xs)
                 
                 // Swipe affordance hint — fades out after first swipe
                 HStack(spacing: 6) {
                     Image(systemName: "chevron.left")
                         .font(.system(size: 11, weight: .medium))
                     Text("Swipe to explore")
-                        .font(Font.bodySans(12, weight: .regular))
+                        .font(.ydg(.caption))
                     Image(systemName: "chevron.right")
                         .font(.system(size: 11, weight: .medium))
                 }
-                .foregroundColor(Color.luxuryMuted.opacity(0.7))
+                .foregroundColor(Color.ydgTextTertiary)
                 .opacity(hasSwipedOnce ? 0 : 1)
                 .animation(.easeOut(duration: 0.4), value: hasSwipedOnce)
                 .hintPulse()
@@ -88,17 +90,7 @@ struct MobileOnboardingView: View {
                 .animation(.easeInOut(duration: 0.3), value: currentSlide)
                 
                 // Bottom actions
-                VStack(spacing: 12) {
-                    // Free vs paid disclosure on last slide
-                    if currentSlide == totalSlides - 1 {
-                        Text("About 2 minutes · skip anything you want")
-                            .font(Font.bodySans(13, weight: .regular))
-                            .foregroundColor(Color.luxuryCreamMuted)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal, 8)
-                            .transition(.opacity)
-                    }
-                    
+                VStack(spacing: YDGSpace.xs) {
                     Button {
                         if currentSlide < totalSlides - 1 {
                             withAnimation {
@@ -109,32 +101,22 @@ struct MobileOnboardingView: View {
                             coordinator.completeOnboarding()
                         }
                     } label: {
-                        Text(currentSlide == totalSlides - 1 ? "Plan My Next Date" : "Next")
-                            .font(Font.bodySans(16, weight: .semibold))
-                            .foregroundColor(Color.backgroundPrimary)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 16)
-                            .background(Color.accentGold)
-                            .cornerRadius(16)
+                        Text(currentSlide == totalSlides - 1 ? "Plan my first date" : "Next")
                     }
-                    .buttonStyle(.plain)
-                    
+                    .buttonStyle(.ydgPrimary)
+
                     if currentSlide < totalSlides - 1 {
-                        Button {
+                        Button("Skip intro") {
                             coordinator.completeOnboarding()
-                        } label: {
-                            Text("Skip intro")
-                                .font(Font.bodySans(14, weight: .semibold))
-                                .foregroundColor(Color.accentGold)
-                                .underline()
-                                .frame(maxWidth: .infinity)
-                                .frame(minHeight: 44)
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.ydgTertiary)
+                    } else {
+                        // Same height as "Skip intro" so the CTA doesn't jump on the last slide.
+                        Color.clear.frame(height: 44)
                     }
                 }
-                .padding(.horizontal, 24)
-                .padding(.bottom, 44)
+                .padding(.horizontal, YDGSpace.margin)
+                .padding(.bottom, YDGSpace.xs)
                 .animation(.easeInOut(duration: 0.25), value: currentSlide)
             }
         }
@@ -270,7 +252,7 @@ struct LuxurySlideChaos: View {
                             // Loading indicator
                             HStack(spacing: 6) {
                                 ProgressView()
-                                    .tint(Color.luxuryGold)
+                                    .tint(Color.ydgTextTertiary)
                                     .scaleEffect(0.7)
                                 Text("Still searching...")
                                     .font(Font.bodySans(10, weight: .regular))
@@ -310,7 +292,7 @@ struct LuxurySlideChaos: View {
                 .cornerRadius(20)
                 .overlay(
                     RoundedRectangle(cornerRadius: 20)
-                        .stroke(Color.luxuryGold.opacity(0.3), lineWidth: 1)
+                        .stroke(Color.ydgBorder, lineWidth: 1)
                 )
                 .offset(y: 185)
                 .opacity(showContent ? 1 : 0)
@@ -360,22 +342,16 @@ struct LuxurySlideItinerary: View {
                 // Header
                 HStack {
                     VStack(alignment: .leading, spacing: 4) {
-                        HStack(spacing: 4) {
-                            Text("Romantic")
-                                .font(Font.bodySerif(17, weight: .regular))
-                                .foregroundColor(Color.luxuryGold)
-                            Text("Italian Night")
-                                .font(Font.bodySans(14, weight: .semibold))
-                                .foregroundColor(Color.luxuryGold)
-                        }
-                        
+                        Text("Romantic Italian Night")
+                            .font(.ydg(.title2))
+                            .foregroundColor(Color.ydgTextPrimary)
+
                         Text("Sat · 3 stops · ~$150")
-                            .font(Font.bodySans(12, weight: .regular))
-                            .foregroundColor(Color.luxuryMuted)
+                            .ydgText(.footnote, color: .ydgTextSecondary)
                     }
                     Spacer()
                     Image(systemName: "sparkles")
-                        .foregroundStyle(LinearGradient.goldShimmer)
+                        .foregroundStyle(Color.ydgIconCream)
                 }
                 .padding(18)
                 .background(Color.luxuryMaroonLight.opacity(0.8))
@@ -464,7 +440,7 @@ struct OnboardingItineraryStop: View {
             // Timeline dot
             VStack(spacing: 0) {
                 Circle()
-                    .fill(isActive ? LinearGradient.goldShimmer : LinearGradient(colors: [Color.luxuryMuted.opacity(0.3)], startPoint: .top, endPoint: .bottom))
+                    .fill(isActive ? Color.ydgIconTile : Color.ydgOverlay)
                     .frame(width: 28, height: 28)
                     .overlay(
                         Text(emoji)
@@ -475,7 +451,7 @@ struct OnboardingItineraryStop: View {
                     Rectangle()
                         .fill(
                             LinearGradient(
-                                colors: [Color.luxuryGold.opacity(isActive ? 0.6 : 0.2), Color.luxuryGold.opacity(0.1)],
+                                colors: [isActive ? Color.ydgBorderStrong : Color.ydgBorder, Color.ydgBorder],
                                 startPoint: .top,
                                 endPoint: .bottom
                             )
@@ -488,7 +464,7 @@ struct OnboardingItineraryStop: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(time)
                     .font(Font.bodySans(11, weight: .medium))
-                    .foregroundColor(Color.luxuryGold)
+                    .foregroundColor(Color.ydgTextSecondary)
                 
                 Text(name)
                     .font(Font.bodySans(14, weight: .semibold))
@@ -514,14 +490,14 @@ struct OnboardingFeatureBadge: View {
     var body: some View {
         Text(text)
             .font(Font.bodySans(11, weight: .medium))
-            .foregroundColor(Color.luxuryGold)
+            .foregroundColor(Color.ydgTextPrimary)
             .padding(.horizontal, 14)
             .padding(.vertical, 8)
-            .background(Color.luxuryGold.opacity(0.15))
+            .background(Color.ydgOverlay)
             .cornerRadius(20)
             .overlay(
                 RoundedRectangle(cornerRadius: 20)
-                    .stroke(Color.luxuryGold.opacity(0.3), lineWidth: 1)
+                    .stroke(Color.ydgBorder, lineWidth: 1)
             )
     }
 }
@@ -533,15 +509,15 @@ struct OnboardingPill: View {
     var body: some View {
         Text(text)
             .font(Font.bodySans(10, weight: .medium))
-            .foregroundColor(Color.luxuryGold)
+            .foregroundColor(Color.ydgTextPrimary)
             .lineLimit(1)
             .minimumScaleFactor(0.8)
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
-            .background(Color.luxuryGold.opacity(0.1))
+            .background(Color.ydgOverlay)
             .clipShape(Capsule())
             .overlay(
-                Capsule().stroke(Color.luxuryGold.opacity(0.22), lineWidth: 1)
+                Capsule().stroke(Color.ydgBorder, lineWidth: 1)
             )
     }
 }
@@ -610,7 +586,7 @@ struct LuxurySlideHomeFlow: View {
                     ZStack {
                         Text("↑ Tap the gold button")
                             .font(Font.bodySans(11, weight: .medium))
-                            .foregroundColor(Color.luxuryGold.opacity(0.85))
+                            .foregroundColor(Color.ydgTextSecondary)
                             .opacity(locked ? 0 : 1)
                             .hintPulse()
 
@@ -633,7 +609,7 @@ struct LuxurySlideHomeFlow: View {
             HStack(alignment: .top, spacing: 12) {
                 ZStack {
                     Circle()
-                        .fill(Color.luxuryGold.opacity(0.14))
+                        .fill(Color.ydgIconTile)
                         .frame(width: 40, height: 40)
                     Text("🌹")
                         .font(.system(size: 18))
@@ -654,7 +630,7 @@ struct LuxurySlideHomeFlow: View {
             .clipShape(RoundedRectangle(cornerRadius: 14))
             .overlay(
                 RoundedRectangle(cornerRadius: 14)
-                    .stroke(Color.luxuryGold.opacity(0.22), lineWidth: 1)
+                    .stroke(Color.ydgBorder, lineWidth: 1)
             )
             .padding(.horizontal, 24)
             .padding(.top, 16)
@@ -677,7 +653,7 @@ struct LuxurySlideHomeFlow: View {
                     .transition(.opacity)
                 Text("Reserve · route · text · calendar")
                     .font(Font.bodySans(13, weight: .regular))
-                    .foregroundColor(Color.luxuryGold.opacity(0.85))
+                    .foregroundColor(Color.ydgTextSecondary)
                     .transition(.opacity)
             } else {
                 OnboardingSlideTitle(lead: "Open the app. ", accent: "Tonight's ready")
@@ -706,23 +682,10 @@ struct LuxurySlideHomeFlow: View {
                 Text(locked ? "Locked in" : "Lock it in")
                     .font(Font.bodySans(14, weight: .semibold))
             }
-            .foregroundColor(locked ? .white : Color.luxuryMaroon)
+            .foregroundColor(locked ? Color.ydgSuccess : Color.ydgTextOnAccent)
             .frame(maxWidth: .infinity)
             .frame(height: 44)
-            .background(
-                Group {
-                    if locked {
-                        LinearGradient(
-                            colors: [Color(hex: "3d8a5a"), Color(hex: "2d6a44")],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    } else {
-                        LinearGradient.goldShimmer
-                    }
-                }
-            )
-            .clipShape(Capsule())
+            .background(Capsule().fill(locked ? Color.ydgSuccess.opacity(0.15) : Color.ydgAccent))
         }
         .buttonStyle(.plain)
 
@@ -755,12 +718,12 @@ struct LuxurySlideHomeFlow: View {
             Text(item.label)
                 .font(Font.bodySans(11, weight: .medium))
         }
-        .foregroundColor(Color.luxuryGold)
+        .foregroundColor(Color.ydgTextPrimary)
         .padding(.horizontal, 12)
         .padding(.vertical, 7)
-        .background(Color.luxuryGold.opacity(0.1))
+        .background(Color.ydgOverlay)
         .clipShape(Capsule())
-        .overlay(Capsule().stroke(Color.luxuryGold.opacity(0.28), lineWidth: 1))
+        .overlay(Capsule().stroke(Color.ydgBorder, lineWidth: 1))
         .scaleEffect(locked ? 1 : 0.4)
         .opacity(locked ? 1 : 0)
         .animation(
@@ -844,7 +807,7 @@ struct LuxurySlideExtras: View {
                     }
                     Spacer()
                     Image(systemName: "sparkles")
-                        .foregroundStyle(LinearGradient.goldShimmer)
+                        .foregroundStyle(Color.ydgIconCream)
                 }
                 .padding(18)
                 .background(Color.luxuryMaroonLight.opacity(0.8))
@@ -854,7 +817,7 @@ struct LuxurySlideExtras: View {
                         HStack(alignment: .top, spacing: 12) {
                             ZStack {
                                 Circle()
-                                    .fill(Color.luxuryGold.opacity(0.14))
+                                    .fill(Color.ydgIconTile)
                                     .frame(width: 40, height: 40)
                                 Text(extra.emoji)
                                     .font(.system(size: 18))
@@ -871,7 +834,7 @@ struct LuxurySlideExtras: View {
                                     .fixedSize(horizontal: false, vertical: true)
                                 Text(extra.location)
                                     .font(Font.bodySans(11, weight: .medium))
-                                    .foregroundColor(Color.luxuryGold)
+                                    .foregroundColor(Color.ydgTextSecondary)
                             }
                             Spacer(minLength: 0)
                         }
@@ -939,7 +902,7 @@ struct LuxurySlideGetStarted: View {
                 .cornerRadius(20)
                 .overlay(
                     RoundedRectangle(cornerRadius: 20)
-                        .stroke(Color.luxuryGold.opacity(0.3), lineWidth: 1)
+                        .stroke(Color.ydgBorder, lineWidth: 1)
                 )
                 .overlay(
                     LinearGradient(
@@ -963,7 +926,7 @@ struct LuxurySlideGetStarted: View {
                     
                     Text("Magical evenings")
                         .font(Font.bodySerif(17, weight: .regular))
-                        .foregroundColor(Color.luxuryGold)
+                        .foregroundColor(Color.ydgTextPrimary)
                 }
                 .padding(16)
             }
@@ -994,7 +957,7 @@ struct LuxurySlideGetStarted: View {
                 OnboardingBenefitRow(text: "Real venues, verified · tailored to you two", isChecked: benefitChecks[1])
                 OnboardingBenefitRow(text: "About 2 minutes · skip anything you want", isChecked: benefitChecks[2])
             }
-            .padding(.horizontal, 40)
+            .padding(.horizontal, YDGSpace.lg)
             .padding(.top, 24)
             
             Spacer()
@@ -1027,7 +990,7 @@ struct LuxurySlideGetStarted: View {
                     HStack(spacing: 4) {
                         Text("\(counterValue)+")
                             .font(Font.bodySans(14, weight: .bold))
-                            .foregroundColor(Color.luxuryGold)
+                            .foregroundColor(Color.ydgTextPrimary)
                             .contentTransition(.numericText())
                         
                         Text("couples joined")
@@ -1084,25 +1047,25 @@ struct OnboardingBenefitRow: View {
         HStack(spacing: 14) {
             ZStack {
                 Circle()
-                    .stroke(isChecked ? Color.luxuryGold : Color.luxuryMuted.opacity(0.3), lineWidth: 1.5)
+                    .stroke(isChecked ? Color.clear : Color.ydgBorderStrong, lineWidth: 1.5)
                     .frame(width: 24, height: 24)
                 
                 if isChecked {
                     Circle()
-                        .fill(Color.luxuryGold)
+                        .fill(Color.ydgSuccess.opacity(0.15))
                         .frame(width: 24, height: 24)
                         .overlay(
                             Image(systemName: "checkmark")
                                 .font(.system(size: 11, weight: .bold))
-                                .foregroundColor(Color.luxuryMaroon)
+                                .foregroundColor(Color.ydgSuccess)
                         )
                         .transition(.scale.combined(with: .opacity))
                 }
             }
             
             Text(text)
-                .font(Font.bodySans(13, weight: .regular))
-                .foregroundColor(isChecked ? Color.luxuryCream : Color.luxuryMuted)
+                .font(.ydg(.subhead))
+                .foregroundColor(isChecked ? Color.ydgTextPrimary : Color.ydgTextTertiary)
             
             Spacer()
         }
@@ -1112,28 +1075,25 @@ struct OnboardingBenefitRow: View {
 
 // MARK: - Onboarding typography (Option D section labels + Option B slide titles)
 
-/// Home-style gold uppercase section label with optional muted subtitle.
+/// Uppercase caption label with optional muted subtitle.
 struct OnboardingSectionHeader: View {
     let label: String
     var subtitle: String? = nil
 
     var body: some View {
         VStack(spacing: 2) {
-            Text(label.uppercased())
-                .font(Font.bodySans(13, weight: .semibold))
-                .tracking(1.2)
-                .foregroundColor(Color.luxuryGold)
+            Text(label)
+                .ydgText(.caption)
             if let subtitle, !subtitle.isEmpty {
                 Text(subtitle)
-                    .font(Font.bodySans(11, weight: .regular))
-                    .foregroundColor(Color.luxuryCreamMuted.opacity(0.75))
+                    .ydgText(.footnote, color: .ydgTextTertiary)
                     .multilineTextAlignment(.center)
             }
         }
     }
 }
 
-/// Georgia 22 title with an inline gold accent — matches home greeting & plan sheet.
+/// Serif slide title with an optional rose accent phrase.
 struct OnboardingSlideTitle: View {
     var lead: String = ""
     var accent: String = ""
@@ -1144,39 +1104,40 @@ struct OnboardingSlideTitle: View {
             if accent.isEmpty {
                 Text(lead + trail)
             } else {
-                Text(lead) + Text(accent).foregroundColor(Color.luxuryGold) + Text(trail)
+                Text(lead) + Text(accent).foregroundColor(Color.ydgHighlight) + Text(trail)
             }
         }
-        .font(Font.bodySerif(22, weight: .regular))
-        .foregroundColor(Color.luxuryCream)
+        .font(.ydg(.title2))
+        .foregroundColor(Color.ydgTextPrimary)
         .multilineTextAlignment(.center)
-        .lineSpacing(4)
+        .fixedSize(horizontal: false, vertical: true)
+        .accessibilityAddTraits(.isHeader)
     }
 }
 
-/// Standard onboarding body copy — Sans 13, muted cream.
+/// Standard onboarding body copy.
 struct OnboardingBodyText: View {
     let text: String
 
     var body: some View {
         Text(text)
-            .font(Font.bodySans(13, weight: .regular))
-            .foregroundColor(Color.luxuryCreamMuted)
+            .ydgText(.subhead, weight: .regular, color: .ydgTextSecondary)
             .multilineTextAlignment(.center)
-            .lineSpacing(4)
+            .fixedSize(horizontal: false, vertical: true)
     }
 }
 
-/// Body line with a gold accent phrase inline.
+/// Body line with a rose accent phrase inline.
 struct OnboardingAccentBody: View {
     let lead: String
     let accent: String
 
     var body: some View {
-        (Text(lead).foregroundColor(Color.luxuryCreamMuted) +
-         Text(accent).foregroundColor(Color.luxuryGold))
-            .font(Font.bodySans(13, weight: .regular))
+        (Text(lead).foregroundColor(Color.ydgTextSecondary) +
+         Text(accent).foregroundColor(Color.ydgHighlight))
+            .font(.ydg(.subhead))
             .multilineTextAlignment(.center)
+            .fixedSize(horizontal: false, vertical: true)
     }
 }
 

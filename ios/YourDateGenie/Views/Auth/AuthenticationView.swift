@@ -35,11 +35,7 @@ struct AuthenticationView: View {
 
     var body: some View {
         ZStack {
-            Color.clear
-                .ignoresSafeArea()
-            
-            RadialGradient.goldGlow
-                .opacity(0.15)
+            Color.ydgBase
                 .ignoresSafeArea()
             
             Group {
@@ -50,26 +46,23 @@ struct AuthenticationView: View {
                         VStack(spacing: 0) {
                             authHeader
 
-                            accountModeToggle
-                                .padding(.top, 20)
-
                             if accountMode == .business {
                                 businessPanel
-                                    .padding(.top, 24)
+                                    .padding(.top, YDGSpace.lg)
                             } else {
                                 // Terms agreement gates every login method (§1.2 EULA).
                                 termsAgreementRow
-                                    .padding(.top, 24)
+                                    .padding(.top, YDGSpace.lg)
 
                                 // Sign in with Apple first (§4.8 prominence when Google is also offered).
                                 socialAuthButtons
-                                    .padding(.top, 16)
+                                    .padding(.top, YDGSpace.lg)
 
                                 socialDivider
-                                    .padding(.top, 28)
+                                    .padding(.top, YDGSpace.lg)
 
                                 authModeToggle
-                                    .padding(.top, 20)
+                                    .padding(.top, YDGSpace.md)
 
                                 if viewModel.isSignUp {
                                     signUpForm
@@ -78,28 +71,32 @@ struct AuthenticationView: View {
                                 }
 
                                 authButton
-                                    .padding(.top, 24)
+                                    .padding(.top, YDGSpace.lg)
 
                                 if !viewModel.isSignUp {
                                     forgotPasswordButton
-                                        .padding(.top, 12)
                                 }
 
                                 if viewModel.isSignUp {
                                     signUpBenefits
-                                        .padding(.top, 32)
+                                        .padding(.top, YDGSpace.lg)
                                 }
 
                                 if allowSkipToExplore {
                                     exploreWithoutAccountButton
-                                        .padding(.top, 28)
+                                        .padding(.top, YDGSpace.md)
                                 }
                             }
 
-                            Spacer(minLength: 100)
+                            accountModeFooter
+                                .padding(.top, YDGSpace.xl)
+
+                            Spacer(minLength: YDGSpace.xxl)
                         }
-                        .padding(.horizontal, 24)
+                        .padding(.horizontal, YDGSpace.margin)
                     }
+                    // Keep scrolled content out from under the status bar (there's no nav bar here).
+                    .clipped()
                 }
             }
             .sheet(isPresented: $showResetPasswordSheet) {
@@ -131,13 +128,16 @@ struct AuthenticationView: View {
                         Button {
                             onDismiss()
                         } label: {
-                            Image(systemName: "xmark.circle.fill")
-                                .font(.system(size: 28))
-                                .foregroundStyle(Color.luxuryGold.opacity(0.9))
-                                .symbolRenderingMode(.hierarchical)
+                            Image(systemName: "xmark")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundColor(Color.ydgTextPrimary)
+                                .frame(width: 32, height: 32)
+                                .background(Circle().fill(Color.ydgOverlay))
+                                .frame(width: 44, height: 44)
                         }
-                        .padding(.top, 56)
-                        .padding(.trailing, 20)
+                        .accessibilityLabel("Close")
+                        .padding(.top, YDGSpace.xs)
+                        .padding(.trailing, YDGSpace.sm)
                     }
                     Spacer()
                 }
@@ -150,7 +150,7 @@ struct AuthenticationView: View {
                 Button("Done") {
                     focusedField = nil
                 }
-                .foregroundColor(Color.luxuryGold)
+                .foregroundColor(Color.ydgAccent)
             }
         }
         .alert("Error", isPresented: $viewModel.showError) {
@@ -217,54 +217,46 @@ struct AuthenticationView: View {
     // MARK: - Social Auth
 
     private var termsAgreementRow: some View {
-        HStack(alignment: .top, spacing: 12) {
+        HStack(alignment: .top, spacing: YDGSpace.xs) {
             Button {
                 agreedToTerms.toggle()
                 AgeEligibility.markAcceptedTerms(agreedToTerms)
             } label: {
                 Image(systemName: agreedToTerms ? "checkmark.square.fill" : "square")
                     .font(.system(size: 22))
-                    .foregroundColor(agreedToTerms ? Color.luxuryGold : Color.luxuryMuted)
+                    .foregroundColor(agreedToTerms ? Color.ydgAccent : Color.ydgTextTertiary)
+                    .frame(width: 30, height: 44, alignment: .topLeading)
             }
             .accessibilityLabel(agreedToTerms ? "Agreed to Terms and Privacy Policy" : "Agree to Terms and Privacy Policy")
 
             VStack(alignment: .leading, spacing: 4) {
                 // Age is already verified on AgeGateView; keep this row to Terms / UGC (§1.2 EULA).
                 Text("I agree to the Terms of Use and Privacy Policy. There is no tolerance for objectionable content or abusive users.")
-                    .font(Font.bodySans(13, weight: .regular))
-                    .foregroundColor(Color.luxuryCreamMuted)
+                    .ydgText(.footnote, color: .ydgTextSecondary)
                     .fixedSize(horizontal: false, vertical: true)
 
-                HStack(spacing: 12) {
+                HStack(spacing: YDGSpace.md) {
                     Link("Terms", destination: URL(string: "https://yourdategenie.com/terms")!)
-                        .font(Font.bodySans(13, weight: .semibold))
-                        .foregroundColor(Color.luxuryGold)
                     Link("Privacy Policy", destination: URL(string: "https://yourdategenie.com/privacy-policy")!)
-                        .font(Font.bodySans(13, weight: .semibold))
-                        .foregroundColor(Color.luxuryGold)
                 }
+                .font(.ydg(.footnote, weight: .semibold))
+                .foregroundColor(Color.ydgAccent)
             }
+            .padding(.top, 2)
         }
-        .padding(14)
-        .background(Color.luxeSurfaceTint)
-        .cornerRadius(12)
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Color.luxuryGold.opacity(0.25), lineWidth: 1)
-        )
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var socialDivider: some View {
         HStack(spacing: 12) {
             Rectangle()
-                .fill(Color.luxuryMuted.opacity(0.3))
+                .fill(Color.ydgBorder)
                 .frame(height: 1)
-            Text("or continue with email")
-                .font(Font.bodySans(12, weight: .regular))
-                .foregroundColor(Color.luxuryMuted)
+            Text("or use email")
+                .ydgText(.footnote, color: .ydgTextTertiary)
                 .fixedSize()
             Rectangle()
-                .fill(Color.luxuryMuted.opacity(0.3))
+                .fill(Color.ydgBorder)
                 .frame(height: 1)
         }
     }
@@ -301,14 +293,10 @@ struct AuthenticationView: View {
                     }
                 )
                 .signInWithAppleButtonStyle(.white)
-                .frame(height: 50)
-                .cornerRadius(12)
+                .frame(height: 52)
+                .clipShape(Capsule())
                 .disabled(socialAuth.isLoading || !agreedToTerms)
                 .opacity(agreedToTerms ? 1 : 0.45)
-
-                Text("Use your Apple ID \u{2014} no new password needed")
-                    .font(Font.bodySans(12, weight: .regular))
-                    .foregroundColor(Color.luxuryMuted)
             }
 
             // Sign in with Google (Supabase OAuth via ASWebAuthenticationSession)
@@ -319,22 +307,9 @@ struct AuthenticationView: View {
                 }
                 socialAuth.signInWithGoogle()
             } label: {
-                HStack(spacing: 10) {
-                    Image(systemName: "globe")
-                        .font(.system(size: 18, weight: .medium))
-                    Text("Continue with Google")
-                        .font(Font.bodySans(15, weight: .medium))
-                }
-                .foregroundColor(Color.textOnCard)
-                .frame(maxWidth: .infinity)
-                .frame(height: 50)
-                .background(LinearGradient.creamParchment)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color.luxeSurfaceBorder, lineWidth: 1)
-                )
-                .cornerRadius(12)
+                Label("Continue with Google", systemImage: "globe")
             }
+            .buttonStyle(.ydgSecondary)
             .disabled(socialAuth.isLoading || !agreedToTerms)
             .opacity(agreedToTerms ? 1 : 0.45)
 
@@ -355,8 +330,9 @@ struct AuthenticationView: View {
             onDismiss?()
         } label: {
             Text("Explore without an account")
-                .font(Font.bodySans(15, weight: .medium))
-                .foregroundColor(Color.luxuryMuted)
+                .font(.ydg(.subhead, weight: .medium))
+                .foregroundColor(Color.ydgTextSecondary)
+                .frame(minHeight: 44)
         }
     }
     
@@ -368,15 +344,13 @@ struct AuthenticationView: View {
             VStack(spacing: 16) {
                 ProgressView()
                     .scaleEffect(1.5)
-                    .tint(Color.luxuryGold)
+                    .tint(Color.ydgTextPrimary)
                 
                 Text(loadingOverlayMessage)
-                    .font(Font.bodySans(14, weight: .medium))
-                    .foregroundColor(Color.luxuryCream)
+                    .ydgText(.subhead, weight: .medium)
             }
-            .padding(32)
-            .background(Color.luxeSurfaceTintStrong)
-            .cornerRadius(16)
+            .padding(YDGSpace.xl)
+            .background(Color.ydgOverlay, in: RoundedRectangle(cornerRadius: YDGRadius.card, style: .continuous))
         }
     }
 
@@ -408,114 +382,85 @@ struct AuthenticationView: View {
         Button {
             showResetPasswordSheet = true
         } label: {
-            HStack(spacing: 4) {
-                Image(systemName: "lock.rotation")
-                    .font(.system(size: 12))
-                Text("Forgot Password?")
-                    .font(Font.bodySans(14, weight: .medium))
-            }
-            .foregroundColor(Color.luxuryGold)
+            Text("Forgot password?")
         }
+        .buttonStyle(.ydgTertiary)
     }
     
     /// Full-screen wait after sign-up: no actions that bypass verification; updates automatically when the confirm link opens in-app.
     private var emailConfirmationWaitScreen: some View {
         let pendingEmail = profileManager.pendingConfirmationEmail ?? viewModel.email
 
-        return VStack(spacing: 0) {
-            Spacer(minLength: 32)
+        return ScrollView(showsIndicators: false) {
+            VStack(alignment: .leading, spacing: 0) {
+                EmailConfirmationMagicalWaitView()
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, YDGSpace.xl)
 
-            DateNightMarkView(side: 120)
+                Text("Check your email")
+                    .ydgText(.title1)
+                    .accessibilityAddTraits(.isHeader)
+                    .padding(.top, YDGSpace.lg)
 
-            EmailConfirmationMagicalWaitView()
-                .padding(.top, 40)
-                .padding(.bottom, 28)
+                (Text("We sent a confirmation link to ").foregroundColor(Color.ydgTextSecondary)
+                 + Text(pendingEmail).foregroundColor(Color.ydgTextPrimary).fontWeight(.semibold))
+                    .font(.ydg(.body))
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, YDGSpace.xs)
 
-            Text("Check your email")
-                .font(Font.bodySerif(30, weight: .regular))
-                .foregroundColor(Color.luxuryGold)
-                .multilineTextAlignment(.center)
-
-            Text("We sent a confirmation link to")
-                .font(Font.bodySans(15, weight: .regular))
-                .foregroundColor(Color.luxuryCreamMuted)
-                .padding(.top, 16)
-
-            Text(pendingEmail)
-                .font(Font.bodySans(16, weight: .semibold))
-                .foregroundColor(Color.luxuryCream)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 8)
-
-            VStack(alignment: .leading, spacing: 14) {
-                EmailConfirmationStep(number: "1", text: "Open the email we just sent to \(pendingEmail)")
-                EmailConfirmationStep(number: "2", text: "Tap the confirmation link inside it")
-                EmailConfirmationStep(number: "3", text: "Come back here — the app will open automatically")
-            }
-            .padding(.top, 20)
-            .padding(.horizontal, 8)
-
-            Text("If the app doesn't open after clicking the link, tap 'Already verified? Sign in' below.")
-                .font(Font.bodySans(13, weight: .regular))
-                .foregroundColor(Color.luxuryMuted)
-                .multilineTextAlignment(.center)
-                .padding(.top, 12)
-                .padding(.horizontal, 8)
-
-            VStack(spacing: 12) {
-                mailAppQuickActions
-
-                Button {
-                    performResendConfirmationEmail()
-                } label: {
-                    Text(resendCooldownRemaining > 0 ? "Resend available in \(resendCooldownRemaining)s" : "Resend confirmation email")
-                        .font(Font.bodySans(15, weight: .semibold))
-                        .frame(maxWidth: .infinity)
+                VStack(alignment: .leading, spacing: YDGSpace.sm) {
+                    EmailConfirmationStep(number: "1", text: "Open the email we just sent")
+                    EmailConfirmationStep(number: "2", text: "Tap the confirmation link inside it")
+                    EmailConfirmationStep(number: "3", text: "Come back here. The app opens automatically.")
                 }
-                .buttonStyle(LuxuryGoldButtonStyle())
-                .disabled(viewModel.isLoading || resendCooldownRemaining > 0 || pendingEmail.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                .opacity((viewModel.isLoading || resendCooldownRemaining > 0) ? 0.6 : 1)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .ydgCard()
+                .padding(.top, YDGSpace.lg)
 
-                Button {
-                    useDifferentEmail()
-                } label: {
-                    Text("Use a different email")
-                        .font(Font.bodySans(14, weight: .medium))
-                        .foregroundColor(Color.luxuryGold)
+                Text("If the app doesn't open after you tap the link, use \"Already verified? Sign in\" below.")
+                    .ydgText(.footnote, color: .ydgTextTertiary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, YDGSpace.sm)
+
+                VStack(spacing: YDGSpace.sm) {
+                    Button("Already verified? Sign in") {
+                        transitionToSignInAfterVerification()
+                    }
+                    .buttonStyle(.ydgPrimary)
+
+                    HStack(spacing: YDGSpace.sm) {
+                        mailAppQuickActions
+                        Button(resendCooldownRemaining > 0 ? "Resend in \(resendCooldownRemaining)s" : "Resend email") {
+                            performResendConfirmationEmail()
+                        }
+                        .buttonStyle(YDGButtonStyle(kind: .secondary, isLoading: viewModel.isLoading))
+                        .disabled(viewModel.isLoading || resendCooldownRemaining > 0 || pendingEmail.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    }
+
+                    Button("Use a different email") {
+                        useDifferentEmail()
+                    }
+                    .buttonStyle(.ydgTertiary)
                 }
+                .padding(.top, YDGSpace.lg)
 
-                Button {
-                    transitionToSignInAfterVerification()
-                } label: {
-                    Text("Already verified? Sign in")
-                        .font(Font.bodySans(15, weight: .semibold))
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(LuxuryMaroonButtonStyle())
-            }
-            .padding(.top, 24)
-            .padding(.horizontal, 8)
-
-            Text("Did not receive it yet? Check spam/promotions or use a different email.")
-                .font(Font.bodySans(12, weight: .regular))
-                .foregroundColor(Color.luxuryMuted)
-                .multilineTextAlignment(.center)
-                .padding(.top, 10)
-                .padding(.horizontal, 8)
-
-            if let resendFeedbackMessage {
-                Text(resendFeedbackMessage)
-                    .font(Font.bodySans(13, weight: .regular))
-                    .foregroundColor(Color.luxuryCreamMuted)
+                Text("Didn't get it? Check spam or promotions, or use a different email.")
+                    .ydgText(.footnote, color: .ydgTextTertiary)
                     .multilineTextAlignment(.center)
-                    .padding(.top, 10)
-                    .padding(.horizontal, 8)
-            }
+                    .frame(maxWidth: .infinity)
+                    .fixedSize(horizontal: false, vertical: true)
 
-            Spacer(minLength: 48)
+                if let resendFeedbackMessage {
+                    Text(resendFeedbackMessage)
+                        .ydgText(.footnote, color: .ydgTextSecondary)
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, YDGSpace.xs)
+                }
+            }
+            .padding(.horizontal, YDGSpace.margin)
+            .padding(.bottom, YDGSpace.xxl)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding(.horizontal, 28)
     }
 
     private var mailAppQuickActions: some View {
@@ -527,159 +472,97 @@ struct AuthenticationView: View {
     }
     
     private var authHeader: some View {
-        VStack(spacing: 16) {
-            DateNightMarkView(side: 140)
+        VStack(spacing: YDGSpace.sm) {
+            DateNightMarkView(side: 96)
             
             Text(authHeaderTitle)
-                .font(Font.bodySerif(28, weight: .regular))
-                .foregroundColor(Color.accentGold)
+                .ydgText(.title1)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityAddTraits(.isHeader)
+                .padding(.top, YDGSpace.xs)
             
             Text(authHeaderSubtitle)
-                .font(Font.bodySans(15, weight: .regular))
-                .foregroundColor(Color.luxuryCreamMuted)
+                .ydgText(.body, color: .ydgTextSecondary)
                 .multilineTextAlignment(.center)
-                .padding(.horizontal, 24)
+                .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(.top, 60)
+        .padding(.top, YDGSpace.xxl)
     }
 
     private var authHeaderTitle: String {
         if coordinator.authRequiredForIntent != nil {
             return "Sign in to plan a date"
         }
-        return viewModel.isSignUp ? "Create Your Account" : "Welcome Back"
+        if accountMode == .business {
+            return "Partner with us"
+        }
+        return viewModel.isSignUp ? "Create your account" : "Welcome back"
     }
 
     private var authHeaderSubtitle: String {
         if coordinator.authRequiredForIntent != nil {
-            return "A free account is required to generate your personalized date plan."
+            return "A free account keeps your plans and lets you share them with your partner."
+        }
+        if accountMode == .business {
+            return "Reach couples planning date nights near you. Restaurants, bars, experiences, retail and events all welcome."
         }
         return viewModel.isSignUp
-            ? "Plans ready when you are — no spreadsheets required."
+            ? "Save plans, share them with your partner and keep your memories in one place."
             : "Pick up where you left off."
     }
     
-    private var accountModeToggle: some View {
-        HStack(spacing: 0) {
-            ForEach([AccountMode.individual, AccountMode.business], id: \.self) { mode in
-                let isOn = accountMode == mode
-                Button {
-                    withAnimation(.easeInOut(duration: 0.2)) { accountMode = mode }
-                } label: {
-                    Text(mode == .individual ? "Individual" : "Business")
-                        .font(Font.bodySans(15, weight: isOn ? .semibold : .regular))
-                        .foregroundColor(isOn ? Color.luxuryMaroon : Color.luxuryMuted)
-                        .frame(maxWidth: .infinity)
-                        .frame(minHeight: 44)
-                        .background(isOn ? AnyShapeStyle(LinearGradient.goldShimmer) : AnyShapeStyle(Color.clear))
-                }
-                .accessibilityAddTraits(isOn ? .isSelected : [])
+    /// Business partners are a side door, so the switch lives at the bottom of the screen.
+    private var accountModeFooter: some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                accountMode = accountMode == .business ? .individual : .business
             }
+        } label: {
+            HStack(spacing: 4) {
+                Text(accountMode == .business ? "Planning a date?" : "Own a venue?")
+                    .foregroundColor(Color.ydgTextSecondary)
+                Text(accountMode == .business ? "Sign in" : "Partner with us")
+                    .fontWeight(.semibold)
+                    .foregroundColor(Color.ydgAccent)
+            }
+            .font(.ydg(.subhead))
+            .frame(minHeight: 44)
         }
-        .background(Color.luxeSurfaceTintStrong)
-        .cornerRadius(12)
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Color.luxuryGold.opacity(0.3), lineWidth: 1)
-        )
+        .buttonStyle(.plain)
     }
 
     private var businessPanel: some View {
-        VStack(spacing: 18) {
-            VStack(spacing: 10) {
-                ZStack {
-                    Circle()
-                        .fill(Color.luxuryGold.opacity(0.12))
-                        .frame(width: 64, height: 64)
-                    Image(systemName: "storefront.fill")
-                        .font(.system(size: 28))
-                        .foregroundColor(Color.luxuryGold)
-                }
-                Text("Own a date spot?")
-                    .font(Font.bodySerif(28, weight: .regular))
-                    .foregroundColor(Color.accentGold)
-                Text("Advertise to couples planning date nights in your area. Every category welcome — restaurants, bars, experiences, retail, events & more.")
-                    .font(Font.bodySans(15, weight: .regular))
-                    .foregroundColor(Color.luxuryCreamMuted)
-                    .multilineTextAlignment(.center)
-                    .lineSpacing(3)
-            }
-
-            VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: YDGSpace.lg) {
+            VStack(alignment: .leading, spacing: YDGSpace.sm) {
                 AuthBenefitRow(text: "Featured inside AI date itineraries")
                 AuthBenefitRow(text: "Reach couples mid-plan, not mid-scroll")
                 AuthBenefitRow(text: "Launch partner placement rates")
             }
-            .padding(.vertical, 4)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .ydgCard()
 
-            Button {
+            Button("Continue to partner portal") {
                 showBusinessPortal = true
-            } label: {
-                HStack(spacing: 10) {
-                    Text("Continue to partner portal")
-                        .font(Font.bodySans(16, weight: .semibold))
-                    Image(systemName: "arrow.right")
-                        .font(.system(size: 14, weight: .semibold))
-                }
-                .frame(maxWidth: .infinity)
             }
-            .buttonStyle(LuxuryGoldButtonStyle())
+            .buttonStyle(.ydgPrimary)
         }
     }
 
     private var authModeToggle: some View {
-        HStack(spacing: 0) {
-            Button {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    viewModel.isSignUp = false
-                }
-            } label: {
-                Text("Sign In")
-                    .font(Font.bodySans(16, weight: viewModel.isSignUp ? .regular : .semibold))
-                    .foregroundColor(viewModel.isSignUp ? Color.luxuryMuted : Color.luxuryMaroon)
-                    .frame(maxWidth: .infinity)
-                    .frame(minHeight: 48)
-                    .padding(.vertical, 14)
-                    .background(
-                        viewModel.isSignUp ? AnyShapeStyle(Color.clear) : AnyShapeStyle(LinearGradient.goldShimmer)
-                    )
-            }
-            .accessibilityLabel("Sign In")
-            .accessibilityAddTraits(viewModel.isSignUp ? [] : .isSelected)
-            
-            Button {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    viewModel.isSignUp = true
-                }
-            } label: {
-                Text("Create Account")
-                    .font(Font.bodySans(16, weight: viewModel.isSignUp ? .semibold : .regular))
-                    .foregroundColor(viewModel.isSignUp ? Color.luxuryMaroon : Color.luxuryMuted)
-                    .frame(maxWidth: .infinity)
-                    .frame(minHeight: 48)
-                    .padding(.vertical, 14)
-                    .background(
-                        viewModel.isSignUp ? AnyShapeStyle(LinearGradient.goldShimmer) : AnyShapeStyle(Color.clear)
-                    )
-            }
-            .accessibilityLabel("Create Account")
-            .accessibilityAddTraits(viewModel.isSignUp ? .isSelected : [])
-        }
-        .background(Color.luxeSurfaceTintStrong)
-        .cornerRadius(12)
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Color.luxuryGold.opacity(0.3), lineWidth: 1)
+        YDGSegmentedControl(
+            options: [false, true],
+            selection: $viewModel.isSignUp,
+            title: { $0 ? "Create account" : "Sign in" }
         )
     }
     
     private var signInForm: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: YDGSpace.md) {
             LuxuryTextField(
                 title: "Email",
                 placeholder: "you@example.com",
                 text: $viewModel.email,
-                icon: "envelope.fill",
                 keyboardType: .emailAddress,
                 autocapitalization: .never
             )
@@ -688,32 +571,31 @@ struct AuthenticationView: View {
             AuthSecureField(
                 title: "Password",
                 placeholder: "Enter your password",
-                text: $viewModel.password,
-                icon: "lock.fill"
+                text: $viewModel.password
             )
             .focused($focusedField, equals: .password)
         }
-        .padding(.top, 16)
+        .padding(.top, YDGSpace.lg)
     }
     
     private var signUpForm: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: YDGSpace.md) {
             if viewModel.isSignUp {
                 signUpBenefitsInline
             }
             
-            HStack(spacing: 16) {
+            HStack(spacing: YDGSpace.sm) {
                 LuxuryTextField(
-                    title: "First Name",
-                    placeholder: "John",
+                    title: "First name",
+                    placeholder: "Maya",
                     text: $viewModel.firstName,
                     icon: nil
                 )
                 .focused($focusedField, equals: .firstName)
                 
                 LuxuryTextField(
-                    title: "Last Name",
-                    placeholder: "Doe",
+                    title: "Last name",
+                    placeholder: "Optional",
                     text: $viewModel.lastName,
                     icon: nil
                 )
@@ -724,36 +606,28 @@ struct AuthenticationView: View {
                 title: "Email",
                 placeholder: "you@example.com",
                 text: $viewModel.email,
-                icon: "envelope.fill",
                 keyboardType: .emailAddress,
                 autocapitalization: .never
             )
             .focused($focusedField, equals: .email)
             
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 0) {
                 AuthSecureField(
                     title: "Password",
-                    placeholder: "••••••••",
-                    text: $viewModel.password,
-                    icon: "lock.fill"
+                    placeholder: "At least 8 characters",
+                    text: $viewModel.password
                 )
                 .focused($focusedField, equals: .password)
-                
-                Text("Must be at least 8 characters")
-                    .font(Font.bodySans(12, weight: .regular))
-                    .foregroundColor(Color.luxuryMuted)
-                    .padding(.leading, 4)
             }
             
             AuthSecureField(
-                title: "Confirm Password",
-                placeholder: "••••••••",
-                text: $viewModel.confirmPassword,
-                icon: "lock.fill"
+                title: "Confirm password",
+                placeholder: "Type it again",
+                text: $viewModel.confirmPassword
             )
             .focused($focusedField, equals: .confirmPassword)
         }
-        .padding(.top, 24)
+        .padding(.top, YDGSpace.lg)
     }
     
     private var signUpBenefitsInline: some View {
@@ -762,11 +636,11 @@ struct AuthenticationView: View {
             AuthBenefitRow(text: "Real venues with verified details")
             AuthBenefitRow(text: "Dietary restrictions always respected")
         }
-        .padding(.vertical, 16)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
     
     private var authButton: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: YDGSpace.xs) {
             Button {
                 guard agreedToTerms else {
                     showTermsRequiredAlert = true
@@ -778,17 +652,10 @@ struct AuthenticationView: View {
                     performSignIn()
                 }
             } label: {
-                HStack(spacing: 10) {
-                    Text(viewModel.isSignUp ? "Start Planning Dates" : "Sign In")
-                        .font(Font.bodySans(16, weight: .semibold))
-                    Image(systemName: "arrow.right")
-                        .font(.system(size: 14, weight: .semibold))
-                }
-                .frame(maxWidth: .infinity)
+                Text(viewModel.isSignUp ? "Create account" : "Sign in")
             }
-            .buttonStyle(LuxuryGoldButtonStyle())
+            .buttonStyle(.ydgPrimary)
             .disabled(!viewModel.isFormValid || !agreedToTerms)
-            .opacity((viewModel.isFormValid && agreedToTerms) ? 1 : 0.5)
             
             Button {
                 withAnimation {
@@ -797,39 +664,34 @@ struct AuthenticationView: View {
             } label: {
                 HStack(spacing: 4) {
                     Text(viewModel.isSignUp ? "Already have an account?" : "Don't have an account?")
-                        .font(Font.bodySans(14, weight: .regular))
-                        .foregroundColor(Color.luxuryMuted)
+                        .foregroundColor(Color.ydgTextSecondary)
                     Text(viewModel.isSignUp ? "Sign in" : "Sign up")
-                        .font(Font.bodySans(14, weight: .semibold))
-                        .foregroundColor(Color.luxuryGold)
+                        .fontWeight(.semibold)
+                        .foregroundColor(Color.ydgAccent)
                 }
+                .font(.ydg(.subhead))
+                .frame(minHeight: 44)
             }
+            .buttonStyle(.plain)
         }
     }
     
     private var signUpBenefits: some View {
-        VStack(spacing: 12) {
-            HStack(spacing: 8) {
-                Image(systemName: "lock.shield.fill")
-                    .foregroundColor(Color.luxuryGold.opacity(0.7))
+        HStack(alignment: .top, spacing: YDGSpace.sm) {
+            Image(systemName: "lock.shield")
+                .font(.system(size: 17))
+                .foregroundColor(Color.ydgTextSecondary)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
                 Text("Your data is private")
-                    .font(Font.bodySans(13, weight: .medium))
-                    .foregroundColor(Color.luxuryGold.opacity(0.9))
+                    .ydgText(.subhead, weight: .semibold)
+                Text("We never share your personal information. Your preferences are only used to plan your dates.")
+                    .ydgText(.footnote, color: .ydgTextSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            
-            Text("We never share your personal information. Your preferences are used only to create personalized date plans.")
-                .font(Font.bodySans(12, weight: .regular))
-                .foregroundColor(Color.luxuryMuted)
-                .multilineTextAlignment(.center)
-                .lineSpacing(4)
+            Spacer(minLength: 0)
         }
-        .padding(16)
-        .background(Color.luxeSurfaceTint)
-        .cornerRadius(12)
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Color.luxuryGold.opacity(0.2), lineWidth: 1)
-        )
+        .ydgCard()
     }
     
     private func performSignIn() {
@@ -1039,20 +901,8 @@ private struct MailQuickActionButton: View {
     let action: () -> Void
 
     var body: some View {
-        Button(action: action) {
-            Text(title)
-                .font(Font.bodySans(12, weight: .semibold))
-                .foregroundColor(Color.luxuryGold)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 7)
-                .frame(maxWidth: .infinity)
-                .background(Color.luxeSurfaceTintStrong)
-                .cornerRadius(10)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 10)
-                        .stroke(Color.luxuryGold.opacity(0.25), lineWidth: 1)
-                )
-        }
+        Button(title, action: action)
+            .buttonStyle(.ydgSecondary)
     }
 }
 
@@ -1067,53 +917,39 @@ private struct ResetPasswordSheet: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color.clear
+                Color.ydgBase
                     .ignoresSafeArea()
                 
-                VStack(spacing: 24) {
-                    Image(systemName: "lock.rotation")
-                        .font(.system(size: 48))
-                        .foregroundStyle(LinearGradient.goldShimmer)
-                    
-                    Text("Reset your password")
-                        .font(Font.bodySerif(22, weight: .semibold))
-                        .foregroundColor(Color.luxuryCream)
-                    
-                    Text("Enter your email and we'll send you a link to reset your password.")
-                        .font(Font.bodySans(15, weight: .regular))
-                        .foregroundColor(Color.luxuryCreamMuted)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal)
+                VStack(alignment: .leading, spacing: YDGSpace.md) {
+                    VStack(alignment: .leading, spacing: YDGSpace.xs) {
+                        Text("Reset your password")
+                            .ydgText(.title1)
+                            .accessibilityAddTraits(.isHeader)
+                        Text("Enter your email and we'll send you a link to reset your password.")
+                            .ydgText(.body, color: .ydgTextSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                     
                     LuxuryTextField(
                         title: "Email",
                         placeholder: "you@example.com",
                         text: $resetEmail,
-                        icon: "envelope.fill",
                         keyboardType: .emailAddress,
                         autocapitalization: .never
                     )
-                    .padding(.top, 8)
-                    
-                    Button {
-                        onSend(resetEmail.isEmpty ? email : resetEmail)
-                    } label: {
-                        HStack(spacing: 8) {
-                            Text("Send Reset Link")
-                                .font(Font.bodySans(16, weight: .semibold))
-                            Image(systemName: "paperplane.fill")
-                                .font(.system(size: 14))
-                        }
-                        .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(LuxuryGoldButtonStyle())
-                    .disabled(resetEmail.isEmpty && email.isEmpty)
-                    .opacity((resetEmail.isEmpty && email.isEmpty) ? 0.5 : 1)
-                    .padding(.top, 16)
+                    .padding(.top, YDGSpace.xs)
                     
                     Spacer()
+
+                    Button("Send reset link") {
+                        onSend(resetEmail.isEmpty ? email : resetEmail)
+                    }
+                    .buttonStyle(.ydgPrimary)
+                    .disabled(resetEmail.isEmpty && email.isEmpty)
                 }
-                .padding(24)
+                .padding(.horizontal, YDGSpace.margin)
+                .padding(.top, YDGSpace.md)
+                .padding(.bottom, YDGSpace.md)
             }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -1121,7 +957,7 @@ private struct ResetPasswordSheet: View {
                     Button("Cancel") {
                         onDismiss()
                     }
-                    .foregroundColor(Color.luxuryGold)
+                    .foregroundColor(Color.ydgAccent)
                 }
             }
             .onAppear {
@@ -1139,11 +975,11 @@ private struct AuthBenefitRow: View {
         HStack(spacing: 12) {
             Image(systemName: "checkmark")
                 .font(.system(size: 12, weight: .bold))
-                .foregroundColor(Color.luxuryGold)
+                .foregroundColor(Color.ydgSuccess)
+                .accessibilityHidden(true)
             
             Text(text)
-                .font(Font.bodySans(14, weight: .regular))
-                .foregroundColor(Color.luxuryCreamMuted)
+                .ydgText(.subhead, weight: .regular, color: .ydgTextPrimary)
         }
     }
 }
@@ -1158,45 +994,38 @@ private struct AuthSecureField: View {
     @State private var isSecure = true
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: YDGSpace.xs) {
             Text(title)
-                .font(Font.bodySans(13, weight: .medium))
-                .foregroundColor(Color.luxuryGold)
+                .ydgText(.subhead, weight: .medium)
             
-            HStack(spacing: 12) {
-                if let icon = icon {
-                    Image(systemName: icon)
-                        .foregroundColor(Color.luxuryGold.opacity(0.7))
-                        .frame(width: 20)
+            HStack(spacing: YDGSpace.sm) {
+                Group {
+                    if isSecure {
+                        SecureField("", text: $text, prompt: Text(placeholder).foregroundColor(Color.ydgTextTertiary))
+                    } else {
+                        TextField("", text: $text, prompt: Text(placeholder).foregroundColor(Color.ydgTextTertiary))
+                    }
                 }
-                
-                if isSecure {
-                    SecureField("", text: $text, prompt: Text(placeholder).foregroundColor(Color.luxuryMuted.opacity(0.6)))
-                        .font(Font.bodySans(16, weight: .regular))
-                        .foregroundColor(Color.luxuryCream)
-                } else {
-                    TextField("", text: $text, prompt: Text(placeholder).foregroundColor(Color.luxuryMuted.opacity(0.6)))
-                        .font(Font.bodySans(16, weight: .regular))
-                        .foregroundColor(Color.luxuryCream)
-                }
+                .font(.ydg(.body))
+                .foregroundColor(Color.ydgTextPrimary)
+                .accessibilityLabel(title)
                 
                 Button {
                     isSecure.toggle()
                 } label: {
-                    Image(systemName: isSecure ? "eye.slash.fill" : "eye.fill")
-                        .foregroundColor(Color.luxuryGold.opacity(0.7))
+                    Image(systemName: isSecure ? "eye" : "eye.slash")
+                        .foregroundColor(Color.ydgTextSecondary)
+                        .frame(width: 44, height: 44)
                 }
+                .accessibilityLabel(isSecure ? "Show password" : "Hide password")
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 14)
-            .background(Color.luxeSurfaceTintStrong)
-            .cornerRadius(12)
+            .padding(.leading, YDGSpace.md)
+            .padding(.trailing, 4)
+            .frame(minHeight: 52)
+            .background(Color.ydgRaised, in: RoundedRectangle(cornerRadius: YDGRadius.card, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(
-                        text.isEmpty ? Color.luxuryGold.opacity(0.2) : Color.luxuryGold.opacity(0.5),
-                        lineWidth: 1
-                    )
+                RoundedRectangle(cornerRadius: YDGRadius.card, style: .continuous)
+                    .stroke(text.isEmpty ? Color.ydgBorder : Color.ydgBorderStrong, lineWidth: 1)
             )
         }
     }
@@ -1215,7 +1044,7 @@ private struct EmailConfirmationMagicalWaitView: View {
                 ForEach(0..<10, id: \.self) { i in
                     Image(systemName: "sparkle")
                         .font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(Color.luxuryGold.opacity(0.88))
+                        .foregroundStyle(Color.ydgIconCream.opacity(0.8))
                         .offset(y: -52)
                         .rotationEffect(.degrees(Double(i) * 36 + spin))
                 }
@@ -1224,10 +1053,10 @@ private struct EmailConfirmationMagicalWaitView: View {
                     .stroke(
                         AngularGradient(
                             colors: [
-                                Color.luxuryGold.opacity(0.2),
-                                Color.luxuryGold,
-                                Color.luxuryGold.opacity(0.55),
-                                Color.luxuryGold.opacity(0.2)
+                                Color.ydgIconCream.opacity(0.15),
+                                Color.ydgIconCream,
+                                Color.ydgIconCream.opacity(0.5),
+                                Color.ydgIconCream.opacity(0.15)
                             ],
                             center: .center
                         ),
@@ -1236,9 +1065,9 @@ private struct EmailConfirmationMagicalWaitView: View {
                     .frame(width: 96, height: 96)
                     .rotationEffect(.degrees(-spin * 1.25))
 
-                Image(systemName: "envelope.open.fill")
+                Image(systemName: "envelope.open")
                     .font(.system(size: 28, weight: .medium))
-                    .foregroundStyle(LinearGradient.goldShimmer)
+                    .foregroundStyle(Color.ydgIconCream)
                     .scaleEffect(pulse)
             }
             .frame(width: 128, height: 128)
@@ -1289,15 +1118,15 @@ private struct EmailConfirmationStep: View {
         HStack(alignment: .top, spacing: 14) {
             ZStack {
                 Circle()
-                    .fill(LinearGradient.goldShimmer)
-                    .frame(width: 28, height: 28)
+                    .fill(Color.ydgHighlightSubtle)
+                    .frame(width: 26, height: 26)
                 Text(number)
-                    .font(Font.bodySans(14, weight: .bold))
-                    .foregroundColor(Color.luxuryMaroon)
+                    .font(Font.ydgSans(13, weight: .bold))
+                    .foregroundColor(Color.ydgHighlight)
             }
+            .accessibilityHidden(true)
             Text(text)
-                .font(Font.bodySans(15, weight: .regular))
-                .foregroundColor(Color.luxuryCream)
+                .ydgText(.subhead, weight: .regular, color: .ydgTextPrimary)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer()
         }

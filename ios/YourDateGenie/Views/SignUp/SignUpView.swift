@@ -375,34 +375,31 @@ struct LuxuryTextField: View {
     var autocapitalization: TextInputAutocapitalization = .words
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: YDGSpace.xs) {
             Text(title)
-                .font(Font.bodySans(13, weight: .medium))
-                .foregroundColor(Color.luxuryGold)
+                .ydgText(.subhead, weight: .medium)
             
-            HStack(spacing: 12) {
+            HStack(spacing: YDGSpace.sm) {
                 if let icon = icon {
                     Image(systemName: icon)
-                        .foregroundColor(Color.luxuryGold.opacity(0.7))
+                        .foregroundColor(Color.ydgTextTertiary)
                         .frame(width: 20)
+                        .accessibilityHidden(true)
                 }
                 
-                TextField("", text: $text, prompt: Text(placeholder).foregroundColor(Color.luxuryMuted.opacity(0.6)))
-                    .font(Font.bodySans(16, weight: .regular))
-                    .foregroundColor(Color.luxuryCream)
+                TextField("", text: $text, prompt: Text(placeholder).foregroundColor(Color.ydgTextTertiary))
+                    .font(.ydg(.body))
+                    .foregroundColor(Color.ydgTextPrimary)
                     .keyboardType(keyboardType)
                     .textInputAutocapitalization(autocapitalization)
+                    .accessibilityLabel(title)
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 14)
-            .background(Color.luxeSurfaceTintStrong)
-            .cornerRadius(12)
+            .padding(.horizontal, YDGSpace.md)
+            .frame(minHeight: 52)
+            .background(Color.ydgRaised, in: RoundedRectangle(cornerRadius: YDGRadius.card, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(
-                        text.isEmpty ? Color.luxuryGold.opacity(0.2) : Color.luxuryGold.opacity(0.5),
-                        lineWidth: 1
-                    )
+                RoundedRectangle(cornerRadius: YDGRadius.card, style: .continuous)
+                    .stroke(text.isEmpty ? Color.ydgBorder : Color.ydgBorderStrong, lineWidth: 1)
             )
         }
     }

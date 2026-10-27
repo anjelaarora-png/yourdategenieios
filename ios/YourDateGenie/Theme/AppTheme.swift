@@ -202,21 +202,16 @@ struct DateNightMarkView: View {
 /// Opening copy on charcoal. Two short serif lines, then a quiet sans line.
 struct DateNightsTagline: View {
     var body: some View {
-        VStack(spacing: 14) {
-            VStack(spacing: 0) {
-                Text("Date night.")
-                    .foregroundColor(Color.textPrimary)
-                Text("Done.")
-                    .foregroundColor(Color.textPrimary)
-            }
-            .font(Font.displaySerif(34, weight: .semibold))
-            .multilineTextAlignment(.center)
-
+        VStack(spacing: YDGSpace.xs) {
+            Text("Date night. Done.")
+                .font(.ydg(.title1))
+                .foregroundColor(Color.ydgTextPrimary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
             Text("We plan. You love.")
-                .font(Font.bodySans(16, weight: .regular))
-                .foregroundColor(Color.luxuryCreamMuted)
-                .multilineTextAlignment(.center)
+                .ydgText(.caption)
         }
+        .multilineTextAlignment(.center)
         .accessibilityElement(children: .combine)
     }
 }

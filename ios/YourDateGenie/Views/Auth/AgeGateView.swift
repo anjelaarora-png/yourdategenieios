@@ -10,11 +10,7 @@ struct AgeGateView: View {
 
     var body: some View {
         ZStack {
-            Color.backgroundPrimary
-                .ignoresSafeArea()
-
-            RadialGradient.goldGlow
-                .opacity(0.15)
+            Color.ydgBase
                 .ignoresSafeArea()
 
             if showUnderageBlock {
@@ -26,105 +22,81 @@ struct AgeGateView: View {
     }
 
     private var gateContent: some View {
-        VStack(spacing: 0) {
-            Spacer(minLength: 24)
-
-            DateNightMarkView(side: 120)
-
-            Text("Age verification")
-                .font(Font.bodySerif(28, weight: .bold))
-                .foregroundColor(Color.luxuryGold)
-                .padding(.top, 20)
-
-            Text("Your Date Genie is for adults only. You must be \(AgeEligibility.minimumAge) or older to continue.")
-                .font(Font.bodySans(15, weight: .regular))
-                .foregroundColor(Color.luxuryCreamMuted)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 32)
-                .padding(.top, 10)
-
-            VStack(alignment: .leading, spacing: 10) {
-                Text("Date of birth")
-                    .font(Font.bodySans(13, weight: .medium))
-                    .foregroundColor(Color.luxuryMuted)
-
-                DatePicker(
-                    "Date of birth",
-                    selection: $birthDate,
-                    in: ...Date(),
-                    displayedComponents: .date
-                )
-                .datePickerStyle(.wheel)
-                .labelsHidden()
-                .colorScheme(.dark)
-                .frame(maxWidth: .infinity)
-                .frame(height: 140)
-                .clipped()
+        VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: YDGSpace.xs) {
+                Text("Age verification")
+                    .ydgText(.caption)
+                Text("When's your birthday?")
+                    .ydgText(.title1)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityAddTraits(.isHeader)
+                Text("Your Date Genie is for adults only. You must be \(AgeEligibility.minimumAge) or older to continue.")
+                    .ydgText(.body, color: .ydgTextSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            .padding(18)
-            .background(Color.luxeSurfaceTint)
-            .cornerRadius(14)
-            .overlay(
-                RoundedRectangle(cornerRadius: 14)
-                    .stroke(Color.luxuryGold.opacity(0.25), lineWidth: 1)
+            .padding(.top, YDGSpace.xxl)
+
+            DatePicker(
+                "Date of birth",
+                selection: $birthDate,
+                in: ...Date(),
+                displayedComponents: .date
             )
-            .padding(.horizontal, 24)
-            .padding(.top, 28)
+            .datePickerStyle(.wheel)
+            .labelsHidden()
+            .colorScheme(.dark)
+            .frame(maxWidth: .infinity)
+            .padding(.top, YDGSpace.xl)
 
-            Button {
+            Spacer(minLength: YDGSpace.lg)
+
+            Button("Continue") {
                 confirmAge()
-            } label: {
-                Text("Continue")
-                    .font(Font.bodySans(16, weight: .semibold))
-                    .frame(maxWidth: .infinity)
             }
-            .buttonStyle(LuxuryGoldButtonStyle())
-            .padding(.horizontal, 24)
-            .padding(.top, 24)
+            .buttonStyle(.ydgPrimary)
 
             Text("By continuing, you confirm your date of birth is accurate.")
-                .font(Font.bodySans(12, weight: .regular))
-                .foregroundColor(Color.luxuryMuted)
+                .ydgText(.footnote, color: .ydgTextTertiary)
                 .multilineTextAlignment(.center)
-                .padding(.horizontal, 32)
-                .padding(.top, 14)
-
-            Spacer(minLength: 40)
+                .frame(maxWidth: .infinity)
+                .padding(.top, YDGSpace.sm)
         }
+        .padding(.horizontal, YDGSpace.margin)
+        .padding(.bottom, YDGSpace.md)
     }
 
     private var underageContent: some View {
-        VStack(spacing: 20) {
+        VStack(alignment: .leading, spacing: YDGSpace.md) {
             Spacer()
 
-            Image(systemName: "hand.raised.fill")
-                .font(.system(size: 44))
-                .foregroundColor(Color.luxuryGold)
+            Image(systemName: "hand.raised")
+                .font(.system(size: 24, weight: .semibold))
+                .foregroundColor(Color.ydgHighlight)
+                .frame(width: 56, height: 56)
+                .background(Circle().fill(Color.ydgHighlightSubtle))
+                .accessibilityHidden(true)
 
-            Text("Sorry — you must be \(AgeEligibility.minimumAge)+")
-                .font(Font.bodySerif(26, weight: .bold))
-                .foregroundColor(Color.luxuryGold)
-                .multilineTextAlignment(.center)
+            Text("Sorry, you must be \(AgeEligibility.minimumAge) or older")
+                .ydgText(.title1)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityAddTraits(.isHeader)
 
-            Text("Your Date Genie is only available to users who are \(AgeEligibility.minimumAge) years of age or older. Please come back when you’re eligible.")
-                .font(Font.bodySans(15, weight: .regular))
-                .foregroundColor(Color.luxuryCreamMuted)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 32)
+            Text("Your Date Genie is only available to people who are \(AgeEligibility.minimumAge) or older. Please come back when you're eligible.")
+                .ydgText(.body, color: .ydgTextSecondary)
+                .fixedSize(horizontal: false, vertical: true)
 
-            Button {
+            Spacer()
+
+            Button("Go back") {
                 withAnimation(.easeInOut(duration: 0.25)) {
                     showUnderageBlock = false
                 }
-            } label: {
-                Text("Go back")
-                    .font(Font.bodySans(15, weight: .medium))
-                    .foregroundColor(Color.luxuryGold)
             }
-            .padding(.top, 8)
-
-            Spacer()
+            .buttonStyle(.ydgSecondary)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, YDGSpace.margin)
+        .padding(.bottom, YDGSpace.md)
     }
 
     private func confirmAge() {

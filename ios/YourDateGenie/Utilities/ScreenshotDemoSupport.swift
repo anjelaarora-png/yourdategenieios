@@ -20,6 +20,13 @@ enum AppScreenshotScene: String {
     case partnerRanking
     case partnerReveal
     case lockedIn
+    // Pre-login root screens (handled by `rootOverrides`).
+    case splash
+    case ageGate
+    case onboarding
+    case signIn
+    case hero
+    case tutorial
 }
 
 enum ScreenshotDemo {
@@ -143,7 +150,42 @@ enum ScreenshotDemo {
             coordinator.activeSheet = .finalDateReveal
         case .lockedIn:
             coordinator.activeSheet = .lockedIn(plan: sample, calendarSynced: true)
+        case .tutorial:
+            coordinator.savedPlans = []
+            coordinator.generatedPlans = []
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                coordinator.homeTutorialReplayToken &+= 1
+            }
+        case .splash, .ageGate, .onboarding, .signIn, .hero:
+            break
         }
+    }
+
+    /// Root-gate flags for pre-login scenes. Returns (showSplash, ageConfirmed).
+    @MainActor
+    static func rootOverrides(for coordinator: NavigationCoordinator) -> (showSplash: Bool, ageConfirmed: Bool) {
+        switch scene {
+        case .splash:
+            return (true, true)
+        case .ageGate:
+            return (false, false)
+        case .onboarding:
+            coordinator.hasCompletedOnboarding = false
+        case .signIn:
+            coordinator.hasSkippedLogin = false
+        case .hero:
+            // Launch-time profile sync re-sets these, so apply after it settles.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                UserDefaults.standard.set(false, forKey: "hasCompletedPreferences")
+                UserProfileManager.shared.hasCompletedPreferences = false
+                coordinator.hasCompletedPreferences = false
+                coordinator.hasDeferredInitialPreferences = false
+                coordinator.presentHeroBeforeInitialPreferences = true
+            }
+        default:
+            break
+        }
+        return (false, true)
     }
 
     @MainActor

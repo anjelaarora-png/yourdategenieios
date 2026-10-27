@@ -1662,10 +1662,11 @@ struct RootNavigationView: View {
         .onAppear {
             #if DEBUG
             if ScreenshotDemo.isActive {
-                showSplash = false
                 AgeEligibility.markConfirmedAdult()
-                hasConfirmedAge18 = true
                 ScreenshotDemo.apply(to: coordinator)
+                let root = ScreenshotDemo.rootOverrides(for: coordinator)
+                showSplash = root.showSplash
+                hasConfirmedAge18 = root.ageConfirmed
                 return
             }
             #endif

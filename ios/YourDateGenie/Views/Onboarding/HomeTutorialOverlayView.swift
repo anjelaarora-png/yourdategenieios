@@ -55,7 +55,7 @@ struct HomeTutorialOverlayView: View {
             anchor: .planButton,
             icon: "wand.and.stars",
             title: "Plan a full date night",
-            body: "Tap Plan My Next Date. Answer a few quick questions and we'll build a complete evening — real venues, timing, route, and a note for your partner.",
+            body: "Tap Plan my next date and answer a few quick questions. We build the whole evening: real venues, timing, a route and a note for your partner.",
             calloutBelowSpotlight: true
         ),
         StepContent(
@@ -76,7 +76,7 @@ struct HomeTutorialOverlayView: View {
             anchor: .planDateButton,
             icon: "wand.and.stars",
             title: "Plan Date anytime",
-            body: "Tap the gold Plan Date button in the tab bar whenever you want a fresh itinerary — venues, timing, and share-ready details.",
+            body: "Tap Plan in the middle of the tab bar whenever you want a fresh itinerary with venues, timing and share-ready details.",
             calloutBelowSpotlight: false
         ),
         StepContent(
@@ -152,10 +152,10 @@ struct HomeTutorialOverlayView: View {
     @ViewBuilder
     private func spotlightRing(for rect: CGRect) -> some View {
         RoundedRectangle(cornerRadius: 18)
-            .stroke(Color.accentGold, lineWidth: 2.5)
+            .stroke(Color.ydgTextPrimary, lineWidth: 2)
             .frame(width: rect.width, height: rect.height)
             .position(x: rect.midX, y: rect.midY)
-            .shadow(color: Color.accentGold.opacity(0.55), radius: pulse ? 14 : 6)
+            .shadow(color: Color.ydgTextPrimary.opacity(0.35), radius: pulse ? 12 : 4)
             .scaleEffect(pulse ? 1.03 : 1.0)
             .animation(reduceMotion ? nil : .easeInOut(duration: 1.1).repeatForever(autoreverses: true), value: pulse)
             .allowsHitTesting(false)
@@ -178,77 +178,62 @@ struct HomeTutorialOverlayView: View {
                 Spacer()
             }
         }
-        .padding(.horizontal, 20)
+        .padding(.horizontal, YDGSpace.margin)
     }
 
     private var calloutCard: some View {
-        VStack(spacing: 18) {
-            HStack(spacing: 8) {
+        VStack(spacing: YDGSpace.md) {
+            HStack(spacing: 6) {
                 ForEach(0..<steps.count, id: \.self) { i in
                     Capsule()
-                        .fill(i == step ? Color.luxuryGold : Color.luxuryMuted.opacity(0.45))
-                        .frame(width: i == step ? 22 : 8, height: 8)
+                        .fill(i == step ? Color.ydgAccent : Color.ydgBorderStrong)
+                        .frame(width: i == step ? 20 : 6, height: 6)
                 }
+                .accessibilityHidden(true)
                 Spacer()
                 Button { isPresented = false } label: {
                     Image(systemName: "xmark")
                         .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(Color.luxuryMuted)
+                        .foregroundColor(Color.ydgTextSecondary)
                         .frame(width: 32, height: 32)
-                        .background(Color.luxeSurfaceTint)
-                        .clipShape(Circle())
+                        .background(Circle().fill(Color.ydgOverlay))
+                        .frame(width: 44, height: 44)
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("Close tour")
             }
 
-            HStack(spacing: 14) {
-                ZStack {
-                    Circle()
-                        .fill(Color.luxuryGold.opacity(0.18))
-                        .frame(width: 52, height: 52)
-                    Image(systemName: current.icon)
-                        .font(.system(size: 22))
-                        .foregroundStyle(LinearGradient.goldShimmer)
-                }
-                VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .top, spacing: YDGSpace.sm) {
+                YDGIconTile(systemName: current.icon, size: 44)
+                VStack(alignment: .leading, spacing: 4) {
                     Text(current.title)
-                        .font(Font.header(18, weight: .bold))
-                        .foregroundColor(Color.luxuryCream)
+                        .ydgText(.title3)
+                        .fixedSize(horizontal: false, vertical: true)
                     Text(current.body)
-                        .font(Font.bodySans(14, weight: .regular))
-                        .foregroundColor(Color.luxuryCreamMuted)
+                        .ydgText(.subhead, weight: .regular, color: .ydgTextSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
-            HStack(spacing: 12) {
+            HStack(spacing: YDGSpace.sm) {
                 if step < steps.count - 1 {
                     Button("Skip") { isPresented = false }
-                        .font(Font.bodySans(15, weight: .medium))
-                        .foregroundColor(Color.luxuryMuted)
-                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .buttonStyle(YDGButtonStyle(kind: .tertiary))
                 }
-                Button {
+                Button(step == steps.count - 1 ? "Got it" : "Next") {
                     advanceOrDismiss()
-                } label: {
-                    HStack(spacing: 8) {
-                        Text(step == steps.count - 1 ? "Got it!" : "Next")
-                        Image(systemName: step == steps.count - 1 ? "checkmark" : "arrow.right")
-                            .font(.system(size: 13, weight: .semibold))
-                    }
-                    .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(LuxuryGoldButtonStyle(isSmall: true))
+                .buttonStyle(.ydgPrimary)
             }
         }
-        .padding(20)
+        .padding(YDGSpace.margin)
         .background(
-            RoundedRectangle(cornerRadius: 20)
-                .fill(Color.surfaceElevated)
+            RoundedRectangle(cornerRadius: YDGRadius.sheet, style: .continuous)
+                .fill(Color.ydgOverlay)
                 .overlay(
-                    RoundedRectangle(cornerRadius: 20)
-                        .stroke(Color.accentGold.opacity(0.35), lineWidth: 1)
+                    RoundedRectangle(cornerRadius: YDGRadius.sheet, style: .continuous)
+                        .stroke(Color.ydgBorder, lineWidth: 1)
                 )
         )
         .shadow(color: Color.black.opacity(0.35), radius: 24, y: 8)
