@@ -20,7 +20,7 @@ struct Step3VibeView: View {
                 VStack(alignment: .leading, spacing: 12) {
                     SectionHeader(
                         emoji: "⚡",
-                        title: "What's the energy?",
+                        title: "Pace",
                         subtitle: "Set the pace for your date"
                     )
                     
@@ -139,5 +139,5 @@ struct FlowLayout: Layout {
 
 #Preview {
     Step3VibeView(data: .constant(QuestionnaireData()), isPreferencesOnly: false)
-        .background(Color.backgroundPrimary)
+        .background(Color.ydgBase)
 }

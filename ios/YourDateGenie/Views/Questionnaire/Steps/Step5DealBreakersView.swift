@@ -17,13 +17,13 @@ struct Step5DealBreakersView: View {
                 // Info banner
                 HStack(spacing: 12) {
                     Image(systemName: "info.circle.fill")
-                        .foregroundColor(.brandGold)
+                        .foregroundColor(Color.ydgTextSecondary)
                     Text("This step is optional but helps us avoid any no-go's")
                         .font(.system(size: 14))
-                        .foregroundColor(Color.luxuryMuted)
+                        .foregroundColor(Color.ydgTextSecondary)
                 }
                 .padding(16)
-                .background(Color.brandGold.opacity(0.1))
+                .background(Color.ydgRaised)
                 .cornerRadius(12)
                 
                 // Allergies
@@ -86,13 +86,13 @@ struct Step5DealBreakersView: View {
                         .frame(minHeight: 100)
                         .padding(12)
                         .scrollContentBackground(.hidden)
-                        .foregroundColor(Color.luxuryCream)
+                        .foregroundColor(Color.ydgTextPrimary)
                         .luxeInsetSurface(cornerRadius: 12)
                         .overlay(
                             Group {
                                 if data.additionalNotes.isEmpty {
                                     Text("E.g., Partner has a bad knee, prefer quieter venues, celebrating a promotion...")
-                                        .foregroundColor(Color.luxuryMuted)
+                                        .foregroundColor(Color.ydgTextSecondary)
                                         .padding(16)
                                         .allowsHitTesting(false)
                                 }
@@ -117,5 +117,5 @@ struct Step5DealBreakersView: View {
 
 #Preview {
     Step5DealBreakersView(data: .constant(QuestionnaireData()), isPreferencesOnly: false)
-        .background(Color.backgroundPrimary)
+        .background(Color.ydgBase)
 }

@@ -66,23 +66,23 @@ struct TravelRadiusCard: View {
                 
                 Text(item.label)
                     .font(Font.bodySans(13, weight: .semibold))
-                    .foregroundColor(isSelected ? Color.luxuryMaroon : Color.luxuryCream)
+                    .foregroundColor(isSelected ? Color.ydgAccent : Color.ydgTextPrimary)
                 
                 if let distance = item.distance {
                     Text(distance)
-                        .font(Font.bodySans(10, weight: .regular))
-                        .foregroundColor(isSelected ? Color.luxuryMaroon.opacity(0.8) : Color.luxuryMuted)
+                        .font(Font.ydgSans(12, weight: .regular))
+                        .foregroundColor(Color.ydgTextSecondary)
                 }
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 16)
             .background(
-                isSelected ? LinearGradient.goldShimmer : LinearGradient(colors: [Color.luxeSurfaceTintStrong], startPoint: .top, endPoint: .bottom)
+                isSelected ? Color.ydgAccentSubtle : Color.ydgRaised
             )
             .cornerRadius(12)
             .overlay(
                 RoundedRectangle(cornerRadius: 12)
-                    .stroke(isSelected ? Color.clear : Color.luxeSurfaceBorder, lineWidth: 1)
+                    .stroke(isSelected ? Color.ydgAccent : Color.ydgBorder, lineWidth: isSelected ? 1.5 : 1)
             )
             .shadow(color: isSelected ? Color.brandGold.opacity(0.3) : Color.clear, radius: 6, y: 3)
         }
@@ -92,5 +92,5 @@ struct TravelRadiusCard: View {
 
 #Preview {
     Step2TransportationView(data: .constant(QuestionnaireData()))
-        .background(Color.backgroundPrimary)
+        .background(Color.ydgBase)
 }

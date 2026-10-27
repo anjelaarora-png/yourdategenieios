@@ -54,17 +54,17 @@ struct RouteMapView: View {
                 }
             }
             .frame(height: 300)
-            .cornerRadius(16)
+            .environment(\.colorScheme, .dark)
+            .clipShape(RoundedRectangle(cornerRadius: YDGRadius.card, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 16)
-                    .stroke(Color.luxuryGold.opacity(0.3), lineWidth: 1)
+                RoundedRectangle(cornerRadius: YDGRadius.card, style: .continuous)
+                    .stroke(Color.ydgBorder, lineWidth: 1)
             )
             
             // Stops List (or empty state)
             if stops.isEmpty {
                 Text("Complete dates and mark them as done to see your journey here.")
-                    .font(Font.bodySans(15, weight: .medium))
-                    .foregroundColor(Color.luxuryCreamMuted)
+                    .ydgText(.body, color: .ydgTextSecondary)
                     .multilineTextAlignment(.center)
                     .padding(.top, 24)
                     .padding(.horizontal, 20)
@@ -85,25 +85,23 @@ struct RouteMapView: View {
             if showRouteLine, !legsList.isEmpty {
                 VStack(alignment: .leading, spacing: 10) {
                     Text("Route legs")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(Color.luxuryCream)
+                        .ydgText(.title3)
+                        .accessibilityAddTraits(.isHeader)
                     VStack(spacing: 8) {
                         ForEach(Array(legsList.enumerated()), id: \.offset) { _, leg in
                             HStack(spacing: 12) {
                                 Image(systemName: TravelModeIcon.sfSymbol(for: leg.mode))
                                     .font(.system(size: 16))
-                                    .foregroundColor(Color.luxuryGold)
+                                    .foregroundColor(Color.ydgTextSecondary)
                                     .frame(width: 24, alignment: .center)
                                 Text(leg.label)
-                                    .font(.system(size: 15, weight: .medium))
-                                    .foregroundColor(Color.luxuryCream)
+                                    .ydgText(.subhead, weight: .medium)
                                 Spacer(minLength: 8)
                                 legTimeDistanceLabel(time: leg.time, distance: leg.distance, mode: leg.mode)
                             }
                             .padding(.horizontal, 14)
                             .padding(.vertical, 10)
-                            .background(Color.luxuryMaroonLight)
-                            .cornerRadius(10)
+                            .background(Color.ydgRaised, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                         }
                     }
                 }
@@ -115,21 +113,13 @@ struct RouteMapView: View {
                 Button {
                     openInMaps()
                 } label: {
-                    HStack {
-                        Image(systemName: "map.fill")
-                        Text(showRouteLine ? "Open Route in Maps" : "View in Maps")
-                    }
+                    Label(showRouteLine ? "Open route in Maps" : "View in Maps", systemImage: "map")
                 }
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundColor(Color.luxuryMaroon)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 14)
-                .background(LinearGradient.goldGradient)
-                .cornerRadius(12)
-                .padding(.top, 16)
+                .buttonStyle(.ydgPrimary)
+                .padding(.top, YDGSpace.md)
             }
         }
-        .background(Color.backgroundPrimary)
+        .background(Color.ydgBase)
         .onAppear {
             updateRegionFromStops()
             resolveMissingCoordinates()
@@ -245,7 +235,7 @@ struct RouteMapView: View {
                 }
                 Text("(\(modeLabel))")
                     .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(Color.luxuryGold.opacity(0.95))
+                    .foregroundColor(Color.ydgTextSecondary)
             }
         }
     }
@@ -419,7 +409,7 @@ struct StartPointMarker: View {
                 
                 Image(systemName: "house.fill")
                     .font(.system(size: 16, weight: .medium))
-                    .foregroundColor(Color.luxuryMaroon)
+                    .foregroundColor(Color.ydgTextOnAccent)
             }
             Triangle()
                 .fill(Color.luxuryCream)
@@ -448,12 +438,12 @@ struct LegTimeDistanceBadge: View {
                     .font(.system(size: 11, weight: .medium))
             }
         }
-        .foregroundColor(Color.luxuryMaroon)
+        .foregroundColor(Color.ydgTextOnAccent)
         .padding(.horizontal, 8)
         .padding(.vertical, 5)
         .background(Color.luxuryCream)
         .cornerRadius(8)
-        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.luxuryGold.opacity(0.6), lineWidth: 1))
+        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.ydgBorder, lineWidth: 1))
     }
 }
 
@@ -466,13 +456,13 @@ struct StopMarker: View {
         VStack(spacing: 0) {
             ZStack {
                 Circle()
-                    .fill(LinearGradient.goldGradient)
+                    .fill(Color.ydgAccent)
                     .frame(width: isSelected ? 44 : 36, height: isSelected ? 44 : 36)
                     .shadow(color: Color.brandGold.opacity(0.4), radius: 4, y: 2)
                 
                 Text("\(stop.order)")
                     .font(.system(size: isSelected ? 16 : 14, weight: .bold))
-                    .foregroundColor(.white)
+                    .foregroundColor(Color.ydgTextOnAccent)
             }
             
             Triangle()
@@ -506,12 +496,12 @@ struct StopListItem: View {
             // Number badge
             ZStack {
                 Circle()
-                    .fill(LinearGradient.goldGradient)
+                    .fill(Color.ydgAccent)
                     .frame(width: 28, height: 28)
                 
                 Text("\(number)")
                     .font(.system(size: 13, weight: .bold))
-                    .foregroundColor(Color.luxuryMaroon)
+                    .foregroundColor(Color.ydgTextOnAccent)
             }
             
             // Content – readable body sizes
@@ -548,11 +538,11 @@ struct StopListItem: View {
             }
         }
         .padding(12)
-        .background(Color.luxuryMaroonLight)
+        .background(Color.ydgRaised)
         .cornerRadius(12)
         .overlay(
             RoundedRectangle(cornerRadius: 12)
-                .stroke(Color.luxuryGold.opacity(0.25), lineWidth: 1)
+                .stroke(Color.ydgBorder, lineWidth: 1)
         )
     }
     

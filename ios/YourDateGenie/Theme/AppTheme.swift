@@ -439,13 +439,12 @@ extension View {
     }
 
     /// Questionnaire toggles / inset panels — flat charcoal tint (matches Home section insets).
-    func questionnaireInsetSurface(cornerRadius: CGFloat = 12) -> some View {
+    func questionnaireInsetSurface(cornerRadius: CGFloat = 14) -> some View {
         padding(16)
-            .background(Color.luxeSurfaceTintStrong)
-            .cornerRadius(cornerRadius)
+            .background(Color.ydgRaised, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: cornerRadius)
-                    .stroke(Color.luxeSurfaceBorder, lineWidth: 1)
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .stroke(Color.ydgBorder, lineWidth: 1)
             )
     }
 

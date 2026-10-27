@@ -84,161 +84,106 @@ struct MagicalLoadingView: View {
         "Your goal is to create a setting where you can connect—everything else supports that.",
     ]
     
-    var body: some View {
-        GeometryReader { geo in
-            ZStack {
-                Color.backgroundPrimary
-                    .ignoresSafeArea()
-                
-                // 1. Confetti (reduced for concierge-style loading)
-                ForEach(confettiPieces) { piece in
-                    LoadingConfettiShape(style: piece.style)
-                        .fill(piece.color)
-                        .frame(width: piece.size, height: piece.size * (piece.style == .rect ? 0.6 : 1))
-                        .rotationEffect(.degrees(piece.rotation))
-                        .position(x: piece.x, y: piece.y)
-                        .opacity(piece.opacity)
-                }
-                
-                // 2. Floating petals (minimal)
-                ForEach(0..<3, id: \.self) { index in
-                    RosePetal()
-                        .fill(
-                            LinearGradient(
-                                colors: [
-                                    Color(hex: "8B0000").opacity(0.4),
-                                    Color(hex: "DC143C").opacity(0.2)
-                                ],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
-                        )
-                        .frame(width: 20, height: 25)
-                        .rotationEffect(.degrees(Double(index * 45)))
-                        .position(petalPosition(for: index, in: geo.size))
-                        .animation(
-                            .easeInOut(duration: petalAnimationDurations[index])
-                            .repeatForever(autoreverses: true)
-                            .delay(Double(index) * 0.3),
-                            value: petalPositions
-                        )
-                }
-                
-                // 3. Golden sparkles (minimal)
-                ForEach(0..<Self.sparkleCount, id: \.self) { index in
-                    if index < sparklePositions.count {
-                        Image(systemName: "sparkle")
-                            .font(.system(size: [10, 12, 14, 16][index % 4]))
-                            .foregroundColor(Color.luxuryGold)
-                            .opacity(sparkleOpacity[index])
-                            .position(sparklePositions[index])
-                    }
-                }
-                
-                // Soft radial glow behind hero
-                RadialGradient(
-                    colors: [
-                        Color.luxuryGold.opacity(0.12),
-                        Color.clear
-                    ],
-                    center: .center,
-                    startRadius: 40,
-                    endRadius: 220
-                )
-                .opacity(glowOpacity)
-                .scaleEffect(glowScale)
-                
-                // 4 + 5: Hero and text block centered together (sparkles stay above)
-                VStack(spacing: 0) {
-                    Spacer()
-                    GenieLampHeroView(progress: routeProgress)
-                        .frame(width: 140, height: 200)
-                    Spacer()
-                    ScrollView(showsIndicators: false) {
-                        VStack(spacing: 12) {
-                            Text("Crafting your date plan")
-                                .font(Font.bodySerif(28, weight: .regular))
-                                .foregroundColor(Color.accentGold)
-                                .multilineTextAlignment(.center)
-                                .opacity(titleOpacity)
-                                .scaleEffect(titleScale)
-                            
-                            Text("Checking venues, timing, and your preferences")
-                                .font(Font.bodySans(15, weight: .regular))
-                                .foregroundColor(Color.luxuryCreamMuted)
-                                .opacity(titleOpacity)
-                            
-                            Text("Tip of the day: \(tipOfTheDay)")
-                                .font(Font.bodySans(13, weight: .regular))
-                                .foregroundColor(Color.luxuryCreamMuted.opacity(0.95))
-                                .multilineTextAlignment(.center)
-                                .lineLimit(4)
-                                .opacity(titleOpacity)
-                            
-                            VStack(spacing: 6) {
-                                GeometryReader { geometry in
-                                    ZStack(alignment: .leading) {
-                                        Capsule()
-                                            .fill(Color.luxeSurfaceTintStrong)
-                                            .frame(height: 5)
-                                        Capsule()
-                                            .fill(LinearGradient.goldShimmer)
-                                            .frame(width: max(0, geometry.size.width * CGFloat(generator.generationProgress)), height: 5)
-                                            .animation(.easeInOut(duration: 0.5), value: generator.generationProgress)
-                                    }
-                                }
-                                .frame(height: 8)
-                                .padding(.horizontal, 24)
-                                
-                                Text("\(Int(generator.generationProgress * 100))%")
-                                    .font(Font.bodySans(12, weight: .medium))
-                                    .foregroundColor(Color.luxuryGold)
-                            }
-                            .opacity(titleOpacity)
-                            
-                            Text("This usually takes under a minute")
-                                .font(Font.bodySans(11, weight: .regular))
-                                .foregroundColor(Color.luxuryMuted)
-                                .opacity(titleOpacity)
+    /// Honest, coarse milestones keyed to generator progress (no invented counts).
+    private static let milestones: [(threshold: Double, title: String)] = [
+        (0.25, "Finding spots near your starting point"),
+        (0.50, "Checking they're open for your night"),
+        (0.75, "Timing the walk between stops"),
+        (1.00, "Writing your three options"),
+    ]
 
-                            if let onCancel {
-                                Button("Cancel", action: onCancel)
-                                    .font(Font.bodySans(14, weight: .medium))
-                                    .foregroundColor(Color.luxuryCreamMuted)
-                                    .padding(.top, 8)
-                                    .opacity(titleOpacity)
-                            }
-                        }
-                        .padding(.horizontal, 24)
-                        .padding(.bottom, 40)
+    var body: some View {
+        ZStack {
+            Color.ydgBase
+                .ignoresSafeArea()
+
+            VStack(alignment: .leading, spacing: 0) {
+                VStack(alignment: .leading, spacing: YDGSpace.sm) {
+                    Text("\(Int(generator.generationProgress * 100))%")
+                        // Inter, not Playfair: Playfair's old-style figures read as decoration, not a number.
+                        .font(.ydgSans(56, weight: .semibold))
+                        .tracking(-1.7)
+                        .foregroundColor(Color.ydgAccent)
+                        .monospacedDigit()
+                        .contentTransition(.numericText())
+                        .animation(.easeInOut(duration: 0.4), value: generator.generationProgress)
+                        .accessibilityLabel("\(Int(generator.generationProgress * 100)) percent")
+
+                    Text("Crafting your date plan")
+                        .ydgText(.title1)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityAddTraits(.isHeader)
+
+                    Text("This usually takes under a minute.")
+                        .ydgText(.body, color: .ydgTextSecondary)
+                }
+                .padding(.top, YDGSpace.xxl + YDGSpace.lg)
+                .padding(.bottom, YDGSpace.xl)
+
+                VStack(alignment: .leading, spacing: 18) {
+                    ForEach(Array(Self.milestones.enumerated()), id: \.offset) { index, milestone in
+                        milestoneRow(index: index, title: milestone.title)
                     }
-                    .frame(maxHeight: geo.size.height * 0.45)
+                }
+
+                Spacer(minLength: YDGSpace.lg)
+
+                VStack(alignment: .leading, spacing: YDGSpace.xxs) {
+                    Text("Tip of the day")
+                        .ydgText(.caption, color: .ydgHighlight)
+                    Text(tipOfTheDay)
+                        .ydgText(.subhead, weight: .regular)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .ydgCard()
+
+                if let onCancel {
+                    Button("Cancel", action: onCancel)
+                        .buttonStyle(.ydgTertiary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, YDGSpace.sm)
                 }
             }
+            .padding(.horizontal, YDGSpace.margin)
+            .padding(.bottom, YDGSpace.lg)
         }
         .onAppear {
             tipOfTheDay = Self.tipsOfTheDay.randomElement() ?? Self.tipsOfTheDay[0]
-            petalAnimationDurations = (0..<3).map { _ in Double.random(in: 4...7) }
-            let size = UIScreen.main.bounds.size
-            spawnConfetti(in: size)
-            animateConfetti(delay: 0.3)
-            petalPositions = (0..<3).map { _ in
-                CGPoint(
-                    x: CGFloat.random(in: 50...(size.width - 50)),
-                    y: CGFloat.random(in: 100...(size.height - 100))
-                )
-            }
-            // Keep sparkles in upper area so they don't cover the text block
-            let sparkleMaxY = size.height * 0.38
-            sparklePositions = (0..<Self.sparkleCount).map { _ in
-                CGPoint(
-                    x: CGFloat.random(in: 20...(size.width - 20)),
-                    y: CGFloat.random(in: 60...(sparkleMaxY))
-                )
-            }
-            startSparkleAnimations()
-            runEntryAnimation()
         }
+    }
+
+    @ViewBuilder
+    private func milestoneRow(index: Int, title: String) -> some View {
+        let progress = generator.generationProgress
+        let previous = index == 0 ? 0 : Self.milestones[index - 1].threshold
+        let isDone = progress >= Self.milestones[index].threshold
+        let isActive = !isDone && progress >= previous
+
+        HStack(spacing: 14) {
+            ZStack {
+                if isDone {
+                    Circle().fill(Color.ydgAccent)
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundColor(Color.ydgTextOnAccent)
+                } else if isActive {
+                    Circle().stroke(Color.ydgBorder, lineWidth: 2)
+                    ProgressView()
+                        .controlSize(.mini)
+                        .tint(Color.ydgAccent)
+                } else {
+                    Circle().stroke(Color.ydgBorder, lineWidth: 2)
+                }
+            }
+            .frame(width: 24, height: 24)
+
+            Text(title)
+                .ydgText(.body, weight: isActive ? .semibold : .regular,
+                         color: isDone || isActive ? .ydgTextPrimary : .ydgTextTertiary)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityValue(isDone ? "Done" : isActive ? "In progress" : "Waiting")
     }
     
     private func spawnConfetti(in size: CGSize) {

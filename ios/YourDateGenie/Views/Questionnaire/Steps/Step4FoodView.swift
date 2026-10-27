@@ -118,23 +118,23 @@ struct BudgetCard: View {
             VStack(spacing: 6) {
                 Text(item.label)
                     .font(Font.bodySans(13, weight: .semibold))
-                    .foregroundColor(isSelected ? Color.luxuryMaroon : Color.luxuryCream)
+                    .foregroundColor(isSelected ? Color.ydgAccent : Color.ydgTextPrimary)
                 
                 if let desc = item.desc {
                     Text(desc)
-                        .font(Font.bodySans(10, weight: .regular))
-                        .foregroundColor(isSelected ? Color.luxuryMaroon.opacity(0.8) : Color.luxuryMuted)
+                        .font(Font.ydgSans(12, weight: .regular))
+                        .foregroundColor(Color.ydgTextSecondary)
                 }
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 16)
             .background(
-                isSelected ? LinearGradient.goldShimmer : LinearGradient(colors: [Color.luxeSurfaceTintStrong], startPoint: .top, endPoint: .bottom)
+                isSelected ? Color.ydgAccentSubtle : Color.ydgRaised
             )
             .cornerRadius(12)
             .overlay(
                 RoundedRectangle(cornerRadius: 12)
-                    .stroke(isSelected ? Color.clear : Color.luxuryGold.opacity(0.3), lineWidth: isSelected ? 2 : 1)
+                    .stroke(isSelected ? Color.ydgAccent : Color.ydgBorder, lineWidth: isSelected ? 1.5 : 1)
             )
             .shadow(color: isSelected ? Color.brandGold.opacity(0.3) : Color.clear, radius: 6, y: 3)
         }
@@ -144,5 +144,5 @@ struct BudgetCard: View {
 
 #Preview {
     Step4FoodView(data: .constant(QuestionnaireData()))
-        .background(Color.backgroundPrimary)
+        .background(Color.ydgBase)
 }

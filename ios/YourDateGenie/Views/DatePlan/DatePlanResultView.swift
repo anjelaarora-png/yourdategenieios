@@ -47,22 +47,22 @@ struct DatePlanResultView: View {
         NavigationStack {
             ZStack {
                 // Background
-                Color.backgroundPrimary
+                Color.ydgBase
                     .ignoresSafeArea()
                 
                 VStack(spacing: 0) {
                     // Main scrollable content
                     ScrollView(.vertical, showsIndicators: false) {
-                        VStack(spacing: 16) {
+                        VStack(spacing: YDGSpace.sm) {
                             if let names = coordinator.currentPlanPartnerNames {
                                 partnerBadgeView(names: names)
                             }
                             mainPlanCard
                             planSecondaryActions
                         }
-                        .padding(.horizontal, 20)
-                        .padding(.top, 8)
-                        .padding(.bottom, 100)
+                        .padding(.horizontal, YDGSpace.margin)
+                        .padding(.top, YDGSpace.xs)
+                        .padding(.bottom, YDGSpace.lg)
                     }
                     .scrollBounceBehavior(.basedOnSize)
                 }
@@ -73,20 +73,17 @@ struct DatePlanResultView: View {
                     Button {
                         coordinator.dismissSheet()
                     } label: {
-                        HStack(spacing: 6) {
-                            Image(systemName: "xmark")
-                                .font(.system(size: 14, weight: .medium))
-                            Text("Close")
-                                .font(Font.bodySans(14, weight: .medium))
-                        }
-                        .foregroundColor(Color.luxuryGold)
-                        .charcoalToolbarPill()
+                        Image(systemName: "xmark")
+                            .font(.system(size: 17, weight: .semibold))
+                            .foregroundColor(Color.ydgTextPrimary)
+                            .frame(width: 44, height: 44)
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel("Close")
                 }
                 
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    HStack(spacing: 16) {
+                    HStack(spacing: 0) {
                         if onDelete != nil {
                             Menu {
                                 Button(role: .destructive) {
@@ -95,9 +92,9 @@ struct DatePlanResultView: View {
                                     Label("Delete plan", systemImage: "trash")
                                 }
                             } label: {
-                                Image(systemName: "ellipsis.circle")
-                                    .font(.system(size: 15))
-                                    .foregroundColor(Color.luxuryGold)
+                                Image(systemName: "ellipsis")
+                                    .font(.system(size: 17, weight: .semibold))
+                                    .foregroundColor(Color.ydgTextPrimary)
                                     .frame(width: 44, height: 44)
                                     .contentShape(Rectangle())
                             }
@@ -110,8 +107,8 @@ struct DatePlanResultView: View {
                             }
                         } label: {
                             Image(systemName: "square.and.arrow.up")
-                                .font(.system(size: 15))
-                                .foregroundColor(Color.luxuryGold)
+                                .font(.system(size: 17, weight: .semibold))
+                                .foregroundColor(Color.ydgTextPrimary)
                                 .opacity(access.canAccess(.datePlan) ? 1 : 0.45)
                                 .frame(width: 44, height: 44)
                                 .contentShape(Rectangle())
@@ -121,7 +118,7 @@ struct DatePlanResultView: View {
                         if isSaved {
                             Image(systemName: "checkmark")
                                 .font(.system(size: 15, weight: .semibold))
-                                .foregroundColor(Color.luxuryGold)
+                                .foregroundColor(Color.ydgSuccess)
                                 .frame(width: 44, height: 44)
                                 .accessibilityLabel("Plan saved")
                                 .accessibilityHidden(true)
@@ -129,7 +126,7 @@ struct DatePlanResultView: View {
                     }
                 }
             }
-            .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
+            .toolbarBackground(Color.ydgBase, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .safeAreaInset(edge: .bottom) {
                 bottomActionBar
@@ -325,40 +322,22 @@ struct DatePlanResultView: View {
     }
 
     private var planSecondaryActions: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: YDGSpace.xs) {
             if SwapStopLogic.dinnerStopIndex(in: displayPlan) != nil {
-                Button {
+                Button("Swap a stop") {
                     presentSwapSheet(for: displayPlan)
-                } label: {
-                    Text("Swap stop")
-                        .font(Font.bodySans(13, weight: .medium))
-                        .foregroundColor(Color.luxuryCream)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 12)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 10)
-                                .stroke(Color.luxuryGold.opacity(0.35), lineWidth: 1)
-                        )
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(YDGButtonStyle(kind: .secondary))
             }
 
             if hasMultipleGeneratedOptions {
-                Button {
+                Button("Compare options") {
                     if let idx = coordinator.generatedPlans.firstIndex(where: { $0.id == displayPlan.id }) {
                         coordinator.generatedPlansSelectedIndex = idx
                     }
                     coordinator.activeSheet = .datePlanOptions
-                } label: {
-                    Text("Compare options")
-                        .font(Font.bodySans(13, weight: .medium))
-                        .foregroundColor(Color.backgroundPrimary)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 12)
-                        .background(Color.accentGold)
-                        .cornerRadius(10)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(YDGButtonStyle(kind: .secondary))
             }
         }
     }
@@ -386,16 +365,15 @@ struct DatePlanResultView: View {
     // MARK: - Partner badge ("Made for A & B")
     private func partnerBadgeView(names: (String, String)) -> some View {
         Text("Made for \(names.0) & \(names.1)")
-            .font(Font.bodySans(14, weight: .semibold))
-            .foregroundColor(Color.accentGold)
-            .charcoalToolbarPill()
+            .ydgText(.caption, color: .ydgHighlight)
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
     
     // MARK: - Bottom Action Bar
     private var bottomActionBar: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: YDGSpace.sm) {
             // Quick Actions
-            HStack(spacing: 12) {
+            HStack(spacing: YDGSpace.xs) {
                 QuickActionButton(icon: "map.fill", label: "Route", isLocked: !access.canAccess(.datePlan)) {
                     access.require(.datePlan) {
                         showMap = true
@@ -459,46 +437,27 @@ struct DatePlanResultView: View {
                         showSaveDatePicker = true
                     }
                 } label: {
-                    HStack(spacing: 10) {
-                        Image(systemName: isSaved ? "checkmark.circle.fill" : "bookmark.fill")
-                            .font(.system(size: 14))
-                        Text(isSaved ? "Saved" : "Save Date Plan")
-                            .font(Font.bodySans(14, weight: .semibold))
-                    }
-                    .foregroundColor(isSaved ? Color.luxuryCream : Color.luxuryGold)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
-                    .background(
-                        Capsule()
-                            .stroke(Color.luxuryGold.opacity(0.5), lineWidth: 1)
-                            .background(Capsule().fill(isSaved ? Color.luxuryGold.opacity(0.4) : Color.luxeSurfaceTintStrong))
-                    )
+                    Label(isSaved ? "Saved" : "Save this plan", systemImage: isSaved ? "checkmark" : "bookmark")
                 }
+                .buttonStyle(.ydgPrimary)
                 .disabled(isSaved)
             }
 
             // Move to Past Dates — when plan is saved, user can mark date as done
             if isSaved && coordinator.savedPlans.contains(where: { $0.id == plan.id }) {
-                Button {
+                Button("We went on this date") {
                     coordinator.markPlanAsPast(plan)
                     coordinator.dismissSheet()
-                } label: {
-                    HStack(spacing: 8) {
-                        Image(systemName: "clock.arrow.circlepath")
-                            .font(.system(size: 14))
-                        Text("We did this date — move to Past Dates")
-                            .font(Font.bodySans(13, weight: .medium))
-                    }
-                    .foregroundColor(Color.luxuryGold.opacity(0.9))
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.ydgTertiary)
             }
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 16)
+        .padding(.horizontal, YDGSpace.margin)
+        .padding(.top, YDGSpace.sm)
+        .padding(.bottom, YDGSpace.xs)
         .background(
-            Color.backgroundPrimary
-                .shadow(color: Color.black.opacity(0.3), radius: 20, y: -5)
+            Color.ydgBase
+                .overlay(alignment: .top) { Rectangle().fill(Color.ydgBorder).frame(height: 1) }
                 .ignoresSafeArea()
         )
     }
@@ -737,36 +696,29 @@ struct QuickActionButton: View {
     
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 8) {
-                ZStack(alignment: .topTrailing) {
-                    ZStack {
-                        Circle()
-                            .fill(Color.accentGold.opacity(0.2))
-                            .frame(width: 48, height: 48)
-                        Image(systemName: icon)
-                            .font(.system(size: 20))
-                            .symbolRenderingMode(.monochrome)
-                            .foregroundColor(Color.accentGold)
+            VStack(spacing: 6) {
+                YDGIconTile(systemName: icon, size: 44)
+                    .overlay(alignment: .topTrailing) {
+                        if isLocked {
+                            Image(systemName: "lock.fill")
+                                .font(.system(size: 8, weight: .bold))
+                                .foregroundColor(Color.ydgTextOnAccent)
+                                .frame(width: 16, height: 16)
+                                .background(Circle().fill(Color.ydgIconCream))
+                                .offset(x: 3, y: -3)
+                        }
                     }
-                    if isLocked {
-                        Image(systemName: "lock.fill")
-                            .font(.system(size: 9, weight: .bold))
-                            .foregroundColor(Color.accentGold)
-                            .offset(x: 4, y: -4)
-                    }
-                }
-                
                 Text(label)
-                    .font(Font.bodySans(11, weight: .medium))
-                    .foregroundColor(Color.luxuryCream)
-                    .lineLimit(2)
-                    .multilineTextAlignment(.center)
+                    .font(Font.ydgSans(12, weight: .medium))
+                    .foregroundColor(Color.ydgTextPrimary)
+                    .lineLimit(1)
                     .minimumScaleFactor(0.85)
             }
-            .opacity(isLocked ? 0.5 : 1)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .frame(maxWidth: .infinity)
+        .accessibilityLabel(isLocked ? "\(label), Premium" : label)
     }
 }
 

@@ -148,6 +148,7 @@ struct LuxuryFeatureTile: View {
 
 /// Graphical `DatePicker` on a cream card with light color scheme so month/day labels
 /// are not black-on-black when the app uses a dark charcoal background.
+/// Graphical calendar on a raised dark card (name kept for call sites; no longer cream).
 struct CreamGraphicalDatePicker: View {
     @Binding var selection: Date
     var minimumDate: Date
@@ -166,22 +167,15 @@ struct CreamGraphicalDatePicker: View {
         )
         .datePickerStyle(.graphical)
         .labelsHidden()
-        .tint(Color.accentMaroon)
-        .colorScheme(.light)
+        .tint(Color.ydgAccent)
+        .environment(\.colorScheme, .dark)
         .padding(.horizontal, 4)
         .padding(.vertical, 6)
-        .background(Color.creamCard)
-        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .background(Color.ydgRaised, in: RoundedRectangle(cornerRadius: YDGRadius.card, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(Color.maroonBorderTint, lineWidth: 1)
+            RoundedRectangle(cornerRadius: YDGRadius.card, style: .continuous)
+                .stroke(Color.ydgBorder, lineWidth: 1)
         )
-        .overlay(alignment: .leading) {
-            RoundedRectangle(cornerRadius: 1.5)
-                .fill(Color.accentMaroon)
-                .frame(width: 3)
-                .padding(.vertical, 1)
-        }
     }
 }
 

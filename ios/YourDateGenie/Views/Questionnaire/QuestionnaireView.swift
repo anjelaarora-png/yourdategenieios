@@ -23,14 +23,24 @@ struct QuestionnaireView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color.backgroundPrimary
+                Color.ydgBase
                     .ignoresSafeArea()
 
                 // Keep questionnaire mounted — swapping the whole tree on tap crashes SwiftUI on device.
                 VStack(spacing: 0) {
                     StepProgressView(currentStep: viewModel.currentStep, totalSteps: 6)
-                        .padding(.horizontal)
-                        .padding(.top, 8)
+                        .padding(.horizontal, YDGSpace.margin)
+                        .padding(.top, YDGSpace.xxs)
+
+                    Text(viewModel.stepHeadline)
+                        .ydgText(.title1)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.horizontal, YDGSpace.margin)
+                        .padding(.top, YDGSpace.sm)
+                        .padding(.bottom, YDGSpace.xxs)
+                        .accessibilityAddTraits(.isHeader)
+                        .id(viewModel.currentStep)
 
                     Group {
                         switch viewModel.currentStep {
@@ -70,28 +80,24 @@ struct QuestionnaireView: View {
                 if !isGenerating {
                     ToolbarItem(placement: .principal) {
                         Text(viewModel.stepTitle)
-                            .font(Font.bodySerif(20, weight: .regular))
-                            .foregroundColor(Color.accentGold)
+                            .font(Font.ydgSans(15, weight: .semibold))
+                            .foregroundColor(Color.ydgTextSecondary)
                     }
                     ToolbarItem(placement: .navigationBarTrailing) {
                         Button {
                             closeQuestionnaireTapped()
                         } label: {
-                            HStack(spacing: 6) {
-                                Image(systemName: "checkmark.circle")
-                                    .font(.system(size: 14, weight: .medium))
-                                Text("Save & Exit")
-                                    .font(Font.bodySans(14, weight: .medium))
-                            }
-                            .foregroundColor(Color.luxuryGold)
-                            .charcoalToolbarPill()
+                            Text("Save & exit")
+                                .font(Font.ydgSans(16, weight: .semibold))
+                                .foregroundColor(Color.ydgAccent)
+                                .frame(minHeight: 44)
                         }
                         .buttonStyle(.plain)
                         .accessibilityLabel("Save progress and exit")
                     }
                 }
             }
-            .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
+            .toolbarBackground(Color.ydgBase, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .sheet(isPresented: $showPremiumPaywall) {
                 PremiumDatePlanPaywallView {
@@ -202,67 +208,49 @@ struct QuestionnaireView: View {
     }
     
     private var navigationButtons: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: YDGSpace.xs) {
             HStack(spacing: 6) {
-                Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: 12))
-                    .foregroundColor(Color.luxurySuccess)
+                Image(systemName: "checkmark")
+                    .font(.system(size: 11, weight: .bold))
                 Text("Progress saved")
-                    .font(Font.bodySans(12, weight: .regular))
-                    .foregroundColor(Color.luxurySuccess)
+                    .font(Font.ydgSans(12, weight: .medium))
             }
+            .foregroundColor(Color.ydgSuccess)
             .opacity(showSavedIndicator ? 1 : 0)
             .animation(.easeInOut(duration: 0.3), value: showSavedIndicator)
-            .padding(.top, 6)
+            .accessibilityHidden(!showSavedIndicator)
 
             if showsFullWidthGenerateFooter {
-                VStack(spacing: 10) {
+                VStack(spacing: YDGSpace.xxs) {
                     Button {
                         requestGenerateDatePlan()
                     } label: {
-                        HStack(spacing: 8) {
-                            Image(systemName: "sparkles")
-                            Text("Generate Date Plan")
-                        }
-                        .frame(maxWidth: .infinity)
+                        Label("Plan my date", systemImage: "sparkles")
                     }
-                    .buttonStyle(LuxuryGoldButtonStyle(isSmall: true))
+                    .buttonStyle(.ydgPrimary)
 
-                    HStack(spacing: 12) {
-                        Button {
+                    HStack(spacing: YDGSpace.lg) {
+                        Button("Back") {
                             withAnimation { viewModel.previousStep() }
-                        } label: {
-                            HStack(spacing: 8) {
-                                Image(systemName: "chevron.left")
-                                Text("Back")
-                            }
-                            .frame(maxWidth: .infinity)
                         }
-                        .buttonStyle(LuxuryOutlineButtonStyle(isSmall: true))
+                        .buttonStyle(.ydgTertiary)
 
-                        Button {
+                        Button("Save and go home") {
                             goToHomeFromQuestionnaire()
-                        } label: {
-                            Text("Go to Home")
-                                .frame(maxWidth: .infinity)
                         }
-                        .buttonStyle(LuxuryOutlineButtonStyle(isSmall: true))
+                        .buttonStyle(.ydgTertiary)
                     }
                 }
             } else {
-                HStack(spacing: 16) {
+                HStack(spacing: YDGSpace.sm) {
                     if viewModel.currentStep > 1 {
                         Button {
                             withAnimation { viewModel.previousStep() }
                         } label: {
-                            HStack(spacing: 8) {
-                                Image(systemName: "chevron.left")
-                                Text("Back")
-                            }
+                            Image(systemName: "chevron.left")
+                                .accessibilityLabel("Back")
                         }
-                        .buttonStyle(LuxuryOutlineButtonStyle(isSmall: true))
-                    } else {
-                        Spacer()
+                        .buttonStyle(YDGButtonStyle(kind: .secondary, fullWidth: false))
                     }
 
                     Button {
@@ -280,36 +268,31 @@ struct QuestionnaireView: View {
                             withAnimation { viewModel.nextStep() }
                         }
                     } label: {
-                        HStack(spacing: 8) {
-                            if viewModel.currentStep == 6 {
-                                if coordinator.partnerJoinSessionId != nil {
-                                    Image(systemName: "checkmark.circle.fill")
-                                    Text("I'm in")
-                                } else if coordinator.questionnairePreferencesOnly {
-                                    Image(systemName: "checkmark.circle.fill")
-                                    Text("Save preferences")
-                                } else {
-                                    Image(systemName: "sparkles")
-                                    Text("Generate Date Plan")
-                                }
+                        if viewModel.currentStep == 6 {
+                            if coordinator.partnerJoinSessionId != nil {
+                                Text("I'm in")
+                            } else if coordinator.questionnairePreferencesOnly {
+                                Text("Save preferences")
                             } else {
-                                Text("Next")
-                                Image(systemName: "chevron.right")
+                                Label("Plan my date", systemImage: "sparkles")
                             }
+                        } else {
+                            Text("Continue")
                         }
-                        .frame(maxWidth: viewModel.currentStep == 1 ? .infinity : nil)
                     }
-                    .buttonStyle(LuxuryGoldButtonStyle(isSmall: true))
+                    .buttonStyle(.ydgPrimary)
                     .disabled(!viewModel.isCurrentStepValid)
-                    .opacity(viewModel.isCurrentStepValid ? 1 : 0.5)
                 }
             }
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 16)
+        .padding(.horizontal, YDGSpace.margin)
+        .padding(.top, YDGSpace.xxs)
+        .padding(.bottom, YDGSpace.md)
         .background(
-            Color.backgroundPrimary
-                .shadow(color: Color.black.opacity(0.3), radius: 10, y: -5)
+            Color.ydgBase
+                .overlay(alignment: .top) {
+                    Rectangle().fill(Color.ydgBorder).frame(height: 1)
+                }
         )
     }
 
@@ -565,57 +548,28 @@ struct StepProgressView: View {
     let currentStep: Int
     let totalSteps: Int
     
-    private let stepLabels = ["Location", "Travel", "Vibe", "Food", "Avoid", "Extras"]
-    
     var body: some View {
-        VStack(spacing: 12) {
-            // Progress bar
+        HStack(spacing: YDGSpace.sm) {
             GeometryReader { geometry in
                 ZStack(alignment: .leading) {
-                    Rectangle()
-                        .fill(Color.luxuryMuted.opacity(0.3))
-                        .frame(height: 4)
-                        .cornerRadius(2)
-                    
-                    Rectangle()
-                        .fill(LinearGradient.goldShimmer)
-                        .frame(width: geometry.size.width * CGFloat(currentStep) / CGFloat(totalSteps), height: 4)
-                        .cornerRadius(2)
+                    Capsule()
+                        .fill(Color.ydgBorder)
+                    Capsule()
+                        .fill(Color.ydgAccent)
+                        .frame(width: geometry.size.width * CGFloat(currentStep) / CGFloat(totalSteps))
                         .animation(.easeInOut(duration: 0.3), value: currentStep)
                 }
             }
             .frame(height: 4)
-            
-            // Step indicators
-            HStack {
-                ForEach(1...totalSteps, id: \.self) { step in
-                    VStack(spacing: 6) {
-                        ZStack {
-                            Circle()
-                                .fill(step <= currentStep ? Color.luxuryGold : Color.luxuryMuted.opacity(0.3))
-                                .frame(width: 10, height: 10)
-                            
-                            if step < currentStep {
-                                Image(systemName: "checkmark")
-                                    .font(.system(size: 6, weight: .bold))
-                                    .foregroundColor(Color.luxuryMaroon)
-                            }
-                        }
-                        
-                        if step == currentStep {
-                            Text(stepLabels[step - 1])
-                                .font(Font.bodySans(10, weight: .medium))
-                                .foregroundColor(Color.luxuryGold)
-                        }
-                    }
-                    
-                    if step < totalSteps {
-                        Spacer()
-                    }
-                }
-            }
+
+            Text("\(currentStep) of \(totalSteps)")
+                .font(Font.ydgSans(13, weight: .medium))
+                .foregroundColor(Color.ydgTextSecondary)
+                .monospacedDigit()
         }
-        .padding(.vertical, 12)
+        .padding(.vertical, YDGSpace.xs)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Step \(currentStep) of \(totalSteps)")
     }
 }
 
@@ -629,6 +583,19 @@ class QuestionnaireViewModel: ObservableObject {
         prePopulateFromSavedPreferences()
     }
     
+    /// Large question shown at the top of each step (Final design).
+    var stepHeadline: String {
+        switch currentStep {
+        case 1: return isPreferencesOnly ? "Where are you based?" : "Where are you planning?"
+        case 2: return "How are you getting around?"
+        case 3: return "What's the energy?"
+        case 4: return "Food & drinks"
+        case 5: return "Any deal-breakers?"
+        case 6: return "A few extras"
+        default: return ""
+        }
+    }
+
     var stepTitle: String {
         switch currentStep {
         case 1: return isPreferencesOnly ? "Your Location" : "Location & Date Type"

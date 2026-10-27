@@ -1,64 +1,53 @@
 import SwiftUI
 
-// MARK: - Section Header (questionnaire questions in display serif)
+// MARK: - Section Header (one question per group)
+/// Emoji are no longer shown (Final design: text-led questions); the parameter is kept
+/// so existing call sites compile.
 struct SectionHeader: View {
     var emoji: String = ""
     let title: String
     var subtitle: String? = nil
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 10) {
-                if !emoji.isEmpty {
-                    Text(emoji)
-                        .font(.system(size: 22))
-                }
-                
-                Text(title)
-                    .font(Font.bodySerif(22, weight: .regular))
-                    .foregroundColor(Color.accentGold)
-            }
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title)
+                .ydgText(.callout, weight: .semibold)
+                .accessibilityAddTraits(.isHeader)
             
             if let subtitle = subtitle {
                 Text(subtitle)
-                    .font(Font.bodySans(14, weight: .regular))
-                    .foregroundColor(Color.luxuryMuted)
+                    .ydgText(.footnote, color: .ydgTextSecondary)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
-// MARK: - Shared option surface styling (Home / questionnaire parity)
+// MARK: - Shared option surface styling (raised, gold when selected)
 private struct QuestionnaireOptionSurface: ViewModifier {
     let isSelected: Bool
-    var cornerRadius: CGFloat = 16
+    var cornerRadius: CGFloat = YDGRadius.card
 
     func body(content: Content) -> some View {
         content
-            .background {
-                if isSelected {
-                    LinearGradient.goldShimmer
-                } else {
-                    Color.luxeSurfaceTintStrong
-                }
-            }
-            .cornerRadius(cornerRadius)
-            .overlay(
-                RoundedRectangle(cornerRadius: cornerRadius)
-                    .stroke(isSelected ? Color.clear : Color.luxeSurfaceBorder, lineWidth: 1)
+            .background(
+                isSelected ? Color.ydgAccentSubtle : Color.ydgRaised,
+                in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
             )
-            .shadow(color: isSelected ? Color.luxuryGold.opacity(0.25) : Color.clear, radius: 8, y: 4)
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .stroke(isSelected ? Color.ydgAccent : Color.ydgBorder, lineWidth: isSelected ? 1.5 : 1)
+            )
     }
 }
 
 private extension View {
-    func questionnaireOptionSurface(isSelected: Bool, cornerRadius: CGFloat = 16) -> some View {
+    func questionnaireOptionSurface(isSelected: Bool, cornerRadius: CGFloat = YDGRadius.card) -> some View {
         modifier(QuestionnaireOptionSurface(isSelected: isSelected, cornerRadius: cornerRadius))
     }
 }
 
-// MARK: - Option Card View (Grid selection)
+// MARK: - Option Card View (Grid selection: title, optional description, check when selected)
 struct OptionCardView: View {
     let item: OptionItem
     let isSelected: Bool
@@ -78,27 +67,40 @@ struct OptionCardView: View {
     
     var body: some View {
         Button(action: onTap) {
-            VStack(spacing: 12) {
-                Text(item.emoji)
-                    .font(.system(size: 34))
-                
-                Text(item.label)
-                    .font(Font.bodySans(13, weight: .semibold))
-                    .foregroundColor(isSelected ? Color.luxuryMaroon : Color.luxuryCream)
-                    .multilineTextAlignment(.center)
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.8)
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text(item.label)
+                        .ydgText(.subhead, weight: .semibold, color: isSelected ? .ydgAccent : .ydgTextPrimary)
+                        .multilineTextAlignment(.leading)
+                        // A single long word ("Anniversary") shrinks rather than breaking mid-word.
+                        .lineLimit(item.label.contains(" ") ? 2 : 1)
+                        .minimumScaleFactor(0.75)
+                    Spacer(minLength: 0)
+                    if isSelected {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 17))
+                            .foregroundColor(Color.ydgAccent)
+                    }
+                }
+                if let desc = item.desc, !desc.isEmpty {
+                    Text(desc)
+                        .ydgText(.footnote, color: .ydgTextSecondary)
+                        .multilineTextAlignment(.leading)
+                        .lineLimit(2)
+                }
             }
-            .frame(maxWidth: .infinity, minHeight: 100)
-            .padding(.vertical, 16)
-            .padding(.horizontal, 12)
+            .frame(maxWidth: .infinity, minHeight: 40, alignment: .leading)
+            .padding(.horizontal, YDGSpace.sm + 2)
+            .padding(.vertical, YDGSpace.sm + 2)
             .questionnaireOptionSurface(isSelected: isSelected)
+            .contentShape(Rectangle())
         }
         .buttonStyle(ScaleButtonStyle())
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }
 
-// MARK: - Chip Option View (Flow layout chips)
+// MARK: - Chip Option View (Flow layout chips; same look as YDGChip)
 struct ChipOptionView: View {
     let item: OptionItem
     let isSelected: Bool
@@ -106,19 +108,17 @@ struct ChipOptionView: View {
     
     var body: some View {
         Button(action: onTap) {
-            HStack(spacing: 8) {
-                Text(item.emoji)
-                    .font(.system(size: 16))
-                
-                Text(item.label)
-                    .font(Font.bodySans(13, weight: isSelected ? .semibold : .medium))
-                    .foregroundColor(isSelected ? Color.luxuryMaroon : Color.luxuryCream)
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
-            .questionnaireOptionSurface(isSelected: isSelected, cornerRadius: 20)
+            Text(item.label)
+                .font(.ydg(.subhead, weight: isSelected ? .semibold : .medium))
+                .foregroundColor(isSelected ? Color.ydgAccent : Color.ydgTextPrimary)
+                .lineLimit(1)
+                .padding(.horizontal, 14)
+                .frame(minHeight: 40)
+                .questionnaireOptionSurface(isSelected: isSelected, cornerRadius: 20)
+                .contentShape(Capsule())
         }
         .buttonStyle(ScaleButtonStyle())
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }
 
@@ -143,32 +143,29 @@ struct MultiSelectOptionCard: View {
     var body: some View {
         Button(action: onTap) {
             HStack(spacing: 14) {
-                Text(item.emoji)
-                    .font(.system(size: 26))
-                
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: 2) {
                     Text(item.label)
-                        .font(Font.bodySans(13, weight: .semibold))
-                        .foregroundColor(isSelected ? Color.luxuryMaroon : Color.luxuryCream)
+                        .ydgText(.headline, color: isSelected ? .ydgAccent : .ydgTextPrimary)
                     
                     if let desc = item.desc {
                         Text(desc)
-                            .font(Font.bodySans(10, weight: .regular))
-                            .foregroundColor(isSelected ? Color.luxuryMaroon.opacity(0.7) : Color.luxuryMuted)
+                            .ydgText(.footnote, color: .ydgTextSecondary)
                     }
                 }
                 
                 Spacer()
                 
                 Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                    .font(.system(size: 24))
-                    .foregroundColor(isSelected ? Color.luxuryMaroon : Color.luxuryMuted.opacity(0.4))
+                    .font(.system(size: 22))
+                    .foregroundColor(isSelected ? Color.ydgAccent : Color.ydgTextTertiary)
             }
-            .padding(.horizontal, 18)
-            .padding(.vertical, 16)
+            .padding(.horizontal, YDGSpace.md)
+            .frame(minHeight: 56)
             .questionnaireOptionSurface(isSelected: isSelected)
+            .contentShape(Rectangle())
         }
         .buttonStyle(ScaleButtonStyle())
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }
 
@@ -184,17 +181,17 @@ struct TextInputCard: View {
             HStack(spacing: 8) {
                 if let icon = icon {
                     Image(systemName: icon)
-                        .foregroundColor(Color.luxuryGold)
+                        .foregroundColor(Color.ydgTextSecondary)
                 }
                 Text(title)
-                    .font(Font.bodySerif(16, weight: .regular))
-                    .foregroundColor(Color.luxuryCream)
+                    .ydgText(.callout, weight: .semibold)
             }
             
-            TextField(placeholder, text: $text)
-                .font(Font.bodySans(15, weight: .regular))
-                .foregroundColor(Color.luxuryCream)
-                .padding(16)
+            TextField("", text: $text, prompt: Text(placeholder).foregroundColor(Color.ydgTextTertiary))
+                .font(.ydg(.body))
+                .foregroundColor(Color.ydgTextPrimary)
+                .padding(.horizontal, YDGSpace.md)
+                .frame(minHeight: 52)
                 .luxeInsetSurface(cornerRadius: 14)
         }
     }
@@ -217,18 +214,14 @@ struct SliderInputCard: View {
                         .font(.system(size: 20))
                 }
                 Text(title)
-                    .font(Font.bodySerif(16, weight: .regular))
-                    .foregroundColor(Color.luxuryCream)
+                    .ydgText(.callout, weight: .semibold)
                 
                 Spacer()
                 
                 Text(valueLabel.isEmpty ? "\(Int(value))" : valueLabel)
-                    .font(Font.bodySans(14, weight: .semibold))
-                    .foregroundColor(Color.luxuryGold)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(Color.luxuryGold.opacity(0.15))
-                    .cornerRadius(8)
+                    .font(.ydg(.subhead, weight: .semibold))
+                    .foregroundColor(Color.ydgTextPrimary)
+                    .monospacedDigit()
             }
             
             Slider(value: $value, in: range, step: step)
@@ -255,13 +248,11 @@ struct ToggleOptionCard: View {
             
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
-                    .font(Font.bodySerif(16, weight: .regular))
-                    .foregroundColor(Color.luxuryCream)
+                    .ydgText(.callout, weight: .semibold)
                 
                 if let subtitle = subtitle {
                     Text(subtitle)
-                        .font(Font.bodySans(12, weight: .regular))
-                        .foregroundColor(Color.luxuryMuted)
+                        .ydgText(.footnote, color: .ydgTextSecondary)
                 }
             }
             

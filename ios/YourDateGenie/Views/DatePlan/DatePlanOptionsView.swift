@@ -45,7 +45,7 @@ struct DatePlanOptionsView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color.backgroundPrimary
+                Color.ydgBase
                     .ignoresSafeArea()
                 
                 VStack(spacing: 0) {
@@ -74,74 +74,49 @@ struct DatePlanOptionsView: View {
                     Button {
                         showCloseConfirmation = true
                     } label: {
-                        HStack(spacing: 6) {
-                            Image(systemName: "xmark")
-                                .font(.system(size: 14, weight: .medium))
-                            Text("Close")
-                                .font(Font.bodySans(14, weight: .medium))
-                        }
-                        .foregroundColor(Color.luxuryGold)
-                        .charcoalToolbarPill()
+                        Image(systemName: "xmark")
+                            .font(.system(size: 17, weight: .semibold))
+                            .foregroundColor(Color.ydgTextPrimary)
+                            .frame(width: 44, height: 44)
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("Save and exit")
-                    .accessibilityHint("Closes this screen. Your plans are saved.")
+                    .accessibilityLabel("Close")
+                    .accessibilityHint("Closes this screen. Your options move to Experiences Waiting.")
                 }
                 
                 ToolbarItem(placement: .principal) {
-                    Text("Your Date Plans")
-                        .font(Font.bodySerif(17, weight: .regular))
-                        .foregroundColor(Color.accentGold)
+                    Text("Your date plans")
+                        .font(Font.ydgSans(17, weight: .semibold))
+                        .foregroundColor(Color.ydgTextPrimary)
                 }
                 
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    HStack(spacing: 16) {
+                    Menu {
                         Button {
                             showAddToCalendar = true
                         } label: {
-                            HStack(spacing: 6) {
-                                Image(systemName: "calendar.badge.plus")
-                                    .font(.system(size: 13))
-                                Text("Add to Calendar")
-                                    .font(Font.bodySans(12, weight: .medium))
-                                    .lineLimit(2)
-                                    .multilineTextAlignment(.center)
-                            }
-                            .foregroundColor(Color.luxuryGold)
-                            .charcoalToolbarPill()
+                            Label("Add to calendar", systemImage: "calendar.badge.plus")
                         }
-                        
                         Button {
                             showPartnerShare = true
                         } label: {
-                            HStack(spacing: 6) {
-                                Image(systemName: "person.2.fill")
-                                    .font(.system(size: 13))
-                                Text("Invite Partner")
-                                    .font(Font.bodySans(12, weight: .medium))
-                                    .lineLimit(2)
-                                    .multilineTextAlignment(.center)
-                            }
-                            .foregroundColor(Color.luxuryGold)
-                            .charcoalToolbarPill()
+                            Label("Invite partner", systemImage: "person.2")
                         }
-                        
                         Button {
                             showExport = true
                         } label: {
-                            HStack(spacing: 6) {
-                                Image(systemName: "square.and.arrow.down")
-                                    .font(.system(size: 13))
-                                Text("Export")
-                                    .font(Font.bodySans(12, weight: .medium))
-                            }
-                            .foregroundColor(Color.luxuryGold)
-                            .charcoalToolbarPill()
+                            Label("Export", systemImage: "square.and.arrow.down")
                         }
+                    } label: {
+                        Image(systemName: "ellipsis")
+                            .font(.system(size: 17, weight: .semibold))
+                            .foregroundColor(Color.ydgTextPrimary)
+                            .frame(width: 44, height: 44)
                     }
+                    .accessibilityLabel("More actions")
                 }
             }
-            .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
+            .toolbarBackground(Color.ydgBase, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .safeAreaInset(edge: .bottom) {
                 if !isOnRegeneratePage {
@@ -284,7 +259,7 @@ struct DatePlanOptionsView: View {
                             canAccessGiftIdeas: access.canAccess(.gifting)
                         )
                     }
-                    .padding(.horizontal, 16)
+                    .padding(.horizontal, YDGSpace.margin)
                     .id(index)
                     .transition(.bookFlip)
                     .opacity(itineraryAppeared ? 1 : 0)
@@ -303,51 +278,16 @@ struct DatePlanOptionsView: View {
     }
     
     private var regeneratePageContent: some View {
-        VStack(spacing: 24) {
+        VStack {
             Spacer()
-            VStack(spacing: 16) {
-                Image(systemName: "arrow.triangle.2.circlepath")
-                    .font(.system(size: 48))
-                    .foregroundStyle(LinearGradient(
-                        colors: [Color.luxuryGold, Color.luxuryGoldLight],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ))
-                Text("Want different options?")
-                    .font(Font.bodySerif(22, weight: .regular))
-                    .foregroundColor(Color.accentGold)
-                    .multilineTextAlignment(.center)
-                Text("Get three new date plans with the same preferences.")
-                    .font(Font.bodySans(16, weight: .regular))
-                    .foregroundColor(Color.luxuryCreamMuted)
-                    .multilineTextAlignment(.center)
-            }
-            .padding(32)
-            .frame(maxWidth: .infinity)
-            .background(Color.luxeSurfaceTintStrong)
-            .cornerRadius(20)
-            .overlay(
-                RoundedRectangle(cornerRadius: 20)
-                    .stroke(Color.luxuryGold.opacity(0.3), lineWidth: 1)
+            YDGEmptyState(
+                systemName: "arrow.triangle.2.circlepath",
+                title: "Want different options?",
+                message: "Get three new date plans with the same preferences.",
+                actionTitle: onRegenerate == nil ? nil : "New options",
+                action: onRegenerate
             )
-            .padding(.horizontal, 24)
-            
-            if let onRegenerate = onRegenerate {
-                Button(action: onRegenerate) {
-                    HStack(spacing: 10) {
-                        Image(systemName: "sparkles")
-                            .font(.system(size: 16))
-                        Text("Regenerate plans")
-                            .font(Font.bodySans(16, weight: .semibold))
-                    }
-                    .foregroundColor(Color.luxuryMaroon)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
-                    .background(LinearGradient.goldShimmer)
-                    .cornerRadius(16)
-                }
-                .padding(.horizontal, 24)
-            }
+            Spacer()
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -358,36 +298,27 @@ struct DatePlanOptionsView: View {
         HStack(spacing: 10) {
             Image(systemName: "checkmark.circle.fill")
                 .font(.system(size: 18))
-                .foregroundColor(Color(hex: "4CAF50"))
+                .foregroundColor(Color.ydgSuccess)
             Text("Date plan saved")
-                .font(Font.bodySans(15, weight: .semibold))
-                .foregroundColor(Color.luxuryCream)
+                .ydgText(.subhead, weight: .semibold)
         }
-        .padding(.horizontal, 20)
+        .padding(.horizontal, YDGSpace.margin)
         .padding(.vertical, 14)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color.luxeSurfaceTintStrong)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color.luxuryGold.opacity(0.5), lineWidth: 1)
-                )
-        )
-        .shadow(color: Color.black.opacity(0.2), radius: 8, y: 4)
+        .background(Color.ydgOverlay, in: Capsule())
+        .overlay(Capsule().stroke(Color.ydgBorder, lineWidth: 1))
+        .accessibilityAddTraits(.isStaticText)
     }
     
     @ViewBuilder
     private var partnerRankPromptView: some View {
         if inviterFirstChoiceIndex == nil {
             Text("Tap your favorite")
-                .font(Font.bodySans(14, weight: .medium))
-                .foregroundColor(Color.luxuryCreamMuted)
+                .ydgText(.subhead, color: .ydgTextSecondary)
                 .padding(.top, 12)
                 .padding(.bottom, 4)
         } else if inviterSecondChoiceIndex == nil {
             Text("Tap your second choice")
-                .font(Font.bodySans(14, weight: .medium))
-                .foregroundColor(Color.luxuryCreamMuted)
+                .ydgText(.subhead, color: .ydgTextSecondary)
                 .padding(.top, 12)
                 .padding(.bottom, 4)
         }
@@ -400,14 +331,13 @@ struct DatePlanOptionsView: View {
                 Text(plans.count == 1
                      ? "We found 1 strong option — swipe for regenerate or save below"
                      : "We found \(plans.count) options — swipe to compare or regenerate for more")
-                    .font(Font.bodySans(12, weight: .regular))
-                    .foregroundColor(Color.luxuryCreamMuted)
+                    .ydgText(.footnote, color: .ydgTextSecondary)
                     .multilineTextAlignment(.center)
-                    .padding(.horizontal, 20)
-                    .padding(.top, 8)
+                    .padding(.horizontal, YDGSpace.margin)
+                    .padding(.top, YDGSpace.xs)
             }
             ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 12) {
+            HStack(spacing: YDGSpace.xs) {
                 ForEach(Array(plans.enumerated()), id: \.element.id) { index, plan in
                     let rankBadge: Int? = {
                         if inviterFirstChoiceIndex == index { return 1 }
@@ -441,22 +371,21 @@ struct DatePlanOptionsView: View {
                     }
                 }
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, YDGSpace.margin)
         }
-        .padding(.vertical, 12)
-        .frame(minHeight: 120)
-        .background(Color.backgroundPrimary)
+        .padding(.vertical, YDGSpace.sm)
+        .background(Color.ydgBase)
         .contentShape(Rectangle())
-        .overlay(alignment: .bottom) {
+
             if !hasSwipedOptions && plans.count > 1 {
-                Text("Swipe between options or tap above")
-                    .font(Font.bodySans(12, weight: .regular))
-                    .foregroundColor(Color.luxuryMuted)
-                    .padding(.bottom, 4)
+                Text("Swipe to compare")
+                    .ydgText(.footnote, color: .ydgTextTertiary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, YDGSpace.margin)
+                    .padding(.bottom, YDGSpace.xs)
                     .transition(.opacity)
                     .animation(.easeOut, value: hasSwipedOptions)
             }
-        }
         }
     }
 
@@ -475,7 +404,7 @@ struct DatePlanOptionsView: View {
     
     // MARK: - Save Plan Bar
     private var savePlanBar: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: YDGSpace.xs) {
             if let onSave = onSave {
                 let isCurrentSaved = savedPlanIds.contains(selectedPlan.id)
                 Button {
@@ -488,76 +417,37 @@ struct DatePlanOptionsView: View {
                         pendingPlanForSave = plan
                     }
                 } label: {
-                    HStack(spacing: 10) {
-                        Image(systemName: isCurrentSaved ? "checkmark.circle.fill" : "bookmark.fill")
-                            .font(.system(size: 16))
-                        Text(isCurrentSaved ? "Saved" : "Save Date Plan")
-                            .font(Font.bodySans(16, weight: .semibold))
-                    }
-                    .foregroundColor(isCurrentSaved ? Color.luxuryCream : Color.luxuryMaroon)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
-                    .background(
-                        Capsule()
-                            .fill(isCurrentSaved ? AnyShapeStyle(Color.luxuryGold.opacity(0.4)) : AnyShapeStyle(LinearGradient.goldShimmer))
-                    )
+                    Label(isCurrentSaved ? "Saved" : "Save this plan",
+                          systemImage: isCurrentSaved ? "checkmark" : "bookmark")
                 }
+                .buttonStyle(.ydgPrimary)
                 .disabled(isCurrentSaved)
             }
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 16)
+        .padding(.horizontal, YDGSpace.margin)
+        .padding(.top, YDGSpace.sm)
+        .padding(.bottom, YDGSpace.xs)
         .background(
-            Color.backgroundPrimary
-                .shadow(color: Color.black.opacity(0.3), radius: 20, y: -5)
+            Color.ydgBase
+                .overlay(alignment: .top) { Rectangle().fill(Color.ydgBorder).frame(height: 1) }
                 .ignoresSafeArea()
         )
     }
     
     // MARK: - Loading Option (preparing in background — luxe animation)
     private var loadingOptionView: some View {
-        VStack(spacing: 28) {
-            ZStack {
-                Circle()
-                    .stroke(Color.luxuryGold.opacity(0.2), lineWidth: 3)
-                    .frame(width: 56, height: 56)
-                Circle()
-                    .trim(from: 0, to: 0.7)
-                    .stroke(
-                        LinearGradient(
-                            colors: [Color.luxuryGold, Color.luxuryGoldLight],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        ),
-                        style: StrokeStyle(lineWidth: 3, lineCap: .round)
-                    )
-                    .frame(width: 56, height: 56)
-                    .rotationEffect(.degrees(loadingSpinnerRotation))
-                    .animation(.linear(duration: 1).repeatForever(autoreverses: false), value: loadingSpinnerRotation)
-                Image(systemName: "mappin.circle.fill")
-                    .font(.system(size: 24))
-                    .foregroundStyle(LinearGradient(
-                        colors: [Color.luxuryGold, Color.luxuryGoldDark],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ))
-            }
-            VStack(spacing: 8) {
-                Text("Adding the finishing touches")
-                    .font(Font.bodySerif(18, weight: .regular))
-                    .foregroundColor(Color.accentGold)
-                Text("Your date is almost ready")
-                    .font(Font.bodySans(13, weight: .regular))
-                    .foregroundColor(Color.luxuryMuted)
-            }
+        VStack(alignment: .leading, spacing: YDGSpace.sm) {
+            ProgressView()
+                .tint(Color.ydgAccent)
+                .padding(.bottom, YDGSpace.xs)
+            Text("Adding the finishing touches")
+                .ydgText(.title3)
+            Text("Checking this option's venues and hours.")
+                .ydgText(.subhead, weight: .regular, color: .ydgTextSecondary)
         }
-        .frame(maxWidth: .infinity)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, YDGSpace.xl)
         .padding(.vertical, 80)
-        .onAppear {
-            withAnimation(.linear(duration: 1).repeatForever(autoreverses: false)) {
-                loadingSpinnerRotation = 360
-            }
-        }
     }
     
     // MARK: - Plan Header (parameterized for TabView pages)
@@ -869,6 +759,7 @@ struct DatePlanOptionsView: View {
 }
 
 // MARK: - Option Chip Card (mini ExperienceCard-style for options strip)
+/// "Option A" pill (gold when selected), with saved / rank / verifying state.
 private struct OptionChipCard: View {
     let plan: DatePlan
     let optionLabel: String
@@ -878,79 +769,38 @@ private struct OptionChipCard: View {
     var rankBadge: Int? = nil
     let onTap: () -> Void
     
-    private let cardWidth: CGFloat = 110
-    private let imageHeight: CGFloat = 52
-    
     var body: some View {
         Button(action: onTap) {
-            VStack(alignment: .leading, spacing: 0) {
-                ZStack(alignment: .bottomLeading) {
-                    if isVerifying {
-                        Color.luxeSurfaceTintStrong
-                            .frame(width: cardWidth, height: imageHeight)
-                        ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle(tint: Color.luxuryGold))
-                            .scaleEffect(0.9)
-                    } else {
-                        AsyncImage(url: URL(string: plan.displayImageUrl)) { phase in
-                            switch phase {
-                            case .success(let image):
-                                image
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fill)
-                            case .empty, .failure:
-                                Color.luxeSurfaceTintStrong
-                            @unknown default:
-                                EmptyView()
-                            }
-                        }
-                        .frame(width: cardWidth, height: imageHeight)
-                        .clipped()
-                        LinearGradient(
-                            colors: [.clear, Color.luxuryMaroon.opacity(0.75)],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                        Text(plan.stops.first?.emoji ?? "✨")
-                            .font(.system(size: 18))
-                            .padding(6)
-                    }
-                    if isSaved {
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.system(size: 14))
-                            .foregroundColor(Color(hex: "4CAF50"))
-                            .padding(6)
-                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-                    }
-                    if let rank = rankBadge {
-                        Text("\(rank)")
-                            .font(Font.bodySans(12, weight: .bold))
-                            .foregroundColor(Color.luxuryMaroon)
-                            .frame(width: 20, height: 20)
-                            .background(Circle().fill(Color.luxuryGold))
-                            .padding(6)
-                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-                    }
+            HStack(spacing: 6) {
+                if isVerifying {
+                    ProgressView()
+                        .controlSize(.mini)
+                        .tint(Color.ydgAccent)
+                } else if let rank = rankBadge {
+                    Text("\(rank)")
+                        .font(Font.ydgSans(12, weight: .bold))
+                        .foregroundColor(Color.ydgTextOnAccent)
+                        .frame(width: 20, height: 20)
+                        .background(Circle().fill(Color.ydgAccent))
+                } else if isSaved {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundColor(Color.ydgSuccess)
                 }
-                .frame(width: cardWidth, height: imageHeight)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(plan.title)
-                        .font(Font.bodySans(11, weight: .semibold))
-                        .foregroundColor(Color.luxuryCream)
-                        .lineLimit(2)
-                }
-                .padding(8)
+                Text(optionLabel)
+                    .font(.ydg(.subhead, weight: isSelected ? .semibold : .medium))
+                    .foregroundColor(isSelected ? Color.ydgAccent : Color.ydgTextPrimary)
+                    .lineLimit(1)
             }
-            .frame(width: cardWidth)
-            .background(Color.luxeSurfaceTintStrong)
-            .cornerRadius(12)
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(isSelected ? Color.luxuryGold : Color.luxuryGold.opacity(0.25), lineWidth: isSelected ? 2 : 1)
-            )
-            .contentShape(Rectangle())
+            .padding(.horizontal, 14)
+            .frame(minHeight: 40)
+            .background(Capsule().fill(isSelected ? Color.ydgAccentSubtle : Color.ydgRaised))
+            .overlay(Capsule().stroke(isSelected ? Color.ydgAccent : Color.ydgBorder, lineWidth: isSelected ? 1.5 : 1))
+            .contentShape(Capsule())
         }
         .buttonStyle(.plain)
+        .accessibilityLabel("\(optionLabel): \(plan.title)")
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }
 

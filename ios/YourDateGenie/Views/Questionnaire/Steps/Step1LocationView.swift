@@ -13,14 +13,14 @@ struct Step1LocationView: View {
                 VStack(alignment: .leading, spacing: 12) {
                     SectionHeader(
                         emoji: "📍",
-                        title: isPreferencesOnly ? "Your location" : "Where are you planning?",
+                        title: "Starting point",
                         subtitle: "We use your starting address for routes, maps, and nearby spots"
                     )
 
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Where are you leaving from?")
                             .font(Font.bodySans(13, weight: .medium))
-                            .foregroundColor(Color.luxuryMuted)
+                            .foregroundColor(Color.ydgTextSecondary)
                         PlacesAutocompleteField(
                             placeholder: "Your starting address (required)",
                             text: $data.startingAddress,
@@ -28,12 +28,12 @@ struct Step1LocationView: View {
                         )
                         if data.startingAddress.isEmpty {
                             Text("Required for your route and map")
-                                .font(Font.bodySans(11, weight: .regular))
-                                .foregroundColor(Color.luxuryGold.opacity(0.9))
+                                .font(Font.ydgSans(12, weight: .regular))
+                                .foregroundColor(Color.ydgTextSecondary)
                         } else if !data.city.isEmpty {
                             Text("Planning near \(data.city)")
-                                .font(Font.bodySans(11, weight: .regular))
-                                .foregroundColor(Color.luxuryMuted)
+                                .font(Font.ydgSans(12, weight: .regular))
+                                .foregroundColor(Color.ydgTextSecondary)
                         }
 
                         Button {
@@ -62,11 +62,11 @@ struct Step1LocationView: View {
                             .foregroundColor(Color.luxuryGold)
                             .frame(maxWidth: .infinity)
                             .frame(minHeight: 44)
-                            .background(Color.luxeSurfaceTintStrong)
+                            .background(Color.ydgRaised)
                             .cornerRadius(12)
                             .overlay(
                                 RoundedRectangle(cornerRadius: 12)
-                                    .stroke(Color.luxuryGold.opacity(0.5), lineWidth: 1)
+                                    .stroke(Color.ydgBorder, lineWidth: 1)
                             )
                         }
                         .buttonStyle(.plain)
@@ -127,8 +127,8 @@ struct Step1LocationView: View {
                     // Part of day + time — one seamless selection
                     VStack(alignment: .leading, spacing: 14) {
                         Text("What time works best?")
-                            .font(Font.displaySerif(22, weight: .bold))
-                            .foregroundColor(Color.luxuryGold)
+                            .font(Font.ydgSans(16, weight: .semibold))
+                            .foregroundColor(Color.ydgTextPrimary)
                         
                         // Period cards (Morning / Afternoon / Evening / Late Night)
                         LazyVGrid(columns: [
@@ -162,11 +162,11 @@ struct Step1LocationView: View {
                         }
                     }
                     .padding(16)
-                    .background(Color.luxeSurfaceTintStrong)
+                    .background(Color.ydgRaised)
                     .cornerRadius(16)
                     .overlay(
                         RoundedRectangle(cornerRadius: 16)
-                            .stroke(Color.luxuryGold.opacity(0.25), lineWidth: 1)
+                            .stroke(Color.ydgBorder, lineWidth: 1)
                     )
                 }
                 } // end if !isPreferencesOnly
@@ -219,24 +219,24 @@ private struct TimeOfDayCard: View {
                     .font(.system(size: 26))
                 Text(period.label)
                     .font(Font.bodySans(13, weight: .semibold))
-                    .foregroundColor(isSelected ? Color.luxuryMaroon : Color.luxuryCream)
+                    .foregroundColor(isSelected ? Color.ydgAccent : Color.ydgTextPrimary)
                     .lineLimit(1)
                 if let timeRange = period.time {
                     Text(timeRange)
-                        .font(Font.bodySans(10, weight: .regular))
-                        .foregroundColor(isSelected ? Color.luxuryMaroon.opacity(0.8) : Color.luxuryMuted)
+                        .font(Font.ydgSans(12, weight: .regular))
+                        .foregroundColor(Color.ydgTextSecondary)
                 }
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 12)
             .padding(.horizontal, 8)
             .background(
-                isSelected ? LinearGradient.goldShimmer : LinearGradient(colors: [Color.luxeSurfaceTintStrong], startPoint: .top, endPoint: .bottom)
+                isSelected ? Color.ydgAccentSubtle : Color.ydgRaised
             )
             .cornerRadius(12)
             .overlay(
                 RoundedRectangle(cornerRadius: 12)
-                    .stroke(isSelected ? Color.clear : Color.luxuryGold.opacity(0.3), lineWidth: 1)
+                    .stroke(isSelected ? Color.ydgAccent : Color.ydgBorder, lineWidth: isSelected ? 1.5 : 1)
             )
         }
         .buttonStyle(ScaleButtonStyle())
@@ -253,16 +253,16 @@ private struct TimeSlotChip: View {
         Button(action: onTap) {
             Text(time)
                 .font(Font.bodySans(13, weight: isSelected ? .semibold : .medium))
-                .foregroundColor(isSelected ? Color.luxuryMaroon : Color.luxuryCream)
+                .foregroundColor(isSelected ? Color.ydgAccent : Color.ydgTextPrimary)
                 .padding(.horizontal, 14)
                 .padding(.vertical, 10)
                 .background(
-                    isSelected ? LinearGradient.goldShimmer : LinearGradient(colors: [Color.luxeSurfaceTintStrong], startPoint: .top, endPoint: .bottom)
+                    isSelected ? Color.ydgAccentSubtle : Color.ydgRaised
                 )
                 .cornerRadius(20)
                 .overlay(
                     RoundedRectangle(cornerRadius: 20)
-                        .stroke(isSelected ? Color.clear : Color.luxuryGold.opacity(0.3), lineWidth: 1)
+                        .stroke(isSelected ? Color.ydgAccent : Color.ydgBorder, lineWidth: isSelected ? 1.5 : 1)
                 )
         }
         .buttonStyle(ScaleButtonStyle())
@@ -274,14 +274,14 @@ struct CustomTextFieldStyle: TextFieldStyle {
     func _body(configuration: TextField<Self._Label>) -> some View {
         configuration
             .font(Font.bodySans(15, weight: .regular))
-            .foregroundColor(Color.luxuryCream)
+            .foregroundColor(Color.ydgTextPrimary)
             .padding(.horizontal, 16)
             .padding(.vertical, 14)
-            .background(Color.luxeSurfaceTintStrong)
+            .background(Color.ydgRaised)
             .cornerRadius(14)
             .overlay(
                 RoundedRectangle(cornerRadius: 14)
-                    .stroke(Color.luxuryGold.opacity(0.3), lineWidth: 1)
+                    .stroke(Color.ydgBorder, lineWidth: 1)
             )
     }
 }
@@ -362,5 +362,5 @@ final class CurrentLocationHelper: NSObject, ObservableObject, CLLocationManager
 
 #Preview {
     Step1LocationView(data: .constant(QuestionnaireData()), isPreferencesOnly: false)
-        .background(Color.backgroundPrimary)
+        .background(Color.ydgBase)
 }

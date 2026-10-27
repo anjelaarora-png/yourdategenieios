@@ -28,7 +28,7 @@ struct Step6ExtrasView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Your gender")
                             .font(Font.bodySans(14, weight: .medium))
-                            .foregroundColor(Color.luxuryMuted)
+                            .foregroundColor(Color.ydgTextSecondary)
                         FlowLayout(spacing: 8) {
                             ForEach(PreferenceOptions.genderOptions, id: \.value) { option in
                                 ChipOptionView(
@@ -42,7 +42,7 @@ struct Step6ExtrasView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Partner's gender")
                             .font(Font.bodySans(14, weight: .medium))
-                            .foregroundColor(Color.luxuryMuted)
+                            .foregroundColor(Color.ydgTextSecondary)
                         FlowLayout(spacing: 8) {
                             ForEach(PreferenceOptions.genderOptions, id: \.value) { option in
                                 ChipOptionView(
@@ -67,17 +67,17 @@ struct Step6ExtrasView: View {
                 if !isPreferencesOnly {
                 HStack(spacing: 12) {
                     Image(systemName: "sparkles")
-                        .foregroundColor(Color.accentGold)
+                        .foregroundColor(Color.ydgTextSecondary)
                     Text("Optional extras to make your date extra special")
                         .font(Font.bodySans(14, weight: .regular))
-                        .foregroundColor(Color.luxuryMuted)
+                        .foregroundColor(Color.ydgTextSecondary)
                 }
                 .padding(16)
-                .background(Color.accentGold.opacity(0.08))
+                .background(Color.ydgRaised)
                 .cornerRadius(12)
                 .overlay(
                     RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color.accentGold.opacity(0.18), lineWidth: 1)
+                        .stroke(Color.ydgBorder, lineWidth: 1)
                 )
                 
                 // Gift Suggestions Toggle
@@ -89,10 +89,10 @@ struct Step6ExtrasView: View {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("Gift Suggestions")
                                     .font(Font.bodySans(16, weight: .semibold))
-                                    .foregroundColor(Color.luxuryCream)
+                                    .foregroundColor(Color.ydgTextPrimary)
                                 Text("Get personalized gift ideas")
                                     .font(Font.bodySans(13, weight: .regular))
-                                    .foregroundColor(Color.luxuryMuted)
+                                    .foregroundColor(Color.ydgTextSecondary)
                             }
                         }
                     }
@@ -107,7 +107,7 @@ struct Step6ExtrasView: View {
                         VStack(alignment: .leading, spacing: 8) {
                             Text("What are they into?")
                                 .font(Font.bodySans(15, weight: .semibold))
-                                .foregroundColor(Color.luxuryCream)
+                                .foregroundColor(Color.ydgTextPrimary)
                             
                             FlowLayout(spacing: 8) {
                                 ForEach(QuestionnaireOptions.partnerInterests) { interest in
@@ -133,10 +133,10 @@ struct Step6ExtrasView: View {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("Conversation Starters")
                                     .font(Font.bodySans(16, weight: .semibold))
-                                    .foregroundColor(Color.luxuryCream)
+                                    .foregroundColor(Color.ydgTextPrimary)
                                 Text("Never have awkward silences")
                                     .font(Font.bodySans(13, weight: .regular))
-                                    .foregroundColor(Color.luxuryMuted)
+                                    .foregroundColor(Color.ydgTextSecondary)
                             }
                         }
                     }
@@ -147,7 +147,7 @@ struct Step6ExtrasView: View {
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Relationship stage")
                                 .font(Font.bodySans(15, weight: .semibold))
-                                .foregroundColor(Color.luxuryCream)
+                                .foregroundColor(Color.ydgTextPrimary)
                             
                             FlowLayout(spacing: 8) {
                                 ForEach(QuestionnaireOptions.relationshipStages) { stage in
@@ -163,7 +163,7 @@ struct Step6ExtrasView: View {
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Topics you'd like to explore")
                                 .font(Font.bodySans(15, weight: .semibold))
-                                .foregroundColor(Color.luxuryCream)
+                                .foregroundColor(Color.ydgTextPrimary)
                             
                             FlowLayout(spacing: 8) {
                                 ForEach(QuestionnaireOptions.conversationTopics) { topic in
@@ -186,22 +186,22 @@ struct Step6ExtrasView: View {
                     if isPreferencesOnly {
                         Text("Save your preferences")
                             .font(Font.bodySans(16, weight: .semibold))
-                            .foregroundColor(Color.accentGold)
+                            .foregroundColor(Color.ydgHighlight)
                         Text("Tap 'Save preferences' below. No date plan will be generated.")
                             .font(Font.bodySans(14, weight: .regular))
-                            .foregroundColor(Color.luxuryMuted)
+                            .foregroundColor(Color.ydgTextSecondary)
                     } else {
                         Text("Ready to create your plan")
                             .font(Font.bodySans(16, weight: .semibold))
-                            .foregroundColor(Color.accentGold)
+                            .foregroundColor(Color.ydgHighlight)
                         Text("Tap Generate below — we'll build three personalized options from everything you've told us.")
                             .font(Font.bodySans(14, weight: .regular))
-                            .foregroundColor(Color.luxuryMuted)
+                            .foregroundColor(Color.ydgTextSecondary)
                     }
                 }
                 .padding(16)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.luxeSurfaceTintStrong)
+                .background(Color.ydgRaised)
                 .cornerRadius(12)
                 .overlay(
                     RoundedRectangle(cornerRadius: 12)
@@ -225,5 +225,5 @@ struct Step6ExtrasView: View {
 
 #Preview {
     Step6ExtrasView(data: .constant(QuestionnaireData()))
-        .background(Color.backgroundPrimary)
+        .background(Color.ydgBase)
 }

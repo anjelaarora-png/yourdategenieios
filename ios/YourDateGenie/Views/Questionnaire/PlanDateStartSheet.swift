@@ -12,19 +12,24 @@ struct PlanDateStartSheet: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                CharcoalMaroonBackground()
+                Color.ydgRaised
                     .ignoresSafeArea()
 
                 ScrollView(showsIndicators: false) {
-                    VStack(alignment: .leading, spacing: 20) {
-                        Text("How should we set up this date?")
-                            .font(Font.bodySerif(22, weight: .regular))
-                            .foregroundColor(Color.luxuryCream)
-                            .padding(.top, 8)
-
-                        Text("Most people keep their saved preferences and change only what’s different tonight.")
-                            .font(Font.bodySans(14, weight: .regular))
-                            .foregroundColor(Color.luxuryCreamMuted)
+                    VStack(alignment: .leading, spacing: YDGSpace.sm) {
+                        VStack(alignment: .leading, spacing: YDGSpace.xs) {
+                            Text("How should we set this one up?")
+                                .font(.ydgDisplay(30))
+                                .tracking(-0.6)
+                                .foregroundColor(Color.ydgTextPrimary)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .accessibilityAddTraits(.isHeader)
+                            Text("Most people keep their saved preferences and change only what’s different tonight.")
+                                .ydgText(.callout, color: .ydgTextSecondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        .padding(.top, YDGSpace.xs)
+                        .padding(.bottom, YDGSpace.sm)
 
                         planOptionButton(
                             title: "Use my saved preferences",
@@ -71,8 +76,8 @@ struct PlanDateStartSheet: View {
                             dismiss()
                         }
                     }
-                    .padding(20)
-                    .padding(.bottom, 24)
+                    .padding(.horizontal, YDGSpace.lg)
+                    .padding(.bottom, YDGSpace.lg)
                 }
                 .scrollContentBackground(.hidden)
             }
@@ -84,10 +89,10 @@ struct PlanDateStartSheet: View {
                         coordinator.showPlanStartChooser = false
                         dismiss()
                     }
-                    .foregroundColor(Color.luxuryGold)
+                    .foregroundColor(Color.ydgAccent)
                 }
             }
-            .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
+            .toolbarBackground(Color.ydgRaised, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
         }
         .presentationDetents([.medium, .large])
@@ -104,48 +109,42 @@ struct PlanDateStartSheet: View {
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Text(title)
-                        .font(Font.bodySans(16, weight: .semibold))
-                        .foregroundColor(isPrimary ? Color.backgroundPrimary : Color.luxuryCream)
-                        .multilineTextAlignment(.leading)
-                    if let badge {
-                        Text(badge)
-                            .font(Font.bodySans(10, weight: .bold))
-                            .foregroundColor(Color.luxuryMaroon)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 3)
-                            .background(Color.luxuryGold.opacity(0.95))
-                            .clipShape(Capsule())
+            HStack(spacing: 14) {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Text(title)
+                            .ydgText(.headline, color: isPrimary ? .ydgAccent : .ydgTextPrimary)
+                            .multilineTextAlignment(.leading)
+                        if let badge {
+                            Text(badge)
+                                .font(Font.ydgSans(12, weight: .semibold))
+                                .foregroundColor(Color.ydgTextOnAccent)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 2)
+                                .background(Capsule().fill(Color.ydgAccent))
+                        }
+                        Spacer(minLength: 0)
                     }
-                    Spacer(minLength: 0)
+                    Text(subtitle)
+                        .ydgText(.subhead, weight: .regular, color: .ydgTextSecondary)
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                Text(subtitle)
-                    .font(Font.bodySans(13, weight: .regular))
-                    .foregroundColor(isPrimary ? Color.backgroundPrimary.opacity(0.85) : Color.luxuryCreamMuted)
-                    .multilineTextAlignment(.leading)
-                    .fixedSize(horizontal: false, vertical: true)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(isPrimary ? Color.ydgAccent : Color.ydgTextTertiary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(16)
-            .background {
-                if isPrimary {
-                    LinearGradient.goldShimmer
-                } else if outline {
-                    Color.clear
-                } else {
-                    Color.luxuryMaroonLight.opacity(0.9)
-                }
-            }
-            .cornerRadius(14)
-            .overlay(
-                RoundedRectangle(cornerRadius: 14)
-                    .stroke(
-                        isPrimary ? Color.clear : Color.luxuryGold.opacity(outline ? 0.45 : 0.22),
-                        lineWidth: outline ? 1.5 : 1
-                    )
+            .padding(YDGSpace.md)
+            .background(
+                isPrimary ? Color.ydgAccentSubtle : (outline ? Color.clear : Color.ydgOverlay),
+                in: RoundedRectangle(cornerRadius: YDGRadius.card, style: .continuous)
             )
+            .overlay(
+                RoundedRectangle(cornerRadius: YDGRadius.card, style: .continuous)
+                    .stroke(isPrimary ? Color.ydgAccent : Color.ydgBorder, lineWidth: isPrimary ? 1.5 : 1)
+            )
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }

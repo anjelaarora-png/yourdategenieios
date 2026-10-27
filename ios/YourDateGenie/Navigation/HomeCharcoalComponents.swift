@@ -146,50 +146,40 @@ enum ItineraryPlanFormatting {
     }
 }
 
+/// Plan card frame. The Final design moved itineraries onto a dark raised card;
+/// `.cream` is kept for love notes and playlist cards, whose content uses on-card colors.
 struct ItineraryCreamCardChrome<Content: View>: View {
+    enum Surface { case raised, cream }
+
     var edgePadding: CGFloat = 20
+    var surface: Surface = .raised
     @ViewBuilder var content: () -> Content
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             content()
         }
-        .background(Color.creamCard)
-        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .background(surface == .cream ? Color.creamCard : Color.ydgRaised,
+                    in: RoundedRectangle(cornerRadius: YDGRadius.card, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: YDGRadius.card, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(Color.maroonBorderTint, lineWidth: 1)
+            RoundedRectangle(cornerRadius: YDGRadius.card, style: .continuous)
+                .stroke(surface == .cream ? Color.maroonBorderTint : Color.ydgBorder, lineWidth: 1)
         )
-        .overlay(alignment: .leading) {
-            RoundedRectangle(cornerRadius: 1.5)
-                .fill(Color.accentMaroon)
-                .frame(width: 3)
-                .padding(.vertical, 1)
-        }
         .padding(.horizontal, edgePadding)
     }
 }
 
+/// Rose overline: "WILLIAMSBURG · FRIDAY". (Was a brown gradient banner.)
 struct ItineraryGradientBanner: View {
     let plan: DatePlan
 
     var body: some View {
-        ZStack(alignment: .bottomLeading) {
-            LinearGradient(
-                colors: [Color(hex: "5C3A2E"), Color(hex: "8B5E4A"), Color(hex: "4A3028")],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            .frame(height: 72)
-
-            Text("\(ItineraryPlanFormatting.locationLabel(for: plan)) · \(ItineraryPlanFormatting.scheduleLabel(for: plan))")
-                .font(Font.bodySans(10, weight: .semibold))
-                .tracking(0.6)
-                .textCase(.uppercase)
-                .foregroundColor(Color.creamParchmentLight.opacity(0.85))
-                .padding(.horizontal, 12)
-                .padding(.bottom, 8)
-        }
+        Text("\(ItineraryPlanFormatting.locationLabel(for: plan)) · \(ItineraryPlanFormatting.scheduleLabel(for: plan))")
+            .ydgText(.caption, color: .ydgHighlight)
+            .lineLimit(1)
+            .padding(.horizontal, YDGSpace.md)
+            .padding(.top, YDGSpace.md)
     }
 }
 
@@ -199,20 +189,43 @@ struct ItineraryPlanHeaderBlock: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
+            Text(plan.title)
+                .font(.ydgDisplay(26))
+                .tracking(-0.3)
+                .foregroundColor(Color.ydgTextPrimary)
+                .fixedSize(horizontal: false, vertical: true)
+            Text(ItineraryPlanFormatting.metaLine(for: plan))
+                .ydgText(.subhead, weight: .regular, color: .ydgTextSecondary)
             if let partner = partnerName, !partner.isEmpty {
                 Text("For you & \(partner)")
-                    .font(Font.bodySans(11, weight: .regular))
-                    .foregroundColor(Color.textMutedOnCard)
+                    .ydgText(.footnote, color: .ydgTextSecondary)
             }
-            Text(plan.title)
-                .font(Font.bodySerif(17, weight: .regular))
-                .foregroundColor(Color.textOnCard)
-            Text(ItineraryPlanFormatting.metaLine(for: plan))
-                .font(Font.bodySans(11, weight: .regular))
-                .foregroundColor(Color.textMutedOnCard)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
+        .padding(.horizontal, YDGSpace.md)
+        .padding(.top, YDGSpace.xs)
+        .padding(.bottom, YDGSpace.md)
+    }
+}
+
+/// Timeline rail: dot + connecting line. First stop is a filled dot.
+private struct ItineraryRail: View {
+    var isFirst: Bool
+    var isLast: Bool
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Circle()
+                .fill(isFirst ? Color.ydgAccent : Color.ydgRaised)
+                .overlay(Circle().stroke(Color.ydgAccent, lineWidth: 2))
+                .frame(width: 14, height: 14)
+                .padding(.top, 3)
+            Rectangle()
+                .fill(isLast ? Color.clear : Color.ydgBorder)
+                .frame(width: 2)
+                .frame(maxHeight: .infinity)
+        }
+        .frame(width: 14)
+        .accessibilityHidden(true)
     }
 }
 
@@ -220,49 +233,83 @@ struct ItineraryCreamStopRow: View {
     let stop: DatePlanStop
     var showsTopDivider: Bool = true
     var onReserve: (() -> Void)? = nil
+    var isFirst: Bool = false
+    var isLast: Bool = false
+    /// Day the plan happens on, to pick that day's opening hours; nil = today.
+    var planDate: Date? = nil
+
+    /// Google's weekday line for the plan's day, e.g. "Friday: 5:00 – 11:00 PM".
+    private var hoursLine: String? {
+        guard let lines = stop.openingHours, !lines.isEmpty else { return nil }
+        let f = DateFormatter(); f.locale = Locale(identifier: "en_US"); f.dateFormat = "EEEE"
+        let day = f.string(from: planDate ?? Date())
+        return lines.first { $0.hasPrefix(day) }
+    }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .top, spacing: 12) {
-                Text(stop.timeSlot)
-                    .font(Font.bodySans(12, weight: .semibold))
-                    .foregroundColor(Color.textOnCard)
-                    .frame(minWidth: 38, alignment: .leading)
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: 5) {
-                        Text(stop.name)
-                            .font(Font.bodySans(13, weight: .medium))
-                            .foregroundColor(Color.textOnCard)
-                        if stop.isVerified {
-                            VerifiedBadge()
-                        }
-                    }
-                    Text(ItineraryPlanFormatting.stopDetail(stop))
-                        .font(Font.bodySans(11, weight: .regular))
-                        .foregroundColor(Color.textMutedOnCard)
-                        .lineLimit(3)
-                        .fixedSize(horizontal: false, vertical: true)
-                    if let onReserve {
-                        Button(action: onReserve) {
-                            HStack(spacing: 4) {
-                                Image(systemName: "fork.knife.circle")
-                                    .font(.system(size: 10))
-                                Text("Reserve")
-                                    .font(Font.bodySans(11, weight: .semibold))
-                            }
-                            .foregroundColor(Color.accentGold)
-                        }
-                        .buttonStyle(.plain)
+        HStack(alignment: .top, spacing: YDGSpace.md) {
+            ItineraryRail(isFirst: isFirst, isLast: isLast)
+
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 4) {
+                    Text(stop.timeSlot)
+                        .font(.ydg(.subhead, weight: .semibold))
+                        .foregroundColor(Color.ydgTextPrimary)
+                    if !stop.duration.isEmpty {
+                        Text("· \(stop.duration)")
+                            .font(.ydg(.subhead))
+                            .foregroundColor(Color.ydgTextTertiary)
                     }
                 }
-                Spacer(minLength: 0)
+                Text(stop.name)
+                    .font(.ydgDisplay(21))
+                    .foregroundColor(Color.ydgTextPrimary)
+                    .fixedSize(horizontal: false, vertical: true)
+                let detail = ItineraryPlanFormatting.stopDetail(stop)
+                if !detail.isEmpty {
+                    Text(detail)
+                        .ydgText(.subhead, weight: .regular, color: .ydgTextSecondary)
+                        .lineLimit(3)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                statusLine
+                if let onReserve {
+                    Button(action: onReserve) {
+                        Label("Check reservation times", systemImage: "fork.knife")
+                            .font(.ydg(.subhead, weight: .semibold))
+                            .foregroundColor(Color.ydgAccent)
+                            .frame(minHeight: 36)
+                    }
+                    .buttonStyle(.plain)
+                }
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 9)
+            .padding(.bottom, isLast ? YDGSpace.xs : YDGSpace.md)
+            Spacer(minLength: 0)
         }
-        .overlay(alignment: .top) {
-            if showsTopDivider {
-                Rectangle().fill(Color.black.opacity(0.06)).frame(height: 1)
+        .padding(.horizontal, YDGSpace.md)
+        .accessibilityElement(children: .contain)
+    }
+
+    /// Hours we actually have from Google, a verified-venue line, or an honest "check" note.
+    @ViewBuilder
+    private var statusLine: some View {
+        if let hoursLine {
+            Label {
+                Text(hoursLine).ydgText(.footnote, color: .ydgTextSecondary)
+            } icon: {
+                Image(systemName: "checkmark").font(.system(size: 11, weight: .bold)).foregroundColor(Color.ydgSuccess)
+            }
+        } else if stop.isVerified {
+            Label {
+                Text("Verified venue · check hours before you go").ydgText(.footnote, color: .ydgTextSecondary)
+            } icon: {
+                Image(systemName: "checkmark").font(.system(size: 11, weight: .bold)).foregroundColor(Color.ydgSuccess)
+            }
+        } else {
+            Label {
+                Text("Hours not listed · worth a quick check").ydgText(.footnote, color: .ydgTextSecondary)
+            } icon: {
+                Image(systemName: "clock").font(.system(size: 11, weight: .semibold)).foregroundColor(Color.ydgWarning)
             }
         }
     }
@@ -274,24 +321,29 @@ struct ItineraryCreamTravelLeg: View {
     let distanceText: String?
 
     var body: some View {
-        HStack(spacing: 6) {
-            Image(systemName: TravelModeIcon.sfSymbol(for: travelMode, inferFromTimeText: timeText))
-                .font(.system(size: 10))
-                .foregroundColor(Color.textMutedOnCard)
-            Text(timeText)
-                .font(Font.bodySans(11, weight: .medium))
-                .foregroundColor(Color.textMutedOnCard)
-            if let distanceText, !distanceText.isEmpty {
-                Text("·")
-                    .foregroundColor(Color.textMutedOnCard)
-                Text(distanceText)
-                    .font(Font.bodySans(11, weight: .regular))
-                    .foregroundColor(Color.textMutedOnCard)
+        HStack(alignment: .center, spacing: YDGSpace.md) {
+            Rectangle()
+                .fill(Color.ydgBorder)
+                .frame(width: 2)
+                .frame(width: 14)
+                .frame(maxHeight: .infinity)
+                .accessibilityHidden(true)
+            HStack(spacing: 6) {
+                Image(systemName: TravelModeIcon.sfSymbol(for: travelMode, inferFromTimeText: timeText))
+                    .font(.system(size: 12))
+                Text(timeText)
+                if let distanceText, !distanceText.isEmpty {
+                    Text("· \(distanceText)")
+                }
             }
+            .font(.ydg(.footnote))
+            .foregroundColor(Color.ydgTextTertiary)
+            .padding(.vertical, 6)
+            Spacer(minLength: 0)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 6)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .fixedSize(horizontal: false, vertical: true)
+        .padding(.horizontal, YDGSpace.md)
+        .padding(.bottom, YDGSpace.xs)
     }
 }
 
@@ -302,13 +354,12 @@ struct ItineraryPlanFooterBlock: View {
         let line = ItineraryPlanFormatting.footerLine(for: plan)
         if !line.isEmpty {
             Text(line)
-                .font(Font.bodySans(12, weight: .regular))
-                .foregroundColor(Color(hex: "9A9690"))
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
+                .ydgText(.footnote, color: .ydgTextTertiary)
+                .padding(.horizontal, YDGSpace.md)
+                .padding(.vertical, YDGSpace.sm)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .overlay(alignment: .top) {
-                    Rectangle().fill(Color.black.opacity(0.06)).frame(height: 1)
+                    Rectangle().fill(Color.ydgBorder).frame(height: 1)
                 }
         }
     }
@@ -333,26 +384,20 @@ struct ItineraryCreamInsetSection<Content: View, Trailing: View>: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: YDGSpace.sm) {
             HStack(spacing: 6) {
-                Image(systemName: icon)
-                    .font(.system(size: 11))
                 Text(title)
-                    .font(Font.bodySans(11, weight: .semibold))
-                    .textCase(.uppercase)
-                    .tracking(0.4)
+                    .ydgText(.caption)
                 Spacer(minLength: 8)
                 trailing()
             }
-            .foregroundColor(Color.textMutedOnCard)
             content()
         }
-        .padding(14)
+        .padding(YDGSpace.md)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.black.opacity(0.04))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
+        .background(Color.ydgOverlay, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .padding(.horizontal, YDGSpace.md)
+        .padding(.vertical, 6)
     }
 }
 
@@ -361,18 +406,16 @@ struct ItineraryStartingPointCreamSection: View {
     let firstStop: DatePlanStop?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .top, spacing: 8) {
-                Image(systemName: "mappin.circle.fill")
-                    .font(.system(size: 14))
-                    .foregroundColor(Color.accentMaroon)
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .top, spacing: YDGSpace.sm) {
+                Image(systemName: "house")
+                    .font(.system(size: 15))
+                    .foregroundColor(Color.ydgTextSecondary)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Starting point")
-                        .font(Font.bodySans(12, weight: .semibold))
-                        .foregroundColor(Color.textOnCard)
+                        .ydgText(.subhead, weight: .semibold)
                     Text(startingPoint.address)
-                        .font(Font.bodySans(11, weight: .regular))
-                        .foregroundColor(Color.textMutedOnCard)
+                        .ydgText(.footnote, color: .ydgTextSecondary)
                 }
                 Spacer(minLength: 0)
             }
@@ -380,58 +423,47 @@ struct ItineraryStartingPointCreamSection: View {
                 Button {
                     UIApplication.shared.open(url)
                 } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "arrow.triangle.turn.up.right.diamond.fill")
-                            .font(.system(size: 11))
-                        Text("Get to stop 1: \(firstStop.name)")
-                            .font(Font.bodySans(12, weight: .medium))
-                    }
-                    .foregroundColor(Color.accentMaroon)
+                    Label("Directions to \(firstStop.name)", systemImage: "arrow.triangle.turn.up.right.diamond")
+                        .font(.ydg(.subhead, weight: .semibold))
+                        .foregroundColor(Color.ydgAccent)
+                        .frame(minHeight: 36)
                 }
                 .buttonStyle(.plain)
+                .padding(.leading, 27)
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
+        .padding(.horizontal, YDGSpace.md)
+        .padding(.vertical, YDGSpace.sm)
         .overlay(alignment: .top) {
-            Rectangle().fill(Color.black.opacity(0.06)).frame(height: 1)
+            Rectangle().fill(Color.ydgBorder).frame(height: 1)
         }
+        .padding(.bottom, YDGSpace.sm)
     }
 }
 
+/// "A little extra": rose-tinted note (Genie's secret touch).
 struct ItineraryGenieSecretCreamSection: View {
     let touch: GenieSecretTouch
 
     var body: some View {
         if !touch.description.isEmpty {
-            VStack(alignment: .leading, spacing: 6) {
-                HStack(spacing: 6) {
-                    if !touch.emoji.isEmpty {
-                        Text(touch.emoji)
-                            .font(.system(size: 14))
-                    }
-                    Text("Genie's secret touch")
-                        .font(Font.bodySans(11, weight: .semibold))
-                        .foregroundColor(Color.textMutedOnCard)
-                        .textCase(.uppercase)
-                        .tracking(0.5)
+            HStack(alignment: .top, spacing: 14) {
+                Image(systemName: "sparkle")
+                    .font(.system(size: 17))
+                    .foregroundColor(Color.ydgHighlight)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(touch.title.isEmpty ? "A little extra" : touch.title)
+                        .ydgText(.subhead, weight: .semibold)
+                    Text(touch.description)
+                        .ydgText(.subhead, weight: .regular, color: .ydgTextSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                if !touch.title.isEmpty {
-                    Text(touch.title)
-                        .font(Font.bodySans(13, weight: .semibold))
-                        .foregroundColor(Color.textOnCard)
-                }
-                Text(touch.description)
-                    .font(Font.bodySans(13, weight: .regular))
-                    .foregroundColor(Color.textOnCard)
-                    .fixedSize(horizontal: false, vertical: true)
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
+            .padding(YDGSpace.md)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .overlay(alignment: .top) {
-                Rectangle().fill(Color.black.opacity(0.06)).frame(height: 1)
-            }
+            .background(Color.ydgHighlightSubtle, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .padding(.horizontal, YDGSpace.md)
+            .padding(.vertical, 6)
         }
     }
 }
@@ -472,7 +504,10 @@ struct ItineraryCreamPlanDetailContent: View {
                     stop: stop,
                     onReserve: (onReserveStop != nil && ItineraryPlanFormatting.isReservable(stop))
                         ? { onReserveStop?(stop) }
-                        : nil
+                        : nil,
+                    isFirst: index == 0,
+                    isLast: index == itineraryStops.count - 1,
+                    planDate: plan.scheduledDate
                 )
             }
 
@@ -483,17 +518,17 @@ struct ItineraryCreamPlanDetailContent: View {
             packingChips
             routeSection
         }
+        .padding(.bottom, YDGSpace.xs)
     }
 
     @ViewBuilder
     private var conversationStartersSection: some View {
         if let starters = plan.conversationStarters, !starters.isEmpty {
-            ItineraryCreamInsetSection(title: "Conversation Starters", icon: "bubble.left.fill") {
+            ItineraryCreamInsetSection(title: "Talk sparks", icon: "bubble.left") {
                 ForEach(starters) { starter in
-                    Text("\"\(starter.question)\"")
-                        .font(Font.bodySerif(14, weight: .regular))
-                        .italic()
-                        .foregroundColor(Color.textOnCard)
+                    Text("\u{201C}\(starter.question)\u{201D}")
+                        .font(.ydgDisplay(16, weight: .regular).italic())
+                        .foregroundColor(Color.ydgTextPrimary)
                         .fixedSize(horizontal: false, vertical: true)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
@@ -505,48 +540,36 @@ struct ItineraryCreamPlanDetailContent: View {
     private var giftSuggestionsSection: some View {
         if let gifts = plan.giftSuggestions, !gifts.isEmpty {
             ItineraryCreamInsetSection(
-                title: "Gift Suggestions",
-                icon: "gift.fill",
+                title: "Gift ideas",
+                icon: "gift",
                 trailing: {
                     if onGetMoreGiftIdeas != nil {
-                        Button(action: { onGetMoreGiftIdeas?() }) {
-                            HStack(spacing: 4) {
-                                Image(systemName: "sparkles")
-                                    .font(.system(size: 10))
-                                Text("Get More Ideas")
-                                    .font(Font.bodySans(11, weight: .semibold))
-                            }
-                            .foregroundColor(Color.accentGold)
+                        Button("More ideas") { onGetMoreGiftIdeas?() }
+                            .font(.ydg(.footnote, weight: .semibold))
+                            .foregroundColor(Color.ydgAccent)
                             .opacity(canAccessGiftIdeas ? 1 : 0.5)
-                        }
-                        .buttonStyle(.plain)
+                            .buttonStyle(.plain)
                     }
                 },
                 content: {
                     ForEach(gifts) { gift in
-                        VStack(alignment: .leading, spacing: 4) {
-                            HStack(alignment: .top) {
-                                Text(gift.emoji)
-                                    .font(.system(size: 16))
+                        VStack(alignment: .leading, spacing: 3) {
+                            HStack(alignment: .firstTextBaseline) {
                                 Text(gift.name)
-                                    .font(Font.bodySans(13, weight: .semibold))
-                                    .foregroundColor(Color.textOnCard)
+                                    .ydgText(.subhead, weight: .semibold)
                                 Spacer(minLength: 8)
                                 Text(gift.priceRange)
-                                    .font(Font.bodySans(11, weight: .medium))
-                                    .foregroundColor(Color.textMutedOnCard)
+                                    .ydgText(.footnote, color: .ydgTextSecondary)
                             }
                             Text(gift.description)
-                                .font(Font.bodySans(12, weight: .regular))
-                                .foregroundColor(Color.textMutedOnCard)
+                                .ydgText(.footnote, color: .ydgTextSecondary)
                                 .fixedSize(horizontal: false, vertical: true)
                             if !gift.whereToBuy.isEmpty {
                                 Text("Where: \(gift.whereToBuy)")
-                                    .font(Font.bodySans(11, weight: .regular))
-                                    .foregroundColor(Color.textMutedOnCard)
+                                    .ydgText(.footnote, color: .ydgTextTertiary)
                             }
                         }
-                        .padding(.vertical, 4)
+                        .padding(.vertical, 2)
                     }
                 }
             )
@@ -556,21 +579,20 @@ struct ItineraryCreamPlanDetailContent: View {
     @ViewBuilder
     private var packingChips: some View {
         if !plan.packingList.isEmpty {
-            ItineraryCreamInsetSection(title: "Pack", icon: "bag.fill") {
+            ItineraryCreamInsetSection(title: "Bring along", icon: "bag") {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
                         ForEach(plan.packingList.prefix(6), id: \.self) { item in
                             HStack(spacing: 5) {
                                 Image(systemName: ItineraryPlanFormatting.packingIcon(for: item))
-                                    .font(.system(size: 10))
+                                    .font(.system(size: 11))
                                 Text(item)
-                                    .font(Font.bodySans(11, weight: .medium))
+                                    .font(.ydg(.footnote, weight: .medium))
                             }
-                            .foregroundColor(Color.textOnCard)
+                            .foregroundColor(Color.ydgTextPrimary)
                             .padding(.horizontal, 10)
                             .padding(.vertical, 6)
-                            .background(Color.black.opacity(0.05))
-                            .clipShape(Capsule())
+                            .background(Capsule().fill(Color.ydgRaised))
                         }
                     }
                 }
@@ -583,30 +605,32 @@ struct ItineraryCreamPlanDetailContent: View {
         if let onOpenRoute, !itineraryStops.isEmpty {
             Button(action: onOpenRoute) {
                 HStack(spacing: 8) {
-                    Image(systemName: "arrow.triangle.turn.up.right.diamond.fill")
-                        .font(.system(size: 12))
-                    Text("View full route")
-                        .font(Font.bodySans(13, weight: .semibold))
+                    Image(systemName: "map")
+                        .font(.system(size: 15))
+                    Text("View the route")
+                        .font(.ydg(.callout, weight: .semibold))
                     Spacer(minLength: 0)
                     Text("\(itineraryStops.count) stops")
-                        .font(Font.bodySans(11, weight: .regular))
-                        .foregroundColor(Color.textMutedOnCard)
+                        .ydgText(.footnote, color: .ydgTextSecondary)
                     Image(systemName: "chevron.right")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(Color.textMutedOnCard)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(Color.ydgTextTertiary)
                 }
-                .foregroundColor(Color.accentMaroon)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
+                .foregroundColor(Color.ydgAccent)
+                .padding(.horizontal, YDGSpace.md)
+                .frame(minHeight: 52)
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .overlay(alignment: .top) {
-                Rectangle().fill(Color.black.opacity(0.06)).frame(height: 1)
+                Rectangle().fill(Color.ydgBorder).frame(height: 1)
             }
+            .padding(.top, YDGSpace.xs)
         }
     }
 }
 
+/// Compact plan summary (share sheet, partner screens): header + time/name rows.
 struct ItineraryCreamPlanPreviewCard: View {
     let plan: DatePlan
     var partnerName: String? = nil
@@ -622,26 +646,49 @@ struct ItineraryCreamPlanPreviewCard: View {
             VStack(alignment: .leading, spacing: 0) {
                 ItineraryGradientBanner(plan: plan)
                 ItineraryPlanHeaderBlock(plan: plan, partnerName: partnerName)
-                ForEach(Array(itineraryStops.prefix(maxStops).enumerated()), id: \.element.id) { index, stop in
-                    if index > 0, let time = stop.travelTimeFromPrevious, !time.isEmpty {
-                        ItineraryCreamTravelLeg(
-                            travelMode: stop.travelMode,
-                            timeText: time,
-                            distanceText: stop.travelDistanceFromPrevious
-                        )
-                    }
-                    ItineraryCreamStopRow(stop: stop)
-                }
+                ItineraryCompactStopList(stops: Array(itineraryStops.prefix(maxStops)))
                 if itineraryStops.count > maxStops {
                     Text("+ \(itineraryStops.count - maxStops) more stop\(itineraryStops.count - maxStops == 1 ? "" : "s")")
-                        .font(Font.bodySans(11, weight: .medium))
-                        .foregroundColor(Color.textMutedOnCard)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 8)
+                        .ydgText(.footnote, color: .ydgTextSecondary)
+                        .padding(.horizontal, YDGSpace.md)
+                        .padding(.vertical, YDGSpace.xs)
                 }
                 ItineraryPlanFooterBlock(plan: plan)
             }
         }
+    }
+}
+
+/// Time | name + type rows with hairlines (pick-a-plan and preview cards).
+struct ItineraryCompactStopList: View {
+    let stops: [DatePlanStop]
+
+    var body: some View {
+        VStack(spacing: 0) {
+            ForEach(stops) { stop in
+                HStack(alignment: .top, spacing: YDGSpace.sm) {
+                    Text(stop.timeSlot)
+                        .font(.ydg(.footnote, weight: .semibold))
+                        .foregroundColor(Color.ydgTextPrimary)
+                        .monospacedDigit()
+                        .frame(width: 66, alignment: .leading)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(stop.name)
+                            .ydgText(.subhead, weight: .semibold)
+                        if !stop.venueType.isEmpty {
+                            Text(stop.venueType)
+                                .ydgText(.footnote, color: .ydgTextSecondary)
+                        }
+                    }
+                    Spacer(minLength: 0)
+                }
+                .padding(.vertical, 10)
+                .overlay(alignment: .top) {
+                    Rectangle().fill(Color.ydgBorder).frame(height: 1)
+                }
+            }
+        }
+        .padding(.horizontal, YDGSpace.md)
     }
 }
 
@@ -680,7 +727,7 @@ struct LoveNoteCreamCard<Content: View>: View {
     @ViewBuilder var content: () -> Content
 
     var body: some View {
-        ItineraryCreamCardChrome(edgePadding: edgePadding) {
+        ItineraryCreamCardChrome(edgePadding: edgePadding, surface: .cream) {
             VStack(alignment: .leading, spacing: 0) {
                 LoveNoteGradientBanner(subtitle: bannerSubtitle)
                 content()
@@ -689,7 +736,7 @@ struct LoveNoteCreamCard<Content: View>: View {
     }
 }
 
-// MARK: - Itinerary hero card (cream card, maroon left border)
+// MARK: - Itinerary hero card (Home: tonight's plan)
 
 struct ItineraryHeroCard: View {
     let plan: DatePlan
@@ -711,79 +758,34 @@ struct ItineraryHeroCard: View {
             VStack(alignment: .leading, spacing: 0) {
                 ItineraryGradientBanner(plan: plan)
                 ItineraryPlanHeaderBlock(plan: plan, partnerName: partnerName)
-
-                if let start = plan.startingPoint {
-                    ItineraryStartingPointCreamSection(
-                        startingPoint: start,
-                        firstStop: itineraryStops.first
-                    )
-                }
-
-                ForEach(Array(previewStops.enumerated()), id: \.element.id) { index, stop in
-                    if index > 0, let time = stop.travelTimeFromPrevious, !time.isEmpty {
-                        ItineraryCreamTravelLeg(
-                            travelMode: stop.travelMode,
-                            timeText: time,
-                            distanceText: stop.travelDistanceFromPrevious
-                        )
-                    }
-                    ItineraryCreamStopRow(stop: stop)
-                }
+                ItineraryCompactStopList(stops: previewStops)
 
                 if itineraryStops.count > previewStops.count {
                     Text("+ \(itineraryStops.count - previewStops.count) more stop\(itineraryStops.count - previewStops.count == 1 ? "" : "s")")
-                        .font(Font.bodySans(11, weight: .medium))
-                        .foregroundColor(Color.textMutedOnCard)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 8)
+                        .ydgText(.footnote, color: .ydgTextSecondary)
+                        .padding(.horizontal, YDGSpace.md)
+                        .padding(.vertical, YDGSpace.xs)
                 }
 
                 ItineraryPlanFooterBlock(plan: plan)
 
-                VStack(spacing: 8) {
-                    HStack(spacing: 8) {
-                        Button(action: onApprove) {
-                            Text("Approve")
-                                .font(Font.bodySans(14, weight: .semibold))
-                                .foregroundColor(Color.backgroundPrimary)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 12)
-                                .background(Color.accentGold)
-                                .cornerRadius(10)
-                        }
-                        .buttonStyle(.plain)
-
-                        Button(action: onSwap) {
-                            Text("Swap stop")
-                                .font(Font.bodySans(13, weight: .medium))
-                                .foregroundColor(Color.textOnCard)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 12)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 10)
-                                        .stroke(Color.textOnCard.opacity(0.2), lineWidth: 1)
-                                )
-                        }
-                        .buttonStyle(.plain)
+                VStack(spacing: YDGSpace.xs) {
+                    HStack(spacing: YDGSpace.xs) {
+                        Button("Swap a stop", action: onSwap)
+                            .buttonStyle(YDGButtonStyle(kind: .secondary))
+                        Button("Approve", action: onApprove)
+                            .buttonStyle(.ydgPrimary)
                     }
-
-                    Button(action: onView) {
-                        Text("View full plan")
-                            .font(Font.bodySans(13, weight: .medium))
-                            .foregroundColor(Color.textMutedOnCard)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 8)
-                    }
-                    .buttonStyle(.plain)
+                    Button("View full plan", action: onView)
+                        .buttonStyle(.ydgTertiary)
                 }
-                .padding(.horizontal, 16)
-                .padding(.bottom, 14)
+                .padding(.horizontal, YDGSpace.md)
+                .padding(.top, YDGSpace.xs)
+                .padding(.bottom, YDGSpace.sm)
             }
         }
     }
 }
-
-// MARK: - Swap stop sheet (hero card — no full re-plan)
 
 struct SwapStopContext: Identifiable {
     let id = UUID()
