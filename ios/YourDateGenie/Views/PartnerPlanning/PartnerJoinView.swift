@@ -55,7 +55,7 @@ struct PartnerJoinView: View {
                 } label: {
                     Image(systemName: "xmark")
                         .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(Color.luxuryGold)
+                        .foregroundColor(Color.ydgTextPrimary)
                 }
             }
         }
@@ -72,11 +72,11 @@ struct PartnerJoinView: View {
         VStack(spacing: 24) {
             Image(systemName: "lock.circle.fill")
                 .font(.system(size: 52))
-                .foregroundColor(Color.accentMaroon)
+                .foregroundColor(Color.ydgHighlight)
 
             VStack(spacing: 8) {
                 Text("Sign in to join")
-                    .font(Font.displaySerif(30, weight: .bold))
+                    .font(Font.ydgDisplay(30))
                     .foregroundColor(Color.textPrimary)
                 Text("You need an account to contribute your preferences to this date plan.")
                     .font(Font.bodySans(14, weight: .regular))
@@ -96,8 +96,7 @@ struct PartnerJoinView: View {
                     .foregroundColor(Color.backgroundPrimary)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 16)
-                    .background(Color.accentGold)
-                    .cornerRadius(16)
+                    .background(Capsule().fill(Color.ydgAccent))
             }
             .buttonStyle(.plain)
             .padding(.horizontal, 24)
@@ -110,9 +109,9 @@ struct PartnerJoinView: View {
         VStack(spacing: 10) {
             Image(systemName: "heart.circle.fill")
                 .font(.system(size: 32))
-                .foregroundColor(Color.accentMaroon)
+                .foregroundColor(Color.ydgHighlight)
             Text(displayTitle)
-                .font(Font.displaySerif(24, weight: .bold))
+                .font(Font.ydgDisplay(24))
                 .foregroundColor(Color.textPrimary)
                 .multilineTextAlignment(.center)
         }
@@ -163,8 +162,7 @@ struct PartnerJoinView: View {
                 .foregroundColor(Color.backgroundPrimary)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 16)
-                .background(Color.accentGold)
-                .cornerRadius(16)
+                .background(Capsule().fill(Color.ydgAccent))
             }
             .buttonStyle(.plain)
         }
@@ -196,8 +194,7 @@ struct PartnerJoinView: View {
                 .foregroundColor(Color.backgroundPrimary)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 16)
-                .background(Color.accentGold)
-                .cornerRadius(16)
+                .background(Capsule().fill(Color.ydgAccent))
             }
             .buttonStyle(.plain)
         }

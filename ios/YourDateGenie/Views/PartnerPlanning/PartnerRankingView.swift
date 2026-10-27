@@ -28,7 +28,7 @@ struct PartnerRankingView: View {
 
     var body: some View {
         ZStack {
-            Color.backgroundPrimary.ignoresSafeArea()
+            Color.ydgBase.ignoresSafeArea()
 
             if rankSubmitted {
                 rankSubmittedView
@@ -44,13 +44,15 @@ struct PartnerRankingView: View {
                         coordinator.dismissSheet()
                     } label: {
                         Image(systemName: "xmark")
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundColor(Color.luxuryGold)
+                            .font(.system(size: 17, weight: .semibold))
+                            .foregroundColor(Color.ydgTextPrimary)
+                            .frame(width: 44, height: 44)
                     }
+                    .accessibilityLabel("Close")
                 }
             }
         }
-        .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
+        .toolbarBackground(Color.ydgBase, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
         .onChange(of: partnerManager.currentPhase) { phase in
             if phase == .finalOptionSelected {
@@ -64,77 +66,39 @@ struct PartnerRankingView: View {
     private var rankingContent: some View {
         VStack(spacing: 0) {
             ScrollView(.vertical, showsIndicators: false) {
-                VStack(spacing: 28) {
+                VStack(alignment: .leading, spacing: YDGSpace.lg) {
                     headerSection
-                    privacyBadge
-                    rankingInstructions
                     rankingCards
+                    Text("Tap a plan to give it the next rank. Tap the x to undo.")
+                        .ydgText(.footnote, color: .ydgTextTertiary)
                     if let err = submitError {
                         Text(err)
-                            .font(Font.bodySans(13, weight: .regular))
-                            .foregroundColor(Color(hex: "FF6B6B"))
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal, 24)
+                            .ydgText(.footnote, color: .ydgDanger)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                 }
-                .padding(.horizontal, 20)
-                .padding(.top, 20)
-                .padding(.bottom, 120)
+                .padding(.horizontal, YDGSpace.margin)
+                .padding(.top, YDGSpace.md)
+                .padding(.bottom, YDGSpace.xl)
             }
             submitBar
         }
     }
 
     private var headerSection: some View {
-        VStack(spacing: 8) {
-            Text("Pick your favorite")
-                .font(Font.displaySerif(32, weight: .bold))
-                .foregroundColor(Color.textPrimary)
-            Text("Your picks are private until you both submit")
-                .font(Font.bodySans(14, weight: .regular))
-                .foregroundColor(Color.textPrimary.opacity(0.6))
-                .multilineTextAlignment(.center)
+        VStack(alignment: .leading, spacing: YDGSpace.xs) {
+            Text("Rank your favorites")
+                .ydgText(.title1)
+                .accessibilityAddTraits(.isHeader)
+            Label("Private until you've both submitted.", systemImage: "lock")
+                .font(.ydg(.subhead))
+                .foregroundColor(Color.ydgTextSecondary)
         }
-    }
-
-    private var privacyBadge: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "lock.fill")
-                .font(.system(size: 11))
-                .foregroundColor(Color.textPrimary.opacity(0.7))
-            Text("Rankings revealed only after both submit")
-                .font(Font.bodySans(11, weight: .semibold))
-                .foregroundColor(Color.textPrimary.opacity(0.7))
-                .tracking(0.5)
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 7)
-        .background(Color.luxeSurfaceTint)
-        .cornerRadius(20)
-        .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.luxeSurfaceTintStrong, lineWidth: 1))
-    }
-
-    private var rankingInstructions: some View {
-        HStack(spacing: 16) {
-            ForEach(1...min(3, plans.count), id: \.self) { rank in
-                VStack(spacing: 4) {
-                    rankBadgeView(rank: rank, size: 32)
-                    Text(rank == 1 ? "Top pick" : rank == 2 ? "2nd" : "3rd")
-                        .font(Font.bodySans(11, weight: .medium))
-                        .foregroundColor(Color.luxuryCreamMuted)
-                }
-            }
-            Spacer()
-            Text("Tap a card to assign rank")
-                .font(Font.bodySans(12, weight: .regular))
-                .foregroundColor(Color.luxuryCreamMuted)
-                .multilineTextAlignment(.trailing)
-        }
-        .padding(.horizontal, 4)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var rankingCards: some View {
-        VStack(spacing: 14) {
+        VStack(spacing: YDGSpace.sm) {
             ForEach(Array(plans.enumerated()), id: \.offset) { index, plan in
                 RankingOptionCard(
                     plan: plan,
@@ -152,114 +116,77 @@ struct PartnerRankingView: View {
     }
 
     private var submitBar: some View {
-        VStack(spacing: 12) {
-            if !allRanked && !plans.isEmpty {
-                Text("Rank all \(plans.count) options to continue")
-                    .font(Font.bodySans(12, weight: .regular))
-                    .foregroundColor(Color.textPrimary.opacity(0.55))
-            }
+        VStack(spacing: YDGSpace.xs) {
             Button {
                 guard allRanked else { return }
                 showSubmitConfirm = true
             } label: {
-                Group {
-                    if isSubmitting {
-                        ProgressView()
-                            .tint(Color.backgroundPrimary)
-                            .accessibilityLabel("Submitting rankings")
-                    } else {
-                        HStack(spacing: 8) {
-                            Image(systemName: "checkmark.circle.fill")
-                                .font(.system(size: 18))
-                            Text(allRanked ? "Submit my rankings" : "Rank all options first")
-                                .font(Font.bodySans(16, weight: .semibold))
-                        }
-                    }
-                }
-                .foregroundColor(allRanked ? Color.backgroundPrimary : Color.textPrimary.opacity(0.55))
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 16)
-                .background(allRanked ? Color.accentGold : Color.surfaceElevated)
-                .cornerRadius(16)
+                Text(allRanked ? "Submit my rankings" : "Rank all \(plans.count) to submit")
             }
-            .buttonStyle(.plain)
+            .buttonStyle(YDGButtonStyle(kind: .primary, isLoading: isSubmitting))
             .disabled(!allRanked || isSubmitting)
             .animation(.easeInOut(duration: 0.2), value: allRanked)
             .confirmationDialog("Submit your rankings?", isPresented: $showSubmitConfirm, titleVisibility: .visible) {
-                Button("Submit Rankings") { submitRankings() }
+                Button("Submit rankings") { submitRankings() }
                 Button("Cancel", role: .cancel) { }
             } message: {
                 Text("Once submitted, you won't be able to change your picks.")
             }
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 16)
-        .background(Color.backgroundPrimary.shadow(color: Color.black.opacity(0.3), radius: 10, y: -5))
+        .padding(.horizontal, YDGSpace.margin)
+        .padding(.top, YDGSpace.sm)
+        .padding(.bottom, YDGSpace.md)
+        .background(
+            Color.ydgBase
+                .overlay(alignment: .top) { Rectangle().fill(Color.ydgBorder).frame(height: 1) }
+        )
     }
 
     // MARK: - Submitted / waiting state
 
     private var rankSubmittedView: some View {
-        VStack(spacing: 32) {
+        VStack(alignment: .leading, spacing: YDGSpace.md) {
             Spacer()
+            Image(systemName: "checkmark")
+                .font(.system(size: 26, weight: .semibold))
+                .foregroundColor(Color.ydgSuccess)
+                .frame(width: 56, height: 56)
+                .background(Circle().fill(Color.ydgSuccess.opacity(0.15)))
+                .accessibilityHidden(true)
 
-            ZStack {
-                Circle()
-                    .stroke(Color.accentMaroon.opacity(0.4), lineWidth: 1)
-                    .frame(width: 100, height: 100)
-                Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: 44))
-                    .foregroundColor(Color.accentMaroon)
-            }
-
-            VStack(spacing: 12) {
-                Text("Your rankings are in.")
-                    .font(Font.displaySerif(30, weight: .bold))
-                    .foregroundColor(Color.textPrimary)
-                Text(partnerManager.currentPhase == .finalOptionSelected
-                     ? "The final plan has been chosen — reveal it now."
-                     : "Waiting for your partner to rank their options.")
-                    .font(Font.bodySans(15, weight: .regular))
-                    .foregroundColor(Color.textPrimary.opacity(0.6))
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 32)
-            }
+            Text("Your rankings are in.")
+                .ydgText(.title1)
+                .accessibilityAddTraits(.isHeader)
+            Text(partnerManager.currentPhase == .finalOptionSelected
+                 ? "The final plan has been chosen. Reveal it now."
+                 : "Waiting for your partner to rank their options.")
+                .ydgText(.body, color: .ydgTextSecondary)
+                .fixedSize(horizontal: false, vertical: true)
 
             if partnerManager.currentPhase == .waitingForPartnerRanking {
                 waitingPulse
             }
 
-            if partnerManager.currentPhase == .finalOptionSelected {
-                Button {
-                    coordinator.loadFinalOptionAndShowReveal()
-                } label: {
-                    HStack(spacing: 8) {
-                        Image(systemName: "star.circle.fill")
-                            .font(.system(size: 18))
-                        Text("Reveal your date plan")
-                            .font(Font.bodySans(16, weight: .semibold))
-                    }
-                    .foregroundColor(Color.backgroundPrimary)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
-                    .background(Color.accentGold)
-                    .cornerRadius(16)
-                }
-                .buttonStyle(.plain)
-                .padding(.horizontal, 32)
-            }
-
             Spacer()
+
+            if partnerManager.currentPhase == .finalOptionSelected {
+                Button("Reveal your date plan") {
+                    coordinator.loadFinalOptionAndShowReveal()
+                }
+                .buttonStyle(.ydgPrimary)
+            }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, YDGSpace.margin)
+        .padding(.bottom, YDGSpace.lg)
     }
 
     private var waitingPulse: some View {
         HStack(spacing: 6) {
             WaitingRingView()
                 .frame(width: 28, height: 28)
-            Text("Waiting for partner…")
-                .font(Font.bodySans(13, weight: .regular))
-                .foregroundColor(Color.luxuryCreamMuted)
+            Text("Waiting for your partner…")
+                .ydgText(.subhead, weight: .regular, color: .ydgTextSecondary)
         }
     }
 
@@ -317,16 +244,15 @@ struct PartnerRankingView: View {
                 .fill(rankColor(rank))
                 .frame(width: size, height: size)
             Text("\(rank)")
-                .font(Font.bodySans(size * 0.4, weight: .bold))
-                .foregroundColor(rank == 1 ? Color.luxuryMaroon : Color.luxuryCream)
+                .font(Font.ydgSans(size * 0.4, weight: .bold))
+                .foregroundColor(rank == 1 ? Color.ydgTextOnAccent : Color.ydgAccent)
         }
     }
 
     private func rankColor(_ rank: Int) -> Color {
         switch rank {
-        case 1: return Color.luxuryGold
-        case 2: return Color.luxuryGoldLight.opacity(0.7)
-        default: return Color.luxuryMaroonLight
+        case 1: return Color.ydgAccent
+        default: return Color.ydgAccentSubtle
         }
     }
 }
@@ -344,99 +270,68 @@ private struct RankingOptionCard: View {
 
     private var isRanked: Bool { assignedRank != nil }
 
+    private var stopNames: String {
+        ItineraryPlanFormatting.itineraryStops(for: plan).prefix(3).map(\.name).joined(separator: " · ")
+    }
+
     var body: some View {
         Button(action: isDisabled ? {} : onTap) {
-            HStack(alignment: .top, spacing: 14) {
-                // Rank badge or empty circle
+            HStack(alignment: .center, spacing: 14) {
                 ZStack {
-                    Circle()
-                        .stroke(isRanked ? rankBorderColor : Color.luxuryGold.opacity(0.3), lineWidth: 1.5)
-                        .frame(width: 44, height: 44)
                     if let rank = assignedRank {
                         Circle()
-                            .fill(rankFillColor(rank))
-                            .frame(width: 40, height: 40)
+                            .fill(rank == 1 ? Color.ydgAccent : Color.clear)
+                        Circle()
+                            .stroke(Color.ydgAccent, lineWidth: 1.5)
                         Text("\(rank)")
-                            .font(Font.bodySans(16, weight: .bold))
-                            .foregroundColor(rank == 1 ? Color.luxuryMaroon : Color.luxuryCream)
+                            .font(Font.ydgSans(16, weight: .bold))
+                            .foregroundColor(rank == 1 ? Color.ydgTextOnAccent : Color.ydgAccent)
                     } else {
-                        Text(optionLabel)
-                            .font(Font.bodySans(13, weight: .semibold))
-                            .foregroundColor(Color.luxuryGold.opacity(0.6))
+                        Circle()
+                            .strokeBorder(Color.ydgBorderStrong, style: StrokeStyle(lineWidth: 1.5, dash: [3, 3]))
                     }
                 }
+                .frame(width: 36, height: 36)
+                .accessibilityHidden(true)
 
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: 3) {
                     Text(plan.title)
-                        .font(Font.bodySans(15, weight: .semibold))
-                        .foregroundColor(isRanked ? Color.luxuryCream : Color.luxuryCream.opacity(0.9))
+                        .ydgText(.callout, weight: .semibold)
                         .lineLimit(2)
-
-                    if !plan.tagline.isEmpty {
-                        Text(plan.tagline)
-                            .font(Font.bodySans(13, weight: .regular))
-                            .foregroundColor(Color.luxuryCreamMuted)
-                            .lineLimit(2)
-                    }
-
-                    if !plan.packingList.isEmpty {
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 6) {
-                                ForEach(plan.packingList.prefix(3), id: \.self) { hint in
-                                    Text(hint)
-                                        .font(Font.bodySans(10, weight: .semibold))
-                                        .foregroundColor(Color.luxuryGold.opacity(0.8))
-                                        .padding(.horizontal, 8)
-                                        .padding(.vertical, 3)
-                                        .background(Color.luxuryGold.opacity(0.1))
-                                        .cornerRadius(8)
-                                }
-                            }
-                        }
-                    }
+                    Text(stopNames.isEmpty ? optionLabel : stopNames)
+                        .ydgText(.footnote, color: .ydgTextSecondary)
+                        .lineLimit(2)
                 }
 
-                Spacer()
+                Spacer(minLength: 0)
 
                 if isRanked {
                     Button(action: isDisabled ? {} : onClear) {
-                        Image(systemName: "xmark.circle")
-                            .font(.system(size: 16))
-                            .foregroundColor(Color.luxuryCreamMuted)
+                        Image(systemName: "xmark")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(Color.ydgTextTertiary)
+                            .frame(width: 44, height: 44)
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel("Clear rank")
                 }
             }
-            .padding(16)
-            .background(
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(isRanked ? Color.luxuryMaroonLight : Color.luxuryMaroonLight.opacity(0.5))
-                    .shadow(color: isRanked ? Color.luxuryGold.opacity(0.15) : Color.clear, radius: 8, y: 2)
-            )
+            .padding(.leading, YDGSpace.md)
+            .padding(.trailing, isRanked ? 4 : YDGSpace.md)
+            .padding(.vertical, YDGSpace.sm)
+            .frame(minHeight: 72)
+            .background(isRanked ? Color.ydgAccentSubtle : Color.ydgRaised,
+                        in: RoundedRectangle(cornerRadius: YDGRadius.card, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 16)
-                    .stroke(isRanked ? rankBorderColor : Color.luxuryGold.opacity(0.2), lineWidth: isRanked ? 1.5 : 1)
+                RoundedRectangle(cornerRadius: YDGRadius.card, style: .continuous)
+                    .stroke(isRanked ? Color.ydgAccent : Color.ydgBorder, lineWidth: isRanked ? 1.5 : 1)
             )
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .animation(.spring(response: 0.3, dampingFraction: 0.75), value: assignedRank)
-    }
-
-    private var rankBorderColor: Color {
-        guard let rank = assignedRank else { return Color.luxuryGold.opacity(0.2) }
-        switch rank {
-        case 1: return Color.luxuryGold
-        case 2: return Color.luxuryGoldLight.opacity(0.7)
-        default: return Color.luxuryGold.opacity(0.4)
-        }
-    }
-
-    private func rankFillColor(_ rank: Int) -> Color {
-        switch rank {
-        case 1: return Color.luxuryGold
-        case 2: return Color.luxuryGoldLight.opacity(0.6)
-        default: return Color.luxuryMaroonLight
-        }
+        .accessibilityLabel("\(optionLabel): \(plan.title)")
+        .accessibilityValue(assignedRank.map { "Ranked \($0)" } ?? "Not ranked")
     }
 }
 

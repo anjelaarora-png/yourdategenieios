@@ -13,19 +13,19 @@ struct PartnerShareView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color.backgroundPrimary
+                Color.ydgBase
                     .ignoresSafeArea()
 
                 ScrollView(.vertical, showsIndicators: false) {
-                    VStack(spacing: 28) {
+                    VStack(alignment: .leading, spacing: YDGSpace.lg) {
                         headerSection
                         planPreviewSection
                         personalNoteSection
                         shareActionsSection
                     }
-                    .padding(.horizontal, 20)
-                    .padding(.top, 16)
-                    .padding(.bottom, 48)
+                    .padding(.horizontal, YDGSpace.margin)
+                    .padding(.top, YDGSpace.xs)
+                    .padding(.bottom, YDGSpace.xl)
                 }
             }
             .navigationBarTitleDisplayMode(.inline)
@@ -35,17 +35,14 @@ struct PartnerShareView: View {
                         dismiss()
                     } label: {
                         Image(systemName: "xmark")
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundColor(Color.luxuryGold)
+                            .font(.system(size: 17, weight: .semibold))
+                            .foregroundColor(Color.ydgTextPrimary)
+                            .frame(width: 44, height: 44)
                     }
-                }
-                ToolbarItem(placement: .principal) {
-                    Text("Share Plan")
-                        .font(Font.displaySerif(18, weight: .semibold))
-                        .foregroundColor(Color.textPrimary)
+                    .accessibilityLabel("Close")
                 }
             }
-            .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
+            .toolbarBackground(Color.ydgBase, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .alert("Message not allowed", isPresented: $showContentFilterAlert) {
                 Button("OK", role: .cancel) {}
@@ -58,37 +55,24 @@ struct PartnerShareView: View {
     // MARK: - Header
 
     private var headerSection: some View {
-        VStack(spacing: 12) {
-            ZStack {
-                Circle()
-                    .stroke(Color.accentGold.opacity(0.55), lineWidth: 2)
-                    .frame(width: 80, height: 80)
-                Image(systemName: "paperplane.fill")
-                    .font(.system(size: 34))
-                    .foregroundColor(Color.accentGold)
-            }
-
+        VStack(alignment: .leading, spacing: YDGSpace.xs) {
             Text("Share with your partner")
-                .font(Font.displaySerif(32, weight: .bold))
-                .foregroundColor(Color.textPrimary)
-                .multilineTextAlignment(.center)
+                .ydgText(.title1)
                 .fixedSize(horizontal: false, vertical: true)
+                .accessibilityAddTraits(.isHeader)
 
-            Text("Send tonight's plan — they'll see every stop, timing, and your personal note.")
-                .font(Font.bodySans(14, weight: .regular))
-                .foregroundColor(Color.textPrimary.opacity(0.6))
-                .multilineTextAlignment(.center)
+            Text("They'll see every stop, the timing and your note.")
+                .ydgText(.body, color: .ydgTextSecondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(.top, 4)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     // MARK: - Plan preview (shared cream card)
 
     private var planPreviewSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            sectionLabel(title: "Tonight's plan", icon: "sparkles")
-
-            ItineraryCreamPlanPreviewCard(plan: plan, edgePadding: 0)
+            ItineraryCreamPlanPreviewCard(plan: plan, maxStops: 3, edgePadding: 0)
         }
     }
 
@@ -96,105 +80,65 @@ struct PartnerShareView: View {
 
     private var personalNoteSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            sectionLabel(title: "Add a personal note", icon: "heart.text.square")
+            sectionLabel(title: "Add a note", icon: "heart.text.square")
 
-            LoveNoteCreamCard(edgePadding: 0, bannerSubtitle: "Your words") {
-                ZStack(alignment: .topLeading) {
-                    TextEditor(text: $shareMessage)
-                        .font(Font.bodySerif(15, weight: .regular))
-                        .foregroundColor(Color.textOnCard)
-                        .scrollContentBackground(.hidden)
-                        .frame(minHeight: 108)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 10)
+            ZStack(alignment: .topLeading) {
+                TextEditor(text: $shareMessage)
+                    .font(.ydgDisplay(19, weight: .regular).italic())
+                    .foregroundColor(Color.ydgTextPrimary)
+                    .scrollContentBackground(.hidden)
+                    .frame(minHeight: 120)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 10)
+                    .accessibilityLabel("Personal note")
 
-                    if shareMessage.isEmpty {
-                        Text("Type a rough note — we'll help polish it…")
-                            .font(Font.bodySerif(15, weight: .regular))
-                            .foregroundColor(Color.textMutedOnCard.opacity(0.55))
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 18)
-                            .allowsHitTesting(false)
-                    }
+                if shareMessage.isEmpty {
+                    Text("Type a rough note. We'll help polish it…")
+                        .font(.ydgDisplay(19, weight: .regular).italic())
+                        .foregroundColor(Color.ydgTextTertiary)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 18)
+                        .allowsHitTesting(false)
+                        .accessibilityHidden(true)
                 }
             }
+            .background(Color.ydgHighlightSubtle, in: RoundedRectangle(cornerRadius: YDGRadius.card, style: .continuous))
 
-            LoveNoteRewriteSection(text: $shareMessage, skin: .charcoal)
+            LoveNoteRewriteSection(text: $shareMessage, skin: .charcoal, rewriteButtonKind: .secondary)
         }
     }
 
     // MARK: - Share actions
 
     private var shareActionsSection: some View {
-        VStack(spacing: 14) {
+        VStack(spacing: YDGSpace.md) {
+            HStack(spacing: YDGSpace.sm) {
+                PartnerShareChannelButton(icon: "message", label: "Messages") {
+                    shareViaMessages()
+                }
+                PartnerShareChannelButton(icon: "envelope", label: "Email") {
+                    shareViaEmail()
+                }
+                PartnerShareChannelButton(icon: copiedToClipboard ? "checkmark" : "doc.on.doc",
+                                          label: copiedToClipboard ? "Copied" : "Copy text") {
+                    copyToClipboard()
+                }
+            }
+
             Button {
                 sharePlan()
             } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: "square.and.arrow.up")
-                        .font(.system(size: 16, weight: .semibold))
-                    Text("Share plan")
-                        .font(Font.bodySans(16, weight: .semibold))
-                }
-                .foregroundColor(Color.backgroundPrimary)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 16)
-                .background(Color.accentGold)
-                .cornerRadius(16)
+                Label("Share plan", systemImage: "square.and.arrow.up")
             }
-            .buttonStyle(.plain)
-
-            Button {
-                copyToClipboard()
-            } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: copiedToClipboard ? "checkmark.circle.fill" : "doc.on.doc")
-                        .font(.system(size: 15, weight: .medium))
-                    Text(copiedToClipboard ? "Copied!" : "Copy plan text")
-                        .font(Font.bodySans(15, weight: .semibold))
-                }
-                .foregroundColor(Color.accentGold)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 14)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color.accentGold.opacity(0.55), lineWidth: 1.5)
-                )
-            }
-            .buttonStyle(.plain)
-
-            VStack(alignment: .leading, spacing: 10) {
-                Text("QUICK SEND")
-                    .font(Font.bodySans(11, weight: .bold))
-                    .tracking(1.4)
-                    .foregroundColor(Color.textPrimary.opacity(0.45))
-
-                HStack(spacing: 12) {
-                    PartnerShareChannelButton(icon: "message.fill", label: "Message") {
-                        shareViaMessages()
-                    }
-                    PartnerShareChannelButton(icon: "envelope.fill", label: "Email") {
-                        shareViaEmail()
-                    }
-                    PartnerShareChannelButton(icon: "note.text", label: "Notes") {
-                        shareAsNote()
-                    }
-                }
-            }
-            .padding(.top, 4)
+            .buttonStyle(.ydgPrimary)
         }
+        .padding(.top, YDGSpace.xs)
     }
 
     private func sectionLabel(title: String, icon: String) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: icon)
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundColor(Color.accentGold)
-            Text(title.uppercased())
-                .font(Font.bodySans(11, weight: .bold))
-                .tracking(1.4)
-                .foregroundColor(Color.textPrimary.opacity(0.55))
-        }
+        Text(title)
+            .ydgText(.subhead, color: .ydgTextSecondary)
+            .accessibilityAddTraits(.isHeader)
     }
 
     // MARK: - Share payload
@@ -306,22 +250,7 @@ private struct PartnerShareChannelButton: View {
     let action: () -> Void
 
     var body: some View {
-        Button(action: action) {
-            VStack(spacing: 8) {
-                Image(systemName: icon)
-                    .font(.system(size: 20, weight: .semibold))
-                    .foregroundColor(Color.backgroundPrimary)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 52)
-                    .background(Color.accentGold)
-                    .cornerRadius(14)
-
-                Text(label)
-                    .font(Font.bodySans(11, weight: .semibold))
-                    .foregroundColor(Color.accentGold)
-            }
-        }
-        .buttonStyle(.plain)
+        YDGShortcutButton(title: label, systemName: icon, action: action)
     }
 }
 

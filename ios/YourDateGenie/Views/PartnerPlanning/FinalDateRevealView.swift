@@ -37,7 +37,14 @@ struct FinalDateRevealView: View {
 
     var body: some View {
         ZStack {
-            Color.backgroundPrimary.ignoresSafeArea()
+            // The app's one signature gradient (Final design): a warm rose glow behind the reveal.
+            RadialGradient(
+                colors: [Color(hex: "4A2328"), Color(hex: "2A1A1C"), Color.ydgBase],
+                center: UnitPoint(x: 0.5, y: 0.18),
+                startRadius: 0,
+                endRadius: 520
+            )
+            .ignoresSafeArea()
 
             // Confetti layer (decorative, skipped when Reduce Motion is on)
             if !reduceMotion {
@@ -57,7 +64,7 @@ struct FinalDateRevealView: View {
             }
 
             ScrollView(.vertical, showsIndicators: false) {
-                VStack(spacing: 32) {
+                VStack(spacing: YDGSpace.lg) {
                     headerSection
                     if let plan = winningPlan {
                         winnerCard(plan: plan)
@@ -74,9 +81,9 @@ struct FinalDateRevealView: View {
                         loadingState
                     }
                 }
-                .padding(.horizontal, 20)
-                .padding(.top, 20)
-                .padding(.bottom, 60)
+                .padding(.horizontal, YDGSpace.margin)
+                .padding(.top, YDGSpace.md)
+                .padding(.bottom, YDGSpace.xxl)
             }
         }
         .navigationBarTitleDisplayMode(.inline)
@@ -87,13 +94,14 @@ struct FinalDateRevealView: View {
                     PartnerSessionManager.shared.clearSession()
                 } label: {
                     Image(systemName: "xmark")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(Color.luxuryGold)
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundColor(Color.ydgTextPrimary)
+                        .frame(width: 44, height: 44)
                 }
+                .accessibilityLabel("Close")
             }
         }
-        .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
-        .toolbarBackground(.visible, for: .navigationBar)
+        .toolbarBackground(.hidden, for: .navigationBar)
         .onAppear {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
                 if reduceMotion {
@@ -127,130 +135,65 @@ struct FinalDateRevealView: View {
     // MARK: - Header
 
     private var headerSection: some View {
-        VStack(spacing: 10) {
-            Image(systemName: "star.circle.fill")
-                .font(.system(size: 36))
-                .foregroundColor(Color.accentMaroon)
+        VStack(spacing: YDGSpace.sm) {
+            Label("Chosen for you both", systemImage: "heart.fill")
+                .font(Font.ydgSans(13, weight: .semibold))
+                .foregroundColor(Color.ydgTextPrimary)
+                .labelStyle(RoseIconLabelStyle())
+                .padding(.horizontal, 12)
+                .frame(minHeight: 30)
+                .background(Capsule().fill(Color.ydgHighlight.opacity(0.15)))
+                .overlay(Capsule().stroke(Color.ydgHighlight.opacity(0.4), lineWidth: 1))
 
-            Text("Your perfect date")
-                .font(Font.displaySerif(38, weight: .bold))
-                .foregroundColor(Color.textPrimary)
-
-            Text("Based on both your preferences and rankings")
-                .font(Font.bodySans(14, weight: .regular))
-                .foregroundColor(Color.textPrimary.opacity(0.6))
-                .multilineTextAlignment(.center)
+            if let plan = winningPlan {
+                Text(plan.title)
+                    .ydgText(.display)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityAddTraits(.isHeader)
+                Text(ItineraryPlanFormatting.metaLine(for: plan))
+                    .ydgText(.body, color: Color(hex: "E0C9C2"))
+                    .multilineTextAlignment(.center)
+            } else {
+                Text("Your perfect date")
+                    .ydgText(.display)
+                    .accessibilityAddTraits(.isHeader)
+            }
         }
-        .padding(.top, 8)
+        .frame(maxWidth: .infinity)
+        .padding(.top, YDGSpace.xxl)
     }
 
     // MARK: - Winner card
 
     private func winnerCard(plan: DatePlan) -> some View {
-        VStack(alignment: .leading, spacing: 20) {
-            winnerCardHeader(plan: plan)
-            winnerCardStops(plan: plan)
+        VStack(alignment: .leading, spacing: 0) {
+            ItineraryCompactStopList(stops: Array(ItineraryPlanFormatting.itineraryStops(for: plan).prefix(4)))
+                .padding(.bottom, 4)
             winnerCardHints(plan: plan)
         }
-        .padding(20)
-        .background(
-            RoundedRectangle(cornerRadius: 20)
-                .fill(Color.surfaceElevated)
-                .shadow(color: Color.black.opacity(0.3), radius: 16, y: 6)
-        )
+        .background(Color.ydgBase.opacity(0.7), in: RoundedRectangle(cornerRadius: YDGRadius.card, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: YDGRadius.card, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 20)
-                .stroke(Color.luxeSurfaceBorder, lineWidth: 1)
+            RoundedRectangle(cornerRadius: YDGRadius.card, style: .continuous)
+                .stroke(Color(hex: "4A3436"), lineWidth: 1)
         )
-        .overlay(alignment: .leading) {
-            RoundedRectangle(cornerRadius: 2)
-                .fill(Color.accentMaroon)
-                .frame(width: 4)
-                .padding(.vertical, 2)
-        }
-    }
-
-    private func winnerCardHeader(plan: DatePlan) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "crown.fill")
-                            .font(.system(size: 12))
-                            .foregroundColor(Color.accentMaroon)
-                        Text("CHOSEN FOR YOU BOTH")
-                            .font(Font.bodySans(10, weight: .bold))
-                            .tracking(2)
-                            .foregroundColor(Color.textPrimary.opacity(0.7))
-                    }
-                    Text(plan.title)
-                        .font(Font.displaySerif(28, weight: .bold))
-                        .foregroundColor(Color.textPrimary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                Spacer()
-            }
-            if !plan.tagline.isEmpty {
-                Text(plan.tagline)
-                    .font(Font.bodySans(14, weight: .regular))
-                    .foregroundColor(Color.textPrimary.opacity(0.6))
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-    }
-
-    @ViewBuilder
-    private func winnerCardStops(plan: DatePlan) -> some View {
-        if !plan.stops.isEmpty {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("YOUR EVENING")
-                    .font(Font.bodySans(10, weight: .bold))
-                    .tracking(2)
-                    .foregroundColor(Color.textPrimary.opacity(0.5))
-                ForEach(plan.stops.prefix(4), id: \.name) { stop in
-                    HStack(alignment: .top, spacing: 10) {
-                        Circle()
-                            .fill(Color.accentMaroon)
-                            .frame(width: 6, height: 6)
-                            .padding(.top, 5)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(stop.name)
-                                .font(Font.bodySans(14, weight: .semibold))
-                                .foregroundColor(Color.textPrimary)
-                            if !stop.description.isEmpty {
-                                Text(stop.description)
-                                    .font(Font.bodySans(12, weight: .regular))
-                                    .foregroundColor(Color.textPrimary.opacity(0.6))
-                                    .lineLimit(2)
-                            }
-                        }
-                    }
-                }
-            }
-            .padding(14)
-            .background(Color.black.opacity(0.2))
-            .cornerRadius(12)
-        }
     }
 
     @ViewBuilder
     private func winnerCardHints(plan: DatePlan) -> some View {
         let hints = Array(plan.packingList.prefix(4))
         if !hints.isEmpty {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(hints, id: \.self) { hint in
-                        Text(hint)
-                            .font(Font.bodySans(11, weight: .semibold))
-                            .foregroundColor(Color.textPrimary.opacity(0.8))
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 4)
-                            .background(Color.luxeSurfaceTint)
-                            .cornerRadius(10)
-                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.luxeSurfaceBorder, lineWidth: 1))
-                    }
-                }
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Bring")
+                    .ydgText(.caption, color: .ydgTextTertiary)
+                Text(hints.joined(separator: " · "))
+                    .ydgText(.footnote, color: .ydgTextSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(YDGSpace.md)
+            .overlay(alignment: .top) { Rectangle().fill(Color(hex: "4A3436")).frame(height: 1) }
         }
     }
 
@@ -259,27 +202,14 @@ struct FinalDateRevealView: View {
     private var selectionReasonCard: some View {
         Group {
             if let reason = coordinator.finalOptionSelection?.selectionReason {
-                HStack(alignment: .top, spacing: 12) {
-                    Image(systemName: "sparkles")
-                        .font(.system(size: 16))
-                        .foregroundColor(Color.accentMaroon)
-                        .padding(.top, 2)
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Why this plan")
-                            .font(Font.bodySans(11, weight: .bold))
-                            .tracking(1.5)
-                            .foregroundColor(Color.textPrimary.opacity(0.6))
-                            .textCase(.uppercase)
-                        Text(reason)
-                            .font(Font.bodySans(13, weight: .regular))
-                            .foregroundColor(Color.textPrimary.opacity(0.6))
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Why this one")
+                        .ydgText(.caption, color: .ydgHighlight)
+                    Text(reason)
+                        .ydgText(.subhead, weight: .regular, color: Color(hex: "E0C9C2"))
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                .padding(16)
-                .background(Color.surfaceElevated)
-                .cornerRadius(14)
-                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.luxeSurfaceTint, lineWidth: 1))
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
     }
@@ -287,65 +217,23 @@ struct FinalDateRevealView: View {
     // MARK: - Actions
 
     private func actionsSection(plan: DatePlan) -> some View {
-        VStack(spacing: 12) {
-            // Single gold action for this screen.
+        VStack(spacing: YDGSpace.xxs) {
             Button {
                 confirmPlan(plan)
             } label: {
-                HStack(spacing: 8) {
-                    if isConfirming {
-                        ProgressView().tint(Color.backgroundPrimary)
-                    } else {
-                        Image(systemName: "calendar.badge.checkmark")
-                            .font(.system(size: 18))
-                        Text("Lock it in")
-                            .font(Font.bodySans(16, weight: .semibold))
-                    }
-                }
-                .foregroundColor(Color.backgroundPrimary)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 16)
-                .background(Color.accentGold)
-                .cornerRadius(16)
+                Text("Lock it in")
             }
-            .buttonStyle(.plain)
+            .buttonStyle(YDGButtonStyle(kind: .primary, isLoading: isConfirming))
             .disabled(isConfirming)
 
-            // Secondary row (no gold — ghost / muted)
-            HStack(spacing: 12) {
-                Button {
-                    savePlanForLater(plan)
-                } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "bookmark.fill")
-                            .font(.system(size: 14))
-                        Text("Save for later")
-                            .font(Font.bodySans(14, weight: .semibold))
-                    }
-                    .foregroundColor(Color.textPrimary)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 13)
-                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.textPrimary.opacity(0.3), lineWidth: 1.5))
-                }
-                .buttonStyle(.plain)
-
-                Button {
-                    regenerate()
-                } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "arrow.clockwise")
-                            .font(.system(size: 14))
-                        Text("Regenerate")
-                            .font(Font.bodySans(14, weight: .semibold))
-                    }
-                    .foregroundColor(Color.textPrimary.opacity(0.6))
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 13)
-                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.textPrimary.opacity(0.25), lineWidth: 1))
-                }
-                .buttonStyle(.plain)
+            HStack(spacing: YDGSpace.lg) {
+                Button("Save for later") { savePlanForLater(plan) }
+                    .buttonStyle(.ydgTertiary)
+                Button("New options") { regenerate() }
+                    .buttonStyle(.ydgTertiary)
             }
         }
+        .padding(.top, YDGSpace.xs)
     }
 
     // MARK: - Runner-up
@@ -356,18 +244,15 @@ struct FinalDateRevealView: View {
                 withAnimation(.easeInOut(duration: 0.25)) { showRunnerUp.toggle() }
             } label: {
                 HStack {
-                    Text("Backup option")
-                        .font(Font.bodySans(13, weight: .semibold))
-                        .foregroundColor(Color.textPrimary.opacity(0.6))
+                    Text("See the backup option")
+                        .ydgText(.subhead, weight: .semibold, color: .ydgTextSecondary)
                     Spacer()
                     Image(systemName: showRunnerUp ? "chevron.up" : "chevron.down")
                         .font(.system(size: 12, weight: .medium))
                         .foregroundColor(Color.textPrimary.opacity(0.6))
                 }
                 .padding(14)
-                .background(Color.surfaceElevated)
-                .cornerRadius(12)
-                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.luxeSurfaceTint, lineWidth: 1))
+                .background(Color.ydgBase.opacity(0.7), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
             }
             .buttonStyle(.plain)
 
@@ -408,7 +293,7 @@ struct FinalDateRevealView: View {
                 .font(.system(size: 32))
                 .foregroundColor(Color.textPrimary.opacity(0.5))
             Text("Couldn't load your date plan")
-                .font(Font.displaySerif(26, weight: .bold))
+                .font(Font.ydgDisplay(26))
                 .foregroundColor(Color.textPrimary)
                 .multilineTextAlignment(.center)
             Text("Check your connection and try again, or go back and retry.")
@@ -423,8 +308,7 @@ struct FinalDateRevealView: View {
                     .foregroundColor(Color.backgroundPrimary)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
-                    .background(Color.accentGold)
-                    .cornerRadius(14)
+                    .background(Capsule().fill(Color.ydgAccent))
             }
             .buttonStyle(.plain)
             .padding(.horizontal, 40)
@@ -543,5 +427,17 @@ private struct RevealConfettiPiece: Identifiable {
     NavigationStack {
         FinalDateRevealView()
             .environmentObject(NavigationCoordinator.shared)
+    }
+}
+
+/// Rose icon + cream title (reveal badge).
+private struct RoseIconLabelStyle: LabelStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        HStack(spacing: 6) {
+            configuration.icon
+                .font(.system(size: 12))
+                .foregroundColor(Color.ydgHighlight)
+            configuration.title
+        }
     }
 }

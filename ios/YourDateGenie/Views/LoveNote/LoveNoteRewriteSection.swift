@@ -4,6 +4,8 @@ import SwiftUI
 struct LoveNoteRewriteSection: View {
     @Binding var text: String
     var skin: Skin = .charcoal
+    /// Secondary when the host screen already has its own primary action (e.g. Share plan).
+    var rewriteButtonKind: YDGButtonStyle.Kind = .primary
 
     @State private var selectedStyle: LoveNoteRewriteStyle = .romantic
     @State private var isRewriting = false
@@ -127,7 +129,7 @@ struct LoveNoteRewriteSection: View {
             Button(action: performRewrite) {
                 Label(appliedStyle == nil ? "Rewrite with AI" : "Try another style", systemImage: "wand.and.stars")
             }
-            .buttonStyle(YDGButtonStyle(kind: .primary, isLoading: isRewriting))
+            .buttonStyle(YDGButtonStyle(kind: rewriteButtonKind, isLoading: isRewriting))
             .disabled(!canRewrite || isRewriting)
         } else {
             legacyRewriteButton

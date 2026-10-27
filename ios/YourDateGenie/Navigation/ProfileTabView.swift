@@ -424,6 +424,8 @@ struct PreferenceChipsSection: View {
                 Image(systemName: icon)
                     .font(.system(size: 14))
                     .foregroundColor(Color.ydgTextSecondary)
+                    .frame(width: 18)
+                    .accessibilityHidden(true)
                 Text(title)
                     .ydgText(.subhead, weight: .semibold)
             }

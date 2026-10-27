@@ -16,6 +16,10 @@ enum AppScreenshotScene: String {
     case memories
     case playlist
     case giftFinder
+    case planTogether
+    case partnerRanking
+    case partnerReveal
+    case lockedIn
 }
 
 enum ScreenshotDemo {
@@ -129,6 +133,16 @@ enum ScreenshotDemo {
             coordinator.activeSheet = .playlist(planTitle: sample.title, planId: sample.id)
         case .giftFinder:
             coordinator.activeSheet = .giftFinder(datePlan: sample, dateLocation: "New York, NY")
+        case .planTogether:
+            coordinator.activeSheet = .partnerPlanning
+        case .partnerRanking:
+            coordinator.generatedPlans = [.sample, .sampleOptionB, .sampleOptionC]
+            coordinator.activeSheet = .partnerRanking
+        case .partnerReveal:
+            coordinator.generatedPlans = [.sample, .sampleOptionB, .sampleOptionC]
+            coordinator.activeSheet = .finalDateReveal
+        case .lockedIn:
+            coordinator.activeSheet = .lockedIn(plan: sample, calendarSynced: true)
         }
     }
 

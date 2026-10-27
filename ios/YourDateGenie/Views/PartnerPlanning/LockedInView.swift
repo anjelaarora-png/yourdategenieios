@@ -26,19 +26,19 @@ struct LockedInView: View {
 
     var body: some View {
         ZStack {
-            Color.backgroundPrimary.ignoresSafeArea()
+            Color.ydgBase.ignoresSafeArea()
 
             ScrollView(.vertical, showsIndicators: false) {
-                VStack(spacing: 28) {
+                VStack(alignment: .leading, spacing: YDGSpace.lg) {
                     sealSection
                     planCard
                     calendarStatusRow
                     draftedNoteSection
                     actionsSection
                 }
-                .padding(.horizontal, 20)
-                .padding(.top, 24)
-                .padding(.bottom, 48)
+                .padding(.horizontal, YDGSpace.margin)
+                .padding(.top, YDGSpace.md)
+                .padding(.bottom, YDGSpace.xl)
             }
         }
         .navigationBarTitleDisplayMode(.inline)
@@ -49,12 +49,14 @@ struct LockedInView: View {
                     PartnerSessionManager.shared.clearSession()
                 } label: {
                     Image(systemName: "xmark")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(Color.luxuryGold)
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundColor(Color.ydgTextPrimary)
+                        .frame(width: 44, height: 44)
                 }
+                .accessibilityLabel("Close")
             }
         }
-        .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
+        .toolbarBackground(Color.ydgBase, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
         .onAppear {
             if noteText.isEmpty { noteText = Self.draftLoveNote(for: plan) }
@@ -73,28 +75,26 @@ struct LockedInView: View {
     // MARK: - Seal / header
 
     private var sealSection: some View {
-        VStack(spacing: 14) {
-            ZStack {
-                Circle()
-                    .stroke(Color.accentMaroon, lineWidth: 2)
-                    .frame(width: 84, height: 84)
-                Image(systemName: "checkmark.seal.fill")
-                    .font(.system(size: 44))
-                    .foregroundColor(Color.accentMaroon)
-            }
-            .scaleEffect(sealScale)
-            .opacity(sealOpacity)
+        VStack(alignment: .leading, spacing: YDGSpace.sm) {
+            Image(systemName: "checkmark")
+                .font(.system(size: 26, weight: .semibold))
+                .foregroundColor(Color.ydgSuccess)
+                .frame(width: 56, height: 56)
+                .background(Circle().fill(Color.ydgSuccess.opacity(0.15)))
+                .scaleEffect(sealScale)
+                .opacity(sealOpacity)
+                .accessibilityHidden(true)
 
-            Text("Locked in")
-                .font(Font.displaySerif(38, weight: .bold))
-                .foregroundColor(Color.textPrimary)
+            Text("Locked in.")
+                .ydgText(.display)
+                .accessibilityAddTraits(.isHeader)
 
-            Text("It's settled — no more back-and-forth texts.")
-                .font(Font.bodySans(14, weight: .regular))
-                .foregroundColor(Color.textPrimary.opacity(0.6))
-                .multilineTextAlignment(.center)
+            Text("It's settled. No more back-and-forth texts.")
+                .ydgText(.body, color: .ydgTextSecondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(.top, 8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.top, YDGSpace.xl)
     }
 
     // MARK: - Plan card (cream itinerary card, maroon left border)
@@ -109,90 +109,62 @@ struct LockedInView: View {
     // MARK: - Calendar status
 
     private var calendarStatusRow: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 14) {
             Image(systemName: calendarSynced ? "calendar.badge.checkmark" : "calendar.badge.exclamationmark")
-                .font(.system(size: 18))
-                .foregroundColor(calendarSynced ? Color.luxurySuccess : Color.textPrimary.opacity(0.6))
+                .font(.system(size: 19))
+                .foregroundColor(calendarSynced ? Color.ydgSuccess : Color.ydgTextSecondary)
+                .frame(width: 24)
             VStack(alignment: .leading, spacing: 2) {
                 Text(calendarSynced ? "On both your calendars" : "Saved to your plans")
-                    .font(Font.bodySans(14, weight: .semibold))
-                    .foregroundColor(Color.textPrimary)
+                    .ydgText(.subhead, weight: .semibold)
                 Text(calendarSynced
                      ? "Reminders set the night before and a few hours ahead."
                      : "Turn on Calendar access to get reminders for you both.")
-                    .font(Font.bodySans(12, weight: .regular))
-                    .foregroundColor(Color.textPrimary.opacity(0.6))
+                    .ydgText(.footnote, color: .ydgTextSecondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 0)
         }
-        .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.surfaceElevated)
-        .cornerRadius(14)
-        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.luxeSurfaceBorder, lineWidth: 1))
+        .ydgCard()
     }
 
     // MARK: - Drafted note
 
     private var draftedNoteSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 8) {
-                Image(systemName: "envelope.fill")
-                    .font(.system(size: 13))
-                    .foregroundColor(Color.accentMaroon)
-                Text("Your Love Note, ready to send")
-                    .font(Font.bodySans(11, weight: .bold))
-                    .tracking(1.5)
-                    .foregroundColor(Color.textPrimary.opacity(0.6))
-                    .textCase(.uppercase)
-            }
+        VStack(alignment: .leading, spacing: YDGSpace.sm) {
+            Text("A note for \(partnerDisplayName), ready to send")
+                .ydgText(.caption, color: .ydgHighlight)
 
-            LoveNoteCreamCard(bannerSubtitle: "Ready to send") {
-                Text(noteText)
-                    .font(Font.bodySerif(15, weight: .regular))
-                    .foregroundColor(Color.textOnCard)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(16)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
+            Text(noteText)
+                .font(.ydgDisplay(19, weight: .regular).italic())
+                .foregroundColor(Color.ydgTextPrimary)
+                .lineSpacing(4)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(18)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.ydgHighlightSubtle, in: RoundedRectangle(cornerRadius: YDGRadius.card, style: .continuous))
         }
     }
 
     // MARK: - Actions (single gold highlight = copy note)
 
     private var actionsSection: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: YDGSpace.sm) {
             Button {
                 copyNote()
             } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: didCopyNote ? "checkmark" : "doc.on.doc.fill")
-                        .font(.system(size: 16))
-                    Text(didCopyNote ? "Copied — paste your Love Note to \(partnerDisplayName)" : "Copy Love Note for \(partnerDisplayName)")
-                        .font(Font.bodySans(16, weight: .semibold))
-                }
-                .foregroundColor(Color.backgroundPrimary)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 16)
-                .background(Color.accentGold)
-                .cornerRadius(16)
+                Label(didCopyNote ? "Copied. Paste it to \(partnerDisplayName)" : "Copy note for \(partnerDisplayName)",
+                      systemImage: didCopyNote ? "checkmark" : "doc.on.doc")
             }
-            .buttonStyle(.plain)
+            .buttonStyle(YDGButtonStyle(kind: .secondary))
 
-            Button {
+            Button("Done") {
                 coordinator.dismissToHome()
                 PartnerSessionManager.shared.clearSession()
-            } label: {
-                Text("Done")
-                    .font(Font.bodySans(15, weight: .semibold))
-                    .foregroundColor(Color.textPrimary.opacity(0.8))
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
-                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.textPrimary.opacity(0.3), lineWidth: 1.5))
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.ydgPrimary)
         }
+        .padding(.top, YDGSpace.xs)
     }
 
     // MARK: - Logic

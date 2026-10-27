@@ -71,7 +71,7 @@ struct PartnerReceivesPlanView: View {
                 } label: {
                     Image(systemName: "xmark")
                         .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(Color.luxuryGold)
+                        .foregroundColor(Color.ydgTextPrimary)
                 }
             }
         }
@@ -96,15 +96,15 @@ struct PartnerReceivesPlanView: View {
         VStack(spacing: 12) {
             ZStack {
                 Circle()
-                    .stroke(Color.accentMaroon, lineWidth: 2)
+                    .stroke(Color.ydgHighlight, lineWidth: 2)
                     .frame(width: 80, height: 80)
                 Image(systemName: "gift.fill")
                     .font(.system(size: 36))
-                    .foregroundColor(Color.accentMaroon)
+                    .foregroundColor(Color.ydgHighlight)
             }
 
             Text("\(inviterDisplayName) planned a date for you")
-                .font(Font.displaySerif(32, weight: .bold))
+                .font(Font.ydgDisplay(32))
                 .foregroundColor(Color.textPrimary)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
@@ -183,8 +183,7 @@ struct PartnerReceivesPlanView: View {
                         .foregroundColor(Color.backgroundPrimary)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 16)
-                        .background(Color.accentGold)
-                        .cornerRadius(16)
+                        .background(Capsule().fill(Color.ydgAccent))
                 }
                 .buttonStyle(.plain)
             } else {
@@ -204,8 +203,7 @@ struct PartnerReceivesPlanView: View {
                     .foregroundColor(Color.backgroundPrimary)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 16)
-                    .background(Color.accentGold)
-                    .cornerRadius(16)
+                    .background(Capsule().fill(Color.ydgAccent))
                 }
                 .buttonStyle(.plain)
                 .disabled(calendarState == .adding)

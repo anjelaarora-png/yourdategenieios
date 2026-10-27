@@ -102,7 +102,7 @@ struct PlanGeneratingView: View {
     private var progressText: some View {
         VStack(spacing: 16) {
             Text("Crafting your evening…")
-                .font(Font.displaySerif(32, weight: .bold))
+                .font(Font.ydgDisplay(32))
                 .foregroundColor(Color.textPrimary)
                 .multilineTextAlignment(.center)
 
