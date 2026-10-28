@@ -28,9 +28,23 @@ struct QuestionnaireView: View {
 
                 // Keep questionnaire mounted — swapping the whole tree on tap crashes SwiftUI on device.
                 VStack(spacing: 0) {
-                    StepProgressView(currentStep: viewModel.currentStep, totalSteps: 6)
-                        .padding(.horizontal, YDGSpace.margin)
-                        .padding(.top, YDGSpace.xxs)
+                    // Close (saves progress) · progress · "N of 6" — the design has no nav-bar title here.
+                    HStack(spacing: YDGSpace.xs) {
+                        Button {
+                            closeQuestionnaireTapped()
+                        } label: {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 17, weight: .semibold))
+                                .foregroundColor(Color.ydgTextPrimary)
+                                .frame(width: 44, height: 44, alignment: .leading)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Save progress and exit")
+
+                        StepProgressView(currentStep: viewModel.currentStep, totalSteps: 6)
+                    }
+                    .padding(.horizontal, YDGSpace.margin)
+                    .padding(.top, YDGSpace.xs)
 
                     Text(viewModel.stepHeadline)
                         .ydgText(.title1)
@@ -75,30 +89,7 @@ struct QuestionnaireView: View {
                     .transition(.opacity)
                 }
             }
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                if !isGenerating {
-                    ToolbarItem(placement: .principal) {
-                        Text(viewModel.stepTitle)
-                            .font(Font.ydgSans(15, weight: .semibold))
-                            .foregroundColor(Color.ydgTextSecondary)
-                    }
-                    ToolbarItem(placement: .navigationBarTrailing) {
-                        Button {
-                            closeQuestionnaireTapped()
-                        } label: {
-                            Text("Save & exit")
-                                .font(Font.ydgSans(16, weight: .semibold))
-                                .foregroundColor(Color.ydgAccent)
-                                .frame(minHeight: 44)
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("Save progress and exit")
-                    }
-                }
-            }
-            .toolbarBackground(Color.ydgBase, for: .navigationBar)
-            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbar(.hidden, for: .navigationBar)
             .sheet(isPresented: $showPremiumPaywall) {
                 PremiumDatePlanPaywallView {
                     // Dismiss paywall, then continue generation on the same main-actor turn as the successful purchase/restore.

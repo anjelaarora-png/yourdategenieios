@@ -28,8 +28,6 @@ struct ExploreCategory: Identifiable {
 struct LuxuryExploreTabView: View {
     @EnvironmentObject var coordinator: NavigationCoordinator
     @State private var selectedExploreCategory: ExploreCategory? = nil
-    @State private var recommendedPlaces: [GooglePlacesService.PlaceSearchResult] = []
-    @State private var recommendedLoading = false
     @State private var explorePlaces: [GooglePlacesService.PlaceSearchResult] = []
     @State private var explorePlacesLoading = false
     @State private var exploreNextPageToken: String?
@@ -48,352 +46,158 @@ struct LuxuryExploreTabView: View {
         return resolved.isEmpty ? "your area" : resolved
     }
     
+    /// Short area name for the title: "Explore Williamsburg".
+    private var areaTitle: String {
+        guard preferredCity != "your area" else { return "Explore nearby" }
+        let first = preferredCity.components(separatedBy: ",").first?.trimmingCharacters(in: .whitespaces) ?? preferredCity
+        // A street address reads badly as a title; fall back to the city part.
+        if first.rangeOfCharacter(from: .decimalDigits) != nil {
+            let city = MapURLHelper.cityStateOrRegionFromAddress(preferredCity)
+                .components(separatedBy: ",").first?.trimmingCharacters(in: .whitespaces) ?? ""
+            return city.isEmpty ? "Explore nearby" : "Explore \(city)"
+        }
+        return "Explore \(first)"
+    }
+
     var body: some View {
-        GeometryReader { geo in
-            ZStack {
-                CharcoalMaroonBackground()
-                    .ignoresSafeArea()
-                
-                ScrollView(.vertical, showsIndicators: false) {
-                        VStack(spacing: 24) {
-                            // Header: Recommended in [city]
-                            VStack(spacing: 6) {
-                                Text("Recommended in your area")
-                                    .font(Font.bodySans(16, weight: .regular))
-                                    .foregroundColor(Color.luxuryCreamMuted)
-                                    .multilineTextAlignment(.center)
-                                    .frame(maxWidth: .infinity)
-                                Text(preferredCity)
-                                    .font(Font.bodySerif(22, weight: .regular))
-                                    .foregroundColor(Color.accentGold)
-                                    .multilineTextAlignment(.center)
-                                    .lineLimit(2)
-                                    .minimumScaleFactor(0.6)
-                                    .frame(maxWidth: geo.size.width - 40)
-                                Text("4★+ restaurants, bars, activities & outdoor spots")
-                                    .font(Font.bodySans(12, weight: .medium))
-                                    .foregroundColor(Color.luxuryCreamMuted)
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding(.top, 16)
-                            .padding(.horizontal, 20)
-                            
-                            // Radius filter bar
-                            radiusBar
+        ZStack {
+            Color.ydgBase
+                .ignoresSafeArea()
 
-                            // 6 tiles: horizontal scroll of recommended places
-                            recommendedTilesSection(geo: geo)
-                            
-                            // Pick a category — isolated so horizontal scroll/taps don’t hit results below
-                            VStack(alignment: .leading, spacing: 12) {
-                                Text("Pick a category")
-                                    .font(Font.bodySerif(20, weight: .regular))
-                                    .foregroundColor(Color.accentGold)
-                                    .padding(.horizontal, 20)
-                                
-                                ScrollView(.horizontal, showsIndicators: true) {
-                                    HStack(spacing: 10) {
-                                        Button {
-                                            selectedExploreCategory = nil
-                                            Task { await loadExplorePlaces() }
-                                        } label: {
-                                            chipLabel("All", isSelected: selectedExploreCategory == nil)
-                                        }
-                                        .buttonStyle(ChipButtonStyle())
-                                        ForEach(ExploreCategory.all) { category in
-                                            Button {
-                                                selectedExploreCategory = category
-                                                Task { await loadExplorePlaces() }
-                                            } label: {
-                                                HStack(spacing: 6) {
-                                                    Text(category.emoji).font(.system(size: 14))
-                                                    Text(category.title)
-                                                        .font(Font.bodySans(13, weight: .semibold))
-                                                        .foregroundColor(selectedExploreCategory?.id == category.id ? Color.luxuryMaroon : Color.luxuryCream)
-                                                        .lineLimit(1)
-                                                        .truncationMode(.tail)
-                                                        .minimumScaleFactor(0.8)
-                                                }
-                                                .padding(.horizontal, 12)
-                                                .padding(.vertical, 8)
-                                                .background(selectedExploreCategory?.id == category.id ? Color.luxuryGold : Color.luxeSurfaceTintStrong)
-                                                .cornerRadius(20)
-                                                .overlay(
-                                                    RoundedRectangle(cornerRadius: 20)
-                                                        .stroke(Color.luxuryGold.opacity(selectedExploreCategory?.id == category.id ? 1 : 0.35), lineWidth: 1)
-                                                )
-                                                .contentShape(Rectangle())
-                                            }
-                                            .buttonStyle(ChipButtonStyle())
-                                        }
-                                    }
-                                    .padding(.horizontal, 20)
-                                    .padding(.vertical, 4)
-                                }
-                                .scrollBounceBehavior(.automatic)
-                                .frame(maxWidth: .infinity)
-                                .background(Color.backgroundPrimary)
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding(.bottom, 20)
-                            .background(Color.backgroundPrimary)
-                            .zIndex(1)
-                            
-                            // Category results list — clear gap so chips scroll doesn’t hit first card
-                            if explorePlacesLoading {
-                                VStack(spacing: 16) {
-                                    ProgressView().tint(Color.luxuryGold)
-                                    Text("Finding spots…")
-                                        .font(Font.bodySans(14, weight: .medium))
-                                        .foregroundColor(Color.luxuryCreamMuted)
-                                }
-                                .frame(maxWidth: .infinity).padding(.vertical, 40)
-                            } else if explorePlaces.isEmpty {
-                                VStack(spacing: 10) {
-                                    Text(selectedExploreCategory == nil
-                                         ? "Pick a category above to see more spots"
-                                         : "No spots found for this category — try a different one or pull to refresh.")
-                                        .font(Font.bodySans(15, weight: .medium))
-                                        .foregroundColor(Color.luxuryCreamMuted)
-                                        .multilineTextAlignment(.center)
-                                        .lineLimit(4)
-                                        .frame(maxWidth: .infinity)
-                                        .padding(.horizontal, 24)
-                                    if selectedExploreCategory != nil {
-                                        Button {
-                                            Task { await loadExplorePlaces() }
-                                        } label: {
-                                            HStack(spacing: 6) {
-                                                Image(systemName: "arrow.clockwise")
-                                                    .font(.system(size: 13, weight: .semibold))
-                                                Text("Retry")
-                                                    .font(Font.bodySans(13, weight: .semibold))
-                                            }
-                                            .foregroundColor(Color.luxuryMaroon)
-                                            .padding(.horizontal, 20)
-                                            .padding(.vertical, 10)
-                                            .background(LinearGradient.goldShimmer)
-                                            .cornerRadius(12)
-                                        }
-                                        .buttonStyle(.plain)
-                                    }
-                                }
-                                .padding(.vertical, 40)
-                            } else {
-                                // Results header: spot count + quick-access refresh button
-                                HStack {
-                                    Text("\(explorePlaces.count) spots found")
-                                        .font(Font.bodySans(13, weight: .medium))
-                                        .foregroundColor(Color.luxuryCreamMuted)
-                                    Spacer()
-                                    Button {
-                                        Task { await loadExplorePlaces() }
-                                    } label: {
-                                        HStack(spacing: 5) {
-                                            Image(systemName: "arrow.clockwise")
-                                                .font(.system(size: 13, weight: .semibold))
-                                            Text("Refresh")
-                                                .font(Font.bodySans(13, weight: .semibold))
-                                        }
-                                        .foregroundColor(Color.luxuryGold)
-                                        .padding(.horizontal, 12)
-                                        .padding(.vertical, 7)
-                                        .background(Color.luxeSurfaceTintStrong)
-                                        .overlay(
-                                            RoundedRectangle(cornerRadius: 20)
-                                                .stroke(Color.luxuryGold.opacity(0.5), lineWidth: 1)
-                                        )
-                                        .clipShape(RoundedRectangle(cornerRadius: 20))
-                                    }
-                                    .buttonStyle(.plain)
-                                    .disabled(explorePlacesLoading)
-                                }
-                                .padding(.horizontal, 20)
-                                .padding(.top, 4)
-
-                                LazyVStack(spacing: 14) {
-                                    ForEach(explorePlaces, id: \.placeId) { place in
-                                        ExplorePlaceCard(place: place, preferredCity: preferredCity) {
-                                            openPlaceInPreferredMaps(place: place)
-                                        }
-                                        .buttonStyle(.plain)
-                                    }
-                                    // Generate more options — appends more spots (uses pagination token when
-                                    // available, otherwise fetches a fresh set and adds only new results)
-                                    Button {
-                                        Task { await loadMoreExplorePlaces() }
-                                    } label: {
-                                        HStack(spacing: 8) {
-                                            if exploreLoadMoreLoading {
-                                                ProgressView()
-                                                    .tint(Color.luxuryMaroon)
-                                            } else {
-                                                Image(systemName: "sparkles")
-                                                    .font(.system(size: 18, weight: .medium))
-                                                Text("Generate more options")
-                                                    .font(Font.bodySans(16, weight: .semibold))
-                                            }
-                                        }
-                                        .foregroundColor(Color.luxuryMaroon)
-                                        .padding(.horizontal, 24)
-                                        .padding(.vertical, 16)
-                                        .frame(maxWidth: .infinity)
-                                        .background(Color.luxeSurfaceTintStrong)
-                                        .overlay(
-                                            RoundedRectangle(cornerRadius: 16)
-                                                .stroke(Color.luxuryGold.opacity(0.6), lineWidth: 1)
-                                        )
-                                        .clipShape(RoundedRectangle(cornerRadius: 16))
-                                    }
-                                    .buttonStyle(.plain)
-                                    .disabled(exploreLoadMoreLoading || explorePlacesLoading)
-                                    .padding(.top, 10)
-                                    .padding(.horizontal, 20)
-                                }
-                                .frame(maxWidth: .infinity)
-                                .padding(.horizontal, 20)
-                                .padding(.top, 8)
-                                .padding(.bottom, 24)
-                            }
-                        }
-                        .frame(minWidth: 0, maxWidth: .infinity)
-                        .padding(.bottom, 120)
+            ScrollView(.vertical, showsIndicators: false) {
+                VStack(alignment: .leading, spacing: YDGSpace.md) {
+                    VStack(alignment: .leading, spacing: YDGSpace.xxs) {
+                        Text(areaTitle)
+                            .ydgText(.title1)
+                            .lineLimit(2)
+                            .minimumScaleFactor(0.7)
+                            .accessibilityAddTraits(.isHeader)
+                        Text("4.0★ and up, open tonight.")
+                            .ydgText(.body, color: .ydgTextSecondary)
                     }
-                    .scrollBounceBehavior(.basedOnSize)
+                    .padding(.horizontal, YDGSpace.margin)
+                    .padding(.top, YDGSpace.xs)
+
+                    categoryChips
+
+                    resultsList
+                }
+                .padding(.bottom, YDGSpace.xxl)
+            }
+            .scrollBounceBehavior(.basedOnSize)
+        }
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                radiusMenu
             }
         }
-        .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
         .onAppear {
-            Task { await loadRecommendedPlaces() }
             Task { await loadExplorePlaces() }
         }
         .refreshable {
-            await loadRecommendedPlaces()
             await loadExplorePlaces()
         }
     }
-    
-    /// Top 6 recommended tiles (horizontal scroll); loading state or empty state when no location.
-    private func recommendedTilesSection(geo: GeometryProxy) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            if recommendedLoading {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 14) {
-                        ForEach(0..<6, id: \.self) { _ in
-                            RoundedRectangle(cornerRadius: 24)
-                                .fill(Color.luxeSurfaceTintStrong)
-                                .frame(width: 200, height: 200)
-                                .overlay(ProgressView().tint(Color.luxuryGold))
-                        }
-                    }
-                    .padding(.horizontal, 20)
-                }
-            } else if recommendedPlaces.isEmpty {
-                Text("Set your starting address or city in Settings to see recommended spots here.")
-                    .font(Font.bodySans(14, weight: .medium))
-                    .foregroundColor(Color.luxuryCreamMuted)
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: .infinity)
-                    .padding(.horizontal, 24)
-                    .padding(.vertical, 24)
-            } else {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 14) {
-                        ForEach(recommendedPlaces.prefix(6), id: \.placeId) { place in
-                            ExplorePlaceCard(place: place, preferredCity: preferredCity) {
-                                openPlaceInPreferredMaps(place: place)
-                            }
-                            .frame(width: min(220, geo.size.width - 60))
-                        }
-                    }
-                    .padding(.horizontal, 20)
-                }
-            }
-        }
-        .frame(maxWidth: .infinity)
-    }
-    
-    private var radiusBar: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 5) {
-                Image(systemName: "location.circle.fill")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(Color.luxuryGold)
-                Text("Area radius")
-                    .font(Font.bodySans(12, weight: .medium))
-                    .foregroundColor(Color.luxuryCreamMuted)
-            }
-            .padding(.horizontal, 20)
 
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(Self.radiusOptions, id: \.miles) { option in
-                        Button {
-                            guard exploreRadiusMiles != option.miles else { return }
-                            exploreRadiusMiles = option.miles
-                            Task {
-                                await loadRecommendedPlaces()
-                                await loadExplorePlaces()
-                            }
-                        } label: {
-                            Text(option.label)
-                                .font(Font.bodySans(13, weight: .semibold))
-                                .foregroundColor(exploreRadiusMiles == option.miles ? Color.luxuryMaroon : Color.luxuryCream)
-                                .padding(.horizontal, 14)
-                                .padding(.vertical, 8)
-                                .background(exploreRadiusMiles == option.miles ? Color.luxuryGold : Color.luxeSurfaceTintStrong)
-                                .cornerRadius(20)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 20)
-                                        .stroke(Color.luxuryGold.opacity(exploreRadiusMiles == option.miles ? 1 : 0.35), lineWidth: 1)
-                                )
-                        }
-                        .buttonStyle(ChipButtonStyle())
+    private var radiusMenu: some View {
+        Menu {
+            ForEach(Self.radiusOptions, id: \.miles) { option in
+                Button {
+                    guard exploreRadiusMiles != option.miles else { return }
+                    exploreRadiusMiles = option.miles
+                    Task { await loadExplorePlaces() }
+                } label: {
+                    if exploreRadiusMiles == option.miles {
+                        Label("Within \(option.label)", systemImage: "checkmark")
+                    } else {
+                        Text("Within \(option.label)")
                     }
                 }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 2)
             }
-            .scrollBounceBehavior(.automatic)
+        } label: {
+            // HStack, not Label: toolbars collapse a Label to its icon.
+            HStack(spacing: 4) {
+                Image(systemName: "mappin")
+                    .font(.system(size: 13, weight: .semibold))
+                Text("Within \(exploreRadiusMiles) mi")
+                    .font(.ydg(.subhead, weight: .medium))
+            }
+            .foregroundColor(Color.ydgTextPrimary)
+            .padding(.horizontal, YDGSpace.xs)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityLabel("Search radius, \(exploreRadiusMiles) miles")
     }
 
-    private func chipLabel(_ title: String, isSelected: Bool) -> some View {
-        Text(title)
-            .font(Font.bodySans(14, weight: .semibold))
-            .foregroundColor(isSelected ? Color.luxuryMaroon : Color.luxuryCream)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 10)
-            .background(isSelected ? Color.luxuryGold : Color.luxeSurfaceTintStrong)
-            .cornerRadius(20)
-            .overlay(
-                RoundedRectangle(cornerRadius: 20)
-                    .stroke(Color.luxuryGold.opacity(isSelected ? 1 : 0.35), lineWidth: 1)
-            )
-    }
-    
-    private func loadRecommendedPlaces() async {
-        let city = preferredCity
-        guard city != "your area", !city.isEmpty else {
-            await MainActor.run { recommendedPlaces = []; recommendedLoading = false }
-            return
-        }
-        let alreadyLoading = await MainActor.run { () -> Bool in
-            if recommendedLoading { return true }
-            recommendedLoading = true
-            return false
-        }
-        guard !alreadyLoading else { return }
-        let radius = exploreRadiusMeters
-        do {
-            let places = try await GooglePlacesService.shared.fetchRecommendedInCity(city: city, limit: 6, radiusMeters: radius)
-            await MainActor.run { recommendedPlaces = places; recommendedLoading = false }
-        } catch {
-            await MainActor.run { recommendedPlaces = []; recommendedLoading = false }
+    private var categoryChips: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: YDGSpace.xs) {
+                YDGChip(title: "All", isSelected: selectedExploreCategory == nil, showsCheckmark: false) {
+                    selectedExploreCategory = nil
+                    Task { await loadExplorePlaces() }
+                }
+                ForEach(ExploreCategory.all) { category in
+                    YDGChip(title: category.title, isSelected: selectedExploreCategory?.id == category.id, showsCheckmark: false) {
+                        selectedExploreCategory = category
+                        Task { await loadExplorePlaces() }
+                    }
+                }
+            }
+            .padding(.horizontal, YDGSpace.margin)
         }
     }
-    
+
+    @ViewBuilder
+    private var resultsList: some View {
+        if explorePlacesLoading {
+            HStack(spacing: YDGSpace.sm) {
+                ProgressView().tint(Color.ydgTextSecondary)
+                Text("Finding spots…")
+                    .ydgText(.subhead, weight: .regular, color: .ydgTextSecondary)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, YDGSpace.xxl)
+        } else if explorePlaces.isEmpty {
+            VStack(alignment: .leading, spacing: YDGSpace.sm) {
+                Text(preferredCity == "your area"
+                     ? "Add a starting point in your preferences to see spots near you."
+                     : "No spots found here. Try another category or a wider radius.")
+                    .ydgText(.body, color: .ydgTextSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                if preferredCity != "your area" {
+                    Button("Try again") { Task { await loadExplorePlaces() } }
+                        .buttonStyle(YDGButtonStyle(kind: .secondary, fullWidth: false, compact: true))
+                }
+            }
+            .padding(.horizontal, YDGSpace.margin)
+            .padding(.top, YDGSpace.md)
+        } else {
+            VStack(alignment: .leading, spacing: 0) {
+                Text("\(explorePlaces.count) spots")
+                    .ydgText(.footnote, color: .ydgTextSecondary)
+                    .padding(.bottom, YDGSpace.xs)
+
+                LazyVStack(spacing: 0) {
+                    ForEach(explorePlaces, id: \.placeId) { place in
+                        ExplorePlaceCard(place: place, preferredCity: preferredCity) {
+                            openPlaceInPreferredMaps(place: place)
+                        }
+                        Rectangle().fill(Color.ydgBorder).frame(height: 1)
+                    }
+                }
+
+                Button {
+                    Task { await loadMoreExplorePlaces() }
+                } label: {
+                    Text("Show more spots")
+                }
+                .buttonStyle(YDGButtonStyle(kind: .secondary, isLoading: exploreLoadMoreLoading))
+                .disabled(exploreLoadMoreLoading || explorePlacesLoading)
+                .padding(.top, YDGSpace.lg)
+            }
+            .padding(.horizontal, YDGSpace.margin)
+        }
+    }
+
     private func loadExplorePlaces() async {
         let city = preferredCity
         guard city != "your area", !city.isEmpty else {
@@ -475,16 +279,6 @@ struct LuxuryExploreTabView: View {
     }
 }
 
-// MARK: - Chip button style — ensures chip taps are consumed and don’t pass through to cards below
-private struct ChipButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .contentShape(Rectangle())
-            .opacity(configuration.isPressed ? 0.9 : 1)
-            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
-    }
-}
-
 // MARK: - Maps opener (shared by Home preview + full Explore)
 
 enum ExplorePlaceOpener {
@@ -517,93 +311,65 @@ enum ExplorePlaceOpener {
     }
 }
 
-// MARK: - Explore Place Card (Google Places result, View in Maps)
+// MARK: - Explore Place Card (Google Places result row)
 struct ExplorePlaceCard: View {
     let place: GooglePlacesService.PlaceSearchResult
     let preferredCity: String
     let onOpenInMaps: () -> Void
     
-    private var tagline: String {
-        if let r = place.rating {
-            let stars = "★ \(String(format: "%.1f", r))"
-            if let n = place.userRatingsTotal, n > 0 { return "\(stars) · \(n) reviews" }
-            return stars
-        }
-        return "Trending on Google"
-    }
-    
     private var locationText: String {
         let cityState = MapURLHelper.cityStateOrRegionFromAddress(place.address)
-        return cityState.isEmpty ? preferredCity : cityState
+        let base = cityState.isEmpty ? preferredCity : cityState
+        let price = CurrencyHelper.formattedPriceLevel(place.priceLevel)
+        return price.isEmpty ? base : "\(base) · \(price)"
     }
     
     var body: some View {
         Button(action: onOpenInMaps) {
-            VStack(alignment: .leading, spacing: 0) {
-                AsyncImage(url: URL(string: place.photoUrl ?? "https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=400&h=300&fit=crop")) { phase in
+            HStack(alignment: .center, spacing: YDGSpace.sm) {
+                AsyncImage(url: place.photoUrl.flatMap(URL.init(string:))) { phase in
                     switch phase {
                     case .success(let image): image.resizable().aspectRatio(contentMode: .fill)
-                    case .empty, .failure: Color.luxeSurfaceTintStrong
-                    @unknown default: EmptyView()
+                    default: Color.ydgOverlay
                     }
                 }
-                .frame(height: 120)
-                .frame(maxWidth: .infinity)
-                .clipped()
-                .overlay(LinearGradient(colors: [.clear, Color.luxuryMaroon.opacity(0.8)], startPoint: .top, endPoint: .bottom))
-                .clipShape(RoundedRectangle(cornerRadius: 24))
-                
-                VStack(alignment: .leading, spacing: 8) {
+                .frame(width: 72, height: 72)
+                .clipShape(RoundedRectangle(cornerRadius: YDGRadius.chip, style: .continuous))
+                .accessibilityHidden(true)
+
+                VStack(alignment: .leading, spacing: 2) {
                     Text(place.name)
-                        .font(Font.bodySans(15, weight: .semibold))
-                        .foregroundColor(Color.luxuryCream)
-                        .lineLimit(2)
-                        .truncationMode(.tail)
-                        .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
-                    Text(tagline)
-                        .font(Font.bodySans(12, weight: .regular))
-                        .foregroundColor(Color.luxuryMuted)
+                        .ydgText(.headline)
                         .lineLimit(1)
-                        .truncationMode(.tail)
-                        .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
-                    HStack(spacing: 8) {
-                        Label(locationText, systemImage: "location")
-                            .font(Font.bodySans(11, weight: .medium))
-                            .foregroundColor(Color.luxuryCreamMuted)
-                            .lineLimit(1)
-                            .truncationMode(.tail)
-                            .minimumScaleFactor(0.9)
-                            .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
+                    Text(locationText)
+                        .ydgText(.footnote, color: .ydgTextSecondary)
+                        .lineLimit(1)
+                    HStack(spacing: YDGSpace.xs) {
+                        if let r = place.rating {
+                            Text("\(String(format: "%.1f", r)) ★")
+                                .ydgText(.footnote, weight: .semibold)
+                        }
                         if place.openNow == true {
-                            Label("Open now", systemImage: "clock")
-                                .font(Font.bodySans(11, weight: .medium))
-                                .foregroundColor(Color.luxuryCreamMuted)
+                            Text("Open now")
+                                .ydgText(.footnote, color: .ydgSuccess)
+                        } else if place.openNow == false {
+                            Text("Closed now")
+                                .ydgText(.footnote, color: .ydgWarning)
                         }
-                        if !CurrencyHelper.formattedPriceLevel(place.priceLevel).isEmpty {
-                            Text(CurrencyHelper.formattedPriceLevel(place.priceLevel))
-                                .font(Font.bodySans(11, weight: .medium))
-                                .foregroundColor(Color.luxuryCreamMuted)
-                        }
-                        Spacer(minLength: 0)
                     }
-                    Text("View in Maps")
-                        .font(Font.bodySans(12, weight: .semibold))
-                        .foregroundColor(Color.luxuryMaroon)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 8)
-                        .background(LinearGradient.goldShimmer)
-                        .cornerRadius(12)
                 }
-                .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
-                .padding(16)
+                Spacer(minLength: 0)
+                Image(systemName: "map")
+                    .font(.system(size: 17, weight: .regular))
+                    .foregroundColor(Color.ydgAccent)
+                    .frame(width: 44, height: 44)
+                    .accessibilityHidden(true)
             }
-            .frame(maxWidth: .infinity)
-            .background(Color.luxeSurfaceTintStrong)
-            .overlay(RoundedRectangle(cornerRadius: 24).stroke(Color.luxuryGold.opacity(0.3), lineWidth: 1))
-            .clipShape(RoundedRectangle(cornerRadius: 24))
-            .shadow(color: Color.luxuryGold.opacity(0.15), radius: 12, y: 4)
+            .padding(.vertical, YDGSpace.sm)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityHint("Opens in Maps")
     }
 }
 

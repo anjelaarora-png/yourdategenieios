@@ -13,35 +13,37 @@ struct PartnerJoinView: View {
     @State private var partnerNote = ""
     @State private var showContentFilterAlert = false
 
-    private var displayTitle: String {
-        let name = (inviterName ?? "").trimmingCharacters(in: .whitespaces)
-        if name.isEmpty {
-            return "Join date plan"
-        }
-        return "Join \(name)'s date plan"
-    }
-
     private var hasSavedPreferences: Bool {
         userProfileManager.hasCompletedPreferences && userProfileManager.isLoggedIn
     }
 
+    private var inviterFirstName: String? {
+        let name = (inviterName ?? "").trimmingCharacters(in: .whitespaces)
+        return name.isEmpty ? nil : name
+    }
+
     var body: some View {
         ZStack {
-            Color.backgroundPrimary
+            Color.ydgBase
                 .ignoresSafeArea()
 
             if !userProfileManager.isLoggedIn {
                 // Partner must be signed in before they can contribute preferences
                 signInRequiredSection
             } else {
-                ScrollView(.vertical, showsIndicators: false) {
-                    VStack(spacing: 28) {
-                        headerSection
-                        contentSection
+                VStack(spacing: 0) {
+                    ScrollView(.vertical, showsIndicators: false) {
+                        VStack(alignment: .leading, spacing: YDGSpace.lg) {
+                            headerSection
+                            contentSection
+                        }
+                        .padding(.horizontal, YDGSpace.margin)
+                        .padding(.top, YDGSpace.md)
+                        .padding(.bottom, YDGSpace.lg)
                     }
-                    .padding(.horizontal, 24)
-                    .padding(.top, 24)
-                    .padding(.bottom, 48)
+                    bottomAction
+                        .padding(.horizontal, YDGSpace.margin)
+                        .padding(.bottom, YDGSpace.xs)
                 }
             }
         }
@@ -54,12 +56,14 @@ struct PartnerJoinView: View {
                     coordinator.dismissSheet()
                 } label: {
                     Image(systemName: "xmark")
-                        .font(.system(size: 14, weight: .medium))
+                        .font(.system(size: 17, weight: .semibold))
                         .foregroundColor(Color.ydgTextPrimary)
+                        .frame(width: 44, height: 44)
                 }
+                .accessibilityLabel("Close")
             }
         }
-        .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
+        .toolbarBackground(Color.ydgBase, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
         .alert("Message not allowed", isPresented: $showContentFilterAlert) {
             Button("OK", role: .cancel) {}
@@ -69,53 +73,57 @@ struct PartnerJoinView: View {
     }
 
     private var signInRequiredSection: some View {
-        VStack(spacing: 24) {
-            Image(systemName: "lock.circle.fill")
-                .font(.system(size: 52))
+        VStack(alignment: .leading, spacing: YDGSpace.md) {
+            Spacer()
+            Image(systemName: "lock")
+                .font(.system(size: 22, weight: .semibold))
                 .foregroundColor(Color.ydgHighlight)
-
-            VStack(spacing: 8) {
-                Text("Sign in to join")
-                    .font(Font.ydgDisplay(30))
-                    .foregroundColor(Color.textPrimary)
-                Text("You need an account to contribute your preferences to this date plan.")
-                    .font(Font.bodySans(14, weight: .regular))
-                    .foregroundColor(Color.textPrimary.opacity(0.6))
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 8)
-            }
-
-            Button {
+                .frame(width: 56, height: 56)
+                .background(Circle().fill(Color.ydgHighlightSubtle))
+                .accessibilityHidden(true)
+            Text(inviterFirstName.map { "Sign in to join \($0)" } ?? "Sign in to join")
+                .ydgText(.title1)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityAddTraits(.isHeader)
+            Text("You need an account to add your preferences to this date plan.")
+                .ydgText(.body, color: .ydgTextSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer()
+            Button("Sign in or create account") {
                 coordinator.dismissSheet()
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
                     coordinator.activeSheet = .authRequired(.fresh)
                 }
-            } label: {
-                Text("Sign in / Create account")
-                    .font(Font.bodySans(16, weight: .semibold))
-                    .foregroundColor(Color.backgroundPrimary)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
-                    .background(Capsule().fill(Color.ydgAccent))
             }
-            .buttonStyle(.plain)
-            .padding(.horizontal, 24)
+            .buttonStyle(.ydgPrimary)
         }
-        .padding(.top, 60)
-        .padding(.horizontal, 24)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, YDGSpace.margin)
+        .padding(.bottom, YDGSpace.xs)
     }
 
     private var headerSection: some View {
-        VStack(spacing: 10) {
-            Image(systemName: "heart.circle.fill")
-                .font(.system(size: 32))
-                .foregroundColor(Color.ydgHighlight)
-            Text(displayTitle)
-                .font(Font.ydgDisplay(24))
-                .foregroundColor(Color.textPrimary)
-                .multilineTextAlignment(.center)
+        VStack(alignment: .leading, spacing: YDGSpace.xs) {
+            HStack(spacing: YDGSpace.xs) {
+                Text(String((inviterFirstName ?? "?").prefix(1)).uppercased())
+                    .font(.ydgSans(13, weight: .semibold))
+                    .foregroundColor(Color.ydgTextPrimary)
+                    .frame(width: 30, height: 30)
+                    .background(Circle().fill(Color.ydgIconTile))
+                    .accessibilityHidden(true)
+                Text(inviterFirstName.map { "\($0) invited you" } ?? "You're invited")
+                    .ydgText(.caption, color: .ydgHighlight)
+            }
+            Text("Help plan your next date")
+                .ydgText(.title1)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityAddTraits(.isHeader)
+                .padding(.top, YDGSpace.xxs)
+            Text("Answer on your own. \(inviterFirstName ?? "They") won't see your picks until you've both ranked.")
+                .ydgText(.body, color: .ydgTextSecondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
-        .frame(maxWidth: .infinity)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     @ViewBuilder
@@ -123,82 +131,103 @@ struct PartnerJoinView: View {
         if hasSavedPreferences {
             oneTapSection
         } else {
-            addPreferencesSection
+            Text("Add your preferences so we can plan something you'll both love.")
+                .ydgText(.body, color: .ydgTextSecondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
+    }
+
+    // MARK: Saved preferences summary (design 4.4)
+
+    private func labels(_ values: [String], in options: [OptionItem]) -> String {
+        let names = values.compactMap { v in options.first { $0.value == v }?.label }
+        return names.isEmpty ? "None" : names.prefix(2).joined(separator: ", ")
+    }
+
+    private var preferenceRows: [(String, String)] {
+        let p = userProfileManager.currentUser?.preferences ?? DatePreferences()
+        return [
+            ("Into", labels(p.favoriteActivities, in: QuestionnaireOptions.activities)),
+            ("Food", labels(p.favoriteCuisines, in: QuestionnaireOptions.cuisines)),
+            ("Drinks", labels(p.beveragePreferences, in: QuestionnaireOptions.drinkPreferences)),
+            ("Hard no's", labels(p.hardNos, in: QuestionnaireOptions.hardNos)),
+        ]
     }
 
     private var oneTapSection: some View {
-        VStack(alignment: .leading, spacing: 24) {
-            Text("We've used your saved preferences.")
-                .font(Font.bodySans(15, weight: .regular))
-                .foregroundColor(Color.textPrimary.opacity(0.6))
+        VStack(alignment: .leading, spacing: YDGSpace.lg) {
+            VStack(spacing: 0) {
+                HStack {
+                    Text("Your saved preferences")
+                        .ydgText(.subhead, weight: .semibold)
+                    Spacer()
+                    Button("Edit") { openPreferencesQuestionnaire() }
+                        .buttonStyle(.ydgTertiary)
+                }
+                .padding(.leading, YDGSpace.md)
+                .padding(.trailing, YDGSpace.xs)
+                ForEach(preferenceRows, id: \.0) { row in
+                    YDGListDivider(leadingInset: 0)
+                    HStack {
+                        Text(row.0)
+                            .ydgText(.subhead, weight: .regular, color: .ydgTextSecondary)
+                        Spacer()
+                        Text(row.1)
+                            .ydgText(.subhead, weight: .regular)
+                            .multilineTextAlignment(.trailing)
+                    }
+                    .padding(.horizontal, YDGSpace.md)
+                    .frame(minHeight: 44)
+                }
+            }
+            .background(Color.ydgRaised, in: RoundedRectangle(cornerRadius: YDGRadius.card, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: YDGRadius.card, style: .continuous)
+                    .stroke(Color.ydgBorder, lineWidth: 1)
+            )
 
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Anything to add? (optional)")
-                    .font(Font.bodySans(12, weight: .medium))
-                    .foregroundColor(Color.textPrimary.opacity(0.6))
-                TextField("", text: $partnerNote, prompt: Text("e.g. Rooftop preferred").foregroundColor(Color.textPrimary.opacity(0.35)))
-                    .font(Font.bodySans(15, weight: .regular))
-                    .foregroundColor(Color.textPrimary)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 12)
-                    .background(Color.surfaceElevated)
-                    .cornerRadius(12)
+            VStack(alignment: .leading, spacing: YDGSpace.xs) {
+                HStack {
+                    Text("Anything to add?")
+                        .ydgText(.subhead, weight: .medium)
+                    Spacer()
+                    Text("Optional")
+                        .ydgText(.footnote, color: .ydgTextTertiary)
+                }
+                TextField("", text: $partnerNote, prompt: Text("e.g. Rooftop if the weather holds").foregroundColor(Color.ydgTextTertiary))
+                    .font(.ydg(.body))
+                    .foregroundColor(Color.ydgTextPrimary)
+                    .padding(.horizontal, YDGSpace.md)
+                    .frame(minHeight: 52)
+                    .background(Color.ydgRaised, in: RoundedRectangle(cornerRadius: YDGRadius.card, style: .continuous))
                     .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(Color.luxeSurfaceBorder, lineWidth: 1)
+                        RoundedRectangle(cornerRadius: YDGRadius.card, style: .continuous)
+                            .stroke(Color.ydgBorder, lineWidth: 1)
                     )
             }
-
-            Button {
-                submitWithSavedPreferences()
-            } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 18))
-                    Text("I'm in")
-                        .font(Font.bodySans(16, weight: .semibold))
-                }
-                .foregroundColor(Color.backgroundPrimary)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 16)
-                .background(Capsule().fill(Color.ydgAccent))
-            }
-            .buttonStyle(.plain)
         }
-        .padding(.vertical, 8)
     }
 
-    private var addPreferencesSection: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            Text("Add your preferences so we can plan something you'll both love.")
-                .font(Font.bodySans(15, weight: .regular))
-                .foregroundColor(Color.textPrimary.opacity(0.6))
-
-            Button {
-                access.require(.datePlan) {
-                    coordinator.partnerJoinSessionId = sessionId
-                    coordinator.dismissSheet()
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-                        coordinator.planIntent = .fresh
-                        coordinator.activeSheet = .questionnaire
-                    }
-                }
-            } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: "pencil.circle.fill")
-                        .font(.system(size: 18))
-                    Text("Add my preferences")
-                        .font(Font.bodySans(16, weight: .semibold))
-                }
-                .foregroundColor(Color.backgroundPrimary)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 16)
-                .background(Capsule().fill(Color.ydgAccent))
-            }
-            .buttonStyle(.plain)
+    @ViewBuilder
+    private var bottomAction: some View {
+        if hasSavedPreferences {
+            Button("I'm in") { submitWithSavedPreferences() }
+                .buttonStyle(.ydgPrimary)
+        } else {
+            Button("Add my preferences") { openPreferencesQuestionnaire() }
+                .buttonStyle(.ydgPrimary)
         }
-        .padding(.vertical, 8)
+    }
+
+    private func openPreferencesQuestionnaire() {
+        access.require(.datePlan) {
+            coordinator.partnerJoinSessionId = sessionId
+            coordinator.dismissSheet()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                coordinator.planIntent = .fresh
+                coordinator.activeSheet = .questionnaire
+            }
+        }
     }
 
     private func submitWithSavedPreferences() {

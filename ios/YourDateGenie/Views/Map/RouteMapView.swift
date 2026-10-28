@@ -21,6 +21,7 @@ struct RouteMapView: View {
     }
     
     var body: some View {
+        ScrollView(showsIndicators: false) {
         VStack(spacing: 0) {
             // Map – position binding so programmatic updates (e.g. after geocode) drive the camera
             Map(position: $position) {
@@ -53,14 +54,10 @@ struct RouteMapView: View {
                     }
                 }
             }
-            .frame(height: 300)
+            .frame(height: 340)
             .environment(\.colorScheme, .dark)
-            .clipShape(RoundedRectangle(cornerRadius: YDGRadius.card, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: YDGRadius.card, style: .continuous)
-                    .stroke(Color.ydgBorder, lineWidth: 1)
-            )
             
+            VStack(spacing: 0) {
             // Stops List (or empty state)
             if stops.isEmpty {
                 Text("Complete dates and mark them as done to see your journey here.")
@@ -69,43 +66,35 @@ struct RouteMapView: View {
                     .padding(.top, 24)
                     .padding(.horizontal, 20)
             } else {
-                VStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 0) {
+                    HStack(alignment: .firstTextBaseline) {
+                        Text("\(stops.count) stop\(stops.count == 1 ? "" : "s")")
+                            .ydgText(.title2)
+                            .accessibilityAddTraits(.isHeader)
+                        Spacer()
+                        if showRouteLine, let total = totalTravelLabel {
+                            Text(total)
+                                .ydgText(.subhead, weight: .regular, color: .ydgTextSecondary)
+                        }
+                    }
+                    .padding(.bottom, YDGSpace.sm)
+
+                    if let start = startingPoint, showRouteLine {
+                        startRow(start)
+                        Rectangle().fill(Color.ydgBorder).frame(height: 1).padding(.leading, 44)
+                    }
                     ForEach(Array(stops.enumerated()), id: \.element.id) { index, stop in
                         StopListItem(
                             stop: stop,
                             number: index + 1,
                             isLast: index == stops.count - 1
                         )
-                    }
-                }
-                .padding(.top, 16)
-            }
-            
-            // Legs summary (Start → 1, 1 → 2, …) with mode icon, time and distance – readable fonts; only when single route.
-            if showRouteLine, !legsList.isEmpty {
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("Route legs")
-                        .ydgText(.title3)
-                        .accessibilityAddTraits(.isHeader)
-                    VStack(spacing: 8) {
-                        ForEach(Array(legsList.enumerated()), id: \.offset) { _, leg in
-                            HStack(spacing: 12) {
-                                Image(systemName: TravelModeIcon.sfSymbol(for: leg.mode))
-                                    .font(.system(size: 16))
-                                    .foregroundColor(Color.ydgTextSecondary)
-                                    .frame(width: 24, alignment: .center)
-                                Text(leg.label)
-                                    .ydgText(.subhead, weight: .medium)
-                                Spacer(minLength: 8)
-                                legTimeDistanceLabel(time: leg.time, distance: leg.distance, mode: leg.mode)
-                            }
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 10)
-                            .background(Color.ydgRaised, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        if index < stops.count - 1 {
+                            Rectangle().fill(Color.ydgBorder).frame(height: 1).padding(.leading, 44)
                         }
                     }
                 }
-                .padding(.top, 14)
+                .padding(.top, YDGSpace.lg)
             }
             
             // Open in Maps Button - match app gold button style (dark text on gold); hide when no stops
@@ -116,10 +105,14 @@ struct RouteMapView: View {
                     Label(showRouteLine ? "Open route in Maps" : "View in Maps", systemImage: "map")
                 }
                 .buttonStyle(.ydgPrimary)
-                .padding(.top, YDGSpace.md)
+                .padding(.top, YDGSpace.lg)
             }
+            }
+            .padding(.horizontal, YDGSpace.margin)
+            .padding(.bottom, YDGSpace.lg)
         }
-        .background(Color.ydgBase)
+        }
+        .background(Color.ydgBase.ignoresSafeArea())
         .onAppear {
             updateRegionFromStops()
             resolveMissingCoordinates()
@@ -211,6 +204,40 @@ struct RouteMapView: View {
     }
     
     /// Legs for summary: Start → 1, 1 → 2, … with time, distance, mode from each stop’s travel fields.
+    /// "22 min walking" — sum of the leg times we have, labelled by the dominant travel mode.
+    private var totalTravelLabel: String? {
+        let minutes = legsList.compactMap { leg -> Int? in
+            let digits = leg.time.prefix { $0.isNumber }
+            return Int(digits)
+        }.reduce(0, +)
+        guard minutes > 0 else { return nil }
+        let mode = (stops.first?.travelMode ?? "walking").lowercased()
+        let verb = mode.contains("driv") ? "driving" : (mode.contains("transit") ? "by transit" : "walking")
+        return "\(minutes) min \(verb)"
+    }
+
+    private func startRow(_ start: StartingPoint) -> some View {
+        HStack(spacing: YDGSpace.sm) {
+            Image(systemName: "house")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(Color.ydgTextPrimary)
+                .frame(width: 30, height: 30)
+                .overlay(Circle().stroke(Color.ydgBorderStrong, lineWidth: 1))
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Start · \(start.address.components(separatedBy: ",").first ?? start.address)")
+                    .ydgText(.body, weight: .medium)
+                    .lineLimit(1)
+                if let first = stops.first, let time = first.travelTimeFromPrevious, !time.isEmpty {
+                    Text("\(time) to \(first.name)")
+                        .ydgText(.footnote, color: .ydgTextSecondary)
+                }
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.vertical, YDGSpace.sm)
+    }
+
     @ViewBuilder
     private func legTimeDistanceLabel(time: String, distance: String?, mode: String) -> some View {
         let modeLabel = TravelModeIcon.displayLabel(for: mode)
@@ -490,60 +517,43 @@ struct StopListItem: View {
     let stop: DatePlanStop
     let number: Int
     let isLast: Bool
+
+    private var subtitle: String {
+        let street = stop.address?.components(separatedBy: ",").first ?? stop.venueType
+        return [stop.timeSlot, street].filter { !$0.isEmpty }.joined(separator: " · ")
+    }
     
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            // Number badge
-            ZStack {
-                Circle()
-                    .fill(Color.ydgAccent)
-                    .frame(width: 28, height: 28)
-                
-                Text("\(number)")
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundColor(Color.ydgTextOnAccent)
+        HStack(alignment: .center, spacing: YDGSpace.sm) {
+            Text("\(number)")
+                .font(.ydgSans(13, weight: .bold))
+                .foregroundColor(Color.ydgTextOnAccent)
+                .frame(width: 30, height: 30)
+                .background(Circle().fill(Color.ydgAccent))
+                .accessibilityHidden(true)
+            
+            VStack(alignment: .leading, spacing: 2) {
+                Text(stop.name)
+                    .ydgText(.body, weight: .medium)
+                    .lineLimit(1)
+                Text(subtitle)
+                    .ydgText(.footnote, color: .ydgTextSecondary)
+                    .lineLimit(1)
             }
             
-            // Content – readable body sizes
-            VStack(alignment: .leading, spacing: 6) {
-                HStack {
-                    Text(stop.emoji)
-                        .font(.system(size: 18))
-                    Text(stop.name)
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(Color.luxuryCream)
-                }
-                
-                Text(stop.venueType)
-                    .font(.system(size: 14))
-                    .foregroundColor(Color.luxuryCreamMuted)
-                
-                if let address = stop.address {
-                    Text(address)
-                        .font(.system(size: 13))
-                        .foregroundColor(Color.luxuryMuted)
-                        .lineLimit(2)
-                }
-            }
+            Spacer(minLength: 0)
             
-            Spacer()
-            
-            // Get Directions - gold icon on dark card for visibility
             Button {
                 openDirections(to: stop)
             } label: {
-                Image(systemName: "arrow.triangle.turn.up.right.circle.fill")
-                    .font(.system(size: 24))
-                    .foregroundColor(Color.luxuryGold)
+                Image(systemName: "arrow.triangle.turn.up.right.diamond")
+                    .font(.system(size: 19, weight: .regular))
+                    .foregroundColor(Color.ydgAccent)
+                    .frame(width: 44, height: 44)
             }
+            .accessibilityLabel("Directions to \(stop.name)")
         }
-        .padding(12)
-        .background(Color.ydgRaised)
-        .cornerRadius(12)
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Color.ydgBorder, lineWidth: 1)
-        )
+        .padding(.vertical, YDGSpace.xxs)
     }
     
     private func openDirections(to stop: DatePlanStop) {

@@ -111,7 +111,8 @@ struct LowKeyDateView: View {
                 .fixedSize(horizontal: false, vertical: true)
 
             HStack(spacing: YDGSpace.xs) {
-                ForEach(current.meta.components(separatedBy: " · "), id: \.self) { tag in
+                ForEach(current.meta.components(separatedBy: " · "), id: \.self) { raw in
+                    let tag = raw == "0 travel" ? "No travel" : raw.prefix(1).uppercased() + raw.dropFirst()
                     Text(tag)
                         .font(.ydg(.footnote, weight: .medium))
                         .foregroundColor(Color.ydgTextPrimary)

@@ -27,11 +27,7 @@ struct DatesTabView: View {
                 Group {
                     switch segment {
                     case .upcoming:
-                        planList(
-                            coordinator.savedPlans,
-                            emptyTitle: "No dates planned yet",
-                            emptySubtitle: "Plan one and save it. It’ll show up here with the route, reservations and extras."
-                        )
+                        upcomingContent
                     case .past:
                         planList(
                             coordinator.pastPlans,
@@ -80,6 +76,100 @@ struct DatesTabView: View {
             }
             .mainTabBarScrollInset()
         }
+    }
+
+    // MARK: - Upcoming (grouped: this week · coming up · plans waiting)
+
+    private var waitingPlans: [DatePlan] {
+        var seen = Set<UUID>()
+        return (coordinator.generatedPlans + coordinator.experiencesWaiting).filter { seen.insert($0.id).inserted }
+    }
+
+    private func isThisWeek(_ plan: DatePlan) -> Bool {
+        guard let d = plan.scheduledDate else { return false }
+        let start = Calendar.current.startOfDay(for: Date())
+        guard let end = Calendar.current.date(byAdding: .day, value: 7, to: start) else { return false }
+        return d >= start && d < end
+    }
+
+    @ViewBuilder
+    private var upcomingContent: some View {
+        let plans = coordinator.savedPlans
+        if plans.isEmpty && waitingPlans.isEmpty {
+            emptyState(
+                title: "No dates planned yet",
+                subtitle: "Plan one and save it. It’ll show up here with the route, reservations and extras."
+            )
+        } else {
+            let thisWeek = plans.filter(isThisWeek)
+            let later = plans.filter { !isThisWeek($0) }
+            ScrollView(showsIndicators: false) {
+                VStack(alignment: .leading, spacing: YDGSpace.lg) {
+                    if !thisWeek.isEmpty {
+                        planGroup("This week", thisWeek)
+                    }
+                    if !later.isEmpty {
+                        planGroup(thisWeek.isEmpty ? "Saved plans" : "Coming up", later)
+                    }
+                    if !waitingPlans.isEmpty {
+                        waitingRow
+                    }
+                }
+                .padding(.horizontal, YDGSpace.margin)
+                .padding(.top, YDGSpace.xxs)
+            }
+            .mainTabBarScrollInset()
+        }
+    }
+
+    private func planGroup(_ title: String, _ plans: [DatePlan]) -> some View {
+        VStack(alignment: .leading, spacing: YDGSpace.sm) {
+            Text(title)
+                .ydgText(.caption)
+                .accessibilityAddTraits(.isHeader)
+            ForEach(plans) { plan in
+                DateListRow(plan: plan) {
+                    coordinator.currentDatePlan = plan
+                    coordinator.activeSheet = nil
+                    coordinator.activeSheet = .datePlanResult
+                }
+            }
+        }
+    }
+
+    private var waitingRow: some View {
+        Button {
+            coordinator.generatedPlansSelectedIndex = 0
+            if coordinator.generatedPlans.isEmpty {
+                coordinator.generatedPlans = waitingPlans
+            }
+            coordinator.activeSheet = .datePlanOptions
+        } label: {
+            HStack(spacing: YDGSpace.sm) {
+                Image(systemName: "sparkle")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(Color.ydgTextSecondary)
+                    .frame(width: 24)
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("\(waitingPlans.count) plan\(waitingPlans.count == 1 ? "" : "s") waiting")
+                        .ydgText(.subhead, weight: .semibold)
+                    Text("Save one to put it on the calendar")
+                        .ydgText(.footnote, color: .ydgTextSecondary)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(Color.ydgTextTertiary)
+            }
+            .padding(YDGSpace.md)
+            .overlay(
+                RoundedRectangle(cornerRadius: YDGRadius.card, style: .continuous)
+                    .strokeBorder(Color.ydgBorderStrong, style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
+            )
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 
     @ViewBuilder

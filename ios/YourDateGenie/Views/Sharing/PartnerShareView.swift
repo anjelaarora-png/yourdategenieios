@@ -9,6 +9,13 @@ struct PartnerShareView: View {
     @State private var shareMessage = ""
     @State private var copiedToClipboard = false
     @State private var showContentFilterAlert = false
+    /// The AI rewrite tools stay folded away until "Polish it" is tapped (design 4.1).
+    @State private var showRewrite = false
+
+    private var partnerName: String? {
+        let name = (PartnerSessionManager.shared.inviteInfo?.partnerName ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        return name.isEmpty ? nil : name
+    }
 
     var body: some View {
         NavigationStack {
@@ -21,12 +28,17 @@ struct PartnerShareView: View {
                         headerSection
                         planPreviewSection
                         personalNoteSection
-                        shareActionsSection
                     }
                     .padding(.horizontal, YDGSpace.margin)
                     .padding(.top, YDGSpace.xs)
                     .padding(.bottom, YDGSpace.xl)
                 }
+            }
+            .safeAreaInset(edge: .bottom) {
+                shareActionsSection
+                    .padding(.horizontal, YDGSpace.margin)
+                    .padding(.bottom, YDGSpace.xs)
+                    .background(Color.ydgBase.ignoresSafeArea())
             }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -56,7 +68,7 @@ struct PartnerShareView: View {
 
     private var headerSection: some View {
         VStack(alignment: .leading, spacing: YDGSpace.xs) {
-            Text("Share with your partner")
+            Text(partnerName.map { "Send it to \($0)" } ?? "Share with your partner")
                 .ydgText(.title1)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityAddTraits(.isHeader)
@@ -71,16 +83,50 @@ struct PartnerShareView: View {
     // MARK: - Plan preview (shared cream card)
 
     private var planPreviewSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            ItineraryCreamPlanPreviewCard(plan: plan, maxStops: 3, edgePadding: 0)
+        let stops = ItineraryPlanFormatting.itineraryStops(for: plan)
+        return HStack(spacing: YDGSpace.sm) {
+            if let date = plan.scheduledDate {
+                VStack(spacing: 0) {
+                    Text(date.formatted(.dateTime.weekday(.abbreviated)).uppercased())
+                        .font(.ydg(.caption, weight: .semibold))
+                        .foregroundColor(Color.ydgHighlight)
+                    Text(date.formatted(.dateTime.day()))
+                        .font(.ydgSans(22, weight: .semibold))
+                        .foregroundColor(Color.ydgTextPrimary)
+                }
+                .frame(width: 48, height: 52)
+                .background(Color.ydgOverlay, in: RoundedRectangle(cornerRadius: YDGRadius.chip, style: .continuous))
+                .accessibilityHidden(true)
+            } else {
+                YDGIconTile(systemName: "calendar", size: 48)
+            }
+            VStack(alignment: .leading, spacing: 2) {
+                Text(plan.title)
+                    .ydgText(.headline)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(stops.prefix(3).map(\.name).joined(separator: " → "))
+                    .ydgText(.footnote, color: .ydgTextSecondary)
+                    .lineLimit(1)
+            }
+            Spacer(minLength: 0)
         }
+        .ydgCard()
     }
 
     // MARK: - Personal note
 
     private var personalNoteSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            sectionLabel(title: "Add a note", icon: "heart.text.square")
+            HStack {
+                sectionLabel(title: "Add a note", icon: "heart.text.square")
+                Spacer()
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) { showRewrite.toggle() }
+                } label: {
+                    Label(showRewrite ? "Done" : "Polish it", systemImage: "sparkle")
+                }
+                .buttonStyle(.ydgTertiary)
+            }
 
             ZStack(alignment: .topLeading) {
                 TextEditor(text: $shareMessage)
@@ -104,7 +150,10 @@ struct PartnerShareView: View {
             }
             .background(Color.ydgHighlightSubtle, in: RoundedRectangle(cornerRadius: YDGRadius.card, style: .continuous))
 
-            LoveNoteRewriteSection(text: $shareMessage, skin: .charcoal, rewriteButtonKind: .secondary)
+            if showRewrite {
+                LoveNoteRewriteSection(text: $shareMessage, skin: .charcoal, rewriteButtonKind: .secondary)
+                    .transition(.opacity)
+            }
         }
     }
 
@@ -128,7 +177,7 @@ struct PartnerShareView: View {
             Button {
                 sharePlan()
             } label: {
-                Label("Share plan", systemImage: "square.and.arrow.up")
+                Text("Share plan")
             }
             .buttonStyle(.ydgPrimary)
         }

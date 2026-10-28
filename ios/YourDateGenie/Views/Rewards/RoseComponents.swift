@@ -178,63 +178,46 @@ struct RoseNewUserIntroCard: View {
     @ObservedObject var rose: RoseManager
     var onTap: () -> Void
 
-    @State private var showScienceInfo = false
-
     var body: some View {
-        HStack(spacing: 0) {
-            Button(action: onTap) {
-                HStack(spacing: 12) {
-                    ZStack {
-                        Circle()
-                            .fill(Color.ydgHighlightSubtle)
-                        RosePlantView(
-                            mode: .blooming(open: 0, total: rose.monthlyGoal),
-                            size: 40
-                        )
-                    }
-                    .frame(width: 48, height: 48)
-                    .accessibilityHidden(true)
-
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("0 of \(rose.monthlyGoal) date nights")
-                            .ydgText(.headline)
-                        Text("Complete a date to grow your first rose")
-                            .ydgText(.subhead, weight: .regular, color: .ydgTextSecondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .multilineTextAlignment(.leading)
-                    }
-
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundColor(Color.ydgTextTertiary)
+        Button(action: onTap) {
+            HStack(spacing: 12) {
+                ZStack {
+                    Circle()
+                        .fill(Color.ydgHighlightSubtle)
+                    RosePlantView(
+                        mode: .blooming(open: 0, total: rose.monthlyGoal),
+                        size: 40
+                    )
                 }
-                .padding(.leading, YDGSpace.md)
-                .padding(.vertical, YDGSpace.md)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Your progress. Zero of \(rose.monthlyGoal) date nights this month.")
-            .accessibilityHint("Each completed date opens a bud on your relationship rose.")
+                .frame(width: 48, height: 48)
+                .accessibilityHidden(true)
 
-            Button {
-                showScienceInfo = true
-            } label: {
-                Image(systemName: "info.circle")
-                    .font(.system(size: 15, weight: .medium))
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("0 of \(rose.monthlyGoal) date nights")
+                        .ydgText(.headline)
+                    Text("Complete a date to grow your first rose")
+                        .ydgText(.subhead, weight: .regular, color: .ydgTextSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .multilineTextAlignment(.leading)
+                }
+
+                Spacer(minLength: 0)
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(Color.ydgTextTertiary)
-                    .frame(width: 44, height: 48)
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Why track date nights with a rose")
-            .padding(.trailing, 8)
+            .padding(YDGSpace.md)
+            .background(Color.ydgRaised, in: RoundedRectangle(cornerRadius: YDGRadius.card, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: YDGRadius.card, style: .continuous)
+                    .stroke(Color.ydgBorder, lineWidth: 1)
+            )
+            .contentShape(Rectangle())
         }
-        .background(Color.ydgRaised, in: RoundedRectangle(cornerRadius: YDGRadius.card, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: YDGRadius.card, style: .continuous)
-                .stroke(Color.ydgBorder, lineWidth: 1)
-        )
-        .sheet(isPresented: $showScienceInfo) {
-            RoseScienceInfoSheet(monthlyGoal: rose.monthlyGoal)
-        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Your progress. Zero of \(rose.monthlyGoal) date nights this month.")
+        .accessibilityHint("Each completed date opens a bud on your relationship rose.")
     }
 }
 

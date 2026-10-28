@@ -45,13 +45,6 @@ struct LuxuryProfileTabView: View {
                         }
                         .padding(.horizontal, YDGSpace.margin)
                         
-                        if let prefs = userProfile?.preferences {
-                            PreferencesSummaryCard(preferences: prefs, onEdit: {
-                                coordinator.startEditPreferencesOnly()
-                            })
-                                .padding(.horizontal, YDGSpace.margin)
-                        }
-                        
                         VStack(spacing: 0) {
                             LuxuryProfileMenuItem(icon: "bookmark", title: "Saved plans", isLocked: !access.canAccess(.datePlan)) {
                                 access.require(.datePlan) {

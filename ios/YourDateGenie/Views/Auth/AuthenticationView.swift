@@ -12,6 +12,8 @@ struct AuthenticationView: View {
     @State private var accountMode: AccountMode = .individual
     @State private var showBusinessPortal = false
     @State private var showResetPasswordSheet = false
+    /// Final design: social sign-in first; the email form is its own step behind "Use email instead".
+    @State private var showEmailForm = false
     /// Required before register or login (Apple §1.2 EULA). Restored from disk so remounts
     /// (social hydrate / auth-required sheet) don't clear a checkbox the user already checked.
     @State private var agreedToTerms = AgeEligibility.hasAcceptedTerms
@@ -44,48 +46,14 @@ struct AuthenticationView: View {
                 } else {
                     ScrollView(showsIndicators: false) {
                         VStack(spacing: 0) {
-                            authHeader
-
                             if accountMode == .business {
+                                authHeader
                                 businessPanel
                                     .padding(.top, YDGSpace.lg)
+                            } else if showEmailForm {
+                                emailFormStep
                             } else {
-                                // Terms agreement gates every login method (§1.2 EULA).
-                                termsAgreementRow
-                                    .padding(.top, YDGSpace.lg)
-
-                                // Sign in with Apple first (§4.8 prominence when Google is also offered).
-                                socialAuthButtons
-                                    .padding(.top, YDGSpace.lg)
-
-                                socialDivider
-                                    .padding(.top, YDGSpace.lg)
-
-                                authModeToggle
-                                    .padding(.top, YDGSpace.md)
-
-                                if viewModel.isSignUp {
-                                    signUpForm
-                                } else {
-                                    signInForm
-                                }
-
-                                authButton
-                                    .padding(.top, YDGSpace.lg)
-
-                                if !viewModel.isSignUp {
-                                    forgotPasswordButton
-                                }
-
-                                if viewModel.isSignUp {
-                                    signUpBenefits
-                                        .padding(.top, YDGSpace.lg)
-                                }
-
-                                if allowSkipToExplore {
-                                    exploreWithoutAccountButton
-                                        .padding(.top, YDGSpace.md)
-                                }
+                                socialStep
                             }
 
                             accountModeFooter
@@ -247,26 +215,12 @@ struct AuthenticationView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private var socialDivider: some View {
-        HStack(spacing: 12) {
-            Rectangle()
-                .fill(Color.ydgBorder)
-                .frame(height: 1)
-            Text("or use email")
-                .ydgText(.footnote, color: .ydgTextTertiary)
-                .fixedSize()
-            Rectangle()
-                .fill(Color.ydgBorder)
-                .frame(height: 1)
-        }
-    }
-
     private var socialAuthButtons: some View {
         VStack(spacing: 12) {
             // Sign in with Apple (required by Apple when Google is offered)
             VStack(spacing: 4) {
                 SignInWithAppleButton(
-                    .signIn,
+                    .continue,
                     onRequest: { request in
                         request.requestedScopes = [.fullName, .email]
                         // Generate a per-attempt nonce; hash goes to Apple, raw value goes to
@@ -307,7 +261,13 @@ struct AuthenticationView: View {
                 }
                 socialAuth.signInWithGoogle()
             } label: {
-                Label("Continue with Google", systemImage: "globe")
+                HStack(spacing: YDGSpace.xs) {
+                    Text("G")
+                        .font(.system(size: 18, weight: .bold))
+                        .foregroundColor(Color(hex: "EA4335"))
+                        .accessibilityHidden(true)
+                    Text("Continue with Google")
+                }
             }
             .buttonStyle(.ydgSecondary)
             .disabled(socialAuth.isLoading || !agreedToTerms)
@@ -471,9 +431,89 @@ struct AuthenticationView: View {
         }
     }
     
+    // MARK: - Step 1 · social sign-in (design 1.4)
+
+    private var socialStep: some View {
+        VStack(spacing: 0) {
+            authHeader
+
+            // Sign in with Apple first (§4.8 prominence when Google is also offered).
+            socialAuthButtons
+                .padding(.top, YDGSpace.lg)
+
+            Button("Use email instead") {
+                withAnimation(.easeInOut(duration: 0.2)) { showEmailForm = true }
+            }
+            .buttonStyle(.ydgTertiary)
+            .padding(.top, YDGSpace.xs)
+
+            Rectangle().fill(Color.ydgBorder).frame(height: 1)
+                .padding(.vertical, YDGSpace.md)
+
+            // Terms agreement gates every login method (§1.2 EULA).
+            termsAgreementRow
+
+            if allowSkipToExplore {
+                exploreWithoutAccountButton
+                    .padding(.top, YDGSpace.lg)
+            }
+        }
+    }
+
+    // MARK: - Step 2 · email (design 1.5)
+
+    private var emailFormStep: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Button {
+                focusedField = nil
+                withAnimation(.easeInOut(duration: 0.2)) { showEmailForm = false }
+            } label: {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundColor(Color.ydgTextPrimary)
+                    .frame(width: 44, height: 44, alignment: .leading)
+            }
+            .accessibilityLabel("Back")
+            .padding(.top, YDGSpace.xs)
+
+            VStack(alignment: .leading, spacing: YDGSpace.xs) {
+                Text(viewModel.isSignUp ? "Create your account" : "Welcome back")
+                    .ydgText(.title1)
+                    .accessibilityAddTraits(.isHeader)
+                Text(viewModel.isSignUp
+                     ? "Save plans, share them with your partner, and keep your memories in one place."
+                     : "Pick up where you left off.")
+                    .ydgText(.body, color: .ydgTextSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(.top, YDGSpace.sm)
+
+            if viewModel.isSignUp {
+                signUpForm
+            } else {
+                signInForm
+            }
+
+            authButton
+                .padding(.top, YDGSpace.lg)
+
+            if !viewModel.isSignUp {
+                forgotPasswordButton
+                    .frame(maxWidth: .infinity)
+            }
+
+            termsAgreementRow
+                .padding(.top, YDGSpace.lg)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
     private var authHeader: some View {
         VStack(spacing: YDGSpace.sm) {
-            DateNightMarkView(side: 96)
+            Image(systemName: "person.2")
+                .font(.system(size: 34, weight: .regular))
+                .foregroundColor(Color.ydgAccent)
+                .accessibilityHidden(true)
             
             Text(authHeaderTitle)
                 .ydgText(.title1)
@@ -497,7 +537,7 @@ struct AuthenticationView: View {
         if accountMode == .business {
             return "Partner with us"
         }
-        return viewModel.isSignUp ? "Create your account" : "Welcome back"
+        return "Sign in to plan a date"
     }
 
     private var authHeaderSubtitle: String {
@@ -507,9 +547,7 @@ struct AuthenticationView: View {
         if accountMode == .business {
             return "Reach couples planning date nights near you. Restaurants, bars, experiences, retail and events all welcome."
         }
-        return viewModel.isSignUp
-            ? "Save plans, share them with your partner and keep your memories in one place."
-            : "Pick up where you left off."
+        return "A free account keeps your plans, and lets you share them with your partner."
     }
     
     /// Business partners are a side door, so the switch lives at the bottom of the screen.
@@ -549,14 +587,6 @@ struct AuthenticationView: View {
         }
     }
 
-    private var authModeToggle: some View {
-        YDGSegmentedControl(
-            options: [false, true],
-            selection: $viewModel.isSignUp,
-            title: { $0 ? "Create account" : "Sign in" }
-        )
-    }
-    
     private var signInForm: some View {
         VStack(spacing: YDGSpace.md) {
             LuxuryTextField(
@@ -580,27 +610,13 @@ struct AuthenticationView: View {
     
     private var signUpForm: some View {
         VStack(spacing: YDGSpace.md) {
-            if viewModel.isSignUp {
-                signUpBenefitsInline
-            }
-            
-            HStack(spacing: YDGSpace.sm) {
-                LuxuryTextField(
-                    title: "First name",
-                    placeholder: "Maya",
-                    text: $viewModel.firstName,
-                    icon: nil
-                )
-                .focused($focusedField, equals: .firstName)
-                
-                LuxuryTextField(
-                    title: "Last name",
-                    placeholder: "Optional",
-                    text: $viewModel.lastName,
-                    icon: nil
-                )
-                .focused($focusedField, equals: .lastName)
-            }
+            LuxuryTextField(
+                title: "First name",
+                placeholder: "Maya",
+                text: $viewModel.firstName,
+                icon: nil
+            )
+            .focused($focusedField, equals: .firstName)
             
             LuxuryTextField(
                 title: "Email",
@@ -611,32 +627,14 @@ struct AuthenticationView: View {
             )
             .focused($focusedField, equals: .email)
             
-            VStack(alignment: .leading, spacing: 0) {
-                AuthSecureField(
-                    title: "Password",
-                    placeholder: "At least 8 characters",
-                    text: $viewModel.password
-                )
-                .focused($focusedField, equals: .password)
-            }
-            
             AuthSecureField(
-                title: "Confirm password",
-                placeholder: "Type it again",
-                text: $viewModel.confirmPassword
+                title: "Password",
+                placeholder: "At least 8 characters",
+                text: $viewModel.password
             )
-            .focused($focusedField, equals: .confirmPassword)
+            .focused($focusedField, equals: .password)
         }
         .padding(.top, YDGSpace.lg)
-    }
-    
-    private var signUpBenefitsInline: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            AuthBenefitRow(text: "Personalized multi-stop date plans")
-            AuthBenefitRow(text: "Real venues with verified details")
-            AuthBenefitRow(text: "Dietary restrictions always respected")
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
     
     private var authButton: some View {
@@ -676,24 +674,6 @@ struct AuthenticationView: View {
         }
     }
     
-    private var signUpBenefits: some View {
-        HStack(alignment: .top, spacing: YDGSpace.sm) {
-            Image(systemName: "lock.shield")
-                .font(.system(size: 17))
-                .foregroundColor(Color.ydgTextSecondary)
-                .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Your data is private")
-                    .ydgText(.subhead, weight: .semibold)
-                Text("We never share your personal information. Your preferences are only used to plan your dates.")
-                    .ydgText(.footnote, color: .ydgTextSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            Spacer(minLength: 0)
-        }
-        .ydgCard()
-    }
-    
     private func performSignIn() {
         focusedField = nil
         viewModel.isLoading = true
@@ -729,12 +709,6 @@ struct AuthenticationView: View {
     
     private func performSignUp() {
         focusedField = nil
-        
-        guard viewModel.password == viewModel.confirmPassword else {
-            viewModel.errorMessage = "Passwords do not match"
-            viewModel.showError = true
-            return
-        }
         
         viewModel.isLoading = true
         
@@ -1098,8 +1072,7 @@ private class AuthViewModelState: ObservableObject {
             return !firstName.isEmpty &&
                    !email.isEmpty &&
                    email.contains("@") &&
-                   password.count >= 6 &&
-                   password == confirmPassword
+                   password.count >= 6
         } else {
             return !email.isEmpty &&
                    email.contains("@") &&

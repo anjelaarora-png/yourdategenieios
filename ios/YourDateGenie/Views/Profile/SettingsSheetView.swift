@@ -18,6 +18,9 @@ struct SettingsSheetView: View {
     @State private var isLoadingRemotePreferences = false
     @State private var remotePreferencesError: String?
     @State private var showingReportSheet = false
+    @State private var showLegalLinks = false
+    @State private var showSignOutConfirm = false
+    @Environment(\.openURL) private var openURL
 
     private var userProfile: UserProfile? {
         profileManager.currentUser
@@ -40,43 +43,25 @@ struct SettingsSheetView: View {
                             .ydgText(.title1)
                             .accessibilityAddTraits(.isHeader)
 
-                        // MARK: - Account (name, email, phone)
-                        SettingsGroup(title: "Account") {
-                            SettingsValueRow(title: "Name", value: valueOrNotSet(userProfile?.fullName)) { showEditAccount = true }
-                            YDGListDivider(leadingInset: YDGSpace.md)
-                            SettingsValueRow(title: "Email", value: valueOrNotSet(userProfile?.email)) { showEditAccount = true }
-                            YDGListDivider(leadingInset: YDGSpace.md)
-                            SettingsValueRow(title: "Phone", value: valueOrNotSet(userProfile?.phoneNumber)) { showEditAccount = true }
-                        }
-
-                        // MARK: - Subscription (StoreKit 2)
+                        // MARK: - Account (name, email, premium)
                         VStack(alignment: .leading, spacing: YDGSpace.xs) {
-                            SettingsGroup(title: "Subscription") {
+                            SettingsGroup(title: "Account") {
+                                SettingsValueRow(title: "Name", value: valueOrNotSet(userProfile?.fullName)) { showEditAccount = true }
+                                YDGListDivider(leadingInset: YDGSpace.md)
+                                SettingsValueRow(title: "Email", value: valueOrNotSet(userProfile?.email)) { showEditAccount = true }
+                                YDGListDivider(leadingInset: YDGSpace.md)
                                 SettingsValueRow(
                                     title: "Premium",
                                     value: purchases.isSubscribed ? "Active" : "7-day free trial"
-                                ) { showSubscriptionOffer = true }
-                                YDGListDivider(leadingInset: YDGSpace.md)
-                                SettingsValueRow(
-                                    title: "Restore purchases",
-                                    value: nil,
-                                    isLoading: purchases.isRestoring,
-                                    showsChevron: false
                                 ) {
-                                    Task { await purchases.restorePurchases() }
-                                }
-                                .disabled(purchases.isRestoring)
-                                if let subscriptionsURL = URL(string: "https://apps.apple.com/account/subscriptions") {
-                                    YDGListDivider(leadingInset: YDGSpace.md)
-                                    SettingsLinkRow(title: "Manage subscriptions", url: subscriptionsURL)
+                                    // Subscribers manage the plan in the App Store; everyone else sees the offer.
+                                    if purchases.isSubscribed, let url = URL(string: "https://apps.apple.com/account/subscriptions") {
+                                        openURL(url)
+                                    } else {
+                                        showSubscriptionOffer = true
+                                    }
                                 }
                             }
-                            Text(purchases.isSubscribed
-                                 ? "Thank you for supporting Your Date Genie."
-                                 : "Start free for 7 days, then $14.99/month or $119.99/year.")
-                                .ydgText(.footnote, color: .ydgTextTertiary)
-                                .fixedSize(horizontal: false, vertical: true)
-                                .padding(.horizontal, YDGSpace.xxs)
                             if let msg = purchases.lastErrorMessage, !msg.isEmpty {
                                 Text(msg)
                                     .ydgText(.footnote, color: .ydgWarning)
@@ -156,19 +141,19 @@ struct SettingsSheetView: View {
 
                         // MARK: - Support & Safety (Apple §1.2) + Legal (Apple §3.1.2 + §5.1.1)
                         SettingsGroup(title: "Support & safety") {
+                            SettingsValueRow(title: "Notifications", value: nil) {
+                                if let url = URL(string: UIApplication.openNotificationSettingsURLString) {
+                                    openURL(url)
+                                }
+                            }
                             if let contactURL = URL(string: "mailto:hello@yourdategenie.com") {
+                                YDGListDivider(leadingInset: YDGSpace.md)
                                 SettingsLinkRow(title: "Contact support", url: contactURL)
-                                YDGListDivider(leadingInset: YDGSpace.md)
                             }
+                            YDGListDivider(leadingInset: YDGSpace.md)
                             SettingsValueRow(title: "Report a concern", value: nil) { showingReportSheet = true }
-                            if let privacyURL = URL(string: "https://yourdategenie.com/privacy-policy") {
-                                YDGListDivider(leadingInset: YDGSpace.md)
-                                SettingsLinkRow(title: "Privacy policy", url: privacyURL)
-                            }
-                            if let termsURL = URL(string: "https://yourdategenie.com/terms") {
-                                YDGListDivider(leadingInset: YDGSpace.md)
-                                SettingsLinkRow(title: "Terms of use", url: termsURL)
-                            }
+                            YDGListDivider(leadingInset: YDGSpace.md)
+                            SettingsValueRow(title: "Privacy & terms", value: nil) { showLegalLinks = true }
                         }
 
                         // MARK: - App tour & intro
@@ -190,6 +175,17 @@ struct SettingsSheetView: View {
                             }
                             #endif
                         }
+
+                        if profileManager.isLoggedIn {
+                            Button {
+                                showSignOutConfirm = true
+                            } label: {
+                                Text("Sign out")
+                                    .ydgText(.body, weight: .semibold, color: .ydgDanger)
+                                    .frame(maxWidth: .infinity, minHeight: 44)
+                            }
+                            .buttonStyle(.plain)
+                        }
                     }
                     .padding(.horizontal, YDGSpace.margin)
                     .padding(.bottom, YDGSpace.xxl)
@@ -197,6 +193,24 @@ struct SettingsSheetView: View {
             }
             .sheet(isPresented: $showEditAccount) {
                 EditAccountSheetView()
+            }
+            .confirmationDialog("Privacy & terms", isPresented: $showLegalLinks, titleVisibility: .visible) {
+                Button("Privacy policy") {
+                    if let url = URL(string: "https://yourdategenie.com/privacy-policy") { openURL(url) }
+                }
+                Button("Terms of use") {
+                    if let url = URL(string: "https://yourdategenie.com/terms") { openURL(url) }
+                }
+                Button("Cancel", role: .cancel) {}
+            }
+            .alert("Sign out?", isPresented: $showSignOutConfirm) {
+                Button("Cancel", role: .cancel) {}
+                Button("Sign out", role: .destructive) {
+                    dismiss()
+                    coordinator.signOut()
+                }
+            } message: {
+                Text("You can sign back in anytime.")
             }
             .sheet(isPresented: $showingReportSheet) {
                 ReportConcernView()

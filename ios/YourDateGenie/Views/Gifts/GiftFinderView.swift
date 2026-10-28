@@ -457,7 +457,9 @@ struct GiftFinderView: View {
 
             // Header with Refine + New Search
             VStack(alignment: .leading, spacing: YDGSpace.xxs) {
-                Text(filteredGifts.isEmpty && giftLoadError != nil ? "Gift ideas" : "\(filteredGifts.count) gift ideas")
+                Text(filteredGifts.isEmpty && giftLoadError != nil
+                     ? "Gift ideas"
+                     : "\(filteredGifts.count) ideas\(prefillPartnerName.isEmpty ? "" : " for \(prefillPartnerName)")")
                     .ydgText(.title1)
                     .accessibilityAddTraits(.isHeader)
 
@@ -468,29 +470,10 @@ struct GiftFinderView: View {
                     Spacer(minLength: 0)
                     Button("Refine") { animate { showResults = false } }
                         .buttonStyle(.ydgTertiary)
-                    Button("New") { resetSearch() }
-                        .buttonStyle(.ydgTertiary)
                 }
             }
             .padding(.horizontal, YDGSpace.margin)
             .padding(.top, YDGSpace.xs)
-
-            // Budget filter
-            VStack(alignment: .leading, spacing: YDGSpace.xs) {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        FilterChip(title: "All", isSelected: resultBudgetFilter.isEmpty) {
-                            resultBudgetFilter = ""
-                        }
-                        ForEach(budgetOptions, id: \.0) { option in
-                            FilterChip(title: option.1, isSelected: resultBudgetFilter == option.0) {
-                                resultBudgetFilter = resultBudgetFilter == option.0 ? "" : option.0
-                            }
-                        }
-                    }
-                    .padding(.horizontal, 20)
-                }
-            }
 
             if !nearbyStores.isEmpty {
                 nearbyStoresSection
@@ -521,12 +504,16 @@ struct GiftFinderView: View {
             .buttonStyle(YDGButtonStyle(kind: .primary, isLoading: isLoading))
             .disabled(isLoading)
             .padding(.horizontal, YDGSpace.margin)
+
+            Button("Start a new search") { resetSearch() }
+                .buttonStyle(.ydgTertiary)
         }
     }
 
     /// "Anniversary · $50–$100 · Italian food" — what these ideas were tuned for.
     private var resultsMetaLine: String {
-        let parts = [selectedOccasion, selectedBudget].filter { !$0.isEmpty }
+        let interestBits = interests.split(separator: ",").prefix(2).map { $0.trimmingCharacters(in: .whitespaces).lowercased() }
+        let parts = [selectedOccasion, selectedBudget, interestBits.joined(separator: ", ")].filter { !$0.isEmpty }
         if parts.isEmpty {
             return effectiveLocation.isEmpty ? "With stores near you" : "With stores near \(effectiveLocationDisplay)"
         }

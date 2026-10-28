@@ -6,7 +6,8 @@ struct LoveNoteGeneratorView: View {
     @EnvironmentObject var coordinator: NavigationCoordinator
     @StateObject private var storage = LoveNoteStorageManager.shared
     @State private var noteText = ""
-    @State private var selectedPromptIndex = 0
+    /// No prompt is picked until the user taps one (final design shows them all unselected).
+    @State private var selectedPromptIndex: Int?
     @State private var selectedSavedNote: SavedLoveNote?
     @State private var showSaveSuccess = false
     @State private var saveSuccessMessage = ""
@@ -20,8 +21,8 @@ struct LoveNoteGeneratorView: View {
     @State private var draftSaveWorkItem: DispatchWorkItem?
 
     private let prompts: [(title: String, placeholder: String)] = [
-        ("What do you love most about them?", "Tell them what makes your heart skip..."),
-        ("A moment you'll never forget", "Describe a memory that still makes you smile..."),
+        ("What I love most about you", "Tell them what makes your heart skip..."),
+        ("A moment I'll never forget", "Describe a memory that still makes you smile..."),
         ("Why they make you smile", "Share the little things that brighten your day..."),
         ("What you're grateful for", "Thank them for something specific..."),
         ("A promise or hope for the future", "Write something you look forward to together...")
@@ -162,9 +163,23 @@ struct LoveNoteGeneratorView: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: YDGSpace.xs) {
                     ForEach(Array(prompts.enumerated()), id: \.offset) { index, prompt in
-                        YDGChip(title: prompt.title, isSelected: selectedPromptIndex == index, showsCheckmark: false) {
-                            selectedPromptIndex = index
+                        Button {
+                            selectedPromptIndex = selectedPromptIndex == index ? nil : index
+                        } label: {
+                            Text(prompt.title)
+                                .font(.ydg(.subhead, weight: .medium))
+                                .foregroundColor(selectedPromptIndex == index ? Color.ydgAccent : Color.ydgTextPrimary)
+                                .padding(.horizontal, YDGSpace.md)
+                                .frame(minHeight: 44)
+                                .background(selectedPromptIndex == index ? Color.ydgAccentSubtle : Color.clear,
+                                            in: RoundedRectangle(cornerRadius: YDGRadius.chip, style: .continuous))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: YDGRadius.chip, style: .continuous)
+                                        .stroke(selectedPromptIndex == index ? Color.ydgAccent : Color.ydgBorderStrong, lineWidth: 1)
+                                )
                         }
+                        .buttonStyle(.plain)
+                        .accessibilityAddTraits(selectedPromptIndex == index ? .isSelected : [])
                     }
                 }
                 .padding(.horizontal, 2)
@@ -176,7 +191,7 @@ struct LoveNoteGeneratorView: View {
     private var writerSection: some View {
         ZStack(alignment: .topLeading) {
             if noteText.isEmpty {
-                Text(prompts[selectedPromptIndex].placeholder)
+                Text(selectedPromptIndex.map { prompts[$0].placeholder } ?? "Tell them what makes your heart skip...")
                     .ydgText(.body, color: .ydgTextTertiary)
                     .padding(.horizontal, YDGSpace.md)
                     .padding(.vertical, YDGSpace.md + 2)

@@ -4,143 +4,92 @@ import SwiftUI
 struct GiftsTabView: View {
     @EnvironmentObject var coordinator: NavigationCoordinator
     @ObservedObject private var giftStore = GiftStorageManager.shared
+    @State private var listTab: ListTab = .saved
+
+    enum ListTab: Hashable { case saved, bought }
     
     var body: some View {
         NavigationStack {
             ZStack {
-                CharcoalMaroonBackground()
+                Color.ydgBase
                     .ignoresSafeArea()
                 
                 ScrollView(.vertical, showsIndicators: false) {
-                    VStack(spacing: 28) {
-                        headerSection
-                        findGiftsSection
-                        savedGiftsSection
-                        boughtGiftsSection
+                    VStack(alignment: .leading, spacing: YDGSpace.lg) {
+                        Text("Find, save and track gifts for your person.")
+                            .ydgText(.body, color: .ydgTextSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        findGiftsCard
+                        giftListSection
                     }
-                    .padding(.bottom, 100)
+                    .padding(.horizontal, YDGSpace.margin)
+                    .padding(.top, YDGSpace.xs)
+                    .padding(.bottom, YDGSpace.xxl)
                 }
             }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .principal) {
                     Text("Gifts")
-                        .font(Font.bodySerif(22, weight: .regular))
-                        .foregroundColor(Color.accentGold)
+                        .ydgText(.headline)
                 }
             }
-            .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
+            .toolbarBackground(Color.ydgBase, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
         }
     }
     
-    private var headerSection: some View {
-        VStack(spacing: 8) {
-            Text("Gifts")
-                .font(Font.bodySerif(32, weight: .regular))
-                .foregroundColor(Color.accentGold)
-            
-            Text("Find, save, and track gifts for your person")
-                .font(Font.bodySans(15, weight: .regular))
-                .foregroundColor(Color.luxuryCreamMuted)
-        }
-        .padding(.top, 16)
-    }
-    
-    private var findGiftsSection: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Text("Find Gifts")
-                .font(Font.bodySerif(20, weight: .regular))
-                .foregroundColor(Color.accentGold)
-                .padding(.horizontal, 20)
-            
-            Button {
+    private var findGiftsCard: some View {
+        VStack(alignment: .leading, spacing: YDGSpace.md) {
+            HStack(alignment: .top, spacing: YDGSpace.sm) {
+                YDGIconTile(systemName: "gift", size: 44)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Gift finder")
+                        .ydgText(.headline)
+                    Text("Occasion, budget, interests. We suggest ideas with links.")
+                        .ydgText(.subhead, weight: .regular, color: .ydgTextSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+            }
+            Button("Find a gift") {
                 coordinator.showGiftFinder(datePlan: nil, dateLocation: nil)
-            } label: {
-                HStack(spacing: 12) {
-                    ZStack {
-                        Circle()
-                            .fill(Color.luxuryGold.opacity(0.2))
-                            .frame(width: 48, height: 48)
-                        Image(systemName: "gift.fill")
-                            .font(.system(size: 22))
-                            .foregroundColor(Color.luxuryGold)
-                    }
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Open Gift Finder")
-                            .font(Font.bodySans(17, weight: .semibold))
-                            .foregroundColor(Color.luxuryCream)
-                        Text("Occasion, budget, interests — we’ll suggest ideas with links")
-                            .font(Font.bodySans(13, weight: .regular))
-                            .foregroundColor(Color.luxuryCreamMuted)
-                    }
-                    Spacer()
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(Color.luxuryGold)
-                }
-                .padding(18)
-                .goldHighlightMaroonAccent(cornerRadius: 16)
             }
-            .buttonStyle(.plain)
-            .padding(.horizontal, 20)
+            .buttonStyle(.ydgPrimary)
         }
+        .ydgCard(padding: YDGSpace.margin)
     }
     
-    private var savedGiftsSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Saved Gifts")
-                .font(Font.bodySerif(20, weight: .regular))
-                .foregroundColor(Color.accentGold)
-                .padding(.horizontal, 20)
-            
-            if giftStore.savedOnly.isEmpty {
+    private var giftListSection: some View {
+        VStack(alignment: .leading, spacing: YDGSpace.md) {
+            Text("Your gift list")
+                .ydgText(.title2)
+                .accessibilityAddTraits(.isHeader)
+
+            YDGSegmentedControl(options: [ListTab.saved, .bought], selection: $listTab) { tab in
+                tab == .saved ? "Saved · \(giftStore.savedOnly.count)" : "Bought · \(giftStore.boughtOnly.count)"
+            }
+
+            let items = listTab == .saved ? giftStore.savedOnly : giftStore.boughtOnly
+            if items.isEmpty {
                 GiftListEmptyState(
-                    icon: "heart.circle.fill",
-                    title: "No saved gifts yet",
-                    subtitle: "Save ideas from the Gift Finder to see them here"
+                    icon: listTab == .saved ? "heart" : "checkmark.circle",
+                    title: listTab == .saved ? "Nothing saved yet" : "Nothing bought yet",
+                    subtitle: listTab == .saved
+                        ? "Tap the heart on any idea in the gift finder to keep it here. Bought gifts won't be suggested again."
+                        : "Mark a gift as bought and we won't suggest it again."
                 )
             } else {
-                VStack(spacing: 10) {
-                    ForEach(giftStore.savedOnly) { stored in
+                VStack(spacing: YDGSpace.sm) {
+                    ForEach(items) { stored in
                         StoredGiftRowView(
                             stored: stored,
                             onShop: { openShop(stored: stored) },
                             onNewLink: { openSearchLink(name: stored.name) },
-                            onMarkBought: { giftStore.markAsBought(toGiftSuggestion(stored)) }
+                            onMarkBought: listTab == .saved ? { giftStore.markAsBought(toGiftSuggestion(stored)) } : nil
                         )
                     }
                 }
-                .padding(.horizontal, 20)
-            }
-        }
-    }
-    
-    private var boughtGiftsSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Bought Gifts")
-                .font(Font.bodySerif(20, weight: .regular))
-                .foregroundColor(Color.accentGold)
-                .padding(.horizontal, 20)
-            
-            if giftStore.boughtOnly.isEmpty {
-                GiftListEmptyState(
-                    icon: "checkmark.circle.fill",
-                    title: "No bought gifts yet",
-                    subtitle: "Mark gifts as bought in the finder so we don't suggest them again"
-                )
-            } else {
-                VStack(spacing: 10) {
-                    ForEach(giftStore.boughtOnly) { stored in
-                        StoredGiftRowView(
-                            stored: stored,
-                            onShop: { openShop(stored: stored) },
-                            onNewLink: { openSearchLink(name: stored.name) },
-                            onMarkBought: nil
-                        )
-                    }
-                }
-                .padding(.horizontal, 20)
             }
         }
     }

@@ -189,7 +189,7 @@ class NavigationCoordinator: ObservableObject {
             switch self {
             case .home: return "Home"
             case .dates: return "Dates"
-            case .convo: return "Convo"
+            case .convo: return "Notes"
             case .you: return "You"
             }
         }
@@ -199,7 +199,7 @@ class NavigationCoordinator: ObservableObject {
             switch self {
             case .home: return "house"
             case .dates: return "heart"
-            case .convo: return "bubble.left.and.bubble.right"
+            case .convo: return "text.bubble"
             case .you: return "person"
             }
         }
@@ -209,7 +209,7 @@ class NavigationCoordinator: ObservableObject {
             switch self {
             case .home: return "house.fill"
             case .dates: return "heart.fill"
-            case .convo: return "bubble.left.and.bubble.right.fill"
+            case .convo: return "text.bubble.fill"
             case .you: return "person.fill"
             }
         }

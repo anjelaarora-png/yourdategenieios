@@ -46,34 +46,41 @@ struct PaywallView: View {
 
     private var paywallChrome: some View {
         ZStack {
-            Color.backgroundPrimary
+            Color.ydgBase
                 .ignoresSafeArea()
 
-            ScrollView(showsIndicators: false) {
-                VStack(spacing: 24) {
-                    headerSection
-                    planToggle
-                    priceBlock.padding(.vertical, 4)
-                    benefitsSection
-                    errorSection
+            VStack(spacing: 0) {
+                ScrollView(showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: YDGSpace.lg) {
+                        headerSection
+                        benefitsSection
+                        planOptions
+                        errorSection
+                    }
+                    .padding(.horizontal, YDGSpace.margin)
+                    .padding(.top, YDGSpace.xs)
+                    .padding(.bottom, YDGSpace.lg)
+                    .frame(maxWidth: 560)
+                    .frame(maxWidth: .infinity)
+                }
+                VStack(spacing: YDGSpace.sm) {
                     ctaSection
                     legalText
                 }
-                .padding(24)
-                .frame(maxWidth: 560)
-                .frame(maxWidth: .infinity)
+                .padding(.horizontal, YDGSpace.margin)
+                .padding(.bottom, YDGSpace.xs)
             }
         }
         .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(Color.backgroundPrimary, for: .navigationBar)
+        .toolbarBackground(Color.ydgBase, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
         .toolbarColorScheme(.dark, for: .navigationBar)
         .toolbar {
             if showsNotNowButton {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Not now") { dismiss() }
-                        .font(Font.bodySans(15, weight: .medium))
-                        .foregroundColor(Color.luxuryGold)
+                        .font(.ydg(.body, weight: .medium))
+                        .foregroundColor(Color.ydgTextSecondary)
                 }
             }
         }
@@ -83,182 +90,140 @@ struct PaywallView: View {
     // MARK: - Header
 
     private var headerSection: some View {
-        VStack(spacing: 10) {
-            Text("Your Date Genie")
-                .font(Font.bodySerif(28, weight: .regular))
-                .foregroundColor(Color.accentGold)
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: .infinity)
-
-            Text("Wake up to a finished date plan — not a blank page")
-                .font(Font.bodySans(17, weight: .medium))
-                .foregroundColor(Color.textPrimary)
-                .multilineTextAlignment(.center)
-
-            Text("7-day free trial · Cancel anytime")
-                .font(Font.bodySans(13, weight: .regular))
-                .foregroundColor(Color.accentGold.opacity(0.9))
-                .multilineTextAlignment(.center)
-                .padding(.top, 2)
+        VStack(alignment: .leading, spacing: YDGSpace.xs) {
+            Text("Your Date Genie Premium")
+                .ydgText(.caption, color: .ydgHighlight)
+            Text("Wake up to a finished plan, not a blank page")
+                .ydgText(.title1)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityAddTraits(.isHeader)
         }
-        .padding(.top, 8)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    // MARK: - Plan toggle
+    // MARK: - Plan rows (design 3.9: two selectable rows, annual first)
 
-    private var planToggle: some View {
-        HStack(spacing: 0) {
-            planTab(.annual, label: "Annual", badge: savingsBadge)
-            planTab(.monthly, label: "Monthly", badge: nil)
+    private var planOptions: some View {
+        VStack(spacing: YDGSpace.sm) {
+            if purchases.isLoadingProducts {
+                ProgressView()
+                    .tint(Color.ydgTextSecondary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, YDGSpace.md)
+            } else {
+                planRow(
+                    .annual,
+                    title: "Annual",
+                    badge: savingsBadge,
+                    detail: "7 days free, then \(purchases.premiumAnnualProduct?.displayPrice ?? "$119.99")/year",
+                    price: annualPerMonthPrice,
+                    priceUnit: "per month"
+                )
+                planRow(
+                    .monthly,
+                    title: "Monthly",
+                    badge: nil,
+                    detail: "7 days free, then \(purchases.premiumMonthlyProduct?.displayPrice ?? "$14.99")/month",
+                    price: purchases.premiumMonthlyProduct?.displayPrice ?? "$14.99",
+                    priceUnit: "per month"
+                )
+            }
         }
-        .background(Color.luxuryMaroonLight)
-        .cornerRadius(12)
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Color.luxuryGold.opacity(0.3), lineWidth: 1)
-        )
     }
 
-    private func planTab(_ plan: SubscriptionPlan, label: String, badge: String?) -> some View {
-        Button {
+    private func planRow(_ plan: SubscriptionPlan, title: String, badge: String?, detail: String, price: String, priceUnit: String) -> some View {
+        let isSelected = selectedPlan == plan
+        return Button {
             withAnimation(.easeInOut(duration: 0.2)) { selectedPlan = plan }
         } label: {
-            HStack(spacing: 6) {
-                Text(label)
-                    .font(Font.bodySans(14, weight: selectedPlan == plan ? .semibold : .regular))
-                    .foregroundColor(selectedPlan == plan ? Color.luxuryMaroon : Color.luxuryCream)
-                if let badge {
-                    Text(badge)
-                        .font(Font.bodySans(11, weight: .semibold))
-                        .foregroundColor(selectedPlan == plan ? Color.luxuryMaroon : Color.luxuryGold)
-                        .padding(.horizontal, 7)
-                        .padding(.vertical, 3)
-                        .background(
-                            Capsule()
-                                .fill(selectedPlan == plan ? Color.luxuryMaroon.opacity(0.15) : Color.luxuryGold.opacity(0.2))
-                        )
+            HStack(spacing: YDGSpace.sm) {
+                ZStack {
+                    Circle()
+                        .stroke(isSelected ? Color.ydgAccent : Color.ydgBorderStrong, lineWidth: isSelected ? 6 : 1.5)
+                        .frame(width: 22, height: 22)
+                    if isSelected { Circle().fill(Color.ydgAccentSubtle).frame(width: 10, height: 10) }
+                }
+                .accessibilityHidden(true)
+
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(spacing: YDGSpace.xs) {
+                        Text(title)
+                            .ydgText(.headline)
+                        if let badge {
+                            Text(badge)
+                                .font(.ydg(.footnote, weight: .semibold))
+                                .foregroundColor(Color.ydgTextOnAccent)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 2)
+                                .background(Capsule().fill(Color.ydgAccent))
+                        }
+                    }
+                    Text(detail)
+                        .ydgText(.footnote, color: .ydgTextSecondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
+                }
+                Spacer(minLength: 0)
+                VStack(alignment: .trailing, spacing: 1) {
+                    Text(price)
+                        .ydgText(.headline)
+                    Text(priceUnit)
+                        .ydgText(.footnote, color: .ydgTextSecondary)
                 }
             }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 13)
-            .background(
-                Group {
-                    if selectedPlan == plan {
-                        AnyView(LinearGradient.goldShimmer)
-                    } else {
-                        AnyView(Color.clear)
-                    }
-                }
+            .padding(YDGSpace.md)
+            .background(isSelected ? Color.ydgAccentSubtle : Color.ydgRaised,
+                        in: RoundedRectangle(cornerRadius: YDGRadius.card, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: YDGRadius.card, style: .continuous)
+                    .stroke(isSelected ? Color.ydgAccent : Color.ydgBorder, lineWidth: isSelected ? 1.5 : 1)
             )
-            .cornerRadius(11)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .animation(.easeInOut(duration: 0.2), value: selectedPlan)
+        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
     }
 
     private var savingsBadge: String {
         guard let annual = purchases.premiumAnnualProduct,
-              let monthly = purchases.premiumMonthlyProduct else { return "Save 17%" }
+              let monthly = purchases.premiumMonthlyProduct else { return "Save 33%" }
         let annualDouble = NSDecimalNumber(decimal: annual.price).doubleValue
         let monthlyDouble = NSDecimalNumber(decimal: monthly.price).doubleValue
-        guard monthlyDouble > 0 else { return "Best Value" }
+        guard monthlyDouble > 0 else { return "Best value" }
         let savings = (1.0 - (annualDouble / 12.0) / monthlyDouble) * 100.0
         let rounded = Int(savings.rounded())
-        return rounded > 0 ? "Save \(rounded)%" : "Best Value"
+        return rounded > 0 ? "Save \(rounded)%" : "Best value"
     }
 
-    // MARK: - Price card
-
-    private var priceBlock: some View {
-        Group {
-            if purchases.isLoadingProducts {
-                ProgressView()
-                    .tint(Color.luxuryGold)
-                    .padding(.vertical, 16)
-            } else {
-                switch selectedPlan {
-                case .annual:
-                    priceCard(
-                        price: purchases.premiumAnnualProduct?.displayPrice ?? "$119.99",
-                        period: "per year",
-                        note: annualPerMonthNote
-                    )
-                case .monthly:
-                    priceCard(
-                        price: purchases.premiumMonthlyProduct?.displayPrice ?? "$14.99",
-                        period: "per month after free trial",
-                        note: nil
-                    )
-                }
-            }
-        }
-    }
-
-    private var annualPerMonthNote: String {
+    private var annualPerMonthPrice: String {
         if let annual = purchases.premiumAnnualProduct {
             let perMonth = NSDecimalNumber(decimal: annual.price).doubleValue / 12.0
-            return String(format: "~$%.2f/mo · 7 days free", perMonth)
+            return annual.priceFormatStyle.format(Decimal(perMonth))
         }
-        return "~$10.00/mo · 7 days free"
-    }
-
-    private func priceCard(price: String, period: String, note: String?) -> some View {
-        VStack(spacing: 6) {
-            Text(price)
-                .font(Font.bodySerif(32, weight: .bold))
-                .foregroundColor(Color.luxuryGold)
-            Text(period)
-                .font(Font.bodySans(13, weight: .regular))
-                .foregroundColor(Color.luxuryMuted)
-            if let note {
-                Text(note)
-                    .font(Font.bodySans(13, weight: .medium))
-                    .foregroundColor(Color.luxuryGold.opacity(0.85))
-            }
-        }
-        .padding(20)
-        .frame(maxWidth: .infinity)
-        .goldHighlightMaroonAccent(cornerRadius: 16)
+        return "$10.00"
     }
 
     // MARK: - Benefits
 
     private var benefitsSection: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            benefitRow("Approve a complete itinerary in one tap",
-                       detail: "Stops, timing, and backup options — ready to go")
-            benefitRow("Unlimited date plans",
-                       detail: "Generate as many finished plans as you need")
-            benefitRow("Plan together with your partner",
-                       detail: "Invite, rank options, and lock in your match")
-            benefitRow("Love Notes, Gift Finder & Memories",
-                       detail: "Every romantic detail, organized for you")
-            benefitRow("Conversation Starters & smart playlists", detail: nil)
-            benefitRow("Route maps & calendar integration", detail: nil)
+        VStack(alignment: .leading, spacing: YDGSpace.sm) {
+            benefitRow("Unlimited date plans, with backups")
+            benefitRow("Plan together: invite, rank, lock it in")
+            benefitRow("Love Notes, Gift Finder and Memories")
+            benefitRow("Route maps, calendar and playlists")
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(16)
-        .goldHighlightMaroonAccent(cornerRadius: 14)
     }
 
-    private func benefitRow(_ text: String, detail: String? = nil) -> some View {
-        HStack(alignment: .top, spacing: 10) {
-            Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 18))
-                .foregroundColor(Color.luxuryGold)
-                .padding(.top, 1)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(text)
-                    .font(Font.bodySans(15, weight: .semibold))
-                    .foregroundColor(Color.luxuryCream)
-                    .fixedSize(horizontal: false, vertical: true)
-                if let detail {
-                    Text(detail)
-                        .font(Font.bodySans(13, weight: .regular))
-                        .foregroundColor(Color.luxuryMuted)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
+    private func benefitRow(_ text: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: YDGSpace.sm) {
+            Image(systemName: "checkmark")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(Color.ydgAccent)
+                .accessibilityHidden(true)
+            Text(text)
+                .ydgText(.body, weight: .regular)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
@@ -268,13 +233,13 @@ struct PaywallView: View {
         Group {
             if let actionError, !actionError.isEmpty {
                 Text(actionError)
-                    .font(Font.bodySans(13, weight: .regular))
-                    .foregroundColor(Color.orange.opacity(0.95))
+                    .font(.ydg(.footnote))
+                    .foregroundColor(Color.ydgWarning)
                     .multilineTextAlignment(.center)
             } else if let msg = purchases.lastErrorMessage, !msg.isEmpty {
                 Text(msg)
-                    .font(Font.bodySans(13, weight: .regular))
-                    .foregroundColor(Color.orange.opacity(0.95))
+                    .font(.ydg(.footnote))
+                    .foregroundColor(Color.ydgWarning)
                     .multilineTextAlignment(.center)
             }
         }
@@ -290,81 +255,57 @@ struct PaywallView: View {
     }
 
     private var ctaSection: some View {
-        VStack(spacing: 12) {
-            Button {
-                Task {
-                    actionError = nil
-                    do {
-                        switch selectedPlan {
-                        case .annual:  try await purchases.purchasePremiumAnnual()
-                        case .monthly: try await purchases.purchasePremiumMonthly()
-                        }
-                        if purchases.isSubscribed { onSubscribed() }
-                    } catch {
-                        actionError = error.localizedDescription
+        Button {
+            Task {
+                actionError = nil
+                do {
+                    switch selectedPlan {
+                    case .annual:  try await purchases.purchasePremiumAnnual()
+                    case .monthly: try await purchases.purchasePremiumMonthly()
                     }
+                    if purchases.isSubscribed { onSubscribed() }
+                } catch {
+                    actionError = error.localizedDescription
                 }
-            } label: {
-                HStack(spacing: 8) {
-                    if purchases.isPurchasing { ProgressView().tint(Color.luxuryMaroon) }
-                    Text(purchases.isPurchasing ? "Processing…" : "Start 7-Day Free Trial")
-                }
-                .frame(maxWidth: .infinity)
             }
-            .buttonStyle(LuxuryGoldButtonStyle())
-            .disabled(purchases.isPurchasing || purchases.isLoadingProducts || !productsReady)
-            .opacity((purchases.isPurchasing || purchases.isLoadingProducts || !productsReady) ? 0.5 : 1)
+        } label: {
+            Text(purchases.isPurchasing ? "Processing…" : "Start 7-day free trial")
+        }
+        .buttonStyle(YDGButtonStyle(kind: .primary, isLoading: purchases.isPurchasing))
+        .disabled(purchases.isPurchasing || purchases.isLoadingProducts || !productsReady)
+    }
 
-            Button {
-                Task {
-                    actionError = nil
-                    await purchases.restorePurchases()
-                    if purchases.isSubscribed {
-                        onSubscribed()
-                    } else if let msg = purchases.lastErrorMessage, !msg.isEmpty {
-                        actionError = msg
-                    }
-                }
-            } label: {
-                HStack(spacing: 8) {
-                    if purchases.isRestoring { ProgressView().tint(Color.luxuryGold) }
-                    Text("Restore Purchases")
-                }
-                .frame(maxWidth: .infinity)
+    private func restoreTapped() {
+        Task {
+            actionError = nil
+            await purchases.restorePurchases()
+            if purchases.isSubscribed {
+                onSubscribed()
+            } else if let msg = purchases.lastErrorMessage, !msg.isEmpty {
+                actionError = msg
             }
-            .buttonStyle(LuxuryOutlineButtonStyle())
-            .disabled(purchases.isRestoring)
         }
     }
 
     // MARK: - Legal
 
     private var legalText: some View {
-        VStack(spacing: 10) {
-            Text("7-day free trial, then \(selectedPlanPriceDescription). Subscription automatically renews unless cancelled at least 24 hours before the end of the current period. Manage in Settings → Subscriptions.")
-                .font(Font.bodySans(11, weight: .regular))
-                .foregroundColor(Color.luxuryMuted.opacity(0.85))
+        VStack(spacing: YDGSpace.xs) {
+            Text("Renews at \(selectedPlanPriceDescription) unless cancelled 24 hours before the trial ends. Cancel anytime in Settings.")
+                .ydgText(.footnote, color: .ydgTextTertiary)
                 .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
 
-            HStack(spacing: 16) {
-                Button("Privacy Policy") {
-                    OpenTableReservationSafari.openInSafari(LegalURLs.privacy)
-                }
-                .font(.footnote)
-                .foregroundColor(Color.luxuryGold.opacity(0.85))
-
-                Text("·")
-                    .font(.footnote)
-                    .foregroundColor(Color.luxuryMuted)
-
-                Button("Terms of Use") {
-                    OpenTableReservationSafari.openInSafari(LegalURLs.terms)
-                }
-                .font(.footnote)
-                .foregroundColor(Color.luxuryGold.opacity(0.85))
+            HStack(spacing: YDGSpace.lg) {
+                Button(purchases.isRestoring ? "Restoring…" : "Restore purchases") { restoreTapped() }
+                    .disabled(purchases.isRestoring)
+                Button("Terms") { OpenTableReservationSafari.openInSafari(LegalURLs.terms) }
+                Button("Privacy") { OpenTableReservationSafari.openInSafari(LegalURLs.privacy) }
             }
+            .font(.ydg(.footnote, weight: .medium))
+            .foregroundColor(Color.ydgTextSecondary)
+            .frame(minHeight: 44)
         }
-        .padding(.top, 4)
     }
 
     private var selectedPlanPriceDescription: String {

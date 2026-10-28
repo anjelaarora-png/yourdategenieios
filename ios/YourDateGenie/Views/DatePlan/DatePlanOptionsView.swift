@@ -27,6 +27,8 @@ struct DatePlanOptionsView: View {
     @State private var showSavedBanner = false
     @State private var showCloseConfirmation = false
     @State private var pendingPlanForSave: DatePlan? = nil
+    /// Full itinerary for one option, opened from its compact card ("Full plan").
+    @State private var fullPlan: PendingSavePlan?
 
     @State private var inviterFirstChoiceIndex: Int?
     @State private var inviterSecondChoiceIndex: Int?
@@ -40,7 +42,6 @@ struct DatePlanOptionsView: View {
         return plans[selectedPlanIndex]
     }
     
-    var isOnRegeneratePage: Bool { selectedPlanIndex >= plans.count }
     
     var body: some View {
         NavigationStack {
@@ -49,6 +50,7 @@ struct DatePlanOptionsView: View {
                     .ignoresSafeArea()
                 
                 VStack(spacing: 0) {
+                    optionsHeader
                     if isPartnerPlanMode, !inviterRankSubmitted {
                         partnerRankPromptView
                             .zIndex(3)
@@ -56,6 +58,7 @@ struct DatePlanOptionsView: View {
                     optionChipsSection
                         .zIndex(2)
                     mainContentArea
+                    pageDots
                 }
                 .overlay(alignment: .top) {
                     if showSavedBanner {
@@ -119,9 +122,7 @@ struct DatePlanOptionsView: View {
             .toolbarBackground(Color.ydgBase, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .safeAreaInset(edge: .bottom) {
-                if !isOnRegeneratePage {
-                    savePlanBar
-                }
+                savePlanBar
             }
             .onAppear {
                 selectedPlanIndex = min(initialSelectedIndex, max(0, plans.count - 1))
@@ -134,6 +135,9 @@ struct DatePlanOptionsView: View {
         }
         .sheet(isPresented: $showPartnerShare) {
             PartnerShareView(plan: selectedPlan)
+        }
+        .sheet(item: $fullPlan) { wrapper in
+            fullPlanSheet(wrapper.plan)
         }
         .sheet(isPresented: $showAddToCalendar) {
             AddToCalendarSheet(
@@ -208,15 +212,37 @@ struct DatePlanOptionsView: View {
         }
     }
 
-    // MARK: - Main content (swipeable TabView: one page per plan + Regenerate page)
+    // MARK: - Header (design 3.6)
+    private var optionsHeader: some View {
+        VStack(alignment: .leading, spacing: YDGSpace.xxs) {
+            Text(optionsHeadline)
+                .ydgText(.title1)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityAddTraits(.isHeader)
+            Text("Every stop is open for its time slot.")
+                .ydgText(.body, color: .ydgTextSecondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, YDGSpace.margin)
+        .padding(.top, YDGSpace.xs)
+    }
+
+    private var optionsHeadline: String {
+        let count = ["One way", "Two ways", "Three ways"][max(0, min(plans.count, 3) - 1)]
+        if let date = plans.first?.scheduledDate {
+            let day = Calendar.current.isDateInToday(date) ? "tonight" : date.formatted(.dateTime.weekday(.wide))
+            return "\(count) to spend \(day)"
+        }
+        return "\(count) to spend your night"
+    }
+
+    // MARK: - Main content (swipeable TabView: one compact card per plan)
     private var mainContentArea: some View {
         TabView(selection: $selectedPlanIndex) {
             ForEach(0..<plans.count, id: \.self) { index in
                 planPageContent(index: index)
                     .tag(index)
             }
-            regeneratePageContent
-                .tag(plans.count)
         }
         .tabViewStyle(.page(indexDisplayMode: .never))
         .animation(.spring(response: 0.45, dampingFraction: 0.8), value: selectedPlanIndex)
@@ -228,6 +254,18 @@ struct DatePlanOptionsView: View {
             }
         }
     }
+
+    private var pageDots: some View {
+        HStack(spacing: 6) {
+            ForEach(0..<plans.count, id: \.self) { i in
+                Capsule()
+                    .fill(i == selectedPlanIndex ? Color.ydgTextPrimary : Color.ydgBorderStrong)
+                    .frame(width: i == selectedPlanIndex ? 18 : 6, height: 6)
+            }
+        }
+        .padding(.vertical, YDGSpace.sm)
+        .accessibilityHidden(true)
+    }
     
     @ViewBuilder
     private func planPageContent(index: Int) -> some View {
@@ -238,37 +276,15 @@ struct DatePlanOptionsView: View {
                         .transition(.opacity.combined(with: .scale(scale: 0.96)))
                 } else {
                     let plan = plans[index]
-                    ItineraryCreamCardChrome(edgePadding: 0) {
-                        ItineraryCreamPlanDetailContent(
-                            plan: plan,
-                            partnerName: coordinator.currentPlanPartnerNames?.1,
-                            onOpenRoute: {
-                                coordinator.showRouteMap(
-                                    stops: ItineraryPlanFormatting.itineraryStops(for: plan),
-                                    startingPoint: plan.startingPoint
-                                )
-                            },
-                            onGetMoreGiftIdeas: {
-                                access.require(.gifting) {
-                                    coordinator.showGiftFinder(
-                                        datePlan: plan,
-                                        dateLocation: plan.stops.first?.address
-                                    )
-                                }
-                            },
-                            canAccessGiftIdeas: access.canAccess(.gifting)
-                        )
-                    }
-                    .padding(.horizontal, YDGSpace.margin)
-                    .id(index)
-                    .transition(.bookFlip)
-                    .opacity(itineraryAppeared ? 1 : 0)
-                    .offset(y: itineraryAppeared ? 0 : 10)
-                    .scaleEffect(itineraryAppeared ? 1 : 0.98)
-                    .animation(.easeOut(duration: 0.45), value: itineraryAppeared)
+                    compactOptionCard(plan)
+                        .padding(.horizontal, YDGSpace.margin)
+                        .id(index)
+                        .opacity(itineraryAppeared ? 1 : 0)
+                        .offset(y: itineraryAppeared ? 0 : 10)
+                        .animation(.easeOut(duration: 0.45), value: itineraryAppeared)
                 }
             }
-            .padding(.bottom, 120)
+            .padding(.top, YDGSpace.xxs)
             .animation(.spring(response: 0.45, dampingFraction: 0.8), value: loadingPlanIndices.contains(index))
         }
         .scrollBounceBehavior(.basedOnSize)
@@ -276,21 +292,103 @@ struct DatePlanOptionsView: View {
             if index == selectedPlanIndex { itineraryAppeared = true }
         }
     }
-    
-    private var regeneratePageContent: some View {
-        VStack {
-            Spacer()
-            YDGEmptyState(
-                systemName: "arrow.triangle.2.circlepath",
-                title: "Want different options?",
-                message: "Get three new date plans with the same preferences.",
-                actionTitle: onRegenerate == nil ? nil : "New options",
-                action: onRegenerate
-            )
-            Spacer()
-            Spacer()
+
+    // MARK: - Compact comparison card
+    private func compactOptionCard(_ plan: DatePlan) -> some View {
+        let stops = ItineraryPlanFormatting.itineraryStops(for: plan)
+        return VStack(alignment: .leading, spacing: 0) {
+            Text(plan.title)
+                .ydgText(.title2)
+                .fixedSize(horizontal: false, vertical: true)
+            Text(compactMeta(plan, stopCount: stops.count))
+                .ydgText(.footnote, color: .ydgTextSecondary)
+                .padding(.top, YDGSpace.xxs)
+                .padding(.bottom, YDGSpace.sm)
+
+            ForEach(Array(stops.prefix(4).enumerated()), id: \.offset) { _, stop in
+                Rectangle().fill(Color.ydgBorder).frame(height: 1)
+                HStack(alignment: .firstTextBaseline, spacing: YDGSpace.md) {
+                    Text(stop.timeSlot)
+                        .ydgText(.subhead, weight: .medium)
+                        .frame(width: 66, alignment: .leading)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(stop.name)
+                            .ydgText(.body, weight: .medium)
+                            .lineLimit(1)
+                        Text(stop.venueType)
+                            .ydgText(.footnote, color: .ydgTextSecondary)
+                            .lineLimit(1)
+                    }
+                    Spacer(minLength: 0)
+                }
+                .padding(.vertical, YDGSpace.sm)
+            }
+            Rectangle().fill(Color.ydgBorder).frame(height: 1)
+
+            HStack {
+                Text(plan.estimatedCost)
+                    .ydgText(.footnote, color: .ydgTextSecondary)
+                    .lineLimit(1)
+                Spacer()
+                Button {
+                    fullPlan = PendingSavePlan(plan: plan)
+                } label: {
+                    HStack(spacing: 4) {
+                        Text("Full plan")
+                        Image(systemName: "chevron.right").font(.system(size: 12, weight: .semibold))
+                    }
+                }
+                .buttonStyle(.ydgTertiary)
+            }
+            .padding(.top, YDGSpace.xxs)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .ydgCard(padding: YDGSpace.margin)
+    }
+
+    private func compactMeta(_ plan: DatePlan, stopCount: Int) -> String {
+        var parts: [String] = []
+        if let first = plan.stops.first?.timeSlot, !first.isEmpty { parts.append(first) }
+        parts.append("\(stopCount) stop\(stopCount == 1 ? "" : "s")")
+        if !plan.totalDuration.isEmpty { parts.append(plan.totalDuration) }
+        return parts.joined(separator: " · ")
+    }
+
+    // MARK: - Full itinerary for one option
+    private func fullPlanSheet(_ plan: DatePlan) -> some View {
+        NavigationStack {
+            ScrollView(showsIndicators: false) {
+                ItineraryCreamCardChrome(edgePadding: 0) {
+                    ItineraryCreamPlanDetailContent(
+                        plan: plan,
+                        partnerName: coordinator.currentPlanPartnerNames?.1,
+                        onOpenRoute: {
+                            coordinator.showRouteMap(
+                                stops: ItineraryPlanFormatting.itineraryStops(for: plan),
+                                startingPoint: plan.startingPoint
+                            )
+                        },
+                        onGetMoreGiftIdeas: {
+                            access.require(.gifting) {
+                                coordinator.showGiftFinder(datePlan: plan, dateLocation: plan.stops.first?.address)
+                            }
+                        },
+                        canAccessGiftIdeas: access.canAccess(.gifting)
+                    )
+                }
+                .padding(.horizontal, YDGSpace.margin)
+                .padding(.bottom, YDGSpace.xl)
+            }
+            .background(Color.ydgBase.ignoresSafeArea())
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") { fullPlan = nil }
+                        .font(.ydg(.body, weight: .semibold))
+                        .foregroundColor(Color.ydgAccent)
+                }
+            }
+            .toolbarBackground(Color.ydgBase, for: .navigationBar)
+        }
     }
     
     // MARK: - Save confirmation banner
@@ -377,15 +475,6 @@ struct DatePlanOptionsView: View {
         .background(Color.ydgBase)
         .contentShape(Rectangle())
 
-            if !hasSwipedOptions && plans.count > 1 {
-                Text("Swipe to compare")
-                    .ydgText(.footnote, color: .ydgTextTertiary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, YDGSpace.margin)
-                    .padding(.bottom, YDGSpace.xs)
-                    .transition(.opacity)
-                    .animation(.easeOut, value: hasSwipedOptions)
-            }
         }
     }
 
@@ -403,8 +492,12 @@ struct DatePlanOptionsView: View {
     }
     
     // MARK: - Save Plan Bar
+    private var selectedOptionLetter: String {
+        selectedPlan.optionLabel?.replacingOccurrences(of: "Option ", with: "") ?? ["A", "B", "C"][min(selectedPlanIndex, 2)]
+    }
+
     private var savePlanBar: some View {
-        VStack(spacing: YDGSpace.xs) {
+        VStack(spacing: YDGSpace.xxs) {
             if let onSave = onSave {
                 let isCurrentSaved = savedPlanIds.contains(selectedPlan.id)
                 Button {
@@ -417,21 +510,29 @@ struct DatePlanOptionsView: View {
                         pendingPlanForSave = plan
                     }
                 } label: {
-                    Label(isCurrentSaved ? "Saved" : "Save this plan",
-                          systemImage: isCurrentSaved ? "checkmark" : "bookmark")
+                    Text(isCurrentSaved ? "Saved" : "Save option \(selectedOptionLetter)")
                 }
                 .buttonStyle(.ydgPrimary)
                 .disabled(isCurrentSaved)
             }
+
+            HStack(spacing: YDGSpace.lg) {
+                Button(partnerRankTitle) { showPartnerShare = true }
+                if let onRegenerate {
+                    Button("New options", action: onRegenerate)
+                }
+            }
+            .buttonStyle(.ydgTertiary)
         }
         .padding(.horizontal, YDGSpace.margin)
         .padding(.top, YDGSpace.sm)
-        .padding(.bottom, YDGSpace.xs)
-        .background(
-            Color.ydgBase
-                .overlay(alignment: .top) { Rectangle().fill(Color.ydgBorder).frame(height: 1) }
-                .ignoresSafeArea()
-        )
+        .padding(.bottom, YDGSpace.xxs)
+        .background(Color.ydgBase.ignoresSafeArea())
+    }
+
+    private var partnerRankTitle: String {
+        let name = (PartnerSessionManager.shared.inviteInfo?.partnerName ?? "").trimmingCharacters(in: .whitespaces)
+        return name.isEmpty ? "Let your partner rank them" : "Let \(name) rank them"
     }
     
     // MARK: - Loading Option (preparing in background — luxe animation)

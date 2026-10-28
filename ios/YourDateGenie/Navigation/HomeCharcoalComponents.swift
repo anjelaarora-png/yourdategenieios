@@ -42,41 +42,26 @@ struct CollapsibleHomeSection<Content: View, Trailing: View>: View {
         self.content = content
     }
 
+    /// The final design shows every Home section open, so `isExpanded` is kept only for call-site compatibility.
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Button {
-                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                    isExpanded.toggle()
-                }
-            } label: {
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(title)
-                            .ydgText(.title2)
-                        if let subtitle, !subtitle.isEmpty {
-                            Text(subtitle)
-                                .ydgText(.footnote, color: .ydgTextSecondary)
-                        }
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .ydgText(.title2)
+                        .accessibilityAddTraits(.isHeader)
+                    if let subtitle, !subtitle.isEmpty {
+                        Text(subtitle)
+                            .ydgText(.footnote, color: .ydgTextSecondary)
                     }
-                    Spacer(minLength: 8)
-                    headerTrailing()
-                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundColor(Color.ydgTextTertiary)
-                        .frame(width: 44, height: 44, alignment: .trailing)
                 }
-                .contentShape(Rectangle())
+                Spacer(minLength: 8)
+                headerTrailing()
             }
-            .buttonStyle(.plain)
-            .accessibilityHint(isExpanded ? "Collapse section" : "Expand section")
             .padding(.horizontal, YDGSpace.margin)
 
             content()
-                .padding(.top, isExpanded ? 14 : 0)
-                .frame(maxHeight: isExpanded ? .infinity : 0, alignment: .top)
-                .clipped()
-                .allowsHitTesting(isExpanded)
-                .accessibilityHidden(!isExpanded)
+                .padding(.top, 14)
         }
     }
 }
@@ -149,24 +134,32 @@ enum ItineraryPlanFormatting {
 /// Plan card frame. The Final design moved itineraries onto a dark raised card;
 /// `.cream` is kept for love notes and playlist cards, whose content uses on-card colors.
 struct ItineraryCreamCardChrome<Content: View>: View {
-    enum Surface { case raised, cream }
+    /// `.plain`: no card at all — the itinerary sits straight on the screen (plan detail, design 3.7).
+    enum Surface { case raised, cream, plain }
 
     var edgePadding: CGFloat = 20
     var surface: Surface = .raised
     @ViewBuilder var content: () -> Content
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            content()
+        if surface == .plain {
+            VStack(alignment: .leading, spacing: 0) {
+                content()
+            }
+            .padding(.horizontal, edgePadding - YDGSpace.md)
+        } else {
+            VStack(alignment: .leading, spacing: 0) {
+                content()
+            }
+            .background(surface == .cream ? Color.creamCard : Color.ydgRaised,
+                        in: RoundedRectangle(cornerRadius: YDGRadius.card, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: YDGRadius.card, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: YDGRadius.card, style: .continuous)
+                    .stroke(surface == .cream ? Color.maroonBorderTint : Color.ydgBorder, lineWidth: 1)
+            )
+            .padding(.horizontal, edgePadding)
         }
-        .background(surface == .cream ? Color.creamCard : Color.ydgRaised,
-                    in: RoundedRectangle(cornerRadius: YDGRadius.card, style: .continuous))
-        .clipShape(RoundedRectangle(cornerRadius: YDGRadius.card, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: YDGRadius.card, style: .continuous)
-                .stroke(surface == .cream ? Color.maroonBorderTint : Color.ydgBorder, lineWidth: 1)
-        )
-        .padding(.horizontal, edgePadding)
     }
 }
 

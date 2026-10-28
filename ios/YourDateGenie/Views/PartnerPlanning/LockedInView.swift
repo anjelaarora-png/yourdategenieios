@@ -31,15 +31,19 @@ struct LockedInView: View {
             ScrollView(.vertical, showsIndicators: false) {
                 VStack(alignment: .leading, spacing: YDGSpace.lg) {
                     sealSection
-                    planCard
-                    calendarStatusRow
+                    statusCard
                     draftedNoteSection
-                    actionsSection
                 }
                 .padding(.horizontal, YDGSpace.margin)
                 .padding(.top, YDGSpace.md)
                 .padding(.bottom, YDGSpace.xl)
             }
+        }
+        .safeAreaInset(edge: .bottom) {
+            actionsSection
+                .padding(.horizontal, YDGSpace.margin)
+                .padding(.bottom, YDGSpace.xs)
+                .background(Color.ydgBase)
         }
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -97,35 +101,68 @@ struct LockedInView: View {
         .padding(.top, YDGSpace.xl)
     }
 
-    // MARK: - Plan card (cream itinerary card, maroon left border)
+    // MARK: - Status card (calendar + booking nudge, design 4.7)
 
-    private var planCard: some View {
-        ItineraryCreamPlanPreviewCard(
-            plan: plan,
-            partnerName: partnerDisplayName == "your partner" ? nil : partnerDisplayName
+    /// First stop that still needs a table — the one worth nudging about.
+    private var unbookedStop: DatePlanStop? {
+        plan.stops.first { ItineraryPlanFormatting.isReservable($0) }
+    }
+
+    private var statusCard: some View {
+        VStack(spacing: 0) {
+            statusRow(
+                systemImage: calendarSynced ? "calendar" : "calendar.badge.exclamationmark",
+                title: calendarSynced ? "On both your calendars" : "Saved to your plans",
+                detail: calendarSynced
+                    ? "Reminders the night before and a few hours ahead."
+                    : "Turn on Calendar access to get reminders for you both."
+            )
+            if let stop = unbookedStop {
+                YDGListDivider(leadingInset: 52)
+                HStack(spacing: 0) {
+                    statusRow(
+                        systemImage: "bookmark",
+                        title: "\(stop.name) isn't booked yet",
+                        detail: "Tables go fast. Grab one now."
+                    )
+                    Button("Book") {
+                        coordinator.reservationPlatformPickerPayload = ReservationPlatformPickerPayload(
+                            venueName: stop.name,
+                            phoneNumber: stop.phoneNumber,
+                            address: stop.address,
+                            reservationPlatforms: stop.reservationPlatforms,
+                            bookingUrl: stop.bookingUrl
+                        )
+                    }
+                    .buttonStyle(.ydgTertiary)
+                    .padding(.trailing, YDGSpace.sm)
+                }
+            }
+        }
+        .background(Color.ydgRaised, in: RoundedRectangle(cornerRadius: YDGRadius.card, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: YDGRadius.card, style: .continuous)
+                .stroke(Color.ydgBorder, lineWidth: 1)
         )
     }
 
-    // MARK: - Calendar status
-
-    private var calendarStatusRow: some View {
-        HStack(spacing: 14) {
-            Image(systemName: calendarSynced ? "calendar.badge.checkmark" : "calendar.badge.exclamationmark")
-                .font(.system(size: 19))
-                .foregroundColor(calendarSynced ? Color.ydgSuccess : Color.ydgTextSecondary)
+    private func statusRow(systemImage: String, title: String, detail: String) -> some View {
+        HStack(spacing: YDGSpace.sm) {
+            Image(systemName: systemImage)
+                .font(.system(size: 17))
+                .foregroundColor(calendarSynced || systemImage == "bookmark" ? Color.ydgTextPrimary : Color.ydgTextSecondary)
                 .frame(width: 24)
+                .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
-                Text(calendarSynced ? "On both your calendars" : "Saved to your plans")
+                Text(title)
                     .ydgText(.subhead, weight: .semibold)
-                Text(calendarSynced
-                     ? "Reminders set the night before and a few hours ahead."
-                     : "Turn on Calendar access to get reminders for you both.")
+                Text(detail)
                     .ydgText(.footnote, color: .ydgTextSecondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 0)
         }
-        .ydgCard()
+        .padding(YDGSpace.md)
     }
 
     // MARK: - Drafted note

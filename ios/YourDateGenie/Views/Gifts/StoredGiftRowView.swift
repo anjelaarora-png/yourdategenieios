@@ -8,78 +8,34 @@ struct StoredGiftRowView: View {
     var onMarkBought: (() -> Void)?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .top, spacing: 12) {
+        VStack(alignment: .leading, spacing: YDGSpace.sm) {
+            HStack(alignment: .top, spacing: YDGSpace.sm) {
                 Text(stored.emoji)
-                    .font(.system(size: 28))
-                    .frame(width: 44, height: 44)
-                    .background(Color.luxeSurfaceTintStrong)
-                    .cornerRadius(10)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 10)
-                            .stroke(Color.luxeSurfaceBorder, lineWidth: 1)
-                    )
-                VStack(alignment: .leading, spacing: 4) {
+                    .font(.system(size: 26))
+                    .frame(width: 48, height: 48)
+                    .background(Color.ydgOverlay, in: RoundedRectangle(cornerRadius: YDGRadius.chip, style: .continuous))
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 2) {
                     Text(stored.name)
-                        .font(Font.bodySans(15, weight: .semibold))
-                        .foregroundColor(Color.luxuryCream)
+                        .ydgText(.headline)
+                        .fixedSize(horizontal: false, vertical: true)
                     Text(stored.priceRange)
-                        .font(Font.bodySans(12, weight: .medium))
-                        .foregroundColor(Color.luxuryGold)
+                        .ydgText(.subhead, weight: .semibold)
                 }
-                Spacer()
+                Spacer(minLength: 0)
             }
-            HStack(spacing: 8) {
-                Button(action: onShop) {
-                    HStack(spacing: 5) {
-                        Image(systemName: "cart.fill")
-                            .font(.system(size: 11))
-                        Text("Shop")
-                            .font(Font.bodySans(12, weight: .semibold))
-                    }
-                    .foregroundColor(Color.luxuryMaroon)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 10)
-                    .background(LinearGradient.goldShimmer)
-                    .cornerRadius(8)
+            HStack(spacing: YDGSpace.xs) {
+                Button("New link", action: onNewLink)
+                    .buttonStyle(YDGButtonStyle(kind: .secondary, fullWidth: false, compact: true))
+                if let onMarkBought {
+                    Button("Bought", action: onMarkBought)
+                        .buttonStyle(YDGButtonStyle(kind: .secondary, fullWidth: false, compact: true))
                 }
-                Button(action: onNewLink) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "link")
-                            .font(.system(size: 10))
-                            .foregroundColor(Color.luxuryGold)
-                        Text("New link")
-                            .font(Font.bodySans(11, weight: .semibold))
-                    }
-                    .foregroundColor(Color.luxuryGold)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 10)
-                    .background(Color.clear)
-                    .cornerRadius(8)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(Color.luxuryGold.opacity(0.5), lineWidth: 1)
-                    )
-                }
-                if let onMarkBought = onMarkBought {
-                    Button(action: onMarkBought) {
-                        HStack(spacing: 4) {
-                            Image(systemName: "checkmark.circle.fill")
-                                .font(.system(size: 11))
-                            Text("Bought")
-                                .font(Font.bodySans(11, weight: .semibold))
-                        }
-                        .foregroundColor(Color.luxuryMaroon)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 10)
-                        .background(Color.luxuryCream.opacity(0.9))
-                        .cornerRadius(8)
-                    }
-                }
+                Button("Shop now", action: onShop)
+                    .buttonStyle(YDGButtonStyle(kind: .accentOutline, compact: true))
             }
         }
-        .padding(14)
-        .goldHighlightMaroonAccent(cornerRadius: 14)
+        .ydgCard()
     }
 }
 
@@ -90,22 +46,21 @@ struct GiftListEmptyState: View {
     let subtitle: String
 
     var body: some View {
-        VStack(spacing: 12) {
+        HStack(alignment: .top, spacing: YDGSpace.sm) {
             Image(systemName: icon)
-                .font(.system(size: 32))
-                .foregroundColor(Color.luxuryGold)
-            Text(title)
-                .font(Font.bodySerif(17, weight: .regular))
-                .foregroundColor(Color.accentGold)
-            Text(subtitle)
-                .font(Font.bodySans(13, weight: .regular))
-                .foregroundColor(Color.luxuryMuted)
-                .multilineTextAlignment(.center)
+                .font(.system(size: 18, weight: .medium))
+                .foregroundColor(Color.ydgHighlight)
+                .frame(width: 24)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: YDGSpace.xxs) {
+                Text(title)
+                    .ydgText(.headline)
+                Text(subtitle)
+                    .ydgText(.subhead, weight: .regular, color: .ydgTextSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 28)
-        .padding(.horizontal, 20)
-        .questionnaireInsetSurface(cornerRadius: 14)
-        .padding(.horizontal, 20)
+        .padding(.top, YDGSpace.xs)
     }
 }

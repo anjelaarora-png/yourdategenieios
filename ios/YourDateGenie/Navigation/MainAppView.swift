@@ -51,8 +51,10 @@ struct LuxuryMainAppView: View {
         }
         .overlay {
             if coordinator.isRegeneratingFromOptions && planGenerator.isGenerating {
-                MagicalLoadingView(generator: planGenerator)
-                    .ignoresSafeArea()
+                MagicalLoadingView(generator: planGenerator) {
+                    planGenerator.cancelGeneration()
+                    coordinator.isRegeneratingFromOptions = false
+                }
             }
         }
         .sheet(item: $coordinator.reservationPlatformPickerPayload) { payload in
@@ -213,7 +215,8 @@ struct LuxuryMainAppView: View {
                 .toolbar {
                     ToolbarItem(placement: .navigationBarTrailing) {
                         Button("Done") { coordinator.dismissSheet() }
-                            .foregroundColor(Color.luxuryGold)
+                            .font(.ydg(.body, weight: .semibold))
+                            .foregroundColor(Color.ydgAccent)
                     }
                 }
             }
@@ -242,14 +245,21 @@ struct LuxuryMainAppView: View {
         case .routeMap(let stops, let startingPoint, let showRouteLine):
             NavigationStack {
                 RouteMapView(stops: stops, startingPoint: startingPoint, showRouteLine: showRouteLine)
-                    .navigationTitle(showRouteLine ? "Your Route" : "Journey Map")
+                    .navigationTitle(showRouteLine ? "Your route" : "Journey map")
                     .navigationBarTitleDisplayMode(.inline)
+                    .toolbarBackground(Color.ydgBase, for: .navigationBar)
+                    .toolbarBackground(.visible, for: .navigationBar)
                     .toolbar {
-                        ToolbarItem(placement: .navigationBarTrailing) {
-                            Button("Done") {
+                        ToolbarItem(placement: .navigationBarLeading) {
+                            Button {
                                 coordinator.dismissSheet()
+                            } label: {
+                                Image(systemName: "chevron.left")
+                                    .font(.system(size: 17, weight: .semibold))
+                                    .foregroundColor(Color.ydgTextPrimary)
+                                    .frame(width: 44, height: 44)
                             }
-                            .foregroundColor(Color.luxuryGold)
+                            .accessibilityLabel("Back")
                         }
                     }
             }
@@ -294,14 +304,20 @@ struct LuxuryMainAppView: View {
             NavigationStack {
                 LuxuryExploreTabView()
                     .environmentObject(coordinator)
-                    .navigationTitle("Explore")
                     .navigationBarTitleDisplayMode(.inline)
+                    .toolbarBackground(Color.ydgBase, for: .navigationBar)
+                    .toolbarBackground(.visible, for: .navigationBar)
                     .toolbar {
-                        ToolbarItem(placement: .navigationBarTrailing) {
-                            Button("Done") {
+                        ToolbarItem(placement: .navigationBarLeading) {
+                            Button {
                                 coordinator.dismissSheet()
+                            } label: {
+                                Image(systemName: "chevron.left")
+                                    .font(.system(size: 17, weight: .semibold))
+                                    .foregroundColor(Color.ydgTextPrimary)
+                                    .frame(width: 44, height: 44)
                             }
-                            .foregroundColor(Color.luxuryGold)
+                            .accessibilityLabel("Back")
                         }
                     }
             }

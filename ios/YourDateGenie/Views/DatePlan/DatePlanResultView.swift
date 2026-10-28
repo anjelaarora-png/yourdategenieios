@@ -60,7 +60,7 @@ struct DatePlanResultView: View {
                             mainPlanCard
                             planSecondaryActions
                         }
-                        .padding(.horizontal, YDGSpace.margin)
+                        .padding(.horizontal, YDGSpace.xxs)
                         .padding(.top, YDGSpace.xs)
                         .padding(.bottom, YDGSpace.lg)
                     }
@@ -73,7 +73,7 @@ struct DatePlanResultView: View {
                     Button {
                         coordinator.dismissSheet()
                     } label: {
-                        Image(systemName: "xmark")
+                        Image(systemName: "chevron.left")
                             .font(.system(size: 17, weight: .semibold))
                             .foregroundColor(Color.ydgTextPrimary)
                             .frame(width: 44, height: 44)
@@ -84,23 +84,6 @@ struct DatePlanResultView: View {
                 
                 ToolbarItem(placement: .navigationBarTrailing) {
                     HStack(spacing: 0) {
-                        if onDelete != nil {
-                            Menu {
-                                Button(role: .destructive) {
-                                    showDeleteConfirmation = true
-                                } label: {
-                                    Label("Delete plan", systemImage: "trash")
-                                }
-                            } label: {
-                                Image(systemName: "ellipsis")
-                                    .font(.system(size: 17, weight: .semibold))
-                                    .foregroundColor(Color.ydgTextPrimary)
-                                    .frame(width: 44, height: 44)
-                                    .contentShape(Rectangle())
-                            }
-                            .accessibilityLabel("More options")
-                        }
-                        
                         Button {
                             access.require(.datePlan) {
                                 showPartnerShare = true
@@ -114,15 +97,25 @@ struct DatePlanResultView: View {
                                 .contentShape(Rectangle())
                         }
                         .accessibilityLabel("Share this plan")
-                        
-                        if isSaved {
-                            Image(systemName: "checkmark")
-                                .font(.system(size: 15, weight: .semibold))
-                                .foregroundColor(Color.ydgSuccess)
+
+                        Menu {
+                            planToolsMenu
+                            if onDelete != nil {
+                                Divider()
+                                Button(role: .destructive) {
+                                    showDeleteConfirmation = true
+                                } label: {
+                                    Label("Delete plan", systemImage: "trash")
+                                }
+                            }
+                        } label: {
+                            Image(systemName: "ellipsis")
+                                .font(.system(size: 17, weight: .semibold))
+                                .foregroundColor(Color.ydgTextPrimary)
                                 .frame(width: 44, height: 44)
-                                .accessibilityLabel("Plan saved")
-                                .accessibilityHidden(true)
+                                .contentShape(Rectangle())
                         }
+                        .accessibilityLabel("More options")
                     }
                 }
             }
@@ -146,7 +139,7 @@ struct DatePlanResultView: View {
                     stops: ItineraryPlanFormatting.itineraryStops(for: plan),
                     startingPoint: plan.startingPoint
                 )
-                    .navigationTitle("Route")
+                    .navigationTitle("Your route")
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar {
                         ToolbarItem(placement: .navigationBarTrailing) {
@@ -289,7 +282,7 @@ struct DatePlanResultView: View {
     
     // MARK: - Main Plan Card (matches Home hero cream card)
     private var mainPlanCard: some View {
-        ItineraryCreamCardChrome(edgePadding: 0) {
+        ItineraryCreamCardChrome(edgePadding: YDGSpace.md, surface: .plain) {
             ItineraryCreamPlanDetailContent(
                 plan: displayPlan,
                 partnerName: partnerDisplayName,
@@ -369,78 +362,78 @@ struct DatePlanResultView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
     }
     
+    // MARK: - Plan tools (in the "…" menu; the design keeps the bottom bar to Share + Save)
+    @ViewBuilder
+    private var planToolsMenu: some View {
+        Button {
+            access.require(.datePlan) { showMap = true }
+        } label: { Label("Route", systemImage: "map") }
+
+        Button {
+            access.require(.datePlan) { showAddToCalendar = true }
+        } label: { Label("Add to calendar", systemImage: "calendar.badge.plus") }
+
+        Button {
+            access.require(.datePlan) { reserveTapped() }
+        } label: { Label("Reserve a table", systemImage: "fork.knife") }
+
+        Button {
+            access.require(.playlist) { showPlaylist = true }
+        } label: { Label("Playlist", systemImage: "music.note") }
+
+        Button {
+            access.require(.gifting) { showGiftFinder = true }
+        } label: { Label("Gift ideas", systemImage: "gift") }
+
+        Button {
+            access.require(.memory) { coordinator.isShowingMemoryCapture = true }
+        } label: { Label("Add a photo", systemImage: "camera") }
+    }
+
+    private func reserveTapped() {
+        let reservable = plan.stops.filter { ItineraryPlanFormatting.isReservable($0) }
+        if reservable.isEmpty {
+            showNoReservableAlert = true
+        } else if reservable.count == 1 {
+            let stop = reservable[0]
+            platformPickerPayload = ReservationPlatformPickerPayload(
+                venueName: stop.name,
+                phoneNumber: stop.phoneNumber,
+                address: stop.address,
+                reservationPlatforms: stop.reservationPlatforms,
+                bookingUrl: stop.bookingUrl
+            )
+        } else {
+            reservableStopsForPicker = reservable
+            showReserveVenuePicker = true
+        }
+    }
+
     // MARK: - Bottom Action Bar
     private var bottomActionBar: some View {
-        VStack(spacing: YDGSpace.sm) {
-            // Quick Actions
-            HStack(spacing: YDGSpace.xs) {
-                QuickActionButton(icon: "map.fill", label: "Route", isLocked: !access.canAccess(.datePlan)) {
-                    access.require(.datePlan) {
-                        showMap = true
-                    }
+        VStack(spacing: YDGSpace.xxs) {
+            HStack(spacing: YDGSpace.sm) {
+                Button("Share") {
+                    access.require(.datePlan) { showPartnerShare = true }
                 }
-                
-                QuickActionButton(icon: "calendar.badge.plus", label: "Calendar", isLocked: !access.canAccess(.datePlan)) {
-                    access.require(.datePlan) {
-                        showAddToCalendar = true
-                    }
-                }
-                
-                QuickActionButton(icon: "music.note", label: "Playlist", isLocked: !access.canAccess(.playlist)) {
-                    access.require(.playlist) {
-                        showPlaylist = true
-                    }
-                }
-                
-                QuickActionButton(icon: "gift.fill", label: "Gifts", isLocked: !access.canAccess(.gifting)) {
-                    access.require(.gifting) {
-                        showGiftFinder = true
-                    }
-                }
-                
-                QuickActionButton(icon: "fork.knife.circle", label: "Reserve", isLocked: !access.canAccess(.datePlan)) {
-                    access.require(.datePlan) {
-                        let reservable = plan.stops.filter { ItineraryPlanFormatting.isReservable($0) }
-                        if reservable.isEmpty {
-                            showNoReservableAlert = true
-                        } else if reservable.count == 1 {
-                            let stop = reservable[0]
-                            platformPickerPayload = ReservationPlatformPickerPayload(
-                                venueName: stop.name,
-                                phoneNumber: stop.phoneNumber,
-                                address: stop.address,
-                                reservationPlatforms: stop.reservationPlatforms,
-                                bookingUrl: stop.bookingUrl
-                            )
+                .buttonStyle(YDGButtonStyle(kind: .secondary, fullWidth: onSave == nil))
+
+                // Save — only when onSave provided
+                if onSave != nil {
+                    Button {
+                        guard !isSaved else { return }
+                        if plan.scheduledDate != nil || coordinator.lastQuestionnaireScheduledDate != nil {
+                            withAnimation(.spring(response: 0.3)) { isSaved = true }
+                            onSave?()
                         } else {
-                            reservableStopsForPicker = reservable
-                            showReserveVenuePicker = true
+                            showSaveDatePicker = true
                         }
+                    } label: {
+                        Text(isSaved ? "Saved" : "Save this plan")
                     }
+                    .buttonStyle(.ydgPrimary)
+                    .disabled(isSaved)
                 }
-                
-                QuickActionButton(icon: "camera.fill", label: "Photo", isLocked: !access.canAccess(.memory)) {
-                    access.require(.memory) {
-                        coordinator.isShowingMemoryCapture = true
-                    }
-                }
-            }
-            
-            // Main Action Button (Save) - only when onSave provided and not yet saved
-            if onSave != nil {
-                Button {
-                    guard !isSaved else { return }
-                    if plan.scheduledDate != nil || coordinator.lastQuestionnaireScheduledDate != nil {
-                        withAnimation(.spring(response: 0.3)) { isSaved = true }
-                        onSave?()
-                    } else {
-                        showSaveDatePicker = true
-                    }
-                } label: {
-                    Label(isSaved ? "Saved" : "Save this plan", systemImage: isSaved ? "checkmark" : "bookmark")
-                }
-                .buttonStyle(.ydgPrimary)
-                .disabled(isSaved)
             }
 
             // Move to Past Dates — when plan is saved, user can mark date as done
@@ -455,11 +448,7 @@ struct DatePlanResultView: View {
         .padding(.horizontal, YDGSpace.margin)
         .padding(.top, YDGSpace.sm)
         .padding(.bottom, YDGSpace.xs)
-        .background(
-            Color.ydgBase
-                .overlay(alignment: .top) { Rectangle().fill(Color.ydgBorder).frame(height: 1) }
-                .ignoresSafeArea()
-        )
+        .background(Color.ydgBase.ignoresSafeArea())
     }
 }
 

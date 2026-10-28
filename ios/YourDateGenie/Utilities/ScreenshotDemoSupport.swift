@@ -31,6 +31,16 @@ enum AppScreenshotScene: String {
     case sparks
     case rose
     case settings
+    // Remaining design frames
+    case you
+    case gifts
+    case explore
+    case planChooser
+    case route
+    case paywall
+    case datesEmpty
+    case partnerJoin
+    case partnerWaiting
 }
 
 enum ScreenshotDemo {
@@ -168,6 +178,27 @@ enum ScreenshotDemo {
             coordinator.activeSheet = .roseRewards
         case .settings:
             coordinator.activeSheet = .settings
+        case .you:
+            coordinator.currentTab = .you
+        case .gifts:
+            coordinator.activeSheet = .gifts
+        case .explore:
+            coordinator.activeSheet = .explore
+        case .planChooser:
+            coordinator.showPlanStartChooser = true
+        case .route:
+            coordinator.activeSheet = .routeMap(stops: sample.stops, startingPoint: nil, showRouteLine: true)
+        case .paywall:
+            access.isSubscribed = false
+            access.isPaywallPresented = true
+        case .datesEmpty:
+            coordinator.savedPlans = []
+            coordinator.currentTab = .dates
+        case .partnerJoin:
+            coordinator.activeSheet = .partnerJoin(sessionId: "demo-session", inviterName: "Maya")
+        case .partnerWaiting:
+            PartnerSessionManager.shared.saveInvite(partnerName: "Jordan", partnerEmail: "", message: "")
+            coordinator.activeSheet = .partnerPlanning
         case .splash, .ageGate, .onboarding, .signIn, .hero:
             break
         }

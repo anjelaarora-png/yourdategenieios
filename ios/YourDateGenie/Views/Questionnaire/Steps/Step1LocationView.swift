@@ -6,172 +6,95 @@ struct Step1LocationView: View {
     var isPreferencesOnly: Bool = false
     @StateObject private var locationHelper = CurrentLocationHelper()
 
+    /// "Other" reveals the full calendar; the three quick tiles cover tonight and the next two nights.
+    @State private var showCalendar = false
+
+    private static let quickTimes = ["11:00 AM", "1:00 PM", "3:00 PM", "5:00 PM", "6:00 PM", "7:00 PM", "8:00 PM", "9:00 PM", "10:00 PM"]
+
     var body: some View {
         ScrollView(showsIndicators: false) {
-            VStack(alignment: .leading, spacing: 24) {
+            VStack(alignment: .leading, spacing: YDGSpace.lg) {
+                Text(isPreferencesOnly
+                     ? "We use this as the default start for routes and nearby spots."
+                     : "Your starting point sets the route, the map and what's nearby.")
+                    .ydgText(.body, color: .ydgTextSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
                 // Location Input
-                VStack(alignment: .leading, spacing: 12) {
-                    SectionHeader(
-                        emoji: "📍",
-                        title: "Starting point",
-                        subtitle: "We use your starting address for routes, maps, and nearby spots"
+                VStack(alignment: .leading, spacing: YDGSpace.xs) {
+                    Text("Where are you leaving from?")
+                        .ydgText(.subhead, weight: .medium)
+                    PlacesAutocompleteField(
+                        placeholder: "Your starting address (required)",
+                        text: $data.startingAddress,
+                        mode: .address
                     )
-
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("Where are you leaving from?")
-                            .font(Font.bodySans(13, weight: .medium))
-                            .foregroundColor(Color.ydgTextSecondary)
-                        PlacesAutocompleteField(
-                            placeholder: "Your starting address (required)",
-                            text: $data.startingAddress,
-                            mode: .address
-                        )
-                        if data.startingAddress.isEmpty {
-                            Text("Required for your route and map")
-                                .font(Font.ydgSans(12, weight: .regular))
-                                .foregroundColor(Color.ydgTextSecondary)
-                        } else if !data.city.isEmpty {
-                            Text("Planning near \(data.city)")
-                                .font(Font.ydgSans(12, weight: .regular))
-                                .foregroundColor(Color.ydgTextSecondary)
-                        }
-
-                        Button {
-                            locationHelper.requestCurrentLocation { address, city in
-                                if let address = address {
-                                    data.startingAddress = address
-                                    data.syncCityFromStartingAddress()
-                                }
-                                if let city = city, data.city.isEmpty {
-                                    data.city = city
-                                }
-                            }
-                        } label: {
-                            HStack(spacing: 8) {
-                                if locationHelper.isLoading {
-                                    ProgressView()
-                                        .scaleEffect(0.8)
-                                        .tint(Color.luxuryGold)
-                                } else {
-                                    Image(systemName: "location.fill")
-                                        .font(.system(size: 14))
-                                }
-                                Text(locationHelper.isLoading ? "Finding your location..." : "Use my current location")
-                                    .font(Font.bodySans(14, weight: .medium))
-                            }
-                            .foregroundColor(Color.luxuryGold)
-                            .frame(maxWidth: .infinity)
-                            .frame(minHeight: 44)
-                            .background(Color.ydgRaised)
-                            .cornerRadius(12)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .stroke(Color.ydgBorder, lineWidth: 1)
-                            )
-                        }
-                        .buttonStyle(.plain)
-                        .disabled(locationHelper.isLoading)
+                    if data.startingAddress.isEmpty {
+                        Text("Required for your route and map")
+                            .ydgText(.footnote, color: .ydgTextSecondary)
                     }
+
+                    Button {
+                        locationHelper.requestCurrentLocation { address, city in
+                            if let address = address {
+                                data.startingAddress = address
+                                data.syncCityFromStartingAddress()
+                            }
+                            if let city = city, data.city.isEmpty {
+                                data.city = city
+                            }
+                        }
+                    } label: {
+                        HStack(spacing: YDGSpace.xs) {
+                            if locationHelper.isLoading {
+                                ProgressView()
+                                    .controlSize(.small)
+                                    .tint(Color.ydgAccent)
+                            } else {
+                                Image(systemName: "location")
+                                    .font(.system(size: 14, weight: .semibold))
+                            }
+                            Text(locationHelper.isLoading ? "Finding your location…" : "Use my current location")
+                        }
+                    }
+                    .buttonStyle(.ydgTertiary)
+                    .disabled(locationHelper.isLoading)
                 }
                 
                 if !isPreferencesOnly {
-                // Date Type
-                VStack(alignment: .leading, spacing: 12) {
-                    SectionHeader(emoji: "💑", title: "What kind of date?")
-                    
-                    LazyVGrid(columns: [
-                        GridItem(.flexible()),
-                        GridItem(.flexible()),
-                        GridItem(.flexible())
-                    ], spacing: 12) {
-                        ForEach(QuestionnaireOptions.dateTypes) { type in
-                            OptionCardView(
-                                item: type,
-                                isSelected: data.dateType == type.value,
-                                onTap: { data.dateType = type.value }
-                            )
-                        }
+                    chipSection("What kind of date?", options: QuestionnaireOptions.dateTypes, selected: data.dateType) {
+                        data.dateType = $0
                     }
-                }
-                
-                // Occasion
-                VStack(alignment: .leading, spacing: 12) {
-                    SectionHeader(emoji: "🎉", title: "Any special occasion?")
-                    
-                    LazyVGrid(columns: [
-                        GridItem(.flexible()),
-                        GridItem(.flexible()),
-                        GridItem(.flexible())
-                    ], spacing: 12) {
-                        ForEach(QuestionnaireOptions.occasions) { occasion in
-                            OptionCardView(
-                                item: occasion,
-                                isSelected: data.occasion == occasion.value,
-                                onTap: { data.occasion = occasion.value }
-                            )
-                        }
+
+                    chipSection("Any special occasion?", options: QuestionnaireOptions.occasions, selected: data.occasion) {
+                        data.occasion = data.occasion == $0 ? "" : $0
                     }
-                }
-                
-                // Date & Time — unified, asked once
-                VStack(alignment: .leading, spacing: 16) {
-                    SectionHeader(emoji: "📅", title: "When?", subtitle: "Pick your date and preferred time")
-                    
-                    CreamGraphicalDatePicker(
-                        selection: Binding(
-                            get: { data.dateScheduled ?? Date() },
-                            set: { data.dateScheduled = $0 }
-                        )
-                    )
-                    
-                    // Part of day + time — one seamless selection
-                    VStack(alignment: .leading, spacing: 14) {
-                        Text("What time works best?")
-                            .font(Font.ydgSans(16, weight: .semibold))
-                            .foregroundColor(Color.ydgTextPrimary)
-                        
-                        // Period cards (Morning / Afternoon / Evening / Late Night)
-                        LazyVGrid(columns: [
-                            GridItem(.flexible()),
-                            GridItem(.flexible())
-                        ], spacing: 10) {
-                            ForEach(QuestionnaireOptions.timeOfDay) { period in
-                                TimeOfDayCard(
-                                    period: period,
-                                    isSelected: data.timeOfDay == period.value,
-                                    onTap: {
-                                        data.timeOfDay = period.value
-                                        data.startTime = timeOptions(for: period.value).first ?? "7:00 PM"
+
+                    nightSection
+
+                    VStack(alignment: .leading, spacing: YDGSpace.sm) {
+                        Text("Starting around")
+                            .ydgText(.subhead, weight: .medium)
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: YDGSpace.xs) {
+                                ForEach(Self.quickTimes, id: \.self) { time in
+                                    YDGChip(title: time.replacingOccurrences(of: ":00", with: ""),
+                                            isSelected: data.startTime == time,
+                                            showsCheckmark: false) {
+                                        data.startTime = time
+                                        data.timeOfDay = Self.period(for: time)
                                     }
-                                )
-                            }
-                        }
-                        
-                        // Time slots within selected period
-                        if !data.timeOfDay.isEmpty {
-                            let slots = timeOptions(for: data.timeOfDay)
-                            FlowLayout(spacing: 8) {
-                                ForEach(slots, id: \.self) { time in
-                                    TimeSlotChip(
-                                        time: time,
-                                        isSelected: data.startTime == time,
-                                        onTap: { data.startTime = time }
-                                    )
                                 }
                             }
+                            .padding(.horizontal, 1)
                         }
+                        .scrollClipDisabled()
                     }
-                    .padding(16)
-                    .background(Color.ydgRaised)
-                    .cornerRadius(16)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 16)
-                            .stroke(Color.ydgBorder, lineWidth: 1)
-                    )
                 }
-                } // end if !isPreferencesOnly
             }
-            .padding(20)
+            .padding(.horizontal, YDGSpace.margin)
+            .padding(.top, YDGSpace.xs)
+            .padding(.bottom, YDGSpace.lg)
         }
         .scrollDismissesKeyboard(.interactively)
         .onChange(of: data.startingAddress) { _, _ in
@@ -182,6 +105,7 @@ struct Step1LocationView: View {
                 data.timeOfDay = "evening"
                 data.startTime = "7:00 PM"
             }
+
         }
         .alert("Location Access Needed", isPresented: $locationHelper.showPermissionDeniedAlert) {
             Button("Open Settings") {
@@ -195,6 +119,108 @@ struct Step1LocationView: View {
         }
     }
     
+    private func chipSection(_ title: String, options: [OptionItem], selected: String, onSelect: @escaping (String) -> Void) -> some View {
+        VStack(alignment: .leading, spacing: YDGSpace.sm) {
+            Text(title)
+                .ydgText(.subhead, weight: .medium)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: YDGSpace.xs) {
+                    ForEach(options) { option in
+                        YDGChip(title: option.label, isSelected: selected == option.value, showsCheckmark: false) {
+                            onSelect(option.value)
+                        }
+                    }
+                }
+                .padding(.horizontal, 1)
+            }
+            .scrollClipDisabled()
+        }
+    }
+
+    // MARK: Which night?
+
+    private var nightSection: some View {
+        let cal = Calendar.current
+        let today = cal.startOfDay(for: Date())
+        let quickDays = (0..<3).compactMap { cal.date(byAdding: .day, value: $0, to: today) }
+        // No date picked yet behaves as tonight, same as the old calendar's default.
+        let selectedDay = cal.startOfDay(for: data.dateScheduled ?? today)
+        let isOther = !quickDays.contains(selectedDay)
+
+        return VStack(alignment: .leading, spacing: YDGSpace.sm) {
+            Text("Which night?")
+                .ydgText(.subhead, weight: .medium)
+            HStack(spacing: YDGSpace.xs) {
+                ForEach(Array(quickDays.enumerated()), id: \.offset) { index, day in
+                    nightTile(
+                        top: index == 0 ? "Tonight" : day.formatted(.dateTime.weekday(.abbreviated)),
+                        bottom: index == 0 ? day.formatted(.dateTime.weekday(.abbreviated).day()) : day.formatted(.dateTime.month(.abbreviated).day()),
+                        isSelected: !showCalendar && selectedDay == day
+                    ) {
+                        showCalendar = false
+                        data.dateScheduled = day
+                    }
+                }
+                nightTile(top: nil, bottom: isOther ? (data.dateScheduled?.formatted(.dateTime.month(.abbreviated).day()) ?? "Other") : "Other",
+                          systemImage: "calendar", isSelected: showCalendar || isOther) {
+                    withAnimation(.easeInOut(duration: 0.2)) { showCalendar.toggle() }
+                }
+            }
+            if showCalendar {
+                CreamGraphicalDatePicker(
+                    selection: Binding(
+                        get: { data.dateScheduled ?? Date() },
+                        set: { data.dateScheduled = $0 }
+                    )
+                )
+                .transition(.opacity)
+            }
+        }
+    }
+
+    private func nightTile(top: String?, bottom: String, systemImage: String? = nil, isSelected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack(spacing: 2) {
+                if let systemImage {
+                    Image(systemName: systemImage)
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundColor(isSelected ? Color.ydgAccent : Color.ydgTextPrimary)
+                }
+                if let top {
+                    Text(top)
+                        .ydgText(.footnote, color: isSelected ? .ydgAccent : .ydgTextSecondary)
+                }
+                Text(bottom)
+                    .ydgText(systemImage == nil ? .headline : .footnote, weight: systemImage == nil ? .medium : .regular,
+                             color: isSelected ? .ydgAccent : (systemImage == nil ? .ydgTextPrimary : .ydgTextSecondary))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+            .frame(maxWidth: .infinity, minHeight: 64)
+            .background(isSelected ? Color.ydgAccentSubtle : Color.ydgRaised,
+                        in: RoundedRectangle(cornerRadius: YDGRadius.card, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: YDGRadius.card, style: .continuous)
+                    .stroke(isSelected ? Color.ydgAccent : Color.ydgBorder, lineWidth: isSelected ? 1.5 : 1)
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+
+    private static func period(for time: String) -> String {
+        let parts = time.split(separator: " ")
+        guard parts.count == 2, let hour = Int(parts[0].split(separator: ":").first ?? "") else { return "evening" }
+        let isPM = parts[1] == "PM"
+        let h24 = isPM ? (hour == 12 ? 12 : hour + 12) : (hour == 12 ? 0 : hour)
+        switch h24 {
+        case ..<12: return "morning"
+        case 12..<17: return "afternoon"
+        case 17..<21: return "evening"
+        default: return "night"
+        }
+    }
+
     private func timeOptions(for period: String) -> [String] {
         switch period {
         case "morning": return ["8:00 AM", "9:00 AM", "10:00 AM", "11:00 AM"]

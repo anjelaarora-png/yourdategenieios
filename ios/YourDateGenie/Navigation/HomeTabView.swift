@@ -230,7 +230,7 @@ struct LuxuryHomeTabView: View {
                 
                 ScrollViewReader { scrollProxy in
                     ScrollView(.vertical, showsIndicators: false) {
-                        VStack(spacing: 28) {
+                        VStack(spacing: YDGSpace.lg) {
                             HomeAppHeaderBar(notificationManager: notificationManager)
                             headerSection
                             proactiveNudgeSection
@@ -565,8 +565,6 @@ struct LuxuryHomeTabView: View {
     }
 
     private var emptyHeroPlanCTA: some View {
-        let showUseLast = LastQuestionnaireStore.hasLastData || coordinator.hasCompletedPreferences
-        let showResume = QuestionnaireProgressStore.hasValidProgress
 
         return VStack(spacing: YDGSpace.sm) {
             Button("Plan my next date") {
@@ -588,12 +586,6 @@ struct LuxuryHomeTabView: View {
                     .multilineTextAlignment(.center)
             }
 
-            if showUseLast || showResume {
-                Button(showResume ? "Continue where I left off" : "Reuse my last setup") {
-                    coordinator.startDatePlanning(mode: showResume ? .resume : .useLast)
-                }
-                .buttonStyle(.ydgTertiary)
-            }
         }
         .padding(.horizontal, YDGSpace.margin)
     }
@@ -678,13 +670,9 @@ struct LuxuryHomeTabView: View {
             subtitle: exploreSectionSubtitle,
             isExpanded: $exploreExpanded,
             headerTrailing: {
-                Button { coordinator.showExplore() } label: {
-                    Image(systemName: "sparkles")
-                        .font(.system(size: 16))
-                        .foregroundColor(Color.accentGold)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Open full Explore list")
+                Button("See all") { coordinator.showExplore() }
+                    .buttonStyle(.ydgTertiary)
+                    .accessibilityLabel("Open full Explore list")
             }
         ) {
             exploreCarouselContent
@@ -836,7 +824,6 @@ struct LuxuryHomeTabView: View {
     private var dateExperiencesCollapsibleSection: some View {
         CollapsibleHomeSection(
             title: "Happening near you",
-            subtitle: "Live events within 60 miles",
             isExpanded: $dateExperiencesExpanded
         ) {
             DateExperiencesSection(showHeader: false, compactEmptyState: true)
@@ -979,51 +966,26 @@ struct LuxuryHomeTabView: View {
         let badgeCount = savedCount + unsavedToMerge.count
 
         return VStack(alignment: .leading, spacing: 0) {
-            // Collapsible header (same treatment as CollapsibleHomeSection)
-            Button {
-                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                    upcomingExpanded.toggle()
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text("Upcoming")
+                    .ydgText(.title2)
+                    .accessibilityAddTraits(.isHeader)
+                Spacer()
+                if badgeCount > 0 {
+                    Button("See all") { coordinator.currentTab = .dates }
+                        .buttonStyle(.ydgTertiary)
                 }
-            } label: {
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        HStack(alignment: .firstTextBaseline, spacing: 8) {
-                            Text("Upcoming")
-                                .ydgText(.title2)
-                            if badgeCount > 0 {
-                                Text("\(badgeCount)")
-                                    .font(Font.ydgSans(12, weight: .semibold))
-                                    .foregroundColor(Color.ydgTextPrimary)
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 2)
-                                    .background(Capsule().fill(Color.ydgOverlay))
-                                    .accessibilityLabel("\(badgeCount) plans")
-                            }
-                        }
-                        Text("Tap any plan to view details and extras")
-                            .ydgText(.footnote, color: .ydgTextSecondary)
-                    }
-                    Spacer()
-                    Image(systemName: upcomingExpanded ? "chevron.up" : "chevron.down")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundColor(Color.ydgTextTertiary)
-                        .frame(width: 44, height: 44, alignment: .trailing)
-                }
-                .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
             .padding(.horizontal, YDGSpace.margin)
 
-            if upcomingExpanded {
-                upcomingDatesExpandedContent(
-                    savedPreview: savedPreview,
-                    unsavedPreview: unsavedToMerge,
-                    totalUnsavedCount: unsaved.count,
-                    totalSavedCount: savedCount
-                )
-                .padding(.top, 14)
-                .transaction { $0.disablesAnimations = true }
-            }
+            upcomingDatesExpandedContent(
+                savedPreview: savedPreview,
+                unsavedPreview: unsavedToMerge,
+                totalUnsavedCount: unsaved.count,
+                totalSavedCount: savedCount
+            )
+            .padding(.top, YDGSpace.sm)
+            .transaction { $0.disablesAnimations = true }
         }
         .animation(nil, value: stableUnsavedOrder)
         .animation(nil, value: stableSavedOrder)
@@ -1094,10 +1056,20 @@ struct LuxuryHomeTabView: View {
             }
 
             if totalSavedCount == 0 && totalUnsavedCount == 0 {
-                Text("Save a plan and it will appear here.")
-                    .font(Font.bodySans(13, weight: .regular))
-                    .foregroundColor(Color.luxuryCreamMuted)
-                    .padding(.horizontal, 20)
+                HStack(spacing: YDGSpace.sm) {
+                    Image(systemName: "calendar")
+                        .foregroundColor(Color.ydgTextSecondary)
+                        .accessibilityHidden(true)
+                    Text("Nothing planned yet")
+                        .ydgText(.subhead, weight: .regular, color: .ydgTextSecondary)
+                    Spacer()
+                    Button("Plan one") { coordinator.startDatePlanning(mode: .fresh) }
+                        .buttonStyle(.ydgTertiary)
+                }
+                .padding(.leading, YDGSpace.md)
+                .padding(.trailing, YDGSpace.xs)
+                .background(Color.ydgRaised, in: RoundedRectangle(cornerRadius: YDGRadius.card, style: .continuous))
+                .padding(.horizontal, YDGSpace.margin)
             }
 
             if totalSavedCount > savedPreview.count {
@@ -1199,7 +1171,6 @@ struct LuxuryHomeTabView: View {
     private var shortcutsCollapsibleSection: some View {
         CollapsibleHomeSection(
             title: "Shortcuts",
-            subtitle: "Quick tools for your date",
             isExpanded: $shortcutsExpanded
         ) {
             shortcutsGridContent
@@ -1212,33 +1183,30 @@ struct LuxuryHomeTabView: View {
             columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 4),
             spacing: 16
         ) {
-            LuxuryQuickTile(icon: "gift", title: "Gift Finder", color: Color.accentGold, isLocked: !access.canAccess(.gifting)) {
+            LuxuryQuickTile(icon: "gift", title: "Gifts", color: Color.accentGold, isLocked: !access.canAccess(.gifting)) {
                     access.require(.gifting) {
-                        coordinator.showGiftFinder(
-                            datePlan: coordinator.currentDatePlan,
-                            dateLocation: coordinator.currentDatePlan?.stops.first?.address
-                        )
+                        coordinator.activeSheet = .gifts
                     }
                 }
-                LuxuryQuickTile(icon: "music.note.list", title: "Smart Playlists", color: Color.luxuryGoldLight, isLocked: !access.canAccess(.playlist)) {
+                LuxuryQuickTile(icon: "music.note.list", title: "Playlists", color: Color.luxuryGoldLight, isLocked: !access.canAccess(.playlist)) {
                     access.require(.playlist) {
                         coordinator.showPlaylist(for: coordinator.currentDatePlan?.title ?? "Date Night", planId: coordinator.currentDatePlan?.id)
                     }
                 }
-                LuxuryQuickTile(icon: "bubble.left.and.bubble.right", title: "Conversation Starters", color: Color.accentGold, isLocked: !access.canAccess(.conversation)) {
+                LuxuryQuickTile(icon: "text.bubble", title: "Talk sparks", color: Color.accentGold, isLocked: !access.canAccess(.conversation)) {
                     access.require(.conversation) {
                         coordinator.showConversationStarters()
                     }
                 }
-                LuxuryQuickTile(icon: "person.2.fill", title: "Plan Together", color: Color.accentGold, isLocked: !access.canAccess(.datePlan)) {
+                LuxuryQuickTile(icon: "person.2", title: "Together", color: Color.accentGold, isLocked: !access.canAccess(.datePlan)) {
                     access.require(.datePlan) {
                         coordinator.showPartnerPlanning()
                     }
                 }
-                LuxuryQuickTile(icon: "clock", title: "Past Dates", color: Color.luxuryGoldLight, isLocked: false) {
+                LuxuryQuickTile(icon: "clock", title: "Past dates", color: Color.luxuryGoldLight, isLocked: false) {
                     coordinator.showPastMagic()
                 }
-                LuxuryQuickTile(icon: "map", title: "Journey Map", color: Color.luxuryGoldLight, isLocked: !access.canAccess(.datePlan)) {
+                LuxuryQuickTile(icon: "map", title: "Journey", color: Color.luxuryGoldLight, isLocked: !access.canAccess(.datePlan)) {
                     access.require(.datePlan) {
                         let allPastStops = coordinator.pastPlans.flatMap { $0.stops }
                         if !allPastStops.isEmpty {
@@ -1250,14 +1218,14 @@ struct LuxuryHomeTabView: View {
                         }
                     }
                 }
-                LuxuryQuickTile(icon: "heart", title: "Send to partner", color: Color.luxuryGoldLight, isLocked: !access.canAccess(.datePlan)) {
+                LuxuryQuickTile(icon: "paperplane", title: "Send", color: Color.luxuryGoldLight, isLocked: !access.canAccess(.datePlan)) {
                     access.require(.datePlan) {
                         if let plan = displayHeroPlan ?? coordinator.currentDatePlan {
                             coordinator.activeSheet = .partnerShare(plan: plan)
                         }
                     }
                 }
-                LuxuryQuickTile(icon: "book.closed", title: "Date Tips", color: Color.accentGold, isLocked: !access.canAccess(.datingTips)) {
+                LuxuryQuickTile(icon: "book.closed", title: "Date tips", color: Color.accentGold, isLocked: !access.canAccess(.datingTips)) {
                     access.require(.datingTips) {
                         coordinator.showPlaybook()
                     }

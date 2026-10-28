@@ -126,15 +126,9 @@ struct PartnerPlanningSheetView: View {
                     planFlowBottomBar
                 }
             } else if viewingPendingSessionId != nil, isWaitingForPartner, partnerManager.sessionId == viewingPendingSessionId {
-                ScrollView(.vertical, showsIndicators: false) {
-                    VStack(spacing: 28) {
-                        headerSection
-                        waitingBlock
-                    }
-                    .padding(.horizontal, 24)
-                    .padding(.vertical, 20)
-                    .padding(.bottom, 80)
-                }
+                waitingBlock
+                    .padding(.horizontal, YDGSpace.margin)
+                    .padding(.bottom, YDGSpace.md)
             } else if showingInvitedSuccess {
                 invitedSuccessView
             } else {
@@ -179,6 +173,43 @@ struct PartnerPlanningSheetView: View {
                             .frame(width: 44, height: 44)
                     }
                     .accessibilityLabel("Close")
+                }
+            }
+            ToolbarItem(placement: .principal) {
+                if !showingPlanFlow {
+                    Text("Plan together")
+                        .ydgText(.headline)
+                }
+            }
+            ToolbarItem(placement: .navigationBarTrailing) {
+                if viewingPendingSessionId != nil, isWaitingForPartner {
+                    Menu {
+                        Button {
+                            startNewInvite()
+                            viewingPendingSessionId = nil
+                        } label: { Label("Send another invite", systemImage: "paperplane") }
+                        Button {
+                            cancelCurrentInvite()
+                            viewingPendingSessionId = nil
+                        } label: { Label("Cancel this invite", systemImage: "xmark.circle") }
+                        Divider()
+                        Button {
+                            Task {
+                                reportTargetUserId = await resolveOtherUserIdForCurrentSession()
+                                await MainActor.run { showingReportSheet = true }
+                            }
+                        } label: { Label("Report a concern", systemImage: "exclamationmark.bubble") }
+                        // Safety (Apple §1.2)
+                        Button(role: .destructive) {
+                            showingUnlinkConfirmation = true
+                        } label: { Label("Block & unlink partner", systemImage: "person.crop.circle.badge.xmark") }
+                    } label: {
+                        Image(systemName: "ellipsis")
+                            .font(.system(size: 17, weight: .semibold))
+                            .foregroundColor(Color.ydgTextPrimary)
+                            .frame(width: 44, height: 44)
+                    }
+                    .accessibilityLabel("More")
                 }
             }
         }
@@ -1334,27 +1365,27 @@ struct PartnerPlanningSheetView: View {
 
     private func waitingTitleForPhase(_ partnerName: String) -> String {
         switch partnerManager.currentPhase {
-        case .preferencesPending:        return "We're holding a seat for \(partnerName)."
+        case .preferencesPending:        return "We're holding a seat for \(partnerName)"
         case .preferencesComplete:       return "Both preferences are in!"
         case .generatingDateOptions:     return "Crafting your date options…"
         case .optionsReadyForRanking:    return "Your options are ready to rank."
         case .waitingForPartnerRanking:  return "Your rankings are submitted."
         case .rankingsComplete:          return "Both rankings are in!"
         case .finalOptionSelected:       return "Your final date plan is ready."
-        default:                         return "We're holding a seat for \(partnerName)."
+        default:                         return "We're holding a seat for \(partnerName)"
         }
     }
 
     private var waitingSubtitleForPhase: String {
         switch partnerManager.currentPhase {
-        case .preferencesPending:        return "No rush — we'll tell you the moment they're in."
+        case .preferencesPending:        return "No rush. We'll tell you the moment they're in."
         case .preferencesComplete:       return "Generating your personalized options now."
         case .generatingDateOptions:     return "This takes just a moment — great things take a little time."
         case .optionsReadyForRanking:    return "Tap \u{201C}Rank\u{201D} to privately rank your favorites."
         case .waitingForPartnerRanking:  return "Waiting for your partner to rank their options."
         case .rankingsComplete:          return "Computing your best match based on both rankings."
         case .finalOptionSelected:       return "Tap \u{201C}Reveal\u{201D} to see your winning plan."
-        default:                         return "No rush — we'll tell you the moment they're in."
+        default:                         return "No rush. We'll tell you the moment they're in."
         }
     }
 
@@ -1424,60 +1455,71 @@ struct PartnerPlanningSheetView: View {
     
     // MARK: - Waiting Block (inline)
     
+    private var waitingPartnerName: String {
+        let name = (partnerManager.inviteInfo?.partnerName ?? "").trimmingCharacters(in: .whitespaces)
+        return name.isEmpty ? "your partner" : name
+    }
+
+    private func initial(_ name: String?) -> String {
+        guard let c = name?.trimmingCharacters(in: .whitespaces).first else { return "?" }
+        return String(c).uppercased()
+    }
+
+    /// Design 4.3: two seats in a ring, the promise, and two quiet actions. Everything else lives in "…".
     private var waitingBlock: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: YDGSpace.md) {
             ZStack {
                 Circle()
-                    .stroke(Color.luxuryGold.opacity(0.3), lineWidth: 2)
-                    .frame(width: 80, height: 80)
-                WaitingRingView()
-            }
-            
-            let partnerDisplayName: String = {
-                let name = (partnerManager.inviteInfo?.partnerName ?? "").trimmingCharacters(in: .whitespaces)
-                return name.isEmpty ? "your partner" : name
-            }()
-            Text(waitingTitleForPhase(partnerDisplayName))
-                .font(Font.ydgDisplay(24))
-                .foregroundColor(Color.textPrimary)
-                .multilineTextAlignment(.center)
-            Text(waitingSubtitleForPhase)
-                .font(Font.bodySans(13, weight: .regular))
-                .foregroundColor(Color.textPrimary.opacity(0.6))
-                .multilineTextAlignment(.center)
-            
-            Circle()
-                .stroke(Color.ydgHighlight, lineWidth: 2)
-                .frame(width: 60, height: 60)
-                .overlay(
-                    Image(systemName: "person.fill")
-                        .font(.system(size: 24))
-                        .foregroundColor(Color.textPrimary.opacity(0.5))
-                )
-            
-            if canSendReminder {
-                // Single gold action for this state.
-                Button {
-                    DispatchQueue.main.async {
-                        presentShareSheet()
-                    }
-                } label: {
-                    Text("Send a reminder")
-                        .font(Font.bodySans(15, weight: .semibold))
-                        .foregroundColor(Color.backgroundPrimary)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
-                        .background(Capsule().fill(Color.ydgAccent))
+                    .stroke(Color.ydgBorderStrong, lineWidth: 2)
+                    .frame(width: 166, height: 166)
+                WaitingArcView()
+                    .frame(width: 166, height: 166)
+                HStack(spacing: -10) {
+                    Text(initial(userProfileManager.currentUser?.firstName))
+                        .font(.ydgSans(20, weight: .semibold))
+                        .foregroundColor(Color.ydgTextPrimary)
+                        .frame(width: 58, height: 58)
+                        .background(Circle().fill(Color.ydgIconTile))
+                    Text(initial(partnerManager.inviteInfo?.partnerName))
+                        .font(.ydgSans(20, weight: .semibold))
+                        .foregroundColor(Color.ydgTextSecondary)
+                        .frame(width: 58, height: 58)
+                        .background(Circle().fill(Color.ydgBase))
+                        .overlay(Circle().strokeBorder(Color.ydgBorderStrong, style: StrokeStyle(lineWidth: 1.5, dash: [4, 4])))
                 }
-                .buttonStyle(.plain)
-                .padding(.horizontal, 24)
+            }
+            .padding(.top, YDGSpace.xl)
+            .accessibilityHidden(true)
+
+            Text(waitingTitleForPhase(waitingPartnerName))
+                .ydgText(.title1)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityAddTraits(.isHeader)
+                .padding(.top, YDGSpace.lg)
+            Text(waitingSubtitleForPhase)
+                .ydgText(.body, color: .ydgTextSecondary)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+            if let sentAt = partnerManager.inviteInfo?.sentAt {
+                Text("Invite sent \(sentAt.formatted(.relative(presentation: .named))) at \(sentAt.formatted(date: .omitted, time: .shortened))")
+                    .ydgText(.footnote, color: .ydgTextTertiary)
+            }
+
+            Spacer(minLength: YDGSpace.xxl)
+
+            if canSendReminder {
+                Button("Send a reminder") {
+                    DispatchQueue.main.async { presentShareSheet() }
+                }
+                .buttonStyle(.ydgSecondary)
             } else {
                 Text(reminderCountdown.isEmpty ? "You can send a reminder in 24 hours." : reminderCountdown)
-                    .font(Font.bodySans(13, weight: .regular))
-                    .foregroundColor(Color.textPrimary.opacity(0.55))
+                    .ydgText(.footnote, color: .ydgTextTertiary)
+                    .frame(minHeight: 54)
             }
-            
-            Button {
+
+            Button("Fill in my preferences") {
                 access.require(.datePlan) {
                     coordinator.isPartnerPlanningInviter = true
                     coordinator.dismissSheet()
@@ -1485,72 +1527,10 @@ struct PartnerPlanningSheetView: View {
                         coordinator.startDatePlanning(mode: .fresh)
                     }
                 }
-            } label: {
-                Text("Fill my preferences")
-                    .font(Font.bodySans(14, weight: .medium))
-                    .foregroundColor(Color.textPrimary.opacity(0.8))
-                    .underline()
             }
-            .buttonStyle(.plain)
-
-            Button {
-                startNewInvite()
-                viewingPendingSessionId = nil
-            } label: {
-                Text("Send another invite")
-                    .font(Font.bodySans(14, weight: .medium))
-                    .foregroundColor(Color.textPrimary.opacity(0.8))
-                    .underline()
-            }
-            .buttonStyle(.plain)
-
-            Button {
-                cancelCurrentInvite()
-                viewingPendingSessionId = nil
-            } label: {
-                Text("Cancel this invite")
-                    .font(Font.bodySans(13, weight: .medium))
-                    .foregroundColor(Color.textPrimary.opacity(0.5))
-            }
-            .buttonStyle(.plain)
-
-            // MARK: Safety (Apple §1.2)
-            Divider()
-                .background(Color.luxeSurfaceTintStrong)
-                .padding(.horizontal, 40)
-                .padding(.top, 8)
-
-            Button(role: .destructive) {
-                showingUnlinkConfirmation = true
-            } label: {
-                Label("Block & Unlink Partner", systemImage: "person.crop.circle.badge.xmark")
-                    .font(Font.bodySans(13, weight: .medium))
-                    .foregroundColor(Color.red.opacity(0.85))
-            }
-            .buttonStyle(.plain)
-
-            Button {
-                Task {
-                    reportTargetUserId = await resolveOtherUserIdForCurrentSession()
-                    await MainActor.run { showingReportSheet = true }
-                }
-            } label: {
-                Label("Report a Concern", systemImage: "exclamationmark.bubble")
-                    .font(Font.bodySans(13, weight: .medium))
-                    .foregroundColor(Color.luxuryCreamMuted)
-            }
-            .buttonStyle(.plain)
+            .buttonStyle(.ydgTertiary)
         }
-        .padding(.vertical, 24)
         .frame(maxWidth: .infinity)
-        .background(
-            RoundedRectangle(cornerRadius: 20)
-                .fill(Color.surfaceElevated)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 20)
-                        .stroke(Color.luxeSurfaceTint, lineWidth: 1)
-                )
-        )
         .alert("Block & Unlink Partner?", isPresented: $showingUnlinkConfirmation) {
             Button("Block & Unlink", role: .destructive) { blockAndUnlinkCurrentPartner() }
             Button("Cancel", role: .cancel) {}
@@ -1760,6 +1740,22 @@ private struct PartnerInviteTextField: View {
 }
 
 // MARK: - Spinning ring animation
+
+/// Rose arc that slowly travels round the waiting ring (design 4.3).
+private struct WaitingArcView: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var rotation: Double = 0
+    var body: some View {
+        Circle()
+            .trim(from: 0, to: 0.17)
+            .stroke(Color.ydgHighlight, style: StrokeStyle(lineWidth: 3, lineCap: .round))
+            .rotationEffect(.degrees(-90 + rotation))
+            .onAppear {
+                guard !reduceMotion else { return }
+                withAnimation(.linear(duration: 4).repeatForever(autoreverses: false)) { rotation = 360 }
+            }
+    }
+}
 
 struct WaitingRingView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion

@@ -18,7 +18,7 @@ struct ConvoTabView: View {
                 .ignoresSafeArea()
 
             VStack(spacing: 0) {
-                YDGLargeTitle(title: "Convo")
+                YDGLargeTitle(title: "Notes")
                     .padding(.bottom, YDGSpace.md)
                 segmentPicker
                     .padding(.horizontal, YDGSpace.margin)
